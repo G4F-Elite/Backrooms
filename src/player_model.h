@@ -137,8 +137,8 @@ inline void renderPlayers(GLuint shader, Mat4& proj, Mat4& view, int myId) {
         float py = pos.y - 1.7f + bobY;
         float pz = pos.z;
         
-        // Поворот на yaw+PI (чтобы смотреть в направлении движения)
-        float angle = yaw + 3.14159f;
+        // Поворачиваем модель по сетевому yaw без дополнительного смещения.
+        float angle = yaw;
         float c = cosf(angle);
         float s = sinf(angle);
         
