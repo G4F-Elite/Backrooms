@@ -22,7 +22,7 @@ for %%f in (src\*.cpp src\*.c src\*.h src\*.hpp) do (
     if exist "%%f" (
         set "lines=0"
         for /f %%l in ('type "%%f" ^| find /c /v ""') do set "lines=%%l"
-        if !lines! gtr 2502 ( :: DO NOT EDIT LIMIT!!! EDIT YOUR CODE INTO SMALLER FILES WITHOUT MINIFIING
+        if !lines! gtr 250 ( :: DO NOT EDIT LIMIT!!! EDIT YOUR CODE INTO SMALLER FILES WITHOUT MINIFIING
             echo ERROR: %%f has !lines! lines - max 2500!
             set "too_large=1"
         )
