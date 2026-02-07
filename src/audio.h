@@ -4,6 +4,7 @@
 #include <atomic>
 #include <cmath>
 #include <cstring>
+#include "audio_dsp.h"
 
 const int SAMP_RATE=44100;
 const int BUF_COUNT=3;
@@ -40,6 +41,7 @@ inline float carpetStep(float t) {
 
 inline void fillAudio(short* buf, int len) {
     static float globalPhase = 0;
+    static AudioSafetyState safe;
     for(int i=0;i<len;i++) {
         globalPhase += 1.0f / SAMP_RATE;
         
@@ -47,7 +49,9 @@ inline void fillAudio(short* buf, int len) {
         float hum = sinf(sndState.humPhase)*0.25f;
         hum += sinf(sndState.humPhase*2.0f)*0.15f;
         hum += sinf(sndState.humPhase*3.0f)*0.08f;
-        hum += (float)(rand()%100-50)/100.0f * 0.02f;
+        float humTargetNoise = (float)(rand()%100-50)/100.0f * 0.02f;
+        safe.humNoise = mixNoise(safe.humNoise, humTargetNoise, 0.03f);
+        hum += safe.humNoise;
         sndState.humPhase += 0.0085f;
         if(sndState.humPhase>6.28318f) sndState.humPhase-=6.28318f;
         
@@ -77,8 +81,12 @@ inline void fillAudio(short* buf, int len) {
         float flashClick = 0;
         static float lastFlash = 0;
         if(sndState.flashlightOn != lastFlash) {
-            flashClick = 0.4f;
+            safe.clickEnv = 1.0f;
             lastFlash = sndState.flashlightOn;
+        }
+        if(safe.clickEnv > 0.0001f) {
+            flashClick = safe.clickEnv * 0.25f;
+            safe.clickEnv *= 0.992f;
         }
         
         // Danger sounds - progressive
@@ -89,7 +97,9 @@ inline void fillAudio(short* buf, int len) {
             // Dissonant tone
             creepy += sinf(sndState.creepyPhase * 2.1f) * 0.1f * sndState.dangerLevel;
             // Static/noise
-            creepy += (float)(rand()%100-50)/100.0f * 0.15f * sndState.dangerLevel;
+            float staticTarget = (float)(rand()%100-50)/100.0f * 0.15f * sndState.dangerLevel;
+            safe.staticNoise = mixNoise(safe.staticNoise, staticTarget, 0.06f);
+            creepy += safe.staticNoise;
             
             // Heartbeat at high danger
             if(sndState.dangerLevel > 0.5f) {
@@ -107,7 +117,7 @@ inline void fillAudio(short* buf, int len) {
         float scare = 0;
         if(sndState.scareVol > 0) {
             scare = sinf(sndState.scareTimer * 200.0f) * sndState.scareVol;
-            scare += (float)(rand()%100-50)/100.0f * sndState.scareVol * 0.5f;
+            scare += safe.staticNoise * sndState.scareVol * 0.35f;
             sndState.scareTimer += 1.0f / SAMP_RATE;
             sndState.scareVol *= 0.9998f;
             if(sndState.scareVol < 0.01f) sndState.scareVol = 0;
@@ -118,15 +128,23 @@ inline void fillAudio(short* buf, int len) {
         float insanity = 1.0f - sndState.sanityLevel;
         if(insanity > 0.2f) {
             float whisper = sinf(sndState.whisperPhase * 15.0f) * sinf(sndState.whisperPhase * 0.5f);
-            whisper *= (float)(rand()%100)/100.0f * 0.12f * insanity;
+            float whisperTarget = (float)(rand()%100)/100.0f * 0.12f * insanity;
+            safe.whisperNoise = mixNoise(safe.whisperNoise, whisperTarget, 0.05f);
+            whisper *= safe.whisperNoise;
             insane += whisper;
             insane += sinf(sndState.whisperPhase * 9.5f) * 0.05f * insanity;
-            if(rand()%800 < (int)(insanity * 12)) insane += ((float)(rand()%100-50)/100.0f) * 0.25f;
+            if(rand()%800 < (int)(insanity * 12)) {
+                safe.insaneBurst = ((float)(rand()%100-50)/100.0f) * 0.18f;
+            }
+            safe.insaneBurst *= 0.993f;
+            insane += safe.insaneBurst;
             sndState.whisperPhase += 0.0012f + insanity * 0.0015f;
             if(sndState.whisperPhase > 6.28318f) sndState.whisperPhase -= 6.28318f;
         }
         
         float v = (hum*sndState.humVol + step + amb + creepy + insane + distant + scare + flashClick) * sndState.masterVol;
+        v = applyLimiter(v, safe.limiterEnv);
+        v = softClip(v);
         if(v>1.0f) v=1.0f; if(v<-1.0f) v=-1.0f;
         buf[i]=(short)(v*32767);
     }
