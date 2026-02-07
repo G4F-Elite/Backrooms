@@ -1,3 +1,4 @@
 # Backrooms Mod
 
-Backrooms mod project for G4F-Elite.
+Backrooms game for G4F-Elite.
+Writed fully with cpp mingw without assets.
