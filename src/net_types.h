@@ -10,6 +10,8 @@ const int NET_PORT = 27015;
 const int NET_DISCOVERY_PORT = 27016;
 const int MAX_PLAYERS = 4;
 const int PACKET_SIZE = 512;
+const int MAX_SYNC_ENTITIES = 16;
+const int MAX_SYNC_ITEMS = 24;
 
 // Packet types
 enum PacketType {
@@ -32,7 +34,13 @@ enum PacketType {
     PKT_RESHUFFLE,       // Map changed
     PKT_DISCOVER_REQ,    // Client LAN discovery request
     PKT_DISCOVER_RESP,   // Host response for LAN discovery
-    PKT_HOST_ANNOUNCE    // Host periodic LAN announce
+    PKT_HOST_ANNOUNCE,   // Host periodic LAN announce
+    PKT_ENTITY_SNAPSHOT, // Host -> clients entity snapshot
+    PKT_OBJECTIVE_STATE, // Host -> clients cooperative objective state
+    PKT_ITEM_SNAPSHOT,   // Host -> clients world item snapshot
+    PKT_INVENTORY_SYNC,  // Host -> clients inventory state for all players
+    PKT_INTERACT_REQ,    // Client -> host interaction request
+    PKT_ROAM_EVENT       // Host -> clients roaming event trigger
 };
 
 // Network player data

@@ -4,6 +4,29 @@
 #include "net_sync_codec.h"
 #include <cstring>
 
+struct NetEntitySnapshotEntry {
+    int id;
+    int type;
+    Vec3 pos;
+    float yaw;
+    int state;
+    bool active;
+};
+
+struct NetWorldItemSnapshotEntry {
+    int id;
+    int type;
+    Vec3 pos;
+    bool active;
+};
+
+struct NetInteractRequest {
+    int playerId;
+    int requestType;
+    int targetId;
+    bool valid;
+};
+
 class NetworkManager {
 public:
     SOCKET sock;
@@ -22,6 +45,41 @@ public:
     unsigned int reshuffleSeed;
     unsigned char reshuffleCells[RESHUFFLE_CELL_COUNT];
     
+    // Extended multiplayer sync
+    NetEntitySnapshotEntry entitySnapshot[MAX_SYNC_ENTITIES];
+    int entitySnapshotCount;
+    bool entitySnapshotReceived;
+    
+    bool objectiveSwitches[2];
+    bool objectiveDoorOpen;
+    bool objectiveStateReceived;
+    
+    NetWorldItemSnapshotEntry itemSnapshot[MAX_SYNC_ITEMS];
+    int itemSnapshotCount;
+    bool itemSnapshotReceived;
+    
+    int inventoryBattery[MAX_PLAYERS];
+    int inventoryMedkit[MAX_PLAYERS];
+    int inventoryBait[MAX_PLAYERS];
+    bool inventorySyncReceived;
+    
+    int roamEventType;
+    int roamEventA;
+    int roamEventB;
+    float roamEventDuration;
+    bool roamEventReceived;
+    
+    NetInteractRequest interactRequests[16];
+    int interactRequestCount;
+    
+    int packetsSent;
+    int packetsRecv;
+    int bytesSent;
+    int bytesRecv;
+    float rttMs;
+    float lastPingTime;
+    unsigned short pingSeq;
+    
     NetworkManager() {
         sock = INVALID_SOCKET;
         isHost = false;
@@ -33,12 +91,36 @@ public:
         reshuffleReceived = false;
         reshuffleSeed = 0;
         memset(reshuffleCells, 0, sizeof(reshuffleCells));
+        entitySnapshotCount = 0;
+        entitySnapshotReceived = false;
+        objectiveSwitches[0] = objectiveSwitches[1] = false;
+        objectiveDoorOpen = false;
+        objectiveStateReceived = false;
+        itemSnapshotCount = 0;
+        itemSnapshotReceived = false;
+        inventorySyncReceived = false;
+        roamEventType = 0;
+        roamEventA = roamEventB = 0;
+        roamEventDuration = 0.0f;
+        roamEventReceived = false;
+        interactRequestCount = 0;
+        packetsSent = packetsRecv = 0;
+        bytesSent = bytesRecv = 0;
+        rttMs = 0.0f;
+        lastPingTime = 0.0f;
+        pingSeq = 0;
         for (int i = 0; i < MAX_PLAYERS; i++) {
             players[i] = NetPlayer();
             players[i].active = false;
             players[i].hasValidPos = false;
             players[i].flashlightOn = false;
+            inventoryBattery[i] = 0;
+            inventoryMedkit[i] = 0;
+            inventoryBait[i] = 0;
         }
+        for (int i = 0; i < MAX_SYNC_ENTITIES; i++) entitySnapshot[i].active = false;
+        for (int i = 0; i < MAX_SYNC_ITEMS; i++) itemSnapshot[i].active = false;
+        for (int i = 0; i < 16; i++) interactRequests[i].valid = false;
         strcpy(hostIP, "192.168.0.1");
     }
     
@@ -193,6 +275,88 @@ public:
         broadcast(buf, SCARE_PACKET_LEN);
     }
     
+    void sendEntitySnapshot(const NetEntitySnapshotEntry* entries, int count) {
+        if (!isHost || !connected || !entries) return;
+        if (count < 0) return;
+        if (count > MAX_SYNC_ENTITIES) count = MAX_SYNC_ENTITIES;
+        char buf[PACKET_SIZE];
+        buf[0] = PKT_ENTITY_SNAPSHOT;
+        buf[1] = (char)count;
+        int off = 2;
+        for (int i = 0; i < count; i++) {
+            buf[off++] = (char)entries[i].id;
+            buf[off++] = (char)entries[i].type;
+            memcpy(buf + off, &entries[i].pos, sizeof(Vec3)); off += (int)sizeof(Vec3);
+            memcpy(buf + off, &entries[i].yaw, 4); off += 4;
+            buf[off++] = (char)entries[i].state;
+            buf[off++] = entries[i].active ? 1 : 0;
+        }
+        broadcast(buf, off);
+    }
+    
+    void sendObjectiveState(bool sw0, bool sw1, bool doorOpen) {
+        if (!isHost || !connected) return;
+        char buf[PACKET_SIZE];
+        buf[0] = PKT_OBJECTIVE_STATE;
+        buf[1] = sw0 ? 1 : 0;
+        buf[2] = sw1 ? 1 : 0;
+        buf[3] = doorOpen ? 1 : 0;
+        broadcast(buf, 8);
+    }
+    
+    void sendItemSnapshot(const NetWorldItemSnapshotEntry* entries, int count) {
+        if (!isHost || !connected || !entries) return;
+        if (count < 0) return;
+        if (count > MAX_SYNC_ITEMS) count = MAX_SYNC_ITEMS;
+        char buf[PACKET_SIZE];
+        buf[0] = PKT_ITEM_SNAPSHOT;
+        buf[1] = (char)count;
+        int off = 2;
+        for (int i = 0; i < count; i++) {
+            buf[off++] = (char)entries[i].id;
+            buf[off++] = (char)entries[i].type;
+            memcpy(buf + off, &entries[i].pos, sizeof(Vec3)); off += (int)sizeof(Vec3);
+            buf[off++] = entries[i].active ? 1 : 0;
+            if (off + 20 >= PACKET_SIZE) break;
+        }
+        broadcast(buf, off);
+    }
+    
+    void sendInventorySync() {
+        if (!isHost || !connected) return;
+        char buf[PACKET_SIZE];
+        buf[0] = PKT_INVENTORY_SYNC;
+        int off = 1;
+        for (int i = 0; i < MAX_PLAYERS; i++) {
+            buf[off++] = (char)i;
+            buf[off++] = (char)inventoryBattery[i];
+            buf[off++] = (char)inventoryMedkit[i];
+            buf[off++] = (char)inventoryBait[i];
+        }
+        broadcast(buf, off);
+    }
+    
+    void sendInteractRequest(int requestType, int targetId) {
+        if (!connected) return;
+        char buf[PACKET_SIZE];
+        buf[0] = PKT_INTERACT_REQ;
+        buf[1] = (char)myId;
+        buf[2] = (char)requestType;
+        buf[3] = (char)targetId;
+        broadcast(buf, 8);
+    }
+    
+    void sendRoamEvent(int eventType, int a, int b, float duration) {
+        if (!isHost || !connected) return;
+        char buf[PACKET_SIZE];
+        buf[0] = PKT_ROAM_EVENT;
+        buf[1] = (char)eventType;
+        buf[2] = (char)a;
+        buf[3] = (char)b;
+        memcpy(buf + 4, &duration, 4);
+        broadcast(buf, 12);
+    }
+    
     void broadcast(char* buf, int len) {
         if (isHost) {
             for (int i = 1; i < MAX_PLAYERS; i++) {
@@ -202,6 +366,8 @@ public:
                 dest.sin_addr.s_addr = players[i].addr;
                 dest.sin_port = players[i].port;
                 sendto(sock, buf, len, 0, (sockaddr*)&dest, sizeof(dest));
+                packetsSent++;
+                bytesSent += len;
             }
         } else {
             sockaddr_in dest;
@@ -209,6 +375,8 @@ public:
             inet_pton(AF_INET, hostIP, &dest.sin_addr);
             dest.sin_port = htons(NET_PORT);
             sendto(sock, buf, len, 0, (sockaddr*)&dest, sizeof(dest));
+            packetsSent++;
+            bytesSent += len;
         }
     }
     
@@ -220,6 +388,8 @@ public:
         while (true) {
             int recv = recvfrom(sock, buf, PACKET_SIZE, 0, (sockaddr*)&from, &fromLen);
             if (recv <= 0) break;
+            packetsRecv++;
+            bytesRecv += recv;
             handlePacket(buf, recv, from);
         }
     }
@@ -227,12 +397,20 @@ public:
     void handlePacket(char* buf, int len, sockaddr_in& from) {
         PacketType type = (PacketType)buf[0];
         if (type == PKT_JOIN && isHost) handleJoin(buf, from);
+        else if (type == PKT_PING) handlePing(buf, len, from);
+        else if (type == PKT_PONG) handlePong(buf, len);
         else if (type == PKT_WELCOME) handleWelcome(buf);
         else if (type == PKT_PLAYER_STATE) handlePlayerState(buf);
         else if (type == PKT_GAME_START) handleGameStart(buf);
         else if (type == PKT_RESHUFFLE) handleReshuffle(buf, len);
         else if (type == PKT_SCARE) handleScare(buf, len);
         else if (type == PKT_NOTE_COLLECT) handleNoteCollect(buf);
+        else if (type == PKT_ENTITY_SNAPSHOT) handleEntitySnapshot(buf, len);
+        else if (type == PKT_OBJECTIVE_STATE) handleObjectiveState(buf, len);
+        else if (type == PKT_ITEM_SNAPSHOT) handleItemSnapshot(buf, len);
+        else if (type == PKT_INVENTORY_SYNC) handleInventorySync(buf, len);
+        else if (type == PKT_INTERACT_REQ) handleInteractRequest(buf, len);
+        else if (type == PKT_ROAM_EVENT) handleRoamEvent(buf, len);
         // Entities handled in entity manager
     }
     
@@ -286,8 +464,42 @@ public:
             resp[1] = (char)i;
             memcpy(resp + 2, &worldSeed, 4);
             sendto(sock, resp, 16, 0, (sockaddr*)&from, sizeof(from));
+            packetsSent++;
+            bytesSent += 16;
             break;
         }
+    }
+    
+    void sendPing(float nowTime) {
+        if (!connected || isHost) return;
+        if (nowTime - lastPingTime < 1.0f) return;
+        lastPingTime = nowTime;
+        char buf[PACKET_SIZE];
+        buf[0] = PKT_PING;
+        memcpy(buf + 1, &pingSeq, 2);
+        memcpy(buf + 3, &nowTime, 4);
+        pingSeq++;
+        broadcast(buf, 8);
+    }
+    
+    void handlePing(char* buf, int len, sockaddr_in& from) {
+        if (!isHost || len < 7) return;
+        char resp[PACKET_SIZE];
+        resp[0] = PKT_PONG;
+        memcpy(resp + 1, buf + 1, 6);
+        sendto(sock, resp, 8, 0, (sockaddr*)&from, sizeof(from));
+        packetsSent++;
+        bytesSent += 8;
+    }
+    
+    void handlePong(char* buf, int len) {
+        if (len < 7 || isHost) return;
+        float sentTime = 0.0f;
+        memcpy(&sentTime, buf + 3, 4);
+        float nowTime = (float)glfwGetTime();
+        float ms = (nowTime - sentTime) * 1000.0f;
+        if (ms < 0) ms = 0;
+        rttMs = rttMs <= 0.0f ? ms : (rttMs * 0.8f + ms * 0.2f);
     }
     
     void handleWelcome(char* buf) {
@@ -357,6 +569,83 @@ public:
         // Handled in story manager
     }
     
+    void handleEntitySnapshot(char* buf, int len) {
+        if (len < 2) return;
+        int count = (unsigned char)buf[1];
+        if (count > MAX_SYNC_ENTITIES) count = MAX_SYNC_ENTITIES;
+        int off = 2;
+        for (int i = 0; i < count; i++) {
+            if (off + 20 > len) break;
+            entitySnapshot[i].id = (unsigned char)buf[off++];
+            entitySnapshot[i].type = (unsigned char)buf[off++];
+            memcpy(&entitySnapshot[i].pos, buf + off, sizeof(Vec3)); off += (int)sizeof(Vec3);
+            memcpy(&entitySnapshot[i].yaw, buf + off, 4); off += 4;
+            entitySnapshot[i].state = (unsigned char)buf[off++];
+            entitySnapshot[i].active = buf[off++] != 0;
+        }
+        entitySnapshotCount = count;
+        entitySnapshotReceived = true;
+    }
+    
+    void handleObjectiveState(char* buf, int len) {
+        if (len < 4) return;
+        objectiveSwitches[0] = buf[1] != 0;
+        objectiveSwitches[1] = buf[2] != 0;
+        objectiveDoorOpen = buf[3] != 0;
+        objectiveStateReceived = true;
+    }
+    
+    void handleItemSnapshot(char* buf, int len) {
+        if (len < 2) return;
+        int count = (unsigned char)buf[1];
+        if (count > MAX_SYNC_ITEMS) count = MAX_SYNC_ITEMS;
+        int off = 2;
+        for (int i = 0; i < count; i++) {
+            if (off + 15 > len) break;
+            itemSnapshot[i].id = (unsigned char)buf[off++];
+            itemSnapshot[i].type = (unsigned char)buf[off++];
+            memcpy(&itemSnapshot[i].pos, buf + off, sizeof(Vec3)); off += (int)sizeof(Vec3);
+            itemSnapshot[i].active = buf[off++] != 0;
+        }
+        itemSnapshotCount = count;
+        itemSnapshotReceived = true;
+    }
+    
+    void handleInventorySync(char* buf, int len) {
+        if (len < 1 + MAX_PLAYERS * 4) return;
+        int off = 1;
+        for (int i = 0; i < MAX_PLAYERS; i++) {
+            int pid = (unsigned char)buf[off++];
+            int bat = (unsigned char)buf[off++];
+            int med = (unsigned char)buf[off++];
+            int bait = (unsigned char)buf[off++];
+            if (pid < 0 || pid >= MAX_PLAYERS) continue;
+            inventoryBattery[pid] = bat;
+            inventoryMedkit[pid] = med;
+            inventoryBait[pid] = bait;
+        }
+        inventorySyncReceived = true;
+    }
+    
+    void handleInteractRequest(char* buf, int len) {
+        if (!isHost || len < 4) return;
+        if (interactRequestCount >= 16) return;
+        int idx = interactRequestCount++;
+        interactRequests[idx].playerId = (unsigned char)buf[1];
+        interactRequests[idx].requestType = (unsigned char)buf[2];
+        interactRequests[idx].targetId = (unsigned char)buf[3];
+        interactRequests[idx].valid = true;
+    }
+    
+    void handleRoamEvent(char* buf, int len) {
+        if (len < 8) return;
+        roamEventType = (unsigned char)buf[1];
+        roamEventA = (unsigned char)buf[2];
+        roamEventB = (unsigned char)buf[3];
+        memcpy(&roamEventDuration, buf + 4, 4);
+        roamEventReceived = true;
+    }
+    
     int getPlayerCount() {
         int c = 0;
         for (int i = 0; i < MAX_PLAYERS; i++) if (players[i].active) c++;
@@ -374,10 +663,34 @@ public:
         reshuffleReceived = false;
         reshuffleSeed = 0;
         memset(reshuffleCells, 0, sizeof(reshuffleCells));
+        entitySnapshotCount = 0;
+        entitySnapshotReceived = false;
+        itemSnapshotCount = 0;
+        itemSnapshotReceived = false;
+        objectiveSwitches[0] = objectiveSwitches[1] = false;
+        objectiveDoorOpen = false;
+        objectiveStateReceived = false;
+        inventorySyncReceived = false;
+        roamEventType = 0;
+        roamEventA = roamEventB = 0;
+        roamEventDuration = 0.0f;
+        roamEventReceived = false;
+        interactRequestCount = 0;
+        packetsSent = packetsRecv = 0;
+        bytesSent = bytesRecv = 0;
+        rttMs = 0.0f;
+        lastPingTime = 0.0f;
+        pingSeq = 0;
         for (int i = 0; i < MAX_PLAYERS; i++) {
             players[i] = NetPlayer();
             players[i].active = false;
+            inventoryBattery[i] = 0;
+            inventoryMedkit[i] = 0;
+            inventoryBait[i] = 0;
         }
+        for (int i = 0; i < MAX_SYNC_ENTITIES; i++) entitySnapshot[i].active = false;
+        for (int i = 0; i < MAX_SYNC_ITEMS; i++) itemSnapshot[i].active = false;
+        for (int i = 0; i < 16; i++) interactRequests[i].valid = false;
     }
 };
 

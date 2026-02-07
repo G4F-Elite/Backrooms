@@ -3,6 +3,208 @@
 GLuint noteVAO=0, noteVBO=0;
 int noteVC=0;
 bool playerModelsInit = false;
+void buildGeom();
+
+enum InteractRequestType {
+    REQ_TOGGLE_SWITCH = 1,
+    REQ_PICK_ITEM
+};
+
+enum RoamEventType {
+    ROAM_NONE = 0,
+    ROAM_LIGHTS_OUT = 1,
+    ROAM_GEOM_SHIFT = 2,
+    ROAM_FALSE_DOOR = 3
+};
+
+struct CoopObjectives {
+    Vec3 switches[2];
+    bool switchOn[2];
+    Vec3 doorPos;
+    bool doorOpen;
+    bool initialized;
+} coop = {};
+
+struct WorldItem {
+    int id;
+    int type; // 0 battery, 1 medkit, 2 bait
+    Vec3 pos;
+    bool active;
+};
+
+std::vector<WorldItem> worldItems;
+int nextWorldItemId = 1;
+float itemSpawnTimer = 12.0f;
+float baitEffectTimer = 0.0f;
+float lightsOutTimer = 0.0f;
+float falseDoorTimer = 0.0f;
+Vec3 falseDoorPos(0,0,0);
+int invBattery = 0, invMedkit = 0, invBait = 0;
+
+inline void initCoopObjectives(const Vec3& basePos){
+    coop.switches[0] = Vec3(basePos.x + CS * 2.0f, 0, basePos.z + CS * 1.0f);
+    coop.switches[1] = Vec3(basePos.x - CS * 2.0f, 0, basePos.z + CS * 1.0f);
+    coop.switchOn[0] = false;
+    coop.switchOn[1] = false;
+    coop.doorPos = Vec3(basePos.x, 0, basePos.z + CS * 4.0f);
+    coop.doorOpen = false;
+    coop.initialized = true;
+}
+
+inline bool nearPoint2D(const Vec3& a, const Vec3& b, float r){
+    Vec3 d = a - b; d.y = 0;
+    return sqrtf(d.x*d.x + d.z*d.z) < r;
+}
+
+inline void updateCoopObjectiveHost(){
+    if(!coop.initialized) return;
+    for(int s=0;s<2;s++) {
+        bool on = nearPoint2D(cam.pos, coop.switches[s], 2.4f);
+        for(int p=0;p<MAX_PLAYERS;p++){
+            if(p==netMgr.myId || !netMgr.players[p].active || !netMgr.players[p].hasValidPos) continue;
+            if(nearPoint2D(netMgr.players[p].pos, coop.switches[s], 2.4f)) { on = true; break; }
+        }
+        coop.switchOn[s] = on;
+    }
+    coop.doorOpen = coop.switchOn[0] && coop.switchOn[1];
+}
+
+inline bool collideCoopDoor(float x, float z, float r){
+    if(!coop.initialized || coop.doorOpen) return false;
+    return fabsf(x - coop.doorPos.x) < (CS * 0.6f + r) && fabsf(z - coop.doorPos.z) < (CS * 0.2f + r);
+}
+
+inline void syncCoopFromNetwork(){
+    if(!netMgr.objectiveStateReceived) return;
+    netMgr.objectiveStateReceived = false;
+    coop.switchOn[0] = netMgr.objectiveSwitches[0];
+    coop.switchOn[1] = netMgr.objectiveSwitches[1];
+    coop.doorOpen = netMgr.objectiveDoorOpen;
+}
+
+inline void hostSpawnItem(int type, const Vec3& around){
+    WorldItem it;
+    it.id = nextWorldItemId++ % 250;
+    it.type = type;
+    it.pos = findSpawnPos(around, 6.0f);
+    it.active = true;
+    worldItems.push_back(it);
+}
+
+inline void hostUpdateItems(){
+    itemSpawnTimer -= dTime;
+    if(itemSpawnTimer > 0) return;
+    itemSpawnTimer = 10.0f + (rng()%10);
+    if((int)worldItems.size() > 10) return;
+    int type = rng()%3;
+    hostSpawnItem(type, cam.pos);
+}
+
+inline void applyItemUse(int type){
+    if(type==0 && invBattery>0){
+        invBattery--;
+        flashlightBattery += 35.0f;
+        if(flashlightBattery>100.0f) flashlightBattery = 100.0f;
+    }else if(type==1 && invMedkit>0){
+        invMedkit--;
+        playerHealth += 40.0f;
+        if(playerHealth>100.0f) playerHealth = 100.0f;
+    }else if(type==2 && invBait>0){
+        invBait--;
+        baitEffectTimer = 12.0f;
+    }
+}
+
+inline void processHostInteractRequests(){
+    if(!netMgr.isHost) return;
+    for(int i=0;i<netMgr.interactRequestCount;i++){
+        if(!netMgr.interactRequests[i].valid) continue;
+        int pid = netMgr.interactRequests[i].playerId;
+        int type = netMgr.interactRequests[i].requestType;
+        int target = netMgr.interactRequests[i].targetId;
+        if(type==REQ_PICK_ITEM){
+            for(auto& it:worldItems){
+                if(!it.active || it.id!=target) continue;
+                it.active = false;
+                if(pid>=0 && pid<MAX_PLAYERS){
+                    if(it.type==0) netMgr.inventoryBattery[pid]++;
+                    else if(it.type==1) netMgr.inventoryMedkit[pid]++;
+                    else netMgr.inventoryBait[pid]++;
+                }
+                break;
+            }
+        }else if(type==REQ_TOGGLE_SWITCH){
+            if(target>=0 && target<2) coop.switchOn[target] = !coop.switchOn[target];
+        }
+    }
+    netMgr.interactRequestCount = 0;
+}
+
+inline void hostSyncFeatureState(){
+    NetWorldItemSnapshotEntry entries[MAX_SYNC_ITEMS];
+    int count = 0;
+    for(auto& it:worldItems){
+        if(count>=MAX_SYNC_ITEMS) break;
+        entries[count].id = it.id;
+        entries[count].type = it.type;
+        entries[count].pos = it.pos;
+        entries[count].active = it.active;
+        count++;
+    }
+    netMgr.sendItemSnapshot(entries, count);
+    netMgr.sendObjectiveState(coop.switchOn[0], coop.switchOn[1], coop.doorOpen);
+    netMgr.inventoryBattery[netMgr.myId] = invBattery;
+    netMgr.inventoryMedkit[netMgr.myId] = invMedkit;
+    netMgr.inventoryBait[netMgr.myId] = invBait;
+    netMgr.sendInventorySync();
+}
+
+inline void clientApplyFeatureState(){
+    if(netMgr.itemSnapshotReceived){
+        netMgr.itemSnapshotReceived = false;
+        worldItems.clear();
+        for(int i=0;i<netMgr.itemSnapshotCount;i++){
+            WorldItem it;
+            it.id = netMgr.itemSnapshot[i].id;
+            it.type = netMgr.itemSnapshot[i].type;
+            it.pos = netMgr.itemSnapshot[i].pos;
+            it.active = netMgr.itemSnapshot[i].active;
+            worldItems.push_back(it);
+        }
+    }
+    if(netMgr.inventorySyncReceived){
+        netMgr.inventorySyncReceived = false;
+        invBattery = netMgr.inventoryBattery[netMgr.myId];
+        invMedkit = netMgr.inventoryMedkit[netMgr.myId];
+        invBait = netMgr.inventoryBait[netMgr.myId];
+    }
+    syncCoopFromNetwork();
+}
+
+inline void applyRoamEvent(int type, int a, int b, float duration){
+    if(type==ROAM_LIGHTS_OUT){
+        lightsOutTimer = duration;
+        for(auto& l:lights) l.on = false;
+    }else if(type==ROAM_GEOM_SHIFT){
+        (void)a; (void)b;
+        reshuffleBehind(cam.pos.x, cam.pos.z, cam.yaw);
+        buildGeom();
+    }else if(type==ROAM_FALSE_DOOR){
+        falseDoorTimer = duration;
+        falseDoorPos = findSpawnPos(cam.pos, 2.0f);
+    }
+}
+
+inline void updateRoamEventsHost(){
+    static float roamTimer = 18.0f;
+    roamTimer -= dTime;
+    if(roamTimer > 0) return;
+    roamTimer = 18.0f + (rng()%15);
+    int type = 1 + (rng()%3);
+    float duration = (type==ROAM_GEOM_SHIFT) ? 0.1f : 8.0f;
+    applyRoamEvent(type, playerChunkX, playerChunkZ, duration);
+    netMgr.sendRoamEvent(type, playerChunkX & 0xFF, playerChunkZ & 0xFF, duration);
+}
 
 void buildGeom(){
     std::vector<float>wv,fv,cv,pv,lv,lvOff;
@@ -92,6 +294,7 @@ void genWorld(){
     updateVisibleChunks(0,0);
     updateLightsAndPillars(0,0);
     Vec3 sp=findSafeSpawn();
+    Vec3 coopBase = sp;
     
     // In multiplayer, use shared spawn position
     if(multiState==MULTI_IN_GAME){
@@ -99,6 +302,7 @@ void genWorld(){
             netMgr.spawnPos=sp;
         }else{
             sp=netMgr.spawnPos;
+            coopBase = netMgr.spawnPos;
         }
         sp.x+=netMgr.myId*1.5f;
     }
@@ -108,6 +312,13 @@ void genWorld(){
     updateLightsAndPillars(playerChunkX,playerChunkZ);
     entityMgr.reset();storyMgr.init();
     resetPlayerInterpolation();
+    initCoopObjectives(coopBase);
+    worldItems.clear();
+    nextWorldItemId = 1;
+    invBattery = invMedkit = invBait = 0;
+    lightsOutTimer = falseDoorTimer = 0.0f;
+    baitEffectTimer = 0.0f;
+    itemSpawnTimer = 8.0f;
     playerHealth=playerSanity=playerStamina=100;
     flashlightBattery=100;flashlightOn=false;isPlayerDead=false;
     entitySpawnTimer=30;survivalTime=0;reshuffleTimer=15;
@@ -148,6 +359,16 @@ void gameInput(GLFWwindow*w){
     flashlightPressed=fNow;
     
     bool eNow=glfwGetKey(w,GLFW_KEY_E)==GLFW_PRESS;
+    int nearSwitch = -1;
+    if(coop.initialized){
+        if(nearPoint2D(cam.pos, coop.switches[0], 2.5f)) nearSwitch = 0;
+        else if(nearPoint2D(cam.pos, coop.switches[1], 2.5f)) nearSwitch = 1;
+    }
+    int nearItemId = -1;
+    for(auto& it:worldItems){
+        if(!it.active) continue;
+        if(nearPoint2D(cam.pos, it.pos, 2.2f)){ nearItemId = it.id; break; }
+    }
     if(eNow&&!interactPressed&&nearNoteId>=0){
         if(storyMgr.checkNotePickup(cam.pos,4.0f)){
             gameState=STATE_NOTE;
@@ -156,8 +377,41 @@ void gameInput(GLFWwindow*w){
             // Sync note collection
             if(multiState==MULTI_IN_GAME) netMgr.sendNoteCollect(nearNoteId);
         }
+    }else if(eNow&&!interactPressed&&nearItemId>=0){
+        if(multiState==MULTI_IN_GAME){
+            if(netMgr.isHost){
+                for(auto& it:worldItems){
+                    if(!it.active||it.id!=nearItemId) continue;
+                    it.active=false;
+                    if(it.type==0) invBattery++;
+                    else if(it.type==1) invMedkit++;
+                    else invBait++;
+                    break;
+                }
+            }else{
+                netMgr.sendInteractRequest(REQ_PICK_ITEM, nearItemId);
+            }
+        }else{
+            for(auto& it:worldItems){
+                if(!it.active||it.id!=nearItemId) continue;
+                it.active=false;
+                if(it.type==0) invBattery++;
+                else if(it.type==1) invMedkit++;
+                else invBait++;
+                break;
+            }
+        }
     }
     interactPressed=eNow;
+    
+    static bool key1Pressed=false,key2Pressed=false,key3Pressed=false;
+    bool k1=glfwGetKey(w,GLFW_KEY_1)==GLFW_PRESS;
+    bool k2=glfwGetKey(w,GLFW_KEY_2)==GLFW_PRESS;
+    bool k3=glfwGetKey(w,GLFW_KEY_3)==GLFW_PRESS;
+    if(k1&&!key1Pressed) applyItemUse(0);
+    if(k2&&!key2Pressed) applyItemUse(1);
+    if(k3&&!key3Pressed) applyItemUse(2);
+    key1Pressed=k1; key2Pressed=k2; key3Pressed=k3;
     
     float spd=4.0f*dTime;
     bool sprinting=glfwGetKey(w,GLFW_KEY_LEFT_SHIFT)==GLFW_PRESS&&playerStamina>0&&staminaCooldown<=0;
@@ -182,8 +436,8 @@ void gameInput(GLFWwindow*w){
     if(glfwGetKey(w,GLFW_KEY_A)==GLFW_PRESS){np=np+right*spd;mv=true;}
     if(glfwGetKey(w,GLFW_KEY_D)==GLFW_PRESS){np=np-right*spd;mv=true;}
     
-    if(!collideWorld(np.x,cam.pos.z,PR))cam.pos.x=np.x;
-    if(!collideWorld(cam.pos.x,np.z,PR))cam.pos.z=np.z;
+    if(!collideWorld(np.x,cam.pos.z,PR)&&!collideCoopDoor(np.x,cam.pos.z,PR)&&!(falseDoorTimer>0&&nearPoint2D(Vec3(np.x,0,cam.pos.z),falseDoorPos,1.0f)))cam.pos.x=np.x;
+    if(!collideWorld(cam.pos.x,np.z,PR)&&!collideCoopDoor(cam.pos.x,np.z,PR)&&!(falseDoorTimer>0&&nearPoint2D(Vec3(cam.pos.x,0,np.z),falseDoorPos,1.0f)))cam.pos.z=np.z;
     
     static float bobT=0,lastB=0;
     if(mv){
@@ -198,6 +452,13 @@ void gameInput(GLFWwindow*w){
     }
     
     if(flashlightOn){
+        if(flashlightBattery<18.0f){
+            float blinkT = vhsTime * (6.0f + (18.0f - flashlightBattery) * 0.35f);
+            bool blinkOff = sinf(blinkT) > 0.78f;
+            sndState.flashlightOn = blinkOff ? 0.0f : 1.0f;
+        }else{
+            sndState.flashlightOn = 1.0f;
+        }
         flashlightBattery-=dTime*1.67f;
         if(flashlightBattery<=0){flashlightBattery=0;flashlightOn=false;sndState.flashlightOn=0;}
     }else{
@@ -220,7 +481,12 @@ void renderScene(){
     glUniform3f(glGetUniformLocation(mainShader,"vp"),cam.pos.x,cam.pos.y,cam.pos.z);
     glUniform1f(glGetUniformLocation(mainShader,"tm"),vhsTime);
     glUniform1f(glGetUniformLocation(mainShader,"danger"),entityMgr.dangerLevel);
-    glUniform1i(glGetUniformLocation(mainShader,"flashOn"),flashlightOn?1:0);
+    bool flashVisualOn = flashlightOn;
+    if(flashlightOn && flashlightBattery < 18.0f){
+        float blinkT = vhsTime * (6.0f + (18.0f - flashlightBattery) * 0.35f);
+        if(sinf(blinkT) > 0.78f) flashVisualOn = false;
+    }
+    glUniform1i(glGetUniformLocation(mainShader,"flashOn"),flashVisualOn?1:0);
     glUniform3f(glGetUniformLocation(mainShader,"flashDir"),sinf(cam.yaw)*cosf(cam.pitch),
                 sinf(cam.pitch),cosf(cam.yaw)*cosf(cam.pitch));
     float remoteFlashPos[12] = {0};
@@ -293,11 +559,36 @@ void drawUI(){
             if(playerSanity<100)drawSanityBar(playerSanity);
             drawStaminaBar(playerStamina);
             if(flashlightBattery<100)drawFlashlightBattery(flashlightBattery,flashlightOn);
+            char invBuf[64];
+            snprintf(invBuf,64,"INV B:%d M:%d T:%d",invBattery,invMedkit,invBait);
+            drawText(invBuf,-0.95f,0.84f,1.2f,0.55f,0.7f,0.5f,0.75f);
+            char objBuf[64];
+            snprintf(objBuf,64,"SW:%d/%d DOOR:%s",(coop.switchOn[0]?1:0)+(coop.switchOn[1]?1:0),2,coop.doorOpen?"OPEN":"LOCK");
+            drawText(objBuf,0.50f,0.74f,1.2f,0.8f,0.85f,0.6f,0.75f);
+            if(!coop.doorOpen){
+                if(nearPoint2D(cam.pos, coop.switches[0], 2.6f)||nearPoint2D(cam.pos, coop.switches[1], 2.6f))
+                    drawText("HOLD SWITCH POSITION",-0.24f,-0.35f,1.4f,0.75f,0.8f,0.55f,0.85f);
+            }
+            if(falseDoorTimer>0) drawText("FALSE DOOR SHIFT",0.48f,0.67f,1.0f,0.9f,0.35f,0.25f,0.7f);
             if(storyMgr.totalCollected>0)drawNoteCounter(storyMgr.totalCollected);
             drawPhaseIndicator((int)storyMgr.getPhase());
             if(nearNoteId>=0)drawInteractPrompt();
+            for(auto& it:worldItems){
+                if(!it.active) continue;
+                if(nearPoint2D(cam.pos,it.pos,2.2f)){
+                    if(it.type==0) drawText("[E] PICK BATTERY",-0.18f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.8f);
+                    else if(it.type==1) drawText("[E] PICK MEDKIT",-0.16f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.8f);
+                    else drawText("[E] PICK BAIT",-0.14f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.8f);
+                    break;
+                }
+            }
             if(storyMgr.hasHallucinations())drawHallucinationEffect((50.0f-playerSanity)/50.0f);
             if(multiState==MULTI_IN_GAME)drawMultiHUD(netMgr.getPlayerCount(),netMgr.isHost);
+            if(multiState==MULTI_IN_GAME){
+                char netBuf[96];
+                snprintf(netBuf,96,"RTT %.0fms TX %d RX %d",netMgr.rttMs,netMgr.packetsSent,netMgr.packetsRecv);
+                drawText(netBuf,0.45f,0.60f,1.0f,0.55f,0.65f,0.8f,0.7f);
+            }
         }
     }
 }
@@ -306,13 +597,21 @@ void updateMultiplayer(){
     if(multiState!=MULTI_IN_GAME) return;
     
     static float netSendTimer=0;
+    static float stateSyncTimer=0;
     netSendTimer+=dTime;
+    stateSyncTimer+=dTime;
     if(netSendTimer>=0.05f){
         netMgr.sendPlayerState(cam.pos,cam.yaw,cam.pitch,flashlightOn);
         netSendTimer=0;
     }
     netMgr.update();
+    netMgr.sendPing((float)glfwGetTime());
     updatePlayerInterpolation(netMgr.myId, dTime);
+    
+    if(netMgr.roamEventReceived){
+        netMgr.roamEventReceived = false;
+        applyRoamEvent(netMgr.roamEventType, netMgr.roamEventA, netMgr.roamEventB, netMgr.roamEventDuration);
+    }
     
     // Handle reshuffle from host
     if(!netMgr.isHost && netMgr.reshuffleReceived){
@@ -339,6 +638,46 @@ void updateMultiplayer(){
     // Only host controls entities
     if(!netMgr.isHost){
         entitySpawnTimer = 999;  // Prevent clients from spawning
+        clientApplyFeatureState();
+        if(netMgr.entitySnapshotReceived){
+            netMgr.entitySnapshotReceived = false;
+            entityMgr.entities.clear();
+            for(int i=0;i<netMgr.entitySnapshotCount;i++){
+                if(!netMgr.entitySnapshot[i].active) continue;
+                Entity e;
+                e.type = (EntityType)netMgr.entitySnapshot[i].type;
+                e.pos = netMgr.entitySnapshot[i].pos;
+                e.yaw = netMgr.entitySnapshot[i].yaw;
+                e.state = (EntityState)netMgr.entitySnapshot[i].state;
+                e.active = true;
+                if(e.type==ENTITY_STALKER){ e.speed=1.5f; e.detectionRange=20.0f; e.attackRange=1.0f; }
+                else if(e.type==ENTITY_CRAWLER){ e.speed=5.0f; e.detectionRange=15.0f; e.attackRange=1.5f; e.pos.y=-0.8f; }
+                else if(e.type==ENTITY_SHADOW){ e.speed=0.5f; e.detectionRange=8.0f; e.attackRange=2.0f; }
+                entityMgr.entities.push_back(e);
+            }
+        }
+    }else{
+        processHostInteractRequests();
+        updateCoopObjectiveHost();
+        hostUpdateItems();
+        updateRoamEventsHost();
+        if(stateSyncTimer>=0.12f){
+            stateSyncTimer = 0;
+            NetEntitySnapshotEntry snap[MAX_SYNC_ENTITIES];
+            int c = 0;
+            for(auto& e:entityMgr.entities){
+                if(c>=MAX_SYNC_ENTITIES) break;
+                snap[c].id = c;
+                snap[c].type = (int)e.type;
+                snap[c].pos = e.pos;
+                snap[c].yaw = e.yaw;
+                snap[c].state = (int)e.state;
+                snap[c].active = e.active;
+                c++;
+            }
+            netMgr.sendEntitySnapshot(snap, c);
+            hostSyncFeatureState();
+        }
     }
 }
 
@@ -412,6 +751,16 @@ int main(){
                 }
                 enterPressed=eN;escPressed=esN;
             }else{
+                if(lightsOutTimer>0){
+                    lightsOutTimer-=dTime;
+                    if(lightsOutTimer<=0){
+                        lightsOutTimer=0;
+                        updateLightsAndPillars(playerChunkX,playerChunkZ);
+                        buildGeom();
+                    }
+                }
+                if(falseDoorTimer>0) falseDoorTimer-=dTime;
+                if(baitEffectTimer>0) baitEffectTimer-=dTime;
                 gameInput(gWin);
                 updateVisibleChunks(cam.pos.x,cam.pos.z);
                 if(playerChunkX!=lastBuildChunkX||playerChunkZ!=lastBuildChunkZ){
@@ -450,6 +799,9 @@ int main(){
                     entitySpawnTimer=spawnDelay+(rng()%15);
                 }
                 entityMgr.update(dTime,cam.pos,cam.yaw,nullptr,0,0,CS);
+                if(baitEffectTimer>0){
+                    entityMgr.dangerLevel *= 0.45f;
+                }
                 
                 // Only host does reshuffles in multiplayer
                 reshuffleTimer-=dTime;
