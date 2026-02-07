@@ -27,6 +27,10 @@ struct SoundState {
     float heartPhase=0;
     float scareTimer=0;
     float scareVol=0;
+    float musicVol=0.55f;
+    float ambienceVol=0.75f;
+    float sfxVol=0.7f;
+    float voiceVol=0.65f;
 };
 
 extern SoundState sndState;
@@ -142,7 +146,15 @@ inline void fillAudio(short* buf, int len) {
             if(sndState.whisperPhase > 6.28318f) sndState.whisperPhase -= 6.28318f;
         }
         
-        float v = (hum*sndState.humVol + step + amb + creepy + insane + distant + scare + flashClick) * sndState.masterVol;
+        float ambienceMix = hum*sndState.humVol + amb + distant;
+        float sfxMix = step + scare + flashClick;
+        float voiceMix = insane;
+        float musicMix = creepy;
+        float v =
+            (ambienceMix * sndState.ambienceVol +
+             sfxMix * sndState.sfxVol +
+             voiceMix * sndState.voiceVol +
+             musicMix * sndState.musicVol) * sndState.masterVol;
         v = applyLimiter(v, safe.limiterEnv);
         v = softClip(v);
         if(v>1.0f) v=1.0f; if(v<-1.0f) v=-1.0f;

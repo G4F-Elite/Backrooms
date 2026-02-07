@@ -3,6 +3,7 @@
 GLuint noteVAO=0, noteVBO=0;
 int noteVC=0;
 bool playerModelsInit = false;
+#include "reconnect_policy.h"
 void buildGeom();
 
 enum InteractRequestType {
@@ -40,6 +41,54 @@ float lightsOutTimer = 0.0f;
 float falseDoorTimer = 0.0f;
 Vec3 falseDoorPos(0,0,0);
 int invBattery = 0, invMedkit = 0, invBait = 0;
+
+struct SessionSnapshot {
+    bool valid;
+    char hostIP[64];
+    Vec3 camPos;
+    float camYaw, camPitch;
+    float health, sanity, stamina, battery;
+    float survival;
+    int invB, invM, invT;
+};
+
+SessionSnapshot lastSession = {};
+bool reconnectInProgress = false;
+bool restoreAfterReconnect = false;
+float reconnectAttemptTimer = 0.0f;
+int reconnectAttempts = 0;
+
+inline void captureSessionSnapshot(){
+    if(multiState!=MULTI_IN_GAME || netMgr.isHost) return;
+    lastSession.valid = true;
+    snprintf(lastSession.hostIP, sizeof(lastSession.hostIP), "%s", netMgr.hostIP);
+    lastSession.camPos = cam.pos;
+    lastSession.camYaw = cam.yaw;
+    lastSession.camPitch = cam.pitch;
+    lastSession.health = playerHealth;
+    lastSession.sanity = playerSanity;
+    lastSession.stamina = playerStamina;
+    lastSession.battery = flashlightBattery;
+    lastSession.survival = survivalTime;
+    lastSession.invB = invBattery;
+    lastSession.invM = invMedkit;
+    lastSession.invT = invBait;
+}
+
+inline void restoreSessionSnapshot(){
+    if(!lastSession.valid) return;
+    cam.pos = lastSession.camPos;
+    cam.yaw = lastSession.camYaw;
+    cam.pitch = lastSession.camPitch;
+    playerHealth = lastSession.health;
+    playerSanity = lastSession.sanity;
+    playerStamina = lastSession.stamina;
+    flashlightBattery = lastSession.battery;
+    survivalTime = lastSession.survival;
+    invBattery = lastSession.invB;
+    invMedkit = lastSession.invM;
+    invBait = lastSession.invT;
+}
 
 inline void initCoopObjectives(const Vec3& basePos){
     coop.switches[0] = Vec3(basePos.x + CS * 2.0f, 0, basePos.z + CS * 1.0f);
@@ -359,11 +408,6 @@ void gameInput(GLFWwindow*w){
     flashlightPressed=fNow;
     
     bool eNow=glfwGetKey(w,GLFW_KEY_E)==GLFW_PRESS;
-    int nearSwitch = -1;
-    if(coop.initialized){
-        if(nearPoint2D(cam.pos, coop.switches[0], 2.5f)) nearSwitch = 0;
-        else if(nearPoint2D(cam.pos, coop.switches[1], 2.5f)) nearSwitch = 1;
-    }
     int nearItemId = -1;
     for(auto& it:worldItems){
         if(!it.active) continue;
@@ -607,6 +651,17 @@ void updateMultiplayer(){
     netMgr.update();
     netMgr.sendPing((float)glfwGetTime());
     updatePlayerInterpolation(netMgr.myId, dTime);
+    if(!netMgr.isHost && netMgr.clientTimedOut((float)glfwGetTime())){
+        captureSessionSnapshot();
+        netMgr.shutdown();
+        reconnectInProgress = true;
+        restoreAfterReconnect = true;
+        reconnectAttemptTimer = 0.0f;
+        reconnectAttempts = 0;
+        multiState = MULTI_CONNECTING;
+        gameState = STATE_MULTI_WAIT;
+        return;
+    }
     
     if(netMgr.roamEventReceived){
         netMgr.roamEventReceived = false;
@@ -705,6 +760,10 @@ int main(){
     while(!glfwWindowShouldClose(gWin)){
         float now=(float)glfwGetTime();dTime=now-lastFrame;lastFrame=now;vhsTime=now;
         sndState.masterVol=settings.masterVol;sndState.dangerLevel=entityMgr.dangerLevel;
+        sndState.musicVol=settings.musicVol;
+        sndState.ambienceVol=settings.ambienceVol;
+        sndState.sfxVol=settings.sfxVol;
+        sndState.voiceVol=settings.voiceVol;
         sndState.sanityLevel=playerSanity/100.0f;currentWinW=winW;currentWinH=winH;
         
         if(gameState==STATE_INTRO){
@@ -731,13 +790,40 @@ int main(){
         else if(gameState==STATE_MENU||gameState==STATE_PAUSE||
                  gameState==STATE_MULTI||gameState==STATE_MULTI_HOST||gameState==STATE_MULTI_JOIN||gameState==STATE_MULTI_WAIT){
             menuInput(gWin);
+            if(gameState==STATE_MULTI_WAIT && reconnectInProgress){
+                reconnectAttemptTimer -= dTime;
+                if(reconnectAttemptTimer<=0){
+                    reconnectAttempts++;
+                    reconnectAttemptTimer = nextReconnectDelaySeconds(reconnectAttempts);
+                    if(shouldContinueReconnect(reconnectAttempts, 12) && lastSession.valid){
+                        netMgr.shutdown();
+                        netMgr.init();
+                        netMgr.joinGame(lastSession.hostIP);
+                    }else{
+                        reconnectInProgress = false;
+                        restoreAfterReconnect = false;
+                        multiState = MULTI_NONE;
+                        gameState = STATE_MULTI;
+                        menuSel = 1;
+                    }
+                }
+            }
             if(gameState==STATE_PAUSE&&enterPressed&&menuSel==2){
                 gameState=STATE_MENU;menuSel=0;genWorld();buildGeom();
             }
             if(gameState==STATE_MULTI_WAIT&&netMgr.gameStarted){
                 multiState=MULTI_IN_GAME;
                 genWorld();buildGeom();
-                gameState=STATE_INTRO;
+                if(restoreAfterReconnect){
+                    restoreSessionSnapshot();
+                    reconnectInProgress = false;
+                    restoreAfterReconnect = false;
+                    gameState=STATE_GAME;
+                    glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_DISABLED);
+                    firstMouse=true;
+                }else{
+                    gameState=STATE_INTRO;
+                }
             }
         }else if(gameState==STATE_GAME){
             if(isPlayerDead){
@@ -844,6 +930,7 @@ int main(){
                     }
                 }
                 camShake*=0.9f;damageFlash*=0.92f;survivalTime+=dTime;
+                if(multiState==MULTI_IN_GAME && !netMgr.isHost) captureSessionSnapshot();
                 
                 // Multiplayer update
                 updateMultiplayer();

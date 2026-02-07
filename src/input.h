@@ -17,14 +17,17 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
     bool right = glfwGetKey(w, GLFW_KEY_RIGHT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_D) == GLFW_PRESS;
     bool enter = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS;
     
-    if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 3; }
-    if (down && !downPressed) { menuSel++; if (menuSel > 3) menuSel = 0; }
+    if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 7; }
+    if (down && !downPressed) { menuSel++; if (menuSel > 7) menuSel = 0; }
     
-    if (menuSel < 3) {
-        float* vals[] = {&settings.masterVol, &settings.vhsIntensity, &settings.mouseSens};
-        float maxV[] = {1.0f, 1.0f, 0.006f};
-        float minV[] = {0.0f, 0.0f, 0.0005f};
-        float step[] = {0.05f, 0.05f, 0.0003f};
+    if (menuSel < 7) {
+        float* vals[] = {
+            &settings.masterVol, &settings.musicVol, &settings.ambienceVol, &settings.sfxVol,
+            &settings.voiceVol, &settings.vhsIntensity, &settings.mouseSens
+        };
+        float maxV[] = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.006f};
+        float minV[] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0005f};
+        float step[] = {0.05f, 0.05f, 0.05f, 0.05f, 0.05f, 0.05f, 0.0003f};
         if (left && !leftPressed) { 
             *vals[menuSel] -= step[menuSel]; 
             if (*vals[menuSel] < minV[menuSel]) *vals[menuSel] = minV[menuSel]; 
@@ -35,7 +38,7 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
         }
     }
     
-    if ((enter && !enterPressed && menuSel == 3) || (esc && !escPressed)) { 
+    if ((enter && !enterPressed && menuSel == 7) || (esc && !escPressed)) { 
         gameState = fromPause ? STATE_PAUSE : STATE_MENU; 
         menuSel = fromPause ? 1 : 2;  // Settings position in respective menu
     }

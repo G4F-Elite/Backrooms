@@ -19,7 +19,15 @@ const unsigned char FONT_DATA[96][7] = {
 };
 
 inline GLuint fontTex=0, textShader=0, textVAO=0, textVBO=0;
-struct Settings { float masterVol=0.7f, vhsIntensity=0.65f, mouseSens=0.002f; };
+struct Settings {
+    float masterVol=0.7f;
+    float musicVol=0.55f;
+    float ambienceVol=0.75f;
+    float sfxVol=0.7f;
+    float voiceVol=0.65f;
+    float vhsIntensity=0.65f;
+    float mouseSens=0.002f;
+};
 inline Settings settings;
 enum GameState { STATE_MENU, STATE_GAME, STATE_PAUSE, STATE_SETTINGS, STATE_SETTINGS_PAUSE, STATE_INTRO, STATE_NOTE, STATE_MULTI, STATE_MULTI_HOST, STATE_MULTI_JOIN, STATE_MULTI_WAIT };
 inline GameState gameState = STATE_MENU;
@@ -89,11 +97,11 @@ inline void drawMenu(float tm) {
 inline void drawSettings(bool fp) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     drawText("SETTINGS",-0.25f,0.55f,3.0f,0.9f,0.85f,0.4f);
-    const char* lb[]={"MASTER VOLUME","VHS EFFECT","MOUSE SENS","BACK"};
-    float*vl[]={&settings.masterVol,&settings.vhsIntensity,&settings.mouseSens,nullptr};
-    float mx[]={1.0f,1.0f,0.006f};
-    for(int i=0;i<4;i++){
-        float s=(menuSel==i)?1.0f:0.5f,y=0.25f-i*0.15f;
+    const char* lb[]={"MASTER VOL","MUSIC VOL","AMBIENCE VOL","SFX VOL","VOICE VOL","VHS EFFECT","MOUSE SENS","BACK"};
+    float*vl[]={&settings.masterVol,&settings.musicVol,&settings.ambienceVol,&settings.sfxVol,&settings.voiceVol,&settings.vhsIntensity,&settings.mouseSens,nullptr};
+    float mx[]={1.0f,1.0f,1.0f,1.0f,1.0f,1.0f,0.006f};
+    for(int i=0;i<8;i++){
+        float s=(menuSel==i)?1.0f:0.5f,y=0.40f-i*0.11f;
         if(menuSel==i)drawText(">",-0.55f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         drawText(lb[i],-0.48f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         if(vl[i]){

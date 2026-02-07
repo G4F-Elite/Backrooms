@@ -79,6 +79,7 @@ public:
     float rttMs;
     float lastPingTime;
     unsigned short pingSeq;
+    float lastPacketRecvTime;
     
     NetworkManager() {
         sock = INVALID_SOCKET;
@@ -109,6 +110,7 @@ public:
         rttMs = 0.0f;
         lastPingTime = 0.0f;
         pingSeq = 0;
+        lastPacketRecvTime = 0.0f;
         for (int i = 0; i < MAX_PLAYERS; i++) {
             players[i] = NetPlayer();
             players[i].active = false;
@@ -142,6 +144,7 @@ public:
         if (bind(sock, (sockaddr*)&addr, sizeof(addr)) == SOCKET_ERROR) return false;
         isHost = true;
         connected = true;
+        lastPacketRecvTime = (float)glfwGetTime();
         myId = 0;
         worldSeed = seed;
         players[0].active = true;
@@ -161,6 +164,7 @@ public:
         bind(sock, (sockaddr*)&local, sizeof(local));
         sendJoinRequest();
         connected = true;
+        lastPacketRecvTime = (float)glfwGetTime();
         return true;
     }
     
@@ -390,6 +394,7 @@ public:
             if (recv <= 0) break;
             packetsRecv++;
             bytesRecv += recv;
+            lastPacketRecvTime = (float)glfwGetTime();
             handlePacket(buf, recv, from);
         }
     }
@@ -466,6 +471,15 @@ public:
             sendto(sock, resp, 16, 0, (sockaddr*)&from, sizeof(from));
             packetsSent++;
             bytesSent += 16;
+            if (gameStarted) {
+                char gs[PACKET_SIZE];
+                gs[0] = PKT_GAME_START;
+                memcpy(gs + 1, &worldSeed, 4);
+                memcpy(gs + 5, &spawnPos, sizeof(Vec3));
+                sendto(sock, gs, 32, 0, (sockaddr*)&from, sizeof(from));
+                packetsSent++;
+                bytesSent += 32;
+            }
             break;
         }
     }
@@ -480,6 +494,11 @@ public:
         memcpy(buf + 3, &nowTime, 4);
         pingSeq++;
         broadcast(buf, 8);
+    }
+    
+    bool clientTimedOut(float nowTime) const {
+        if (!connected || isHost) return false;
+        return (nowTime - lastPacketRecvTime) > 6.0f;
     }
     
     void handlePing(char* buf, int len, sockaddr_in& from) {
@@ -681,6 +700,7 @@ public:
         rttMs = 0.0f;
         lastPingTime = 0.0f;
         pingSeq = 0;
+        lastPacketRecvTime = 0.0f;
         for (int i = 0; i < MAX_PLAYERS; i++) {
             players[i] = NetPlayer();
             players[i].active = false;
