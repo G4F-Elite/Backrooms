@@ -1,6 +1,7 @@
 #pragma once
 // Network manager - host/join/sync logic
 #include "net_types.h"
+#include "net_sync_codec.h"
 #include <cstring>
 
 class NetworkManager {
@@ -18,6 +19,8 @@ public:
     // Sync flags
     bool reshuffleReceived;
     int reshuffleChunkX, reshuffleChunkZ;
+    unsigned int reshuffleSeed;
+    unsigned char reshuffleCells[RESHUFFLE_CELL_COUNT];
     
     NetworkManager() {
         sock = INVALID_SOCKET;
@@ -28,6 +31,8 @@ public:
         worldSeed = 0;
         spawnPos = Vec3(0, 1.7f, 0);
         reshuffleReceived = false;
+        reshuffleSeed = 0;
+        memset(reshuffleCells, 0, sizeof(reshuffleCells));
         for (int i = 0; i < MAX_PLAYERS; i++) {
             players[i] = NetPlayer();
             players[i].active = false;
@@ -160,12 +165,32 @@ public:
     // Reshuffle happened (map changed)
     void sendReshuffle(int chunkX, int chunkZ, unsigned int seed) {
         if (!isHost || !connected) return;
+        long long key = ((long long)chunkX << 32) | (chunkZ & 0xFFFFFFFF);
+        auto it = chunks.find(key);
+        if (it == chunks.end()) return;
+        
         char buf[PACKET_SIZE];
         buf[0] = PKT_RESHUFFLE;
-        memcpy(buf + 1, &chunkX, 4);
-        memcpy(buf + 5, &chunkZ, 4);
-        memcpy(buf + 9, &seed, 4);
-        broadcast(buf, 16);
+        ReshuffleSyncData data;
+        data.chunkX = chunkX;
+        data.chunkZ = chunkZ;
+        data.seed = seed;
+        for (int x = 0; x < CHUNK_SIZE; x++) {
+            for (int z = 0; z < CHUNK_SIZE; z++) {
+                int idx = x * CHUNK_SIZE + z;
+                data.cells[idx] = (unsigned char)it->second.cells[x][z];
+            }
+        }
+        if (!encodeReshufflePayload(buf, PACKET_SIZE, data)) return;
+        broadcast(buf, RESHUFFLE_PACKET_LEN);
+    }
+    
+    void sendScare(int sourcePlayerId) {
+        if (!connected) return;
+        char buf[PACKET_SIZE];
+        buf[0] = PKT_SCARE;
+        if (!encodeScarePayload(buf, PACKET_SIZE, sourcePlayerId)) return;
+        broadcast(buf, SCARE_PACKET_LEN);
     }
     
     void broadcast(char* buf, int len) {
@@ -205,7 +230,8 @@ public:
         else if (type == PKT_WELCOME) handleWelcome(buf);
         else if (type == PKT_PLAYER_STATE) handlePlayerState(buf);
         else if (type == PKT_GAME_START) handleGameStart(buf);
-        else if (type == PKT_RESHUFFLE) handleReshuffle(buf);
+        else if (type == PKT_RESHUFFLE) handleReshuffle(buf, len);
+        else if (type == PKT_SCARE) handleScare(buf, len);
         else if (type == PKT_NOTE_COLLECT) handleNoteCollect(buf);
         // Entities handled in entity manager
     }
@@ -295,13 +321,36 @@ public:
         }
     }
     
-    void handleReshuffle(char* buf) {
-        memcpy(&reshuffleChunkX, buf + 1, 4);
-        memcpy(&reshuffleChunkZ, buf + 5, 4);
-        unsigned int seed;
-        memcpy(&seed, buf + 9, 4);
+    void handleReshuffle(char* buf, int len) {
+        ReshuffleSyncData data;
+        if (!decodeReshufflePayload(buf, len, data)) return;
+        reshuffleChunkX = data.chunkX;
+        reshuffleChunkZ = data.chunkZ;
+        reshuffleSeed = data.seed;
+        memcpy(reshuffleCells, data.cells, RESHUFFLE_CELL_COUNT);
         // Signal to game_loop to reshuffle this chunk
         reshuffleReceived = true;
+    }
+    
+    void handleScare(char* buf, int len) {
+        int sourcePlayerId = -1;
+        if (!decodeScarePayload(buf, len, sourcePlayerId)) return;
+        
+        if (isHost) {
+            // Relay scare event to all clients (including sender).
+            for (int i = 1; i < MAX_PLAYERS; i++) {
+                if (!players[i].active) continue;
+                sockaddr_in dest;
+                dest.sin_family = AF_INET;
+                dest.sin_addr.s_addr = players[i].addr;
+                dest.sin_port = players[i].port;
+                sendto(sock, buf, SCARE_PACKET_LEN, 0, (sockaddr*)&dest, sizeof(dest));
+            }
+        }
+        
+        if (sourcePlayerId >= 0 && sourcePlayerId < MAX_PLAYERS) {
+            triggerScare();
+        }
     }
     
     void handleNoteCollect(char* buf) {
@@ -323,6 +372,8 @@ public:
         isHost = false;
         myId = 0;
         reshuffleReceived = false;
+        reshuffleSeed = 0;
+        memset(reshuffleCells, 0, sizeof(reshuffleCells));
         for (int i = 0; i < MAX_PLAYERS; i++) {
             players[i] = NetPlayer();
             players[i].active = false;

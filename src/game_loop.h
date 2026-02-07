@@ -304,6 +304,22 @@ void updateMultiplayer(){
     // Handle reshuffle from host
     if(!netMgr.isHost && netMgr.reshuffleReceived){
         netMgr.reshuffleReceived = false;
+        long long key = chunkKey(netMgr.reshuffleChunkX, netMgr.reshuffleChunkZ);
+        auto it = chunks.find(key);
+        if (it == chunks.end()) {
+            generateChunk(netMgr.reshuffleChunkX, netMgr.reshuffleChunkZ);
+            it = chunks.find(key);
+        }
+        if (it != chunks.end()) {
+            for (int x = 0; x < CHUNK_SIZE; x++) {
+                for (int z = 0; z < CHUNK_SIZE; z++) {
+                    int idx = x * CHUNK_SIZE + z;
+                    it->second.cells[x][z] = (int)netMgr.reshuffleCells[idx];
+                }
+            }
+        }
+        worldSeed = netMgr.reshuffleSeed;
+        updateLightsAndPillars(playerChunkX, playerChunkZ);
         buildGeom();
     }
     
@@ -450,7 +466,13 @@ int main(){
                 }
                 if(entityMgr.checkPlayerAttack(cam.pos)){
                     playerHealth-=35.0f*dTime;playerSanity-=15.0f*dTime;
-                    camShake=0.15f;damageFlash=0.4f;triggerScare();
+                    camShake=0.15f;damageFlash=0.4f;
+                    if(multiState==MULTI_IN_GAME){
+                        netMgr.sendScare(netMgr.myId);
+                        if(netMgr.isHost) triggerScare();
+                    }else{
+                        triggerScare();
+                    }
                     if(playerHealth<=0){
                         isPlayerDead=true;playerHealth=0;
                         glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
