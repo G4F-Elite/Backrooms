@@ -3,6 +3,7 @@
 #include "menu.h"
 #include "menu_multi.h"
 #include "net.h"
+#include "lan_discovery.h"
 
 extern bool escPressed, upPressed, downPressed, enterPressed, leftPressed, rightPressed;
 extern bool firstMouse;
@@ -109,6 +110,7 @@ inline void menuInput(GLFWwindow* w) {
                 else if (menuSel == 3) { 
                     // Disconnect
                     netMgr.shutdown();
+                    lanDiscovery.stop();
                     multiState = MULTI_NONE;
                     gameState = STATE_MENU;
                     menuSel = 0;
@@ -164,6 +166,7 @@ inline void menuInput(GLFWwindow* w) {
                 // Host game - initialize network and start hosting
                 netMgr.init();
                 if (netMgr.hostGame((unsigned int)time(nullptr))) {
+                    lanDiscovery.startHost();
                     multiState = MULTI_HOST_LOBBY;
                     gameState = STATE_MULTI_HOST;
                     menuSel = 0;
@@ -173,6 +176,9 @@ inline void menuInput(GLFWwindow* w) {
                 // Join game
                 gameState = STATE_MULTI_JOIN; 
                 menuSel = 0; 
+                multiIPManualEdit = false;
+                lanDiscovery.startClient();
+                lanDiscovery.requestScan();
             }
             else { 
                 // Back
@@ -187,6 +193,7 @@ inline void menuInput(GLFWwindow* w) {
         if (down && !downPressed) { menuSel++; if (menuSel > 1) menuSel = 0; }
         if (esc && !escPressed) { 
             netMgr.shutdown();
+            lanDiscovery.stop();
             multiState = MULTI_NONE;
             gameState = STATE_MULTI; 
             menuSel = 0;
@@ -208,6 +215,7 @@ inline void menuInput(GLFWwindow* w) {
             else { 
                 // Back - shutdown hosting
                 netMgr.shutdown();
+                lanDiscovery.stop();
                 multiState = MULTI_NONE;
                 gameState = STATE_MULTI;
                 menuSel = 0;
@@ -215,12 +223,14 @@ inline void menuInput(GLFWwindow* w) {
         }
         // Update network to check for new connections
         netMgr.update();
+        lanDiscovery.updateHost(netMgr.getPlayerCount(), netMgr.gameStarted, (float)glfwGetTime());
     }
     else if (gameState == STATE_MULTI_JOIN) {
         // Join menu: CONNECT, BACK (2 items: 0-1)
         if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 1; }
         if (down && !downPressed) { menuSel++; if (menuSel > 1) menuSel = 0; }
         if (esc && !escPressed) { 
+            lanDiscovery.stop();
             gameState = STATE_MULTI; 
             menuSel = 1;
         }
@@ -250,6 +260,7 @@ inline void menuInput(GLFWwindow* w) {
                         if (i < 10 || (i == 10 && len > 0 && multiJoinIP[len-1] != '.')) {
                             multiJoinIP[len] = chars[i];
                             multiJoinIP[len + 1] = 0;
+                            multiIPManualEdit = true;
                         }
                     }
                 } else {
@@ -272,13 +283,45 @@ inline void menuInput(GLFWwindow* w) {
         if (bsNow && !bsPressed) {
             if (multiInputField == 0) {
                 int len = (int)strlen(multiJoinIP);
-                if (len > 0) multiJoinIP[len - 1] = 0;
+                if (len > 0) {
+                    multiJoinIP[len - 1] = 0;
+                    multiIPManualEdit = true;
+                }
             } else {
                 int len = (int)strlen(multiJoinPort);
                 if (len > 0) multiJoinPort[len - 1] = 0;
             }
         }
         bsPressed = bsNow;
+        
+        static bool refreshPressed = false;
+        bool refreshNow = glfwGetKey(w, GLFW_KEY_R) == GLFW_PRESS;
+        if (refreshNow && !refreshPressed) {
+            lanDiscovery.requestScan();
+        }
+        refreshPressed = refreshNow;
+        
+        static bool pickRoomPressed = false;
+        bool pickRoomNow = glfwGetKey(w, GLFW_KEY_F) == GLFW_PRESS;
+        if (pickRoomNow && !pickRoomPressed) {
+            lanDiscovery.selectNextRoom();
+            const LanRoomInfo* room = lanDiscovery.getSelectedRoom();
+            if (room) {
+                snprintf(multiJoinIP, sizeof(multiJoinIP), "%s", room->ip);
+                snprintf(multiJoinPort, sizeof(multiJoinPort), "%hu", room->gamePort);
+                multiIPManualEdit = false;
+            }
+        }
+        pickRoomPressed = pickRoomNow;
+        
+        lanDiscovery.updateClient((float)glfwGetTime());
+        if (!multiIPManualEdit) {
+            const LanRoomInfo* room = lanDiscovery.getSelectedRoom();
+            if (room) {
+                snprintf(multiJoinIP, sizeof(multiJoinIP), "%s", room->ip);
+                snprintf(multiJoinPort, sizeof(multiJoinPort), "%hu", room->gamePort);
+            }
+        }
         
         if (enter && !enterPressed) {
             if (menuSel == 0) { 
@@ -287,6 +330,7 @@ inline void menuInput(GLFWwindow* w) {
                 snprintf(fullAddr, 64, "%s", multiJoinIP);
                 netMgr.init();
                 if (netMgr.joinGame(fullAddr)) {
+                    lanDiscovery.stop();
                     multiState = MULTI_CONNECTING;
                     gameState = STATE_MULTI_WAIT;  // Wait for host to start
                     menuSel = 0;
@@ -294,17 +338,17 @@ inline void menuInput(GLFWwindow* w) {
             }
             else { 
                 // Back
+                lanDiscovery.stop();
                 gameState = STATE_MULTI;
                 menuSel = 1;
             }
         }
-        // Also update network while in join screen
-        netMgr.update();
     }
     else if (gameState == STATE_MULTI_WAIT) {
         // Waiting for host to start
         if (esc && !escPressed) {
             netMgr.shutdown();
+            lanDiscovery.stop();
             multiState = MULTI_NONE;
             gameState = STATE_MULTI;
             menuSel = 1;

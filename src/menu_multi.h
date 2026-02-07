@@ -1,6 +1,7 @@
 #pragma once
 // Multiplayer menu UI - requires menu.h and net.h to be included first
 // Include order: glad.h -> menu.h -> net.h -> menu_multi.h
+#include "lan_discovery.h"
 
 // Multiplayer state
 enum MultiState {
@@ -16,6 +17,7 @@ inline int multiMenuSel = 0;
 inline char multiJoinIP[64] = "192.168.0.1";
 inline char multiJoinPort[8] = "27015";
 inline int multiInputField = 0;  // 0 = IP, 1 = Port
+inline bool multiIPManualEdit = false;
 
 // Draw multiplayer main menu
 inline void drawMultiMenuScreen(float tm) {
@@ -35,6 +37,10 @@ inline void drawMultiMenuScreen(float tm) {
     
     drawText("USE RADMIN VPN OR HAMACHI FOR LAN", -0.48f, -0.3f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);
     drawText("PORT: 27015 UDP", -0.22f, -0.42f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);
+    lanDiscovery.ensureLocalIP();
+    char ipLine[96];
+    snprintf(ipLine, 96, "LOCAL IP: %s", lanDiscovery.localIP);
+    drawText(ipLine, -0.4f, -0.52f, 1.3f, 0.55f, 0.65f, 0.45f, 0.75f);
     
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
@@ -81,6 +87,18 @@ inline void drawJoinMenuScreen(float tm) {
     
     drawText("TAB TO SWITCH FIELDS    0-9 AND . FOR INPUT", -0.58f, -0.4f, 1.3f, 0.5f, 0.5f, 0.4f, 0.6f);
     drawText("BACKSPACE TO DELETE     ENTER TO CONNECT", -0.52f, -0.5f, 1.3f, 0.5f, 0.5f, 0.4f, 0.6f);
+    drawText("AUTO LAN SCAN: R REFRESH, F NEXT ROOM", -0.58f, -0.6f, 1.2f, 0.55f, 0.65f, 0.45f, 0.7f);
+    
+    char roomHead[64];
+    snprintf(roomHead, 64, "ROOMS FOUND: %d", lanDiscovery.roomCount);
+    drawText(roomHead, -0.58f, -0.72f, 1.2f, 0.7f, 0.8f, 0.55f, 0.75f);
+    for (int i = 0; i < lanDiscovery.roomCount && i < 3; i++) {
+        const LanRoomInfo& room = lanDiscovery.rooms[i];
+        char roomLine[128];
+        snprintf(roomLine, 128, "%s %d/%d %s", room.ip, (int)room.playerCount, (int)room.maxPlayers, room.gameStarted ? "IN GAME" : "LOBBY");
+        float alpha = (i == lanDiscovery.selectedRoom) ? 0.95f : 0.65f;
+        drawText(roomLine, -0.58f, -0.8f - i * 0.07f, 1.1f, 0.75f, 0.85f, 0.6f, alpha);
+    }
     
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
@@ -108,6 +126,10 @@ inline void drawHostLobbyScreen(float tm, int playerCount) {
     }
     
     drawText("SHARE YOUR RADMIN/HAMACHI IP", -0.42f, -0.5f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);
+    lanDiscovery.ensureLocalIP();
+    char ipLine[96];
+    snprintf(ipLine, 96, "YOUR LAN IP: %s", lanDiscovery.localIP);
+    drawText(ipLine, -0.38f, -0.6f, 1.3f, 0.6f, 0.75f, 0.5f, 0.8f);
     
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);

@@ -7,6 +7,7 @@
 #pragma comment(lib, "ws2_32.lib")
 
 const int NET_PORT = 27015;
+const int NET_DISCOVERY_PORT = 27016;
 const int MAX_PLAYERS = 4;
 const int PACKET_SIZE = 512;
 
@@ -28,7 +29,10 @@ enum PacketType {
     PKT_TELEPORT,        // Request teleport to another player
     PKT_NOTE_SPAWN,      // Note spawned
     PKT_NOTE_COLLECT,    // Note collected
-    PKT_RESHUFFLE        // Map changed
+    PKT_RESHUFFLE,       // Map changed
+    PKT_DISCOVER_REQ,    // Client LAN discovery request
+    PKT_DISCOVER_RESP,   // Host response for LAN discovery
+    PKT_HOST_ANNOUNCE    // Host periodic LAN announce
 };
 
 // Network player data
