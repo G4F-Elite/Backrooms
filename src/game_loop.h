@@ -107,6 +107,7 @@ void genWorld(){
     updateVisibleChunks(cam.pos.x,cam.pos.z);
     updateLightsAndPillars(playerChunkX,playerChunkZ);
     entityMgr.reset();storyMgr.init();
+    resetPlayerInterpolation();
     playerHealth=playerSanity=playerStamina=100;
     flashlightBattery=100;flashlightOn=false;isPlayerDead=false;
     entitySpawnTimer=30;survivalTime=0;reshuffleTimer=15;
@@ -222,6 +223,17 @@ void renderScene(){
     glUniform1i(glGetUniformLocation(mainShader,"flashOn"),flashlightOn?1:0);
     glUniform3f(glGetUniformLocation(mainShader,"flashDir"),sinf(cam.yaw)*cosf(cam.pitch),
                 sinf(cam.pitch),cosf(cam.yaw)*cosf(cam.pitch));
+    float remoteFlashPos[12] = {0};
+    float remoteFlashDir[12] = {0};
+    int remoteFlashCount = 0;
+    if(multiState==MULTI_IN_GAME){
+        remoteFlashCount = gatherRemoteFlashlights(netMgr.myId, remoteFlashPos, remoteFlashDir);
+    }
+    glUniform1i(glGetUniformLocation(mainShader,"rfc"),remoteFlashCount);
+    if(remoteFlashCount>0){
+        glUniform3fv(glGetUniformLocation(mainShader,"rfp"),remoteFlashCount,remoteFlashPos);
+        glUniform3fv(glGetUniformLocation(mainShader,"rfd"),remoteFlashCount,remoteFlashDir);
+    }
     
     std::vector<float>lpos;
     for(auto&l:lights)if(l.on){
@@ -300,6 +312,7 @@ void updateMultiplayer(){
         netSendTimer=0;
     }
     netMgr.update();
+    updatePlayerInterpolation(netMgr.myId, dTime);
     
     // Handle reshuffle from host
     if(!netMgr.isHost && netMgr.reshuffleReceived){

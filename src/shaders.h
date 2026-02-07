@@ -11,6 +11,7 @@ out vec4 F; in vec2 uv; in vec3 fp,nm;
 uniform sampler2D tex; uniform vec3 vp; uniform float tm;
 uniform int nl; uniform vec3 lp[64]; uniform float danger;
 uniform int flashOn; uniform vec3 flashDir;
+uniform int rfc; uniform vec3 rfp[4]; uniform vec3 rfd[4];
 
 float hash(float n){ return fract(sin(n)*43758.5453); }
 
@@ -62,6 +63,20 @@ void main(){
    // Red tint at edges always when danger
    if(spotAngle < 0.9 && danger > 0.2) flashColor = vec3(0.9, 0.2, 0.1);
    res += tc * flashColor * spotAtt * distAtt * NdotL * 1.5;
+  }
+ }
+ 
+ // REMOTE FLASHLIGHTS (other players in multiplayer)
+ for(int i = 0; i < rfc && i < 4; i++) {
+  vec3 toFrag = normalize(fp - rfp[i]);
+  float spotAngle = dot(toFrag, rfd[i]);
+  float dist = length(fp - rfp[i]);
+  if(spotAngle > 0.88 && dist < 13.0) {
+   float spotAtt = smoothstep(0.88, 0.96, spotAngle);
+   float distAtt = 1.0 - dist / 13.0;
+   float NdotL = max(dot(N, -toFrag), 0.0);
+   vec3 remoteFlash = vec3(0.9, 0.95, 1.0);
+   res += tc * remoteFlash * spotAtt * distAtt * NdotL * 0.95;
   }
  }
  
