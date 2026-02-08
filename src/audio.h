@@ -106,15 +106,15 @@ inline void fillAudio(short* buf, int len) {
         }
         float uiMove = 0.0f;
         if(safe.uiMoveEnv > 0.0001f){
-            uiMove = sinf(globalPhase * 1900.0f) * safe.uiMoveEnv * 0.26f;
-            uiMove += sinf(globalPhase * 2300.0f) * safe.uiMoveEnv * 0.08f;
-            safe.uiMoveEnv *= 0.981f;
+            uiMove = sinf(globalPhase * 980.0f) * safe.uiMoveEnv * 0.42f;
+            uiMove += sinf(globalPhase * 1320.0f) * safe.uiMoveEnv * 0.22f;
+            safe.uiMoveEnv *= 0.972f;
         }
         float uiConfirm = 0.0f;
         if(safe.uiConfirmEnv > 0.0001f){
-            uiConfirm = sinf(globalPhase * 1300.0f) * safe.uiConfirmEnv * 0.34f;
-            uiConfirm += sinf(globalPhase * 820.0f) * safe.uiConfirmEnv * 0.14f;
-            safe.uiConfirmEnv *= 0.978f;
+            uiConfirm = sinf(globalPhase * 760.0f) * safe.uiConfirmEnv * 0.58f;
+            uiConfirm += sinf(globalPhase * 1120.0f) * safe.uiConfirmEnv * 0.28f;
+            safe.uiConfirmEnv *= 0.968f;
         }
         
         // Danger sounds - progressive
@@ -171,12 +171,14 @@ inline void fillAudio(short* buf, int len) {
         }
         
         float ambienceMix = hum*sndState.humVol + amb + distant;
-        float sfxMix = step + scare + flashClick + uiMove + uiConfirm;
+        float sfxMix = step + scare + flashClick;
+        float uiMix = (uiMove + uiConfirm) * (0.35f + 0.65f * sndState.sfxVol);
         float voiceMix = insane;
         float musicMix = creepy;
         float v =
             (ambienceMix * sndState.ambienceVol +
              sfxMix * sndState.sfxVol +
+             uiMix +
              voiceMix * sndState.voiceVol +
              musicMix * sndState.musicVol) * sndState.masterVol;
         v = applyLimiter(v, safe.limiterEnv);

@@ -634,8 +634,8 @@ int main(){
         glDisable(GL_DEPTH_TEST);
 
         glUseProgram(vhsShader);
-        bool vhsMenu=(gameState==STATE_MENU);
-        float vI=vhsMenu?(settings.vhsIntensity*0.15f):0.0f;
+        bool vhsMenu=(gameState==STATE_MENU||gameState==STATE_MULTI||gameState==STATE_MULTI_HOST||gameState==STATE_MULTI_JOIN||gameState==STATE_MULTI_WAIT);
+        float vI=vhsMenu?(settings.vhsIntensity*0.55f):0.0f;
         static GLint vhsTmLoc = -1;
         static GLint vhsIntenLoc = -1;
         static GLint vhsUpscalerLoc = -1;
