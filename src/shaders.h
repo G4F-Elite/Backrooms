@@ -55,8 +55,9 @@ void main(){
    float NdotL = max(dot(N, L), 0.0);
    df = smoothstep(0.0, 0.5, NdotL);
   }
-  float baseFlick = sin(tm*20.0 + float(i)*2.1) * 0.015;
-  float panicFlick = sin(tm*30.0 + float(i)*3.7) * 0.05 * danger;
+  // Reduced flicker - only subtle slow variation
+  float baseFlick = sin(tm*2.0 + float(i)*2.1) * 0.008;
+  float panicFlick = sin(tm*8.0 + float(i)*3.7) * 0.03 * danger;
   float fl = 1.0 + baseFlick + panicFlick;
   vec3 lightColor = vec3(1.0, 0.92, 0.75);
   
@@ -98,24 +99,14 @@ void main(){
   if(maxB > 0.1) res = max(res, tc * 0.15);
  }
  
- // THICK FOG - exponential falloff to hide distant LOD transitions
+ // FOG - smooth exponential falloff
  float dist = length(vp - fp);
- 
- // Exponential fog - much thicker, starts closer
  float fogDensity = 0.065;
  float fog = exp(-dist * fogDensity);
  fog = clamp(fog, 0.0, 1.0);
  
- // Add noise to fog edge to break up hard transitions
- float fogNoise = hash(floor(fp * 2.0) + vec3(tm * 0.1));
- fog = fog * (0.92 + fogNoise * 0.08);
- 
- // Darker, warmer fog color
+ // Fog color
  vec3 fogColor = vec3(0.045, 0.04, 0.035);
- 
- // Add subtle "dust particles" effect based on distance
- float dustDist = dist * 0.08;
- float dust = hash(fp * 0.5 + vec3(tm * 0.3, 0, 0)) * 0.015 * min(dustDist, 1.0);
  
  // Distance-based color desaturation (far objects lose color)
  float desat = smoothstep(8.0, 20.0, dist);
@@ -128,9 +119,6 @@ void main(){
  
  // Apply fog
  res = mix(fogColor, res, fog);
- 
- // Add dust on top
- res += vec3(dust);
  
  res *= vec3(1.0, 0.97, 0.9);
  
@@ -156,11 +144,10 @@ void main(){ uv=t; gl_Position=P*V*M*vec4(p,1); })";
 const char* lightFS=R"(#version 330
 out vec4 F; in vec2 uv;
 uniform sampler2D tex; uniform float inten,tm,fade;
-float hash(float n){ return fract(sin(n)*43758.5453); }
 void main(){
  vec3 c = texture(tex,uv).rgb * inten;
- float flick = 0.97 + sin(tm*25.0)*0.015 + hash(floor(tm*7.0))*0.015;
- // Apply fade for smooth light sprite transitions
+ // Subtle slow flicker only
+ float flick = 0.99 + sin(tm*2.0)*0.01;
  F = vec4(c * flick * fade, fade);
 })";
 
@@ -175,6 +162,7 @@ uniform int upscaler;
 uniform float sharpness;
 uniform float texelX;
 uniform float texelY;
+uniform int inMenu;
 
 float rnd(vec2 s){ return fract(sin(dot(s,vec2(12.9898,78.233)))*43758.5453); }
 
@@ -222,11 +210,11 @@ void main(){
  float b = upscaledSample(uv - vec2(ab,0)).b;
  vec3 c = vec3(r,g,b);
  
- // Scanlines
- c -= sin(uv.y * 600.0 + tm * 6.0) * 0.016 * inten;
+ // Scanlines - reduced
+ c -= sin(uv.y * 400.0 + tm * 3.0) * 0.008 * inten;
  
- // Light static noise
- c += (rnd(uv + vec2(tm,0)) - 0.5) * 0.035 * inten;
+ // Light static noise - greatly reduced
+ c += (rnd(uv + vec2(floor(tm*5.0),0)) - 0.5) * 0.015 * inten;
  
  // Horizontal distortion glitch (rare)
  if(inten > 0.45 && rnd(vec2(tm * 0.08, floor(uv.y * 60))) > 0.985) {
@@ -239,10 +227,12 @@ void main(){
  vig = smoothstep(0.3, 1.0, vig);
  c *= vig;
  
- // Subtle dust particles overlay
- float dust = noise(uv * 200.0 + vec2(tm * 3.0, tm * 2.0));
- dust = smoothstep(0.75, 0.95, dust) * 0.08 * inten;
- c += dust;
+ // Subtle dust particles overlay - only in menu
+ if(inMenu == 1) {
+  float dust = noise(uv * 200.0 + vec2(tm * 3.0, tm * 2.0));
+  dust = smoothstep(0.75, 0.95, dust) * 0.08 * inten;
+  c += dust;
+ }
  
  // Subtle light leak / haze at center
  float haze = 1.0 - length(uv - 0.5) * 1.5;

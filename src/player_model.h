@@ -1,9 +1,11 @@
 #pragma once
 // Player model for multiplayer - animated humanoid with flashlight and interpolation
+
 #include <vector>
 #include "math.h"
 #include "interpolation.h"
 
+// Player color palette for multiplayer identification
 const float PLAYER_COLORS[4][3] = {
     {0.1f, 0.9f, 0.2f},
     {0.2f, 0.6f, 1.0f},
@@ -29,27 +31,41 @@ inline void addColorBox(std::vector<float>& v, float x, float y, float z,
         {x-hx,y-hy,z-hz,0,0,0,-1,0, x+hx,y-hy,z-hz,1,0,0,-1,0, x+hx,y-hy,z+hz,1,1,0,-1,0,
          x-hx,y-hy,z-hz,0,0,0,-1,0, x+hx,y-hy,z+hz,1,1,0,-1,0, x-hx,y-hy,z+hz,0,1,0,-1,0}
     };
-    for (int f = 0; f < 6; f++) for (int i = 0; i < 48; i++) v.push_back(faces[f][i]);
+    for (int f = 0; f < 6; f++) {
+        for (int i = 0; i < 48; i++) {
+            v.push_back(faces[f][i]);
+        }
+    }
 }
 
 inline void buildPlayerModel(std::vector<float>& v, int colorId) {
     float r = PLAYER_COLORS[colorId][0];
     float g = PLAYER_COLORS[colorId][1];
     float b = PLAYER_COLORS[colorId][2];
+    // Torso
     addColorBox(v, 0, 1.0f, 0, 0.45f, 0.55f, 0.22f, r, g, b);
+    // Belt
     addColorBox(v, 0, 0.95f, 0.12f, 0.35f, 0.08f, 0.02f, r*1.5f, g*1.5f, b*1.5f);
+    // Head
     addColorBox(v, 0, 1.5f, 0, 0.28f, 0.28f, 0.28f, 0.85f, 0.75f, 0.65f);
+    // Hair
     addColorBox(v, 0, 1.67f, 0, 0.30f, 0.08f, 0.30f, 0.15f, 0.1f, 0.05f);
+    // Eyes
     addColorBox(v, -0.06f, 1.52f, 0.14f, 0.05f, 0.03f, 0.02f, 0.1f, 0.1f, 0.1f);
     addColorBox(v, 0.06f, 1.52f, 0.14f, 0.05f, 0.03f, 0.02f, 0.1f, 0.1f, 0.1f);
+    // Legs
     addColorBox(v, -0.1f, 0.35f, 0, 0.14f, 0.65f, 0.14f, 0.15f, 0.2f, 0.35f);
     addColorBox(v, 0.1f, 0.35f, 0, 0.14f, 0.65f, 0.14f, 0.15f, 0.2f, 0.35f);
+    // Feet
     addColorBox(v, -0.1f, 0.05f, 0.02f, 0.14f, 0.1f, 0.18f, 0.1f, 0.1f, 0.1f);
     addColorBox(v, 0.1f, 0.05f, 0.02f, 0.14f, 0.1f, 0.18f, 0.1f, 0.1f, 0.1f);
+    // Arms
     addColorBox(v, -0.32f, 1.0f, 0, 0.1f, 0.45f, 0.1f, r*0.8f, g*0.8f, b*0.8f);
     addColorBox(v, 0.32f, 1.0f, 0, 0.1f, 0.45f, 0.1f, r*0.8f, g*0.8f, b*0.8f);
+    // Hands
     addColorBox(v, -0.32f, 0.72f, 0, 0.08f, 0.1f, 0.08f, 0.85f, 0.75f, 0.65f);
     addColorBox(v, 0.32f, 0.72f, 0, 0.08f, 0.1f, 0.08f, 0.85f, 0.75f, 0.65f);
+    // Backpack
     addColorBox(v, 0, 1.0f, -0.18f, 0.3f, 0.4f, 0.12f, 0.2f, 0.15f, 0.1f);
 }
 
@@ -163,10 +179,22 @@ inline void renderPlayers(GLuint shader, Mat4& proj, Mat4& view, int myId) {
         float c = cosf(yaw);
         float s = sinf(yaw);
         Mat4 model;
-        model.m[0] = c;    model.m[4] = 0;  model.m[8] = s;   model.m[12] = px;
-        model.m[1] = 0;    model.m[5] = 1;  model.m[9] = 0;   model.m[13] = py;
-        model.m[2] = -s;   model.m[6] = 0;  model.m[10] = c;  model.m[14] = pz;
-        model.m[3] = 0;    model.m[7] = 0;  model.m[11] = 0;  model.m[15] = 1;
+        model.m[0] = c;
+        model.m[1] = 0;
+        model.m[2] = -s;
+        model.m[3] = 0;
+        model.m[4] = 0;
+        model.m[5] = 1;
+        model.m[6] = 0;
+        model.m[7] = 0;
+        model.m[8] = s;
+        model.m[9] = 0;
+        model.m[10] = c;
+        model.m[11] = 0;
+        model.m[12] = px;
+        model.m[13] = py;
+        model.m[14] = pz;
+        model.m[15] = 1;
         glUniformMatrix4fv(glGetUniformLocation(shader, "M"), 1, GL_FALSE, model.m);
         glBindVertexArray(playerVAOs[i]);
         glDrawArrays(GL_TRIANGLES, 0, playerVCs[i]);
