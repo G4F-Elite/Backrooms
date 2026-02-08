@@ -32,6 +32,8 @@
 #include "story.h"
 #include "menu.h"
 #include "input.h"
+#include "cheats.h"
+#include "minimap.h"
 #include "net_types.h"
 #include "net.h"
 #include "player_model.h"
@@ -75,6 +77,10 @@ float playerStamina = 100, staminaCooldown = 0, flashlightBattery = 100;
 bool flashlightOn = false, flashlightPressed = false;
 bool flashlightShutdownBlinkActive = false;
 float flashlightShutdownBlinkTimer = 0.0f;
+bool minimapEnabled = false;
+int minimapCheatProgress = 0;
+int nearbyWorldItemId = -1;
+int nearbyWorldItemType = -1;
 ScareSystemState scareState = {};
 bool interactPressed = false, spacePressed = false;
 int nearNoteId = -1, lastSpawnedNote = -1;

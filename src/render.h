@@ -12,6 +12,8 @@ struct RenderData {
 };
 
 inline void setupVAO(GLuint& vao, GLuint& vbo, std::vector<float>& d, bool hasNorm) {
+    if (vao) glDeleteVertexArrays(1, &vao);
+    if (vbo) glDeleteBuffers(1, &vbo);
     glGenVertexArrays(1, &vao);
     glGenBuffers(1, &vbo);
     glBindVertexArray(vao);
