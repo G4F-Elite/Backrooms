@@ -148,6 +148,14 @@ inline int minimapWallSampler(int wx, int wz){
 
 inline void updateMinimapCheat(GLFWwindow* w){
     static bool letterPressed[26] = {false};
+    static bool f6Pressed = false;
+
+    bool f6Now = glfwGetKey(w, GLFW_KEY_F6) == GLFW_PRESS;
+    if(f6Now && !f6Pressed){
+        minimapEnabled = !minimapEnabled;
+    }
+    f6Pressed = f6Now;
+
     for(int i=0;i<26;i++){
         bool now = glfwGetKey(w, GLFW_KEY_A + i) == GLFW_PRESS;
         if(now && !letterPressed[i]){
