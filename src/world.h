@@ -52,6 +52,68 @@ inline int countOpenCells(const Chunk& c) {
     return open;
 }
 
+// Count walls around a cell (for dead-end detection)
+inline int countWallsAround(const Chunk& c, int x, int z) {
+    int walls = 0;
+    if (x <= 0 || c.cells[x-1][z] == 1) walls++;
+    if (x >= CHUNK_SIZE-1 || c.cells[x+1][z] == 1) walls++;
+    if (z <= 0 || c.cells[x][z-1] == 1) walls++;
+    if (z >= CHUNK_SIZE-1 || c.cells[x][z+1] == 1) walls++;
+    return walls;
+}
+
+// Remove dead-ends by opening passages
+inline void removeDeadEnds(Chunk& c, std::mt19937& cr) {
+    bool changed = true;
+    int iterations = 0;
+    while (changed && iterations < 5) {
+        changed = false;
+        iterations++;
+        for (int x = 1; x < CHUNK_SIZE - 1; x++) {
+            for (int z = 1; z < CHUNK_SIZE - 1; z++) {
+                if (c.cells[x][z] != 0) continue;  // Only check open cells
+                
+                int walls = countWallsAround(c, x, z);
+                if (walls >= 3) {  // Dead-end detected (3 walls = only 1 exit)
+                    // 70% chance to remove dead-end
+                    if (cr() % 100 < 70) {
+                        // Find a wall to remove
+                        std::vector<std::pair<int,int>> wallDirs;
+                        if (x > 1 && c.cells[x-1][z] == 1) wallDirs.push_back({x-1, z});
+                        if (x < CHUNK_SIZE-2 && c.cells[x+1][z] == 1) wallDirs.push_back({x+1, z});
+                        if (z > 1 && c.cells[x][z-1] == 1) wallDirs.push_back({x, z-1});
+                        if (z < CHUNK_SIZE-2 && c.cells[x][z+1] == 1) wallDirs.push_back({x, z+1});
+                        
+                        if (!wallDirs.empty()) {
+                            auto& w = wallDirs[cr() % wallDirs.size()];
+                            c.cells[w.first][w.second] = 0;
+                            changed = true;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// Add extra connections to reduce isolation
+inline void addExtraConnections(Chunk& c, std::mt19937& cr) {
+    int connections = 4 + cr() % 4;  // Add 4-7 extra connections
+    for (int i = 0; i < connections; i++) {
+        int x = 2 + cr() % (CHUNK_SIZE - 4);
+        int z = 2 + cr() % (CHUNK_SIZE - 4);
+        
+        // Find a wall that separates two open areas
+        if (c.cells[x][z] == 1) {
+            bool hasOpenH = (x > 0 && c.cells[x-1][z] == 0) && (x < CHUNK_SIZE-1 && c.cells[x+1][z] == 0);
+            bool hasOpenV = (z > 0 && c.cells[x][z-1] == 0) && (z < CHUNK_SIZE-1 && c.cells[x][z+1] == 0);
+            if (hasOpenH || hasOpenV) {
+                c.cells[x][z] = 0;  // Create shortcut
+            }
+        }
+    }
+}
+
 inline void applyAtriumPattern(Chunk& c, std::mt19937& cr) {
     int x0 = 2 + (int)(cr() % 2);
     int z0 = 2 + (int)(cr() % 2);
@@ -77,9 +139,13 @@ inline void applyOfficePattern(Chunk& c, std::mt19937& cr) {
         for (int z = 2; z < CHUNK_SIZE - 2; z++) {
             c.cells[x][z] = 1;
         }
-        int doorZ = 2 + (int)(cr() % (CHUNK_SIZE - 4));
-        c.cells[x][doorZ] = 0;
-        if (doorZ + 1 < CHUNK_SIZE - 1) c.cells[x][doorZ + 1] = 0;
+        // Add more doors per wall section
+        int numDoors = 2 + cr() % 2;
+        for (int d = 0; d < numDoors; d++) {
+            int doorZ = 2 + (int)(cr() % (CHUNK_SIZE - 4));
+            c.cells[x][doorZ] = 0;
+            if (doorZ + 1 < CHUNK_SIZE - 1) c.cells[x][doorZ + 1] = 0;
+        }
     }
 }
 
@@ -91,12 +157,14 @@ inline void applyServicePattern(Chunk& c, std::mt19937& cr) {
         c.cells[laneA][z] = 1;
         c.cells[laneB][z] = 1;
     }
-    for (int i = 0; i < 4; i++) {
+    // More gates for better connectivity
+    for (int i = 0; i < 6; i++) {
         int gate = 2 + (int)(cr() % (CHUNK_SIZE - 4));
         c.cells[laneA][gate] = 0;
         c.cells[laneB][gate] = 0;
     }
-    for (int i = 0; i < 6; i++) {
+    // Fewer blocking boxes
+    for (int i = 0; i < 3; i++) {
         int bx = 2 + (int)(cr() % (CHUNK_SIZE - 4));
         int bz = 2 + (int)(cr() % (CHUNK_SIZE - 4));
         fillRect(c, bx, bz, 2, 2);
@@ -134,6 +202,8 @@ inline void generateChunk(int cx, int cz) {
     unsigned int seed = worldSeed ^ (unsigned)(cx * 73856093) ^ (unsigned)(cz * 19349663);
     std::mt19937 cr(seed);
     for (int x = 0; x < CHUNK_SIZE; x++) for (int z = 0; z < CHUNK_SIZE; z++) c.cells[x][z] = 1;
+    
+    // Generate base maze with DFS
     std::vector<std::pair<int,int>> stk;
     int sx = 1 + cr() % (CHUNK_SIZE-2), sz = 1 + cr() % (CHUNK_SIZE-2);
     c.cells[sx][sz] = 0; stk.push_back({sx, sz});
@@ -141,17 +211,55 @@ inline void generateChunk(int cx, int cz) {
     while (!stk.empty()) {
         int x = stk.back().first, z = stk.back().second;
         std::vector<int> dirs;
-        for (int d = 0; d < 4; d++) { int nx = x+dx[d], nz = z+dz[d];
-            if (nx > 0 && nx < CHUNK_SIZE-1 && nz > 0 && nz < CHUNK_SIZE-1 && c.cells[nx][nz] == 1) dirs.push_back(d); }
+        for (int d = 0; d < 4; d++) { 
+            int nx = x+dx[d], nz = z+dz[d];
+            if (nx > 0 && nx < CHUNK_SIZE-1 && nz > 0 && nz < CHUNK_SIZE-1 && c.cells[nx][nz] == 1) 
+                dirs.push_back(d); 
+        }
         if (dirs.empty()) stk.pop_back();
-        else { int d = dirs[cr() % dirs.size()]; c.cells[x+dx[d]/2][z+dz[d]/2] = 0; c.cells[x+dx[d]][z+dz[d]] = 0; stk.push_back({x+dx[d], z+dz[d]}); }
+        else { 
+            int d = dirs[cr() % dirs.size()]; 
+            c.cells[x+dx[d]/2][z+dz[d]/2] = 0; 
+            c.cells[x+dx[d]][z+dz[d]] = 0; 
+            stk.push_back({x+dx[d], z+dz[d]}); 
+        }
     }
+    
+    // Apply architecture patterns
     applyChunkArchitecturePattern(c, cr);
-    for (int i = 0; i < 3; i++) { int rx = 1+cr()%(CHUNK_SIZE-4), rz = 1+cr()%(CHUNK_SIZE-4), rw = 2+cr()%2, rh = 2+cr()%2;
-        for (int x = rx; x < rx+rw && x < CHUNK_SIZE-1; x++) for (int z = rz; z < rz+rh && z < CHUNK_SIZE-1; z++) c.cells[x][z] = 0; }
-    for (int x = 1; x < CHUNK_SIZE-1; x++) for (int z = 1; z < CHUNK_SIZE-1; z++) if (c.cells[x][z] == 1 && cr()%100 < 15) c.cells[x][z] = 0;
-    for (int i = 2; i < CHUNK_SIZE-2; i += 3) { c.cells[0][i] = 0; c.cells[CHUNK_SIZE-1][i] = 0; c.cells[i][0] = 0; c.cells[i][CHUNK_SIZE-1] = 0; }
-    if (countOpenCells(c) < 40) carveRect(c, 2, 2, CHUNK_SIZE - 4, CHUNK_SIZE - 4);
+    
+    // Add random rooms (4-5 instead of 3)
+    for (int i = 0; i < 4 + cr() % 2; i++) { 
+        int rx = 1+cr()%(CHUNK_SIZE-4), rz = 1+cr()%(CHUNK_SIZE-4);
+        int rw = 2+cr()%3, rh = 2+cr()%3;  // Slightly larger rooms
+        for (int x = rx; x < rx+rw && x < CHUNK_SIZE-1; x++) 
+            for (int z = rz; z < rz+rh && z < CHUNK_SIZE-1; z++) 
+                c.cells[x][z] = 0; 
+    }
+    
+    // Random wall removal (increased from 15% to 22%)
+    for (int x = 1; x < CHUNK_SIZE-1; x++) 
+        for (int z = 1; z < CHUNK_SIZE-1; z++) 
+            if (c.cells[x][z] == 1 && cr()%100 < 22) 
+                c.cells[x][z] = 0;
+    
+    // Remove dead-ends
+    removeDeadEnds(c, cr);
+    
+    // Add extra connections for better flow
+    addExtraConnections(c, cr);
+    
+    // Chunk border passages (more passages)
+    for (int i = 1; i < CHUNK_SIZE-1; i += 2) { 
+        c.cells[0][i] = 0; 
+        c.cells[CHUNK_SIZE-1][i] = 0; 
+        c.cells[i][0] = 0; 
+        c.cells[i][CHUNK_SIZE-1] = 0; 
+    }
+    
+    // Ensure minimum open space
+    if (countOpenCells(c) < 50) carveRect(c, 2, 2, CHUNK_SIZE - 4, CHUNK_SIZE - 4);
+    
     chunks[key] = c;
 }
 
@@ -314,7 +422,8 @@ inline Vec3 findSpawnPos(Vec3 pPos, float minD) {
         if(collideWorld(p.x,p.z,spawnRadius)) continue;
         return p;
     }
-    for(int r=6;r<18;r++){
+    // Fallback: search in expanding rings
+    for(int r=5; r<20; r++){
         for(int a=0;a<16;a++){
             float ang = (float)a * 0.3926991f;
             float fx = pPos.x + sinf(ang) * (float)r * CS * 0.5f;
