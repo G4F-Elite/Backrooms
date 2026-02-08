@@ -65,33 +65,51 @@ inline void mkBox(std::vector<float>& v, float cx, float y0, float cz, float sx,
     float hx = sx * 0.5f;
     float hz = sz * 0.5f;
     float y1 = y0 + sy;
+    const float tile = 2.4f;
+    float uvX = sx / tile;
+    float uvY = sy / tile;
+    float uvZ = sz / tile;
+    if (uvX < 0.6f) uvX = 0.6f;
+    if (uvY < 0.6f) uvY = 0.6f;
+    if (uvZ < 0.6f) uvZ = 0.6f;
 
-    auto pushFace = [&](float x0, float z0, float x1, float z1, float nx, float nz) {
+    auto pushQuad = [&](Vec3 a, Vec3 b, Vec3 c, Vec3 d, Vec3 n, float uMax, float vMax) {
         float vv[] = {
-            x0, y0, z0, 0, 0, nx, 0, nz,
-            x1, y0, z1, 1, 0, nx, 0, nz,
-            x1, y1, z1, 1, 1, nx, 0, nz,
-            x0, y0, z0, 0, 0, nx, 0, nz,
-            x1, y1, z1, 1, 1, nx, 0, nz,
-            x0, y1, z0, 0, 1, nx, 0, nz
+            a.x, a.y, a.z, 0, 0, n.x, n.y, n.z,
+            b.x, b.y, b.z, uMax, 0, n.x, n.y, n.z,
+            c.x, c.y, c.z, uMax, vMax, n.x, n.y, n.z,
+            a.x, a.y, a.z, 0, 0, n.x, n.y, n.z,
+            c.x, c.y, c.z, uMax, vMax, n.x, n.y, n.z,
+            d.x, d.y, d.z, 0, vMax, n.x, n.y, n.z
         };
         for (int i = 0; i < 48; i++) v.push_back(vv[i]);
     };
 
-    pushFace(cx - hx, cz + hz, cx + hx, cz + hz, 0, 1);
-    pushFace(cx + hx, cz - hz, cx - hx, cz - hz, 0, -1);
-    pushFace(cx + hx, cz + hz, cx + hx, cz - hz, 1, 0);
-    pushFace(cx - hx, cz - hz, cx - hx, cz + hz, -1, 0);
-
-    float top[] = {
-        cx - hx, y1, cz - hz, 0, 0, 0, 1, 0,
-        cx + hx, y1, cz - hz, 1, 0, 0, 1, 0,
-        cx + hx, y1, cz + hz, 1, 1, 0, 1, 0,
-        cx - hx, y1, cz - hz, 0, 0, 0, 1, 0,
-        cx + hx, y1, cz + hz, 1, 1, 0, 1, 0,
-        cx - hx, y1, cz + hz, 0, 1, 0, 1, 0
-    };
-    for (int i = 0; i < 48; i++) v.push_back(top[i]);
+    pushQuad(
+        Vec3(cx - hx, y0, cz + hz), Vec3(cx + hx, y0, cz + hz),
+        Vec3(cx + hx, y1, cz + hz), Vec3(cx - hx, y1, cz + hz),
+        Vec3(0, 0, 1), uvX, uvY
+    );
+    pushQuad(
+        Vec3(cx + hx, y0, cz - hz), Vec3(cx - hx, y0, cz - hz),
+        Vec3(cx - hx, y1, cz - hz), Vec3(cx + hx, y1, cz - hz),
+        Vec3(0, 0, -1), uvX, uvY
+    );
+    pushQuad(
+        Vec3(cx + hx, y0, cz + hz), Vec3(cx + hx, y0, cz - hz),
+        Vec3(cx + hx, y1, cz - hz), Vec3(cx + hx, y1, cz + hz),
+        Vec3(1, 0, 0), uvZ, uvY
+    );
+    pushQuad(
+        Vec3(cx - hx, y0, cz - hz), Vec3(cx - hx, y0, cz + hz),
+        Vec3(cx - hx, y1, cz + hz), Vec3(cx - hx, y1, cz - hz),
+        Vec3(-1, 0, 0), uvZ, uvY
+    );
+    pushQuad(
+        Vec3(cx - hx, y1, cz + hz), Vec3(cx + hx, y1, cz + hz),
+        Vec3(cx + hx, y1, cz - hz), Vec3(cx - hx, y1, cz - hz),
+        Vec3(0, 1, 0), uvX, uvZ
+    );
 }
 
 inline void mkFloorDecal(std::vector<float>& v, float cx, float y, float cz, float sx, float sz) {

@@ -398,7 +398,11 @@ void renderScene(){
     
     glBindTexture(GL_TEXTURE_2D,wallTex);glBindVertexArray(wallVAO);glDrawArrays(GL_TRIANGLES,0,wallVC);
     glBindVertexArray(pillarVAO);glDrawArrays(GL_TRIANGLES,0,pillarVC);
-    if(decorVC>0){glBindVertexArray(decorVAO);glDrawArrays(GL_TRIANGLES,0,decorVC);}
+    if(decorVC>0){
+        glDisable(GL_CULL_FACE);
+        glBindVertexArray(decorVAO);glDrawArrays(GL_TRIANGLES,0,decorVC);
+        glEnable(GL_CULL_FACE);
+    }
     glBindTexture(GL_TEXTURE_2D,floorTex);glBindVertexArray(floorVAO);glDrawArrays(GL_TRIANGLES,0,floorVC);
     glDisable(GL_CULL_FACE);
     glBindTexture(GL_TEXTURE_2D,ceilTex);glBindVertexArray(ceilVAO);glDrawArrays(GL_TRIANGLES,0,ceilVC);
