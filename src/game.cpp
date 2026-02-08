@@ -255,6 +255,7 @@ int main() {
     floorTex = genTex(1);
     ceilTex = genTex(2);
     lightTex = genTex(3);
+    lampTex = genTex(4);
     
     mainShader = mkShader(mainVS, mainFS);
     lightShader = mkShader(lightVS, lightFS);
