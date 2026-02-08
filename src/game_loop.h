@@ -2,123 +2,122 @@
 
 #include "coop.h"
 
-void buildGeom(){
-    std::vector<float>wv,fv,cv,pv,lv,lvOff;
-    int pcx=playerChunkX,pcz=playerChunkZ;
+void buildGeom() {
+    std::vector<float> wv, fv, cv, pv, lv, lvOff;
+    int pcx = playerChunkX, pcz = playerChunkZ;
     
-    for(int dcx=-VIEW_CHUNKS; dcx<=VIEW_CHUNKS; dcx++){
-        for(int dcz=-VIEW_CHUNKS; dcz<=VIEW_CHUNKS; dcz++){
-            auto it=chunks.find(chunkKey(pcx+dcx,pcz+dcz));
-            if(it==chunks.end()) continue;
+    for (int dcx = -VIEW_CHUNKS; dcx <= VIEW_CHUNKS; dcx++) {
+        for (int dcz = -VIEW_CHUNKS; dcz <= VIEW_CHUNKS; dcz++) {
+            auto it = chunks.find(chunkKey(pcx + dcx, pcz + dcz));
+            if (it == chunks.end()) continue;
             
-            for(int lx=0; lx<CHUNK_SIZE; lx++){
-                for(int lz=0; lz<CHUNK_SIZE; lz++){
-                    int wx=(pcx+dcx)*CHUNK_SIZE+lx;
-                    int wz=(pcz+dcz)*CHUNK_SIZE+lz;
-                    if(it->second.cells[lx][lz]!=0) continue;
+            for (int lx = 0; lx < CHUNK_SIZE; lx++) {
+                for (int lz = 0; lz < CHUNK_SIZE; lz++) {
+                    int wx = (pcx + dcx) * CHUNK_SIZE + lx;
+                    int wz = (pcz + dcz) * CHUNK_SIZE + lz;
+                    if (it->second.cells[lx][lz] != 0) continue;
                     
-                    float px=wx*CS, pz=wz*CS;
+                    float px = wx * CS, pz = wz * CS;
                     const float uvTile = 2.2f;
                     
-                    float fl[]={
-                        px,0,pz,0,0,0,1,0,
-                        px,0,pz+CS,0,uvTile,0,1,0,
-                        px+CS,0,pz+CS,uvTile,uvTile,0,1,0,
-                        px,0,pz,0,0,0,1,0,
-                        px+CS,0,pz+CS,uvTile,uvTile,0,1,0,
-                        px+CS,0,pz,uvTile,0,0,1,0
+                    float fl[] = {
+                        px, 0, pz, 0, 0, 0, 1, 0,
+                        px, 0, pz + CS, 0, uvTile, 0, 1, 0,
+                        px + CS, 0, pz + CS, uvTile, uvTile, 0, 1, 0,
+                        px, 0, pz, 0, 0, 0, 1, 0,
+                        px + CS, 0, pz + CS, uvTile, uvTile, 0, 1, 0,
+                        px + CS, 0, pz, uvTile, 0, 0, 1, 0
                     };
-                    for(int i=0;i<48;i++) fv.push_back(fl[i]);
+                    for (int i = 0; i < 48; i++) fv.push_back(fl[i]);
                     
-                    float cl[]={
-                        px,WH,pz,0,0,0,-1,0,
-                        px,WH,pz+CS,0,uvTile,0,-1,0,
-                        px+CS,WH,pz+CS,uvTile,uvTile,0,-1,0,
-                        px,WH,pz,0,0,0,-1,0,
-                        px+CS,WH,pz+CS,uvTile,uvTile,0,-1,0,
-                        px+CS,WH,pz,uvTile,0,0,-1,0
+                    float cl[] = {
+                        px, WH, pz, 0, 0, 0, -1, 0,
+                        px, WH, pz + CS, 0, uvTile, 0, -1, 0,
+                        px + CS, WH, pz + CS, uvTile, uvTile, 0, -1, 0,
+                        px, WH, pz, 0, 0, 0, -1, 0,
+                        px + CS, WH, pz + CS, uvTile, uvTile, 0, -1, 0,
+                        px + CS, WH, pz, uvTile, 0, 0, -1, 0
                     };
-                    for(int i=0;i<48;i++) cv.push_back(cl[i]);
+                    for (int i = 0; i < 48; i++) cv.push_back(cl[i]);
                     
-                    if(getCellWorld(wx-1,wz)==1) mkWall(wv,px,pz,0,CS,WH,CS,WH);
-                    if(getCellWorld(wx+1,wz)==1) mkWall(wv,px+CS,pz+CS,0,-CS,WH,CS,WH);
-                    if(getCellWorld(wx,wz-1)==1) mkWall(wv,px+CS,pz,-CS,0,WH,CS,WH);
-                    if(getCellWorld(wx,wz+1)==1) mkWall(wv,px,pz+CS,CS,0,WH,CS,WH);
+                    if (getCellWorld(wx - 1, wz) == 1) mkWall(wv, px, pz, 0, CS, WH, CS, WH);
+                    if (getCellWorld(wx + 1, wz) == 1) mkWall(wv, px + CS, pz + CS, 0, -CS, WH, CS, WH);
+                    if (getCellWorld(wx, wz - 1) == 1) mkWall(wv, px + CS, pz, -CS, 0, WH, CS, WH);
+                    if (getCellWorld(wx, wz + 1) == 1) mkWall(wv, px, pz + CS, CS, 0, WH, CS, WH);
                 }
             }
         }
     }
     
-    for(auto&p:pillars) mkPillar(pv,p.x,p.z,0.6f,WH);
-    
-    for(auto&l:lights){
-        if(l.on) mkLight(lv,l.pos,l.sizeX,l.sizeZ);
-        else mkLight(lvOff,l.pos,l.sizeX,l.sizeZ);
+    for (auto& p : pillars) mkPillar(pv, p.x, p.z, 0.6f, WH);
+    for (auto& l : lights) {
+        if (l.on) mkLight(lv, l.pos, l.sizeX, l.sizeZ);
+        else mkLight(lvOff, l.pos, l.sizeX, l.sizeZ);
     }
     
-    wallVC=(int)wv.size()/8;
-    floorVC=(int)fv.size()/8;
-    ceilVC=(int)cv.size()/8;
-    pillarVC=(int)pv.size()/8;
-    lightVC=(int)lv.size()/5;
-    lightOffVC=(int)lvOff.size()/5;
+    wallVC = (int)wv.size() / 8;
+    floorVC = (int)fv.size() / 8;
+    ceilVC = (int)cv.size() / 8;
+    pillarVC = (int)pv.size() / 8;
+    lightVC = (int)lv.size() / 5;
+    lightOffVC = (int)lvOff.size() / 5;
     
-    setupVAO(wallVAO,wallVBO,wv,true);
-    setupVAO(floorVAO,floorVBO,fv,true);
-    setupVAO(ceilVAO,ceilVBO,cv,true);
-    setupVAO(pillarVAO,pillarVBO,pv,true);
-    setupVAO(lightVAO,lightVBO,lv,false);
+    setupVAO(wallVAO, wallVBO, wv, true);
+    setupVAO(floorVAO, floorVBO, fv, true);
+    setupVAO(ceilVAO, ceilVBO, cv, true);
+    setupVAO(pillarVAO, pillarVBO, pv, true);
+    setupVAO(lightVAO, lightVBO, lv, false);
     
-    if(!lvOff.empty()) setupVAO(lightOffVAO,lightOffVBO,lvOff,false);
+    if (!lvOff.empty()) setupVAO(lightOffVAO, lightOffVBO, lvOff, false);
     
-    initQuad(quadVAO,quadVBO);
-    lastBuildChunkX=pcx;
-    lastBuildChunkZ=pcz;
+    initQuad(quadVAO, quadVBO);
+    lastBuildChunkX = pcx;
+    lastBuildChunkZ = pcz;
 }
 
-void buildNotes(float tm){
-    std::vector<float>nv;
-    for(auto&n:storyMgr.notes){
-        if(!n.active||n.collected) continue;
-        mkNoteGlow(nv,n.pos,n.bobPhase);
+void buildNotes(float tm) {
+    std::vector<float> nv;
+    for (auto& n : storyMgr.notes) {
+        if (!n.active || n.collected) continue;
+        mkNoteGlow(nv, n.pos, n.bobPhase);
     }
-    noteVC=(int)nv.size()/8;
-    if(noteVC>0) setupVAO(noteVAO,noteVBO,nv,true);
+    noteVC = (int)nv.size() / 8;
+    if (noteVC > 0) setupVAO(noteVAO, noteVBO, nv, true);
 }
 
-void trySpawnNote(int noteId){
-    if(noteId>=12||storyMgr.notesCollected[noteId]) return;
-    if(multiState==MULTI_IN_GAME && !netMgr.isHost) return;
+void trySpawnNote(int noteId) {
+    if (noteId >= 12 || storyMgr.notesCollected[noteId]) return;
+    if (multiState == MULTI_IN_GAME && !netMgr.isHost) return;
     
-    Vec3 sp=findSpawnPos(cam.pos,12.0f);
-    Vec3 d=sp-cam.pos;
-    d.y=0;
+    Vec3 sp = findSpawnPos(cam.pos, 12.0f);
+    Vec3 d = sp - cam.pos;
+    d.y = 0;
     
-    if(sqrtf(d.x*d.x+d.z*d.z)>8.0f){
-        storyMgr.spawnNote(sp,noteId);
-        lastSpawnedNote=noteId;
-        if(multiState==MULTI_IN_GAME) netMgr.sendNoteSpawn(noteId, sp);
+    if (sqrtf(d.x * d.x + d.z * d.z) > 8.0f) {
+        storyMgr.spawnNote(sp, noteId);
+        lastSpawnedNote = noteId;
+        if (multiState == MULTI_IN_GAME) netMgr.sendNoteSpawn(noteId, sp);
     }
 }
 
-void cleanupFarNotes(){
-    for(auto&n:storyMgr.notes){
-        if(!n.active||n.collected) continue;
-        Vec3 d=n.pos-cam.pos;
-        d.y=0;
-        if(sqrtf(d.x*d.x+d.z*d.z)>80.0f){
-            n.active=false;
-            if(n.id==lastSpawnedNote) lastSpawnedNote=n.id-1;
+void cleanupFarNotes() {
+    for (auto& n : storyMgr.notes) {
+        if (!n.active || n.collected) continue;
+        Vec3 d = n.pos - cam.pos;
+        d.y = 0;
+        if (sqrtf(d.x * d.x + d.z * d.z) > 80.0f) {
+            n.active = false;
+            if (n.id == lastSpawnedNote) lastSpawnedNote = n.id - 1;
         }
     }
 }
 
-void genWorld(){
-    if(multiState==MULTI_IN_GAME && !netMgr.isHost){
-        worldSeed=netMgr.worldSeed;
-    }else{
-        worldSeed=(unsigned int)time(nullptr);
-        if(multiState==MULTI_IN_GAME) netMgr.worldSeed = worldSeed;
+void genWorld() {
+    if (multiState == MULTI_IN_GAME && !netMgr.isHost) {
+        worldSeed = netMgr.worldSeed;
+    } else {
+        worldSeed = (unsigned int)time(nullptr);
+        if (multiState == MULTI_IN_GAME) netMgr.worldSeed = worldSeed;
     }
     
     chunks.clear();
@@ -126,25 +125,21 @@ void genWorld(){
     pillars.clear();
     g_lightStates.clear();
     
-    updateVisibleChunks(0,0);
-    updateLightsAndPillars(0,0);
-    Vec3 sp=findSafeSpawn();
+    updateVisibleChunks(0, 0);
+    updateLightsAndPillars(0, 0);
+    Vec3 sp = findSafeSpawn();
     Vec3 coopBase = sp;
     
-    if(multiState==MULTI_IN_GAME){
-        if(netMgr.isHost){
-            netMgr.spawnPos=sp;
-        }else{
-            sp=netMgr.spawnPos;
-            coopBase = netMgr.spawnPos;
-        }
-        sp.x+=netMgr.myId*1.5f;
+    if (multiState == MULTI_IN_GAME) {
+        if (netMgr.isHost) netMgr.spawnPos = sp;
+        else { sp = netMgr.spawnPos; coopBase = netMgr.spawnPos; }
+        sp.x += netMgr.myId * 1.5f;
     }
     
-    cam.pos=Vec3(sp.x,PH,sp.z);
-    cam.yaw=cam.pitch=0;
-    updateVisibleChunks(cam.pos.x,cam.pos.z);
-    updateLightsAndPillars(playerChunkX,playerChunkZ);
+    cam.pos = Vec3(sp.x, PH, sp.z);
+    cam.yaw = cam.pitch = 0;
+    updateVisibleChunks(cam.pos.x, cam.pos.z);
+    updateLightsAndPillars(playerChunkX, playerChunkZ);
     
     entityMgr.reset();
     storyMgr.init();
@@ -156,596 +151,199 @@ void genWorld(){
     nextWorldItemId = 1;
     invBattery = invMedkit = invBait = 0;
     clearEchoSignal();
-    echoSpawnTimer = 12.0f + (float)(rng()%8);
-    echoStatusTimer = 0.0f;
-    echoStatusText[0] = '\0';
-    trapStatusTimer = 0.0f;
-    trapStatusText[0] = '\0';
-    anomalyBlur = 0.0f;
-    lightsOutTimer = falseDoorTimer = 0.0f;
-    baitEffectTimer = 0.0f;
+    echoSpawnTimer = 12.0f + (float)(rng() % 8);
+    echoStatusTimer = trapStatusTimer = anomalyBlur = 0.0f;
+    echoStatusText[0] = trapStatusText[0] = '\0';
+    lightsOutTimer = falseDoorTimer = baitEffectTimer = 0.0f;
     itemSpawnTimer = 8.0f;
-    playerHealth=playerSanity=playerStamina=100;
-    flashlightBattery=100;
-    flashlightOn=false;
-    isPlayerDead=false;
-    flashlightShutdownBlinkActive = false;
+    playerHealth = playerSanity = playerStamina = 100;
+    flashlightBattery = 100;
+    flashlightOn = isPlayerDead = flashlightShutdownBlinkActive = false;
     flashlightShutdownBlinkTimer = 0.0f;
     resetScareSystemState(scareState);
-    entitySpawnTimer=30;
-    survivalTime=0;
-    reshuffleTimer=15;
-    lastSpawnedNote=-1;
-    noteSpawnTimer=15.0f;
+    entitySpawnTimer = 30;
+    survivalTime = reshuffleTimer = 15;
+    lastSpawnedNote = -1;
+    noteSpawnTimer = 15.0f;
 }
 
-void teleportToPlayer(){
-    if(multiState!=MULTI_IN_GAME) return;
-    if(!netMgr.hasOtherPlayersWithPos()) return;
-    
-    Vec3 tp=netMgr.getOtherPlayerPos();
-    cam.pos=Vec3(tp.x+1.0f,PH,tp.z);
-    updateVisibleChunks(cam.pos.x,cam.pos.z);
-    updateLightsAndPillars(playerChunkX,playerChunkZ);
+void teleportToPlayer() {
+    if (multiState != MULTI_IN_GAME || !netMgr.hasOtherPlayersWithPos()) return;
+    Vec3 tp = netMgr.getOtherPlayerPos();
+    cam.pos = Vec3(tp.x + 1.0f, PH, tp.z);
+    updateVisibleChunks(cam.pos.x, cam.pos.z);
+    updateLightsAndPillars(playerChunkX, playerChunkZ);
     buildGeom();
 }
 
-void mouse(GLFWwindow*,double xp,double yp){
-    if(gameState!=STATE_GAME&&gameState!=STATE_INTRO) return;
-    
-    if(firstMouse){
-        lastX=(float)xp;
-        lastY=(float)yp;
-        firstMouse=false;
-    }
-    
-    cam.yaw-=((float)xp-lastX)*settings.mouseSens;
-    cam.pitch+=(lastY-(float)yp)*settings.mouseSens;
-    
-    if(cam.pitch>1.4f) cam.pitch=1.4f;
-    if(cam.pitch<-1.4f) cam.pitch=-1.4f;
-    
-    lastX=(float)xp;
-    lastY=(float)yp;
+void mouse(GLFWwindow*, double xp, double yp) {
+    if (gameState != STATE_GAME && gameState != STATE_INTRO) return;
+    if (firstMouse) { lastX = (float)xp; lastY = (float)yp; firstMouse = false; }
+    cam.yaw -= ((float)xp - lastX) * settings.mouseSens;
+    cam.pitch += (lastY - (float)yp) * settings.mouseSens;
+    if (cam.pitch > 1.4f) cam.pitch = 1.4f;
+    if (cam.pitch < -1.4f) cam.pitch = -1.4f;
+    lastX = (float)xp;
+    lastY = (float)yp;
 }
 
-void gameInput(GLFWwindow*w){
-    if(glfwGetKey(w,settings.binds.pause)==GLFW_PRESS&&!escPressed){
-        gameState=STATE_PAUSE;menuSel=0;
-        glfwSetInputMode(w,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
-    }
-    escPressed=glfwGetKey(w,settings.binds.pause)==GLFW_PRESS;
-    updateMinimapCheat(w);
-    
-    bool fNow=glfwGetKey(w,settings.binds.flashlight)==GLFW_PRESS;
-    if(fNow&&!flashlightPressed&&flashlightBattery>5.0f){
-        flashlightOn=!flashlightOn;
-        if(!flashlightOn){
-            flashlightShutdownBlinkActive = false;
-            flashlightShutdownBlinkTimer = 0.0f;
-        }
-        sndState.flashlightOn=flashlightOn?1.0f:0.0f;
-    }
-    flashlightPressed=fNow;
-    
-    bool eNow=glfwGetKey(w,settings.binds.interact)==GLFW_PRESS;
-    nearbyWorldItemId = -1;
-    nearbyWorldItemType = -1;
-    for(auto& it:worldItems){
-        if(!it.active) continue;
-        if(nearPoint2D(cam.pos, it.pos, 2.2f)){
-            nearbyWorldItemId = it.id;
-            nearbyWorldItemType = it.type;
-            break;
-        }
-    }
-    bool nearEchoSignal = echoSignal.active && isEchoInRange(cam.pos, echoSignal.pos, 2.5f);
-    if(eNow&&!interactPressed&&nearNoteId>=0){
-        if(storyMgr.checkNotePickup(cam.pos,4.0f)){
-            if(tryTriggerStoryScare(scareState, storyMgr.currentNote)){
-                triggerLocalScare(0.34f, 0.18f, 5.0f);
-            }
-            gameState=STATE_NOTE;
-            playerSanity-=8.0f;
-            if(playerSanity<0)playerSanity=0;
-            if(multiState==MULTI_IN_GAME) netMgr.sendNoteCollect(nearNoteId);
-        }
-    }else if(eNow&&!interactPressed&&nearbyWorldItemId>=0){
-        if(multiState==MULTI_IN_GAME){
-            if(netMgr.isHost){
-                for(auto& it:worldItems){
-                    if(!it.active||it.id!=nearbyWorldItemId) continue;
-                    it.active=false;
-                    if(it.type==0) invBattery++;
-                    else if(it.type==1) invMedkit++;
-                    else invBait++;
-                    break;
-                }
-            }else{
-                netMgr.sendInteractRequest(REQ_PICK_ITEM, nearbyWorldItemId);
-            }
-        }else{
-            for(auto& it:worldItems){
-                if(!it.active||it.id!=nearbyWorldItemId) continue;
-                it.active=false;
-                if(it.type==0) invBattery++;
-                else if(it.type==1) invMedkit++;
+void handleItemPickup() {
+    if (multiState == MULTI_IN_GAME) {
+        if (netMgr.isHost) {
+            for (auto& it : worldItems) {
+                if (!it.active || it.id != nearbyWorldItemId) continue;
+                it.active = false;
+                if (it.type == 0) invBattery++;
+                else if (it.type == 1) invMedkit++;
                 else invBait++;
                 break;
             }
+        } else {
+            netMgr.sendInteractRequest(REQ_PICK_ITEM, nearbyWorldItemId);
         }
-    }else if(eNow&&!interactPressed&&nearEchoSignal){
-        resolveEchoInteraction();
-    }
-    interactPressed=eNow;
-    
-    static bool key1Pressed=false,key2Pressed=false,key3Pressed=false;
-    bool k1=glfwGetKey(w,settings.binds.item1)==GLFW_PRESS;
-    bool k2=glfwGetKey(w,settings.binds.item2)==GLFW_PRESS;
-    bool k3=glfwGetKey(w,settings.binds.item3)==GLFW_PRESS;
-    if(k1&&!key1Pressed) applyItemUse(0);
-    if(k2&&!key2Pressed) applyItemUse(1);
-    if(k3&&!key3Pressed) applyItemUse(2);
-    key1Pressed=k1; key2Pressed=k2; key3Pressed=k3;
-    
-    float spd=4.0f*dTime;
-    bool sprinting=glfwGetKey(w,settings.binds.sprint)==GLFW_PRESS&&playerStamina>0&&staminaCooldown<=0;
-    if(sprinting){
-        spd*=1.6f;playerStamina-=20.0f*dTime;
-        if(playerStamina<0){playerStamina=0;staminaCooldown=1.5f;}
-    }else{
-        playerStamina+=15.0f*dTime;
-        if(playerStamina>100)playerStamina=100;
-    }
-    if(staminaCooldown>0)staminaCooldown-=dTime;
-    
-    if(glfwGetKey(w,settings.binds.crouch)==GLFW_PRESS){
-        cam.targetH=PH_CROUCH;cam.crouch=true;spd*=0.5f;
-    }else{cam.targetH=PH;cam.crouch=false;}
-    cam.curH+=(cam.targetH-cam.curH)*10.0f*dTime;
-    
-    Vec3 fwd(sinf(cam.yaw),0,cosf(cam.yaw)),right(cosf(cam.yaw),0,-sinf(cam.yaw));
-    Vec3 np=cam.pos;bool mv=false;
-    if(glfwGetKey(w,settings.binds.forward)==GLFW_PRESS){np=np+fwd*spd;mv=true;}
-    if(glfwGetKey(w,settings.binds.back)==GLFW_PRESS){np=np-fwd*spd;mv=true;}
-    if(glfwGetKey(w,settings.binds.left)==GLFW_PRESS){np=np+right*spd;mv=true;}
-    if(glfwGetKey(w,settings.binds.right)==GLFW_PRESS){np=np-right*spd;mv=true;}
-    
-    if(!collideWorld(np.x,cam.pos.z,PR)&&!collideCoopDoor(np.x,cam.pos.z,PR)&&!(falseDoorTimer>0&&nearPoint2D(Vec3(np.x,0,cam.pos.z),falseDoorPos,1.0f)))cam.pos.x=np.x;
-    if(!collideWorld(cam.pos.x,np.z,PR)&&!collideCoopDoor(cam.pos.x,np.z,PR)&&!(falseDoorTimer>0&&nearPoint2D(Vec3(cam.pos.x,0,np.z),falseDoorPos,1.0f)))cam.pos.z=np.z;
-    
-    static float bobT=0,lastB=0;
-    if(mv){
-        bobT+=dTime*(spd>5.0f?12.0f:8.0f);
-        float cb=sinf(bobT);cam.pos.y=cam.curH+cb*0.04f;
-        if(lastB>-0.7f&&cb<=-0.7f&&!sndState.stepTrig){
-            sndState.stepTrig=true;sndState.footPhase=0;
+    } else {
+        for (auto& it : worldItems) {
+            if (!it.active || it.id != nearbyWorldItemId) continue;
+            it.active = false;
+            if (it.type == 0) invBattery++;
+            else if (it.type == 1) invMedkit++;
+            else invBait++;
+            break;
         }
-        lastB=cb;
-    }else{
-        cam.pos.y=cam.curH+(cam.pos.y-cam.curH)*0.9f;bobT=0;lastB=0;
     }
-    
-    if(flashlightOn){
-        if(!flashlightShutdownBlinkActive && shouldStartFlashlightShutdownBlink(flashlightBattery)){
-            flashlightShutdownBlinkActive = true;
-            flashlightShutdownBlinkTimer = 0.0f;
-        }
+}
 
-        if(flashlightShutdownBlinkActive){
+void handleMovement(GLFWwindow* w) {
+    float spd = 4.0f * dTime;
+    bool sprinting = glfwGetKey(w, settings.binds.sprint) == GLFW_PRESS && 
+                     playerStamina > 0 && staminaCooldown <= 0;
+    
+    if (sprinting) {
+        spd *= 1.6f;
+        playerStamina -= 20.0f * dTime;
+        if (playerStamina < 0) { playerStamina = 0; staminaCooldown = 1.5f; }
+    } else {
+        playerStamina += 15.0f * dTime;
+        if (playerStamina > 100) playerStamina = 100;
+    }
+    if (staminaCooldown > 0) staminaCooldown -= dTime;
+    
+    if (glfwGetKey(w, settings.binds.crouch) == GLFW_PRESS) {
+        cam.targetH = PH_CROUCH; cam.crouch = true; spd *= 0.5f;
+    } else { cam.targetH = PH; cam.crouch = false; }
+    cam.curH += (cam.targetH - cam.curH) * 10.0f * dTime;
+    
+    Vec3 fwd(sinf(cam.yaw), 0, cosf(cam.yaw));
+    Vec3 right(cosf(cam.yaw), 0, -sinf(cam.yaw));
+    Vec3 np = cam.pos;
+    bool mv = false;
+    
+    if (glfwGetKey(w, settings.binds.forward) == GLFW_PRESS) { np = np + fwd * spd; mv = true; }
+    if (glfwGetKey(w, settings.binds.back) == GLFW_PRESS) { np = np - fwd * spd; mv = true; }
+    if (glfwGetKey(w, settings.binds.left) == GLFW_PRESS) { np = np + right * spd; mv = true; }
+    if (glfwGetKey(w, settings.binds.right) == GLFW_PRESS) { np = np - right * spd; mv = true; }
+    
+    bool blockX = collideWorld(np.x, cam.pos.z, PR) || collideCoopDoor(np.x, cam.pos.z, PR);
+    bool blockZ = collideWorld(cam.pos.x, np.z, PR) || collideCoopDoor(cam.pos.x, np.z, PR);
+    if (falseDoorTimer > 0) {
+        if (nearPoint2D(Vec3(np.x, 0, cam.pos.z), falseDoorPos, 1.0f)) blockX = true;
+        if (nearPoint2D(Vec3(cam.pos.x, 0, np.z), falseDoorPos, 1.0f)) blockZ = true;
+    }
+    if (!blockX) cam.pos.x = np.x;
+    if (!blockZ) cam.pos.z = np.z;
+    
+    static float bobT = 0, lastB = 0;
+    if (mv) {
+        bobT += dTime * (spd > 5.0f ? 12.0f : 8.0f);
+        float cb = sinf(bobT);
+        cam.pos.y = cam.curH + cb * 0.04f;
+        if (lastB > -0.7f && cb <= -0.7f && !sndState.stepTrig) {
+            sndState.stepTrig = true; sndState.footPhase = 0;
+        }
+        lastB = cb;
+    } else { cam.pos.y = cam.curH + (cam.pos.y - cam.curH) * 0.9f; bobT = lastB = 0; }
+}
+
+void handleFlashlight() {
+    if (flashlightOn) {
+        if (!flashlightShutdownBlinkActive && shouldStartFlashlightShutdownBlink(flashlightBattery)) {
+            flashlightShutdownBlinkActive = true; flashlightShutdownBlinkTimer = 0.0f;
+        }
+        if (flashlightShutdownBlinkActive) {
             flashlightShutdownBlinkTimer += dTime;
             sndState.flashlightOn = isFlashlightOnDuringShutdownBlink(flashlightShutdownBlinkTimer) ? 1.0f : 0.0f;
             flashlightBattery -= dTime * 1.67f;
-            if(flashlightBattery < 0.0f) flashlightBattery = 0.0f;
-            if(isFlashlightShutdownBlinkFinished(flashlightShutdownBlinkTimer)){
-                flashlightBattery = 0.0f;
-                flashlightOn = false;
-                flashlightShutdownBlinkActive = false;
-                flashlightShutdownBlinkTimer = 0.0f;
-                sndState.flashlightOn = 0.0f;
+            if (flashlightBattery < 0.0f) flashlightBattery = 0.0f;
+            if (isFlashlightShutdownBlinkFinished(flashlightShutdownBlinkTimer)) {
+                flashlightBattery = flashlightOn = flashlightShutdownBlinkActive = 0;
+                flashlightShutdownBlinkTimer = sndState.flashlightOn = 0.0f;
             }
-        }else{
+        } else {
             sndState.flashlightOn = 1.0f;
-            flashlightBattery-=dTime*1.67f;
-            if(flashlightBattery<=0){flashlightBattery=0;flashlightOn=false;sndState.flashlightOn=0;}
+            flashlightBattery -= dTime * 1.67f;
+            if (flashlightBattery <= 0) { flashlightBattery = flashlightOn = 0; sndState.flashlightOn = 0; }
         }
-    }else{
-        flashlightShutdownBlinkActive = false;
-        flashlightShutdownBlinkTimer = 0.0f;
-        flashlightBattery+=dTime*10.0f;
-        if(flashlightBattery>100)flashlightBattery=100;
+    } else {
+        flashlightShutdownBlinkActive = false; flashlightShutdownBlinkTimer = 0.0f;
+        flashlightBattery += dTime * 10.0f;
+        if (flashlightBattery > 100) flashlightBattery = 100;
     }
-
 }
 
-void renderScene(){
-    struct MainUniforms {
-        GLint P, V, M, vp, tm, danger, flashOn, flashDir, rfc, rfp, rfd, nl, lp;
-    };
-    struct LightUniforms {
-        GLint P, V, M, inten, tm, fade;
-    };
+void gameInput(GLFWwindow* w) {
+    if (glfwGetKey(w, settings.binds.pause) == GLFW_PRESS && !escPressed) {
+        gameState = STATE_PAUSE; menuSel = 0;
+        glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
+    escPressed = glfwGetKey(w, settings.binds.pause) == GLFW_PRESS;
+    updateMinimapCheat(w);
     
-    static MainUniforms mu = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
-    static LightUniforms lu = {-1,-1,-1,-1,-1,-1};
+    bool fNow = glfwGetKey(w, settings.binds.flashlight) == GLFW_PRESS;
+    if (fNow && !flashlightPressed && flashlightBattery > 5.0f) {
+        flashlightOn = !flashlightOn;
+        if (!flashlightOn) { flashlightShutdownBlinkActive = false; flashlightShutdownBlinkTimer = 0.0f; }
+        sndState.flashlightOn = flashlightOn ? 1.0f : 0.0f;
+    }
+    flashlightPressed = fNow;
     
-    if(mu.P < 0){
-        mu.P = glGetUniformLocation(mainShader,"P");
-        mu.V = glGetUniformLocation(mainShader,"V");
-        mu.M = glGetUniformLocation(mainShader,"M");
-        mu.vp = glGetUniformLocation(mainShader,"vp");
-        mu.tm = glGetUniformLocation(mainShader,"tm");
-        mu.danger = glGetUniformLocation(mainShader,"danger");
-        mu.flashOn = glGetUniformLocation(mainShader,"flashOn");
-        mu.flashDir = glGetUniformLocation(mainShader,"flashDir");
-        mu.rfc = glGetUniformLocation(mainShader,"rfc");
-        mu.rfp = glGetUniformLocation(mainShader,"rfp");
-        mu.rfd = glGetUniformLocation(mainShader,"rfd");
-        mu.nl = glGetUniformLocation(mainShader,"nl");
-        mu.lp = glGetUniformLocation(mainShader,"lp");
+    bool eNow = glfwGetKey(w, settings.binds.interact) == GLFW_PRESS;
+    nearbyWorldItemId = nearbyWorldItemType = -1;
+    for (auto& it : worldItems) {
+        if (!it.active) continue;
+        if (nearPoint2D(cam.pos, it.pos, 2.2f)) {
+            nearbyWorldItemId = it.id; nearbyWorldItemType = it.type; break;
+        }
     }
     
-    if(lu.P < 0){
-        lu.P = glGetUniformLocation(lightShader,"P");
-        lu.V = glGetUniformLocation(lightShader,"V");
-        lu.M = glGetUniformLocation(lightShader,"M");
-        lu.inten = glGetUniformLocation(lightShader,"inten");
-        lu.tm = glGetUniformLocation(lightShader,"tm");
-        lu.fade = glGetUniformLocation(lightShader,"fade");
+    bool nearEchoSignal = echoSignal.active && isEchoInRange(cam.pos, echoSignal.pos, 2.5f);
+    if (eNow && !interactPressed && nearNoteId >= 0) {
+        if (storyMgr.checkNotePickup(cam.pos, 4.0f)) {
+            if (tryTriggerStoryScare(scareState, storyMgr.currentNote)) triggerLocalScare(0.34f, 0.18f, 5.0f);
+            gameState = STATE_NOTE;
+            playerSanity -= 8.0f;
+            if (playerSanity < 0) playerSanity = 0;
+            if (multiState == MULTI_IN_GAME) netMgr.sendNoteCollect(nearNoteId);
+        }
+    } else if (eNow && !interactPressed && nearbyWorldItemId >= 0) {
+        handleItemPickup();
+    } else if (eNow && !interactPressed && nearEchoSignal) {
+        resolveEchoInteraction();
     }
-
-    glUseProgram(mainShader);
-    Mat4 proj=Mat4::persp(1.2f,(float)winW/winH,0.1f,100.0f);
+    interactPressed = eNow;
     
-    float shX=camShake*(rand()%100-50)/500.0f;
-    float shY=camShake*(rand()%100-50)/500.0f;
+    static bool key1P = false, key2P = false, key3P = false;
+    bool k1 = glfwGetKey(w, settings.binds.item1) == GLFW_PRESS;
+    bool k2 = glfwGetKey(w, settings.binds.item2) == GLFW_PRESS;
+    bool k3 = glfwGetKey(w, settings.binds.item3) == GLFW_PRESS;
+    if (k1 && !key1P) applyItemUse(0);
+    if (k2 && !key2P) applyItemUse(1);
+    if (k3 && !key3P) applyItemUse(2);
+    key1P = k1; key2P = k2; key3P = k3;
     
-    Vec3 la=cam.pos+Vec3(
-        sinf(cam.yaw+shX)*cosf(cam.pitch+shY),
-        sinf(cam.pitch+shY),
-        cosf(cam.yaw+shX)*cosf(cam.pitch+shY)
-    );
-    
-    Mat4 view=Mat4::look(cam.pos,la,Vec3(0,1,0));
-    Mat4 model;
-    
-    glUniformMatrix4fv(mu.P,1,GL_FALSE,proj.m);
-    glUniformMatrix4fv(mu.V,1,GL_FALSE,view.m);
-    glUniformMatrix4fv(mu.M,1,GL_FALSE,model.m);
-    glUniform3f(mu.vp,cam.pos.x,cam.pos.y,cam.pos.z);
-    glUniform1f(mu.tm,vhsTime);
-    glUniform1f(mu.danger,entityMgr.dangerLevel);
-    
-    bool flashVisualOn = flashlightOn;
-    if(flashlightOn && flashlightShutdownBlinkActive){
-        flashVisualOn = isFlashlightOnDuringShutdownBlink(flashlightShutdownBlinkTimer);
-    }
-    
-    glUniform1i(mu.flashOn,flashVisualOn?1:0);
-    glUniform3f(mu.flashDir,
-        sinf(cam.yaw)*cosf(cam.pitch),
-        sinf(cam.pitch),
-        cosf(cam.yaw)*cosf(cam.pitch)
-    );
-    
-    float remoteFlashPos[12] = {0};
-    float remoteFlashDir[12] = {0};
-    int remoteFlashCount = 0;
-    
-    if(multiState==MULTI_IN_GAME){
-        remoteFlashCount = gatherRemoteFlashlights(netMgr.myId, remoteFlashPos, remoteFlashDir);
-    }
-    
-    glUniform1i(mu.rfc,remoteFlashCount);
-    if(remoteFlashCount>0){
-        glUniform3fv(mu.rfp,remoteFlashCount,remoteFlashPos);
-        glUniform3fv(mu.rfd,remoteFlashCount,remoteFlashDir);
-    }
-    
-    float lpos[SCENE_LIGHT_LIMIT * 3] = {0};
-    int nl = gatherNearestSceneLights(lights, cam.pos, lpos);
-    glUniform1i(mu.nl,nl);
-    if(nl>0) glUniform3fv(mu.lp,nl,lpos);
-    
-    glBindTexture(GL_TEXTURE_2D,wallTex);
-    glBindVertexArray(wallVAO);
-    glDrawArrays(GL_TRIANGLES,0,wallVC);
-    
-    glBindVertexArray(pillarVAO);
-    glDrawArrays(GL_TRIANGLES,0,pillarVC);
-    
-    glBindTexture(GL_TEXTURE_2D,floorTex);
-    glBindVertexArray(floorVAO);
-    glDrawArrays(GL_TRIANGLES,0,floorVC);
-    
-    glDisable(GL_CULL_FACE);
-    glBindTexture(GL_TEXTURE_2D,ceilTex);
-    glBindVertexArray(ceilVAO);
-    glDrawArrays(GL_TRIANGLES,0,ceilVC);
-    
-    if(noteVC>0){
-        glBindTexture(GL_TEXTURE_2D,lightTex);
-        glBindVertexArray(noteVAO);
-        glDrawArrays(GL_TRIANGLES,0,noteVC);
-    }
-    glEnable(GL_CULL_FACE);
-    
-    if(multiState==MULTI_IN_GAME && playerModelsInit){
-        renderPlayers(mainShader, proj, view, netMgr.myId);
-    }
-    
-    glUseProgram(lightShader);
-    glUniformMatrix4fv(lu.P,1,GL_FALSE,proj.m);
-    glUniformMatrix4fv(lu.V,1,GL_FALSE,view.m);
-    glUniformMatrix4fv(lu.M,1,GL_FALSE,model.m);
-    glUniform1f(lu.inten,1.2f);
-    glUniform1f(lu.tm,vhsTime);
-    glUniform1f(lu.fade,1.0f);
-    
-    glBindTexture(GL_TEXTURE_2D,lightTex);
-    glBindVertexArray(lightVAO);
-    glDrawArrays(GL_TRIANGLES,0,lightVC);
-    
-    if(lightOffVC>0){
-        glUniform1f(lu.inten,0.15f);
-        glUniform1f(lu.fade,1.0f);
-        glBindVertexArray(lightOffVAO);
-        glDrawArrays(GL_TRIANGLES,0,lightOffVC);
-    }
-    
-    entityMgr.render(mainShader,proj,view);
+    handleMovement(w);
+    handleFlashlight();
 }
 
+#include "scene_render.h"
 #include "hud.h"
 #include "game_state.h"
-
-int main(){
-    std::random_device rd;
-    rng.seed(rd());
-    
-    if(!glfwInit()) return -1;
-    
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
-    
-    gWin=glfwCreateWindow(winW,winH,"Backrooms - Level 0",NULL,NULL);
-    if(!gWin){
-        glfwTerminate();
-        return -1;
-    }
-    
-    glfwMakeContextCurrent(gWin);
-    glfwSetCursorPosCallback(gWin,mouse);
-    glfwSetFramebufferSizeCallback(gWin,windowResize);
-    
-    if(!gladLoadGL()) return -1;
-    
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-    
-    genWorld();
-    wallTex=genTex(0);
-    floorTex=genTex(1);
-    ceilTex=genTex(2);
-    lightTex=genTex(3);
-    
-    mainShader=mkShader(mainVS,mainFS);
-    lightShader=mkShader(lightVS,lightFS);
-    vhsShader=mkShader(vhsVS,vhsFS);
-    
-    buildGeom();
-    computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), renderW, renderH);
-    initFBO(fbo,fboTex,rbo,renderW,renderH);
-    initTaaTargets();
-    initText();
-    entityMgr.init();
-    initPlayerModels();
-    playerModelsInit = true;
-    
-    std::thread aT(audioThread);
-    
-    while(!glfwWindowShouldClose(gWin)){
-        float now=(float)glfwGetTime();
-        dTime=now-lastFrame;
-        lastFrame=now;
-        vhsTime=now;
-        
-        int desiredRenderW = 0, desiredRenderH = 0;
-        computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), desiredRenderW, desiredRenderH);
-        
-        if(desiredRenderW != renderW || desiredRenderH != renderH){
-            renderW = desiredRenderW;
-            renderH = desiredRenderH;
-            if(fbo) glDeleteFramebuffers(1, &fbo);
-            if(fboTex) glDeleteTextures(1, &fboTex);
-            if(rbo) glDeleteRenderbuffers(1, &rbo);
-            initFBO(fbo, fboTex, rbo, renderW, renderH);
-        }
-        
-        sndState.masterVol=settings.masterVol;
-        sndState.dangerLevel=entityMgr.dangerLevel;
-        sndState.musicVol=settings.musicVol;
-        sndState.ambienceVol=settings.ambienceVol;
-        sndState.sfxVol=settings.sfxVol;
-        sndState.voiceVol=settings.voiceVol;
-        sndState.sanityLevel=playerSanity/100.0f;
-        currentWinW=winW;
-        currentWinH=winH;
-        
-        processGameState();
-        
-        glBindFramebuffer(GL_FRAMEBUFFER,fbo);
-        glViewport(0,0,renderW,renderH);
-        glClearColor(0.02f,0.02f,0.02f,1);
-        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-        
-        if(gameState==STATE_GAME||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_KEYBINDS_PAUSE||gameState==STATE_NOTE){
-            renderScene();
-        }
-        
-        glBindFramebuffer(GL_FRAMEBUFFER,0);
-        glViewport(0,0,winW,winH);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glDisable(GL_DEPTH_TEST);
-
-        glUseProgram(vhsShader);
-
-        bool vhsMenu=(gameState==STATE_MENU||gameState==STATE_MULTI||gameState==STATE_MULTI_HOST||gameState==STATE_MULTI_JOIN||gameState==STATE_MULTI_WAIT||gameState==STATE_SETTINGS||gameState==STATE_KEYBINDS);
-        bool vhsGameplay=(gameState==STATE_GAME||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_KEYBINDS_PAUSE||gameState==STATE_NOTE||gameState==STATE_INTRO);
-        float vI=0.0f;
-        if(vhsMenu){
-            vI=0.22f+settings.vhsIntensity*0.58f;
-        }else if(vhsGameplay){
-            float sanityLoss=1.0f-(playerSanity/100.0f);
-            if(sanityLoss<0.0f) sanityLoss=0.0f;
-            if(sanityLoss>1.0f) sanityLoss=1.0f;
-            float stress=entityMgr.dangerLevel*0.65f+sanityLoss*0.35f;
-            if(stress<0.0f) stress=0.0f;
-            if(stress>1.0f) stress=1.0f;
-            vI=settings.vhsIntensity*(0.26f+0.44f*stress) + anomalyBlur * 0.55f;
-        }
-
-        static GLint vhsTmLoc = -1;
-        static GLint vhsIntenLoc = -1;
-        static GLint vhsUpscalerLoc = -1;
-        static GLint vhsAaModeLoc = -1;
-        static GLint vhsSharpnessLoc = -1;
-        static GLint vhsTexelXLoc = -1;
-        static GLint vhsTexelYLoc = -1;
-        static GLint vhsInMenuLoc = -1;
-        static GLint vhsTaaHistLoc = -1;
-        static GLint vhsTaaBlendLoc = -1;
-        static GLint vhsTaaJitterLoc = -1;
-        static GLint vhsTaaValidLoc = -1;
-
-        if(vhsTmLoc<0){
-            glUniform1i(glGetUniformLocation(vhsShader,"tex"),0);
-            vhsTmLoc = glGetUniformLocation(vhsShader,"tm");
-            vhsIntenLoc = glGetUniformLocation(vhsShader,"inten");
-            vhsUpscalerLoc = glGetUniformLocation(vhsShader,"upscaler");
-            vhsAaModeLoc = glGetUniformLocation(vhsShader,"aaMode");
-            vhsSharpnessLoc = glGetUniformLocation(vhsShader,"sharpness");
-            vhsTexelXLoc = glGetUniformLocation(vhsShader,"texelX");
-            vhsTexelYLoc = glGetUniformLocation(vhsShader,"texelY");
-            vhsInMenuLoc = glGetUniformLocation(vhsShader,"inMenu");
-            vhsTaaHistLoc = glGetUniformLocation(vhsShader,"histTex");
-            vhsTaaBlendLoc = glGetUniformLocation(vhsShader,"taaBlend");
-            vhsTaaJitterLoc = glGetUniformLocation(vhsShader,"taaJitter");
-            vhsTaaValidLoc = glGetUniformLocation(vhsShader,"taaValid");
-        }
-        
-        int inMenu = (gameState == STATE_MENU || gameState == STATE_MULTI || 
-                      gameState == STATE_MULTI_HOST || gameState == STATE_MULTI_JOIN ||
-                      gameState == STATE_MULTI_WAIT || gameState == STATE_SETTINGS) ? 1 : 0;
-        
-        static int prevAaMode = -1;
-        int aaMode = clampAaMode(settings.aaMode);
-        if(aaMode != prevAaMode){
-            prevAaMode = aaMode;
-            taaHistoryValid = false;
-            taaFrameIndex = 0;
-        }
-        float jitterX = 0.0f;
-        float jitterY = 0.0f;
-        if(aaMode == AA_MODE_TAA){
-            static const float jitterSeq[8][2] = {
-                {0.5f, 0.5f}, {0.75f, 0.25f}, {0.25f, 0.75f}, {0.875f, 0.625f},
-                {0.375f, 0.125f}, {0.625f, 0.875f}, {0.125f, 0.375f}, {0.9375f, 0.9375f}
-            };
-            jitterX = jitterSeq[taaFrameIndex & 7][0] - 0.5f;
-            jitterY = jitterSeq[taaFrameIndex & 7][1] - 0.5f;
-        }
-
-        if(aaMode==AA_MODE_TAA){
-            glBindFramebuffer(GL_FRAMEBUFFER,taaResolveFbo);
-            glViewport(0,0,winW,winH);
-            glClear(GL_COLOR_BUFFER_BIT);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D,fboTex);
-            glActiveTexture(GL_TEXTURE0 + 1);
-            glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
-            glUniform1i(vhsTaaHistLoc,1);
-            glActiveTexture(GL_TEXTURE0);
-            glUniform1f(vhsTmLoc,vhsTime);
-            glUniform1f(vhsIntenLoc,vI);
-            glUniform1i(vhsUpscalerLoc,clampUpscalerMode(settings.upscalerMode));
-            glUniform1i(vhsAaModeLoc,AA_MODE_TAA);
-            glUniform1f(vhsSharpnessLoc,clampFsrSharpness(settings.fsrSharpness));
-            glUniform1f(vhsTexelXLoc,1.0f/(float)renderW);
-            glUniform1f(vhsTexelYLoc,1.0f/(float)renderH);
-            glUniform1f(vhsTaaBlendLoc,0.88f);
-            glUniform3f(vhsTaaJitterLoc,jitterX,jitterY,0.0f);
-            glUniform1f(vhsTaaValidLoc,taaHistoryValid?1.0f:0.0f);
-            glUniform1i(vhsInMenuLoc,inMenu);
-            glBindVertexArray(quadVAO);
-            glDrawArrays(GL_TRIANGLES,0,6);
-
-            taaHistoryValid = true;
-            taaFrameIndex = (taaFrameIndex + 1) & 7;
-
-            GLuint taaTmp = taaHistoryTex;
-            taaHistoryTex = taaResolveTex;
-            taaResolveTex = taaTmp;
-            glBindFramebuffer(GL_FRAMEBUFFER,taaResolveFbo);
-            glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,taaResolveTex,0);
-
-            glBindFramebuffer(GL_FRAMEBUFFER,0);
-            glViewport(0,0,winW,winH);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
-            glActiveTexture(GL_TEXTURE0 + 1);
-            glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
-            glUniform1i(vhsTaaHistLoc,1);
-            glActiveTexture(GL_TEXTURE0);
-            glUniform1f(vhsTmLoc,vhsTime);
-            glUniform1f(vhsIntenLoc,0.0f);
-            glUniform1i(vhsUpscalerLoc,UPSCALER_MODE_OFF);
-            glUniform1i(vhsAaModeLoc,AA_MODE_OFF);
-            glUniform1f(vhsSharpnessLoc,0.0f);
-            glUniform1f(vhsTexelXLoc,1.0f/(float)winW);
-            glUniform1f(vhsTexelYLoc,1.0f/(float)winH);
-            glUniform1f(vhsTaaBlendLoc,0.0f);
-            glUniform3f(vhsTaaJitterLoc,0.0f,0.0f,0.0f);
-            glUniform1f(vhsTaaValidLoc,0.0f);
-            glUniform1i(vhsInMenuLoc,inMenu);
-            glBindVertexArray(quadVAO);
-            glDrawArrays(GL_TRIANGLES,0,6);
-        }else{
-            taaHistoryValid = false;
-            taaFrameIndex = 0;
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D,fboTex);
-            glActiveTexture(GL_TEXTURE0 + 1);
-            glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
-            glUniform1i(vhsTaaHistLoc,1);
-            glActiveTexture(GL_TEXTURE0);
-            glUniform1f(vhsTmLoc,vhsTime);
-            glUniform1f(vhsIntenLoc,vI);
-            glUniform1i(vhsUpscalerLoc,clampUpscalerMode(settings.upscalerMode));
-            glUniform1i(vhsAaModeLoc,aaMode);
-            glUniform1f(vhsSharpnessLoc,clampFsrSharpness(settings.fsrSharpness));
-            glUniform1f(vhsTexelXLoc,1.0f/(float)renderW);
-            glUniform1f(vhsTexelYLoc,1.0f/(float)renderH);
-            glUniform1f(vhsTaaBlendLoc,0.0f);
-            glUniform3f(vhsTaaJitterLoc,0.0f,0.0f,0.0f);
-            glUniform1f(vhsTaaValidLoc,0.0f);
-            glUniform1i(vhsInMenuLoc,inMenu);
-            glBindVertexArray(quadVAO);
-            glDrawArrays(GL_TRIANGLES,0,6);
-        }
-        glEnable(GL_DEPTH_TEST);
-        
-        drawUI();
-        
-        glfwSwapBuffers(gWin);
-        glfwPollEvents();
-    }
-    
-    audioRunning=false;
-    SetEvent(hEvent);
-    aT.join();
-    glfwTerminate();
-    
-    return 0;
-}

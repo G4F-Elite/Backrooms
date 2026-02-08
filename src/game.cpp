@@ -224,3 +224,256 @@ GLuint mkShader(const char* vs, const char* fs) {
 
 // Include game loop (uses all above)
 #include "game_loop.h"
+
+int main() {
+    std::random_device rd;
+    rng.seed(rd());
+    
+    if (!glfwInit()) return -1;
+    
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    
+    gWin = glfwCreateWindow(winW, winH, "Backrooms - Level 0", NULL, NULL);
+    if (!gWin) {
+        glfwTerminate();
+        return -1;
+    }
+    
+    glfwMakeContextCurrent(gWin);
+    glfwSetCursorPosCallback(gWin, mouse);
+    glfwSetFramebufferSizeCallback(gWin, windowResize);
+    
+    if (!gladLoadGL()) return -1;
+    
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    
+    genWorld();
+    wallTex = genTex(0);
+    floorTex = genTex(1);
+    ceilTex = genTex(2);
+    lightTex = genTex(3);
+    
+    mainShader = mkShader(mainVS, mainFS);
+    lightShader = mkShader(lightVS, lightFS);
+    vhsShader = mkShader(vhsVS, vhsFS);
+    
+    buildGeom();
+    computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), renderW, renderH);
+    initFBO(fbo, fboTex, rbo, renderW, renderH);
+    initTaaTargets();
+    initText();
+    entityMgr.init();
+    initPlayerModels();
+    playerModelsInit = true;
+    
+    std::thread aT(audioThread);
+    
+    while (!glfwWindowShouldClose(gWin)) {
+        float now = (float)glfwGetTime();
+        dTime = now - lastFrame;
+        lastFrame = now;
+        vhsTime = now;
+        
+        int desiredRenderW = 0, desiredRenderH = 0;
+        computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), desiredRenderW, desiredRenderH);
+        
+        if (desiredRenderW != renderW || desiredRenderH != renderH) {
+            renderW = desiredRenderW;
+            renderH = desiredRenderH;
+            if (fbo) glDeleteFramebuffers(1, &fbo);
+            if (fboTex) glDeleteTextures(1, &fboTex);
+            if (rbo) glDeleteRenderbuffers(1, &rbo);
+            initFBO(fbo, fboTex, rbo, renderW, renderH);
+        }
+        
+        sndState.masterVol = settings.masterVol;
+        sndState.dangerLevel = entityMgr.dangerLevel;
+        sndState.musicVol = settings.musicVol;
+        sndState.ambienceVol = settings.ambienceVol;
+        sndState.sfxVol = settings.sfxVol;
+        sndState.voiceVol = settings.voiceVol;
+        sndState.sanityLevel = playerSanity / 100.0f;
+        currentWinW = winW;
+        currentWinH = winH;
+        
+        processGameState();
+        
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glViewport(0, 0, renderW, renderH);
+        glClearColor(0.02f, 0.02f, 0.02f, 1);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        
+        if (gameState == STATE_GAME || gameState == STATE_PAUSE || 
+            gameState == STATE_SETTINGS_PAUSE || gameState == STATE_KEYBINDS_PAUSE || 
+            gameState == STATE_NOTE) {
+            renderScene();
+        }
+        
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        glViewport(0, 0, winW, winH);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glDisable(GL_DEPTH_TEST);
+        
+        glUseProgram(vhsShader);
+        
+        bool vhsMenu = (gameState == STATE_MENU || gameState == STATE_MULTI || 
+                        gameState == STATE_MULTI_HOST || gameState == STATE_MULTI_JOIN || 
+                        gameState == STATE_MULTI_WAIT || gameState == STATE_SETTINGS || 
+                        gameState == STATE_KEYBINDS);
+        bool vhsGameplay = (gameState == STATE_GAME || gameState == STATE_PAUSE || 
+                            gameState == STATE_SETTINGS_PAUSE || gameState == STATE_KEYBINDS_PAUSE || 
+                            gameState == STATE_NOTE || gameState == STATE_INTRO);
+        
+        float vI = 0.0f;
+        if (vhsMenu) {
+            vI = 0.22f + settings.vhsIntensity * 0.58f;
+        } else if (vhsGameplay) {
+            float sanityLoss = 1.0f - (playerSanity / 100.0f);
+            if (sanityLoss < 0.0f) sanityLoss = 0.0f;
+            if (sanityLoss > 1.0f) sanityLoss = 1.0f;
+            float stress = entityMgr.dangerLevel * 0.65f + sanityLoss * 0.35f;
+            if (stress < 0.0f) stress = 0.0f;
+            if (stress > 1.0f) stress = 1.0f;
+            vI = settings.vhsIntensity * (0.26f + 0.44f * stress) + anomalyBlur * 0.55f;
+        }
+        
+        static GLint vhsTmLoc = -1, vhsIntenLoc = -1, vhsUpscalerLoc = -1;
+        static GLint vhsAaModeLoc = -1, vhsSharpnessLoc = -1, vhsTexelXLoc = -1;
+        static GLint vhsTexelYLoc = -1, vhsInMenuLoc = -1, vhsTaaHistLoc = -1;
+        static GLint vhsTaaBlendLoc = -1, vhsTaaJitterLoc = -1, vhsTaaValidLoc = -1;
+        
+        if (vhsTmLoc < 0) {
+            glUniform1i(glGetUniformLocation(vhsShader, "tex"), 0);
+            vhsTmLoc = glGetUniformLocation(vhsShader, "tm");
+            vhsIntenLoc = glGetUniformLocation(vhsShader, "inten");
+            vhsUpscalerLoc = glGetUniformLocation(vhsShader, "upscaler");
+            vhsAaModeLoc = glGetUniformLocation(vhsShader, "aaMode");
+            vhsSharpnessLoc = glGetUniformLocation(vhsShader, "sharpness");
+            vhsTexelXLoc = glGetUniformLocation(vhsShader, "texelX");
+            vhsTexelYLoc = glGetUniformLocation(vhsShader, "texelY");
+            vhsInMenuLoc = glGetUniformLocation(vhsShader, "inMenu");
+            vhsTaaHistLoc = glGetUniformLocation(vhsShader, "histTex");
+            vhsTaaBlendLoc = glGetUniformLocation(vhsShader, "taaBlend");
+            vhsTaaJitterLoc = glGetUniformLocation(vhsShader, "taaJitter");
+            vhsTaaValidLoc = glGetUniformLocation(vhsShader, "taaValid");
+        }
+        
+        int inMenu = (gameState == STATE_MENU || gameState == STATE_MULTI || 
+                      gameState == STATE_MULTI_HOST || gameState == STATE_MULTI_JOIN ||
+                      gameState == STATE_MULTI_WAIT || gameState == STATE_SETTINGS) ? 1 : 0;
+        
+        static int prevAaMode = -1;
+        int aaMode = clampAaMode(settings.aaMode);
+        if (aaMode != prevAaMode) {
+            prevAaMode = aaMode;
+            taaHistoryValid = false;
+            taaFrameIndex = 0;
+        }
+        
+        float jitterX = 0.0f, jitterY = 0.0f;
+        if (aaMode == AA_MODE_TAA) {
+            static const float jitterSeq[8][2] = {
+                {0.5f, 0.5f}, {0.75f, 0.25f}, {0.25f, 0.75f}, {0.875f, 0.625f},
+                {0.375f, 0.125f}, {0.625f, 0.875f}, {0.125f, 0.375f}, {0.9375f, 0.9375f}
+            };
+            jitterX = jitterSeq[taaFrameIndex & 7][0] - 0.5f;
+            jitterY = jitterSeq[taaFrameIndex & 7][1] - 0.5f;
+        }
+        
+        if (aaMode == AA_MODE_TAA) {
+            // TAA resolve pass
+            glBindFramebuffer(GL_FRAMEBUFFER, taaResolveFbo);
+            glViewport(0, 0, winW, winH);
+            glClear(GL_COLOR_BUFFER_BIT);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, fboTex);
+            glActiveTexture(GL_TEXTURE0 + 1);
+            glBindTexture(GL_TEXTURE_2D, taaHistoryTex);
+            glUniform1i(vhsTaaHistLoc, 1);
+            glActiveTexture(GL_TEXTURE0);
+            glUniform1f(vhsTmLoc, vhsTime);
+            glUniform1f(vhsIntenLoc, vI);
+            glUniform1i(vhsUpscalerLoc, clampUpscalerMode(settings.upscalerMode));
+            glUniform1i(vhsAaModeLoc, AA_MODE_TAA);
+            glUniform1f(vhsSharpnessLoc, clampFsrSharpness(settings.fsrSharpness));
+            glUniform1f(vhsTexelXLoc, 1.0f / (float)renderW);
+            glUniform1f(vhsTexelYLoc, 1.0f / (float)renderH);
+            glUniform1f(vhsTaaBlendLoc, 0.88f);
+            glUniform3f(vhsTaaJitterLoc, jitterX, jitterY, 0.0f);
+            glUniform1f(vhsTaaValidLoc, taaHistoryValid ? 1.0f : 0.0f);
+            glUniform1i(vhsInMenuLoc, inMenu);
+            glBindVertexArray(quadVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+            
+            taaHistoryValid = true;
+            taaFrameIndex = (taaFrameIndex + 1) & 7;
+            
+            GLuint taaTmp = taaHistoryTex;
+            taaHistoryTex = taaResolveTex;
+            taaResolveTex = taaTmp;
+            glBindFramebuffer(GL_FRAMEBUFFER, taaResolveFbo);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, taaResolveTex, 0);
+            
+            // Final output
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glViewport(0, 0, winW, winH);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, taaHistoryTex);
+            glActiveTexture(GL_TEXTURE0 + 1);
+            glBindTexture(GL_TEXTURE_2D, taaHistoryTex);
+            glUniform1i(vhsTaaHistLoc, 1);
+            glActiveTexture(GL_TEXTURE0);
+            glUniform1f(vhsTmLoc, vhsTime);
+            glUniform1f(vhsIntenLoc, 0.0f);
+            glUniform1i(vhsUpscalerLoc, UPSCALER_MODE_OFF);
+            glUniform1i(vhsAaModeLoc, AA_MODE_OFF);
+            glUniform1f(vhsSharpnessLoc, 0.0f);
+            glUniform1f(vhsTexelXLoc, 1.0f / (float)winW);
+            glUniform1f(vhsTexelYLoc, 1.0f / (float)winH);
+            glUniform1f(vhsTaaBlendLoc, 0.0f);
+            glUniform3f(vhsTaaJitterLoc, 0.0f, 0.0f, 0.0f);
+            glUniform1f(vhsTaaValidLoc, 0.0f);
+            glUniform1i(vhsInMenuLoc, inMenu);
+            glBindVertexArray(quadVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        } else {
+            taaHistoryValid = false;
+            taaFrameIndex = 0;
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, fboTex);
+            glActiveTexture(GL_TEXTURE0 + 1);
+            glBindTexture(GL_TEXTURE_2D, taaHistoryTex);
+            glUniform1i(vhsTaaHistLoc, 1);
+            glActiveTexture(GL_TEXTURE0);
+            glUniform1f(vhsTmLoc, vhsTime);
+            glUniform1f(vhsIntenLoc, vI);
+            glUniform1i(vhsUpscalerLoc, clampUpscalerMode(settings.upscalerMode));
+            glUniform1i(vhsAaModeLoc, aaMode);
+            glUniform1f(vhsSharpnessLoc, clampFsrSharpness(settings.fsrSharpness));
+            glUniform1f(vhsTexelXLoc, 1.0f / (float)renderW);
+            glUniform1f(vhsTexelYLoc, 1.0f / (float)renderH);
+            glUniform1f(vhsTaaBlendLoc, 0.0f);
+            glUniform3f(vhsTaaJitterLoc, 0.0f, 0.0f, 0.0f);
+            glUniform1f(vhsTaaValidLoc, 0.0f);
+            glUniform1i(vhsInMenuLoc, inMenu);
+            glBindVertexArray(quadVAO);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
+        }
+        
+        glEnable(GL_DEPTH_TEST);
+        drawUI();
+        
+        glfwSwapBuffers(gWin);
+        glfwPollEvents();
+    }
+    
+    audioRunning = false;
+    SetEvent(hEvent);
+    aT.join();
+    glfwTerminate();
+    
+    return 0;
+}

@@ -44,10 +44,8 @@ inline void popNicknameChar() {
 inline void handleNicknameInput(GLFWwindow* w) {
     static bool letterPressed[26] = {false};
     static bool digitPressed[10] = {false};
-    static bool spacePressedNick = false;
-    static bool minusPressedNick = false;
-    static bool underscorePressedNick = false;
-    static bool backspacePressedNick = false;
+    static bool spacePressedNick = false, minusPressedNick = false;
+    static bool underscorePressedNick = false, backspacePressedNick = false;
 
     for (int i = 0; i < 26; i++) {
         bool now = glfwGetKey(w, GLFW_KEY_A + i) == GLFW_PRESS;
@@ -63,12 +61,12 @@ inline void handleNicknameInput(GLFWwindow* w) {
     if (spaceNow && !spacePressedNick) pushNicknameChar(' ');
     spacePressedNick = spaceNow;
 
-    bool underNow = glfwGetKey(w, GLFW_KEY_MINUS) == GLFW_PRESS &&
-                    (glfwGetKey(w, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS);
+    bool shiftHeld = glfwGetKey(w, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || 
+                     glfwGetKey(w, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS;
     bool minusNow = glfwGetKey(w, GLFW_KEY_MINUS) == GLFW_PRESS;
-    if (underNow && !underscorePressedNick) pushNicknameChar('_');
+    if (shiftHeld && minusNow && !underscorePressedNick) pushNicknameChar('_');
     else if (minusNow && !minusPressedNick) pushNicknameChar('-');
-    underscorePressedNick = underNow;
+    underscorePressedNick = shiftHeld && minusNow;
     minusPressedNick = minusNow;
 
     bool bsNow = glfwGetKey(w, GLFW_KEY_BACKSPACE) == GLFW_PRESS;
@@ -76,121 +74,226 @@ inline void handleNicknameInput(GLFWwindow* w) {
     backspacePressedNick = bsNow;
 }
 
-inline void settingsInput(GLFWwindow* w, bool fromPause) {
-    static constexpr int SETTINGS_ITEMS = 13;
-    static constexpr int SETTINGS_AA_INDEX = 10;
-    static constexpr int SETTINGS_BINDS_INDEX = 11;
-    static constexpr int SETTINGS_BACK_INDEX = 12;
-    bool esc = glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS;
-    bool up = glfwGetKey(w, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS;
-    bool down = glfwGetKey(w, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS;
-    bool left = glfwGetKey(w, GLFW_KEY_LEFT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_A) == GLFW_PRESS;
-    bool right = glfwGetKey(w, GLFW_KEY_RIGHT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_D) == GLFW_PRESS;
-    bool enter = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS;
-    
-    if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = SETTINGS_ITEMS - 1; triggerMenuNavigateSound(); }
-    if (down && !downPressed) { menuSel++; if (menuSel >= SETTINGS_ITEMS) menuSel = 0; triggerMenuNavigateSound(); }
-    
-    if (menuSel <= 6) {
-        float* vals[] = {
-            &settings.masterVol, &settings.musicVol, &settings.ambienceVol, &settings.sfxVol,
-            &settings.voiceVol, &settings.vhsIntensity, &settings.mouseSens
-        };
-        float maxV[] = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.006f};
-        float minV[] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0005f};
-        float step[] = {0.05f, 0.05f, 0.05f, 0.05f, 0.05f, 0.05f, 0.0003f};
-        if (left && !leftPressed) { 
-            *vals[menuSel] -= step[menuSel]; 
-            if (*vals[menuSel] < minV[menuSel]) *vals[menuSel] = minV[menuSel]; 
-            triggerMenuNavigateSound();
+#include "input_settings.h"
+
+inline void menuPauseInput(GLFWwindow* w, bool esc, bool up, bool down, bool enter) {
+    if (multiState == MULTI_IN_GAME) {
+        if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 4; triggerMenuNavigateSound(); }
+        if (down && !downPressed) { menuSel++; if (menuSel > 4) menuSel = 0; triggerMenuNavigateSound(); }
+        if (esc && !escPressed) { 
+            triggerMenuConfirmSound();
+            gameState = STATE_GAME;
+            glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            firstMouse = true;
         }
-        if (right && !rightPressed) { 
-            *vals[menuSel] += step[menuSel]; 
-            if (*vals[menuSel] > maxV[menuSel]) *vals[menuSel] = maxV[menuSel]; 
-            triggerMenuNavigateSound();
-        }
-    } else if (menuSel == 7) {
-        if (left && !leftPressed) { settings.upscalerMode = clampUpscalerMode(settings.upscalerMode - 1); triggerMenuNavigateSound(); }
-        if (right && !rightPressed) { settings.upscalerMode = clampUpscalerMode(settings.upscalerMode + 1); triggerMenuNavigateSound(); }
-    } else if (menuSel == 8) {
-        if (left && !leftPressed) { settings.renderScalePreset = stepRenderScalePreset(settings.renderScalePreset, -1); triggerMenuNavigateSound(); }
-        if (right && !rightPressed) { settings.renderScalePreset = stepRenderScalePreset(settings.renderScalePreset, 1); triggerMenuNavigateSound(); }
-    } else if (menuSel == 9) {
-        if (left && !leftPressed) { settings.fsrSharpness = clampFsrSharpness(settings.fsrSharpness - 0.05f); triggerMenuNavigateSound(); }
-        if (right && !rightPressed) { settings.fsrSharpness = clampFsrSharpness(settings.fsrSharpness + 0.05f); triggerMenuNavigateSound(); }
-    } else if (menuSel == SETTINGS_AA_INDEX) {
-        if (left && !leftPressed) { settings.aaMode = stepAaMode(settings.aaMode, -1); triggerMenuNavigateSound(); }
-        if (right && !rightPressed) { settings.aaMode = stepAaMode(settings.aaMode, 1); triggerMenuNavigateSound(); }
-    } else if (menuSel == SETTINGS_BINDS_INDEX) {
         if (enter && !enterPressed) {
             triggerMenuConfirmSound();
-            gameState = fromPause ? STATE_KEYBINDS_PAUSE : STATE_KEYBINDS;
-            menuSel = 0;
-            keybindCaptureIndex = -1;
-        }
-    }
-    
-    if ((enter && !enterPressed && menuSel == SETTINGS_BACK_INDEX) || (esc && !escPressed)) { 
-        triggerMenuConfirmSound();
-        gameState = fromPause ? STATE_PAUSE : STATE_MENU; 
-        menuSel = fromPause ? 1 : 2;  // Settings position in respective menu
-    }
-    
-    escPressed = esc; 
-    upPressed = up; 
-    downPressed = down; 
-    leftPressed = left; 
-    rightPressed = right; 
-    enterPressed = enter;
-}
-
-inline void keybindsInput(GLFWwindow* w, bool fromPause) {
-    static bool waitRelease = false;
-    bool esc = glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS;
-    bool up = glfwGetKey(w, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS;
-    bool down = glfwGetKey(w, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS;
-    bool enter = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS;
-
-    if (keybindCaptureIndex >= 0) {
-        if (waitRelease) {
-            if (!isAnyKeyboardKeyDown(w)) waitRelease = false;
-        } else {
-            int pressed = firstPressedKeyboardKey(w);
-            if (pressed >= 0) {
-                int* keyRef = gameplayBindByIndex(settings.binds, keybindCaptureIndex);
-                if (keyRef) *keyRef = pressed;
-                keybindCaptureIndex = -1;
-                triggerMenuConfirmSound();
-            } else if (esc && !escPressed) {
-                keybindCaptureIndex = -1;
-                triggerMenuConfirmSound();
+            if (menuSel == 0) { 
+                gameState = STATE_GAME;
+                glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                firstMouse = true;
             }
+            else if (menuSel == 1) {
+                extern void teleportToPlayer();
+                teleportToPlayer();
+                gameState = STATE_GAME;
+                glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                firstMouse = true;
+            }
+            else if (menuSel == 2) { gameState = STATE_SETTINGS_PAUSE; menuSel = 0; }
+            else if (menuSel == 3) {
+                netMgr.shutdown();
+                lanDiscovery.stop();
+                multiState = MULTI_NONE;
+                gameState = STATE_MENU;
+                menuSel = 0;
+            }
+            else glfwSetWindowShouldClose(w, 1);
         }
     } else {
-        if (up && !upPressed) { menuSel = clampKeybindMenuIndex(menuSel - 1); triggerMenuNavigateSound(); }
-        if (down && !downPressed) { menuSel = clampKeybindMenuIndex(menuSel + 1); triggerMenuNavigateSound(); }
-        if (enter && !enterPressed) {
-            if (isGameplayBindIndex(menuSel)) {
-                keybindCaptureIndex = menuSel;
-                waitRelease = true;
-                triggerMenuConfirmSound();
-            } else if (menuSel == KEYBINDS_BACK_INDEX) {
-                triggerMenuConfirmSound();
-                gameState = fromPause ? STATE_SETTINGS_PAUSE : STATE_SETTINGS;
-                menuSel = 11;
-            }
-        }
-        if (esc && !escPressed) {
+        if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 3; triggerMenuNavigateSound(); }
+        if (down && !downPressed) { menuSel++; if (menuSel > 3) menuSel = 0; triggerMenuNavigateSound(); }
+        if (esc && !escPressed) { 
             triggerMenuConfirmSound();
-            gameState = fromPause ? STATE_SETTINGS_PAUSE : STATE_SETTINGS;
-            menuSel = 11;
+            gameState = STATE_GAME;
+            glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+            firstMouse = true;
+        }
+        if (enter && !enterPressed) {
+            triggerMenuConfirmSound();
+            if (menuSel == 0) {
+                gameState = STATE_GAME;
+                glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                firstMouse = true;
+            }
+            else if (menuSel == 1) { gameState = STATE_SETTINGS_PAUSE; menuSel = 0; }
+            else if (menuSel == 2) {
+                extern void genWorld();
+                extern void buildGeom();
+                gameState = STATE_MENU;
+                menuSel = 0;
+                genWorld();
+                buildGeom();
+            }
+            else glfwSetWindowShouldClose(w, 1);
         }
     }
+}
 
-    escPressed = esc;
-    upPressed = up;
-    downPressed = down;
-    enterPressed = enter;
+inline void menuMultiInput(GLFWwindow* w, bool esc, bool up, bool down, bool enter) {
+    static bool tabPressed = false;
+    bool tabNow = glfwGetKey(w, GLFW_KEY_TAB) == GLFW_PRESS;
+    if (tabNow && !tabPressed) multiEditingNickname = !multiEditingNickname;
+    tabPressed = tabNow;
+
+    if (multiEditingNickname) {
+        handleNicknameInput(w);
+        bool confirmNick = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS;
+        if (confirmNick && !enterPressed) multiEditingNickname = false;
+        if (esc && !escPressed) multiEditingNickname = false;
+        return;
+    }
+
+    if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 2; triggerMenuNavigateSound(); }
+    if (down && !downPressed) { menuSel++; if (menuSel > 2) menuSel = 0; triggerMenuNavigateSound(); }
+    if (esc && !escPressed) { triggerMenuConfirmSound(); gameState = STATE_MENU; menuSel = 1; }
+    if (enter && !enterPressed) {
+        triggerMenuConfirmSound();
+        if (menuSel == 0) { 
+            netMgr.init();
+            if (netMgr.hostGame((unsigned int)time(nullptr))) {
+                netMgr.setLocalPlayerName(multiNickname);
+                lanDiscovery.startHost();
+                multiState = MULTI_HOST_LOBBY;
+                gameState = STATE_MULTI_HOST;
+                menuSel = 0;
+            }
+        }
+        else if (menuSel == 1) {
+            gameState = STATE_MULTI_JOIN;
+            menuSel = 0;
+            multiIPManualEdit = false;
+            lanDiscovery.startClient();
+            lanDiscovery.requestScan();
+        }
+        else { gameState = STATE_MENU; menuSel = 1; }
+    }
+}
+
+inline void menuHostInput(GLFWwindow* w, bool esc, bool up, bool down, bool enter) {
+    if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 1; triggerMenuNavigateSound(); }
+    if (down && !downPressed) { menuSel++; if (menuSel > 1) menuSel = 0; triggerMenuNavigateSound(); }
+    if (esc && !escPressed) { 
+        triggerMenuConfirmSound();
+        netMgr.shutdown();
+        lanDiscovery.stop();
+        multiState = MULTI_NONE;
+        gameState = STATE_MULTI;
+        menuSel = 0;
+    }
+    if (enter && !enterPressed) {
+        triggerMenuConfirmSound();
+        if (menuSel == 0) { 
+            multiState = MULTI_IN_GAME;
+            extern void genWorld();
+            extern void buildGeom();
+            genWorld();
+            buildGeom();
+            netMgr.sendGameStart(netMgr.spawnPos);
+            gameState = STATE_INTRO;
+        }
+        else {
+            netMgr.shutdown();
+            lanDiscovery.stop();
+            multiState = MULTI_NONE;
+            gameState = STATE_MULTI;
+            menuSel = 0;
+        }
+    }
+    netMgr.update();
+    lanDiscovery.updateHost(netMgr.getPlayerCount(), netMgr.gameStarted, (float)glfwGetTime());
+}
+
+inline void menuJoinInput(GLFWwindow* w, bool esc, bool up, bool down, bool enter) {
+    if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 1; triggerMenuNavigateSound(); }
+    if (down && !downPressed) { menuSel++; if (menuSel > 1) menuSel = 0; triggerMenuNavigateSound(); }
+    if (esc && !escPressed) { triggerMenuConfirmSound(); lanDiscovery.stop(); gameState = STATE_MULTI; menuSel = 1; }
+    
+    static bool tabPressedJoin = false;
+    bool tabNow = glfwGetKey(w, GLFW_KEY_TAB) == GLFW_PRESS;
+    if (tabNow && !tabPressedJoin) multiInputField = (multiInputField == 0) ? 1 : 0;
+    tabPressedJoin = tabNow;
+    
+    static bool numPressed[11] = {false};
+    int keys[] = {GLFW_KEY_0, GLFW_KEY_1, GLFW_KEY_2, GLFW_KEY_3, GLFW_KEY_4,
+                  GLFW_KEY_5, GLFW_KEY_6, GLFW_KEY_7, GLFW_KEY_8, GLFW_KEY_9, GLFW_KEY_PERIOD};
+    char chars[] = {'0','1','2','3','4','5','6','7','8','9','.'};
+    
+    for (int i = 0; i < 11; i++) {
+        bool p = glfwGetKey(w, keys[i]) == GLFW_PRESS;
+        if (p && !numPressed[i]) {
+            int ipLen = (int)strlen(multiJoinIP);
+            int portLen = (int)strlen(multiJoinPort);
+            if (multiInputField == 0 && ipLen < 15) {
+                bool canAdd = (i < 10) || (i == 10 && ipLen > 0 && multiJoinIP[ipLen - 1] != '.');
+                if (canAdd) { multiJoinIP[ipLen] = chars[i]; multiJoinIP[ipLen + 1] = 0; multiIPManualEdit = true; }
+            }
+            else if (multiInputField == 1 && i < 10 && portLen < 5) {
+                multiJoinPort[portLen] = chars[i];
+                multiJoinPort[portLen + 1] = 0;
+            }
+        }
+        numPressed[i] = p;
+    }
+    
+    static bool bsJoin = false;
+    bool bsNow = glfwGetKey(w, GLFW_KEY_BACKSPACE) == GLFW_PRESS;
+    if (bsNow && !bsJoin) {
+        int ipLen = (int)strlen(multiJoinIP);
+        int portLen = (int)strlen(multiJoinPort);
+        if (multiInputField == 0 && ipLen > 0) { multiJoinIP[ipLen - 1] = 0; multiIPManualEdit = true; }
+        else if (multiInputField == 1 && portLen > 0) multiJoinPort[portLen - 1] = 0;
+    }
+    bsJoin = bsNow;
+    
+    static bool refreshP = false;
+    if (glfwGetKey(w, GLFW_KEY_R) == GLFW_PRESS && !refreshP) lanDiscovery.requestScan();
+    refreshP = glfwGetKey(w, GLFW_KEY_R) == GLFW_PRESS;
+    
+    static bool pickP = false;
+    if (glfwGetKey(w, GLFW_KEY_F) == GLFW_PRESS && !pickP) {
+        lanDiscovery.selectNextRoom();
+        const LanRoomInfo* r = lanDiscovery.getSelectedRoom();
+        if (r) {
+            snprintf(multiJoinIP, sizeof(multiJoinIP), "%s", r->ip);
+            snprintf(multiJoinPort, sizeof(multiJoinPort), "%hu", r->gamePort);
+            multiIPManualEdit = false;
+        }
+    }
+    pickP = glfwGetKey(w, GLFW_KEY_F) == GLFW_PRESS;
+    
+    lanDiscovery.updateClient((float)glfwGetTime());
+    if (!multiIPManualEdit) {
+        const LanRoomInfo* r = lanDiscovery.getSelectedRoom();
+        if (r) {
+            snprintf(multiJoinIP, sizeof(multiJoinIP), "%s", r->ip);
+            snprintf(multiJoinPort, sizeof(multiJoinPort), "%hu", r->gamePort);
+        }
+    }
+    
+    if (enter && !enterPressed) {
+        triggerMenuConfirmSound();
+        if (menuSel == 0) {
+            netMgr.init();
+            if (netMgr.joinGame(multiJoinIP, multiNickname)) {
+                lanDiscovery.stop();
+                multiState = MULTI_CONNECTING;
+                gameState = STATE_MULTI_WAIT;
+                menuSel = 0;
+            }
+        }
+        else { lanDiscovery.stop(); gameState = STATE_MULTI; menuSel = 1; }
+    }
 }
 
 inline void menuInput(GLFWwindow* w) {
@@ -200,326 +303,21 @@ inline void menuInput(GLFWwindow* w) {
     bool enter = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_SPACE) == GLFW_PRESS;
     
     if (gameState == STATE_MENU) {
-        // Main menu: START GAME, MULTIPLAYER, SETTINGS, QUIT (4 items: 0-3)
         if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 3; triggerMenuNavigateSound(); }
         if (down && !downPressed) { menuSel++; if (menuSel > 3) menuSel = 0; triggerMenuNavigateSound(); }
         if (enter && !enterPressed) {
             triggerMenuConfirmSound();
-            if (menuSel == 0) { 
-                // Start game - go to intro first
-                gameState = STATE_INTRO;
-            }
-            else if (menuSel == 1) { 
-                // Multiplayer menu
-                gameState = STATE_MULTI; 
-                menuSel = 0; 
-            }
-            else if (menuSel == 2) { 
-                // Settings
-                gameState = STATE_SETTINGS; 
-                menuSel = 0; 
-            }
-            else { 
-                // Quit
-                glfwSetWindowShouldClose(w, 1); 
-            }
+            if (menuSel == 0) gameState = STATE_INTRO;
+            else if (menuSel == 1) { gameState = STATE_MULTI; menuSel = 0; }
+            else if (menuSel == 2) { gameState = STATE_SETTINGS; menuSel = 0; }
+            else glfwSetWindowShouldClose(w, 1);
         }
     } 
-    else if (gameState == STATE_PAUSE) {
-        if (multiState == MULTI_IN_GAME) {
-            // Multiplayer pause: RESUME, TELEPORT, SETTINGS, DISCONNECT, QUIT (5 items)
-            if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 4; triggerMenuNavigateSound(); }
-            if (down && !downPressed) { menuSel++; if (menuSel > 4) menuSel = 0; triggerMenuNavigateSound(); }
-            if (esc && !escPressed) { 
-                triggerMenuConfirmSound();
-                gameState = STATE_GAME; 
-                glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED); 
-                firstMouse = true; 
-            }
-            if (enter && !enterPressed) {
-                triggerMenuConfirmSound();
-                if (menuSel == 0) { 
-                    gameState = STATE_GAME; 
-                    glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED); 
-                    firstMouse = true; 
-                }
-                else if (menuSel == 1) { 
-                    // Teleport to player - defined in game_loop.h
-                    extern void teleportToPlayer();
-                    teleportToPlayer();
-                    gameState = STATE_GAME;
-                    glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-                    firstMouse = true;
-                }
-                else if (menuSel == 2) { 
-                    gameState = STATE_SETTINGS_PAUSE; 
-                    menuSel = 0; 
-                }
-                else if (menuSel == 3) { 
-                    // Disconnect
-                    netMgr.shutdown();
-                    lanDiscovery.stop();
-                    multiState = MULTI_NONE;
-                    gameState = STATE_MENU;
-                    menuSel = 0;
-                }
-                else { 
-                    glfwSetWindowShouldClose(w, 1); 
-                }
-            }
-        } else {
-            // Single player pause: RESUME, SETTINGS, MAIN MENU, QUIT (4 items)
-            if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 3; triggerMenuNavigateSound(); }
-            if (down && !downPressed) { menuSel++; if (menuSel > 3) menuSel = 0; triggerMenuNavigateSound(); }
-            if (esc && !escPressed) { 
-                triggerMenuConfirmSound();
-                gameState = STATE_GAME; 
-                glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED); 
-                firstMouse = true; 
-            }
-            if (enter && !enterPressed) {
-                triggerMenuConfirmSound();
-                if (menuSel == 0) { 
-                    gameState = STATE_GAME; 
-                    glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED); 
-                    firstMouse = true; 
-                }
-                else if (menuSel == 1) { 
-                    gameState = STATE_SETTINGS_PAUSE; 
-                    menuSel = 0; 
-                }
-                else if (menuSel == 2) { 
-                    // Main menu
-                    extern void genWorld();
-                    extern void buildGeom();
-                    gameState = STATE_MENU;
-                    menuSel = 0;
-                    genWorld();
-                    buildGeom();
-                }
-                else { 
-                    glfwSetWindowShouldClose(w, 1); 
-                }
-            }
-        }
-    }
-    else if (gameState == STATE_MULTI) {
-        static bool tabPressed = false;
-        bool tabNow = glfwGetKey(w, GLFW_KEY_TAB) == GLFW_PRESS;
-        if (tabNow && !tabPressed) multiEditingNickname = !multiEditingNickname;
-        tabPressed = tabNow;
-
-        if (multiEditingNickname) {
-            handleNicknameInput(w);
-            bool confirmNick = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS;
-            if (confirmNick && !enterPressed) multiEditingNickname = false;
-            if (esc && !escPressed) multiEditingNickname = false;
-            escPressed = esc;
-            upPressed = up;
-            downPressed = down;
-            enterPressed = enter;
-            return;
-        }
-
-        // Multiplayer menu: HOST GAME, JOIN GAME, BACK (3 items: 0-2)
-        if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 2; triggerMenuNavigateSound(); }
-        if (down && !downPressed) { menuSel++; if (menuSel > 2) menuSel = 0; triggerMenuNavigateSound(); }
-        if (esc && !escPressed) { 
-            triggerMenuConfirmSound();
-            gameState = STATE_MENU; 
-            menuSel = 1;  // Back to Multiplayer option
-        }
-        if (enter && !enterPressed) {
-            triggerMenuConfirmSound();
-            if (menuSel == 0) { 
-                // Host game - initialize network and start hosting
-                netMgr.init();
-                if (netMgr.hostGame((unsigned int)time(nullptr))) {
-                    netMgr.setLocalPlayerName(multiNickname);
-                    lanDiscovery.startHost();
-                    multiState = MULTI_HOST_LOBBY;
-                    gameState = STATE_MULTI_HOST;
-                    menuSel = 0;
-                }
-            }
-            else if (menuSel == 1) { 
-                // Join game
-                gameState = STATE_MULTI_JOIN; 
-                menuSel = 0; 
-                multiIPManualEdit = false;
-                lanDiscovery.startClient();
-                lanDiscovery.requestScan();
-            }
-            else { 
-                // Back
-                gameState = STATE_MENU;
-                menuSel = 1;
-            }
-        }
-    }
-    else if (gameState == STATE_MULTI_HOST) {
-        // Host lobby: START GAME, BACK (2 items: 0-1)
-        if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 1; triggerMenuNavigateSound(); }
-        if (down && !downPressed) { menuSel++; if (menuSel > 1) menuSel = 0; triggerMenuNavigateSound(); }
-        if (esc && !escPressed) { 
-            triggerMenuConfirmSound();
-            netMgr.shutdown();
-            lanDiscovery.stop();
-            multiState = MULTI_NONE;
-            gameState = STATE_MULTI; 
-            menuSel = 0;
-        }
-        if (enter && !enterPressed) {
-            triggerMenuConfirmSound();
-            if (menuSel == 0) { 
-                // Start multiplayer game with all connected players
-                // First set multiState so genWorld knows we're in multiplayer
-                multiState = MULTI_IN_GAME;
-                // Generate world and get spawn position
-                extern void genWorld();
-                extern void buildGeom();
-                genWorld();
-                buildGeom();
-                // Now send game start with correct spawn position
-                netMgr.sendGameStart(netMgr.spawnPos);
-                gameState = STATE_INTRO;
-            }
-            else { 
-                // Back - shutdown hosting
-                netMgr.shutdown();
-                lanDiscovery.stop();
-                multiState = MULTI_NONE;
-                gameState = STATE_MULTI;
-                menuSel = 0;
-            }
-        }
-        // Update network to check for new connections
-        netMgr.update();
-        lanDiscovery.updateHost(netMgr.getPlayerCount(), netMgr.gameStarted, (float)glfwGetTime());
-    }
-    else if (gameState == STATE_MULTI_JOIN) {
-        // Join menu: CONNECT, BACK (2 items: 0-1)
-        if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 1; triggerMenuNavigateSound(); }
-        if (down && !downPressed) { menuSel++; if (menuSel > 1) menuSel = 0; triggerMenuNavigateSound(); }
-        if (esc && !escPressed) { 
-            triggerMenuConfirmSound();
-            lanDiscovery.stop();
-            gameState = STATE_MULTI; 
-            menuSel = 1;
-        }
-        
-        // TAB to switch between IP and Port fields
-        static bool tabPressed = false;
-        bool tabNow = glfwGetKey(w, GLFW_KEY_TAB) == GLFW_PRESS;
-        if (tabNow && !tabPressed) {
-            multiInputField = (multiInputField == 0) ? 1 : 0;
-        }
-        tabPressed = tabNow;
-        
-        // Number input for IP/Port
-        static bool numPressed[11] = {false};
-        int keys[] = {GLFW_KEY_0, GLFW_KEY_1, GLFW_KEY_2, GLFW_KEY_3, GLFW_KEY_4,
-                      GLFW_KEY_5, GLFW_KEY_6, GLFW_KEY_7, GLFW_KEY_8, GLFW_KEY_9,
-                      GLFW_KEY_PERIOD};
-        char chars[] = {'0','1','2','3','4','5','6','7','8','9','.'};
-        
-        for (int i = 0; i < 11; i++) {
-            bool pressed = glfwGetKey(w, keys[i]) == GLFW_PRESS;
-            if (pressed && !numPressed[i]) {
-                if (multiInputField == 0) {
-                    // IP field - allow numbers and dots
-                    int len = (int)strlen(multiJoinIP);
-                    if (len < 15) {
-                        if (i < 10 || (i == 10 && len > 0 && multiJoinIP[len-1] != '.')) {
-                            multiJoinIP[len] = chars[i];
-                            multiJoinIP[len + 1] = 0;
-                            multiIPManualEdit = true;
-                        }
-                    }
-                } else {
-                    // Port field - numbers only
-                    if (i < 10) {
-                        int len = (int)strlen(multiJoinPort);
-                        if (len < 5) {
-                            multiJoinPort[len] = chars[i];
-                            multiJoinPort[len + 1] = 0;
-                        }
-                    }
-                }
-            }
-            numPressed[i] = pressed;
-        }
-        
-        // Backspace handling
-        static bool bsPressed = false;
-        bool bsNow = glfwGetKey(w, GLFW_KEY_BACKSPACE) == GLFW_PRESS;
-        if (bsNow && !bsPressed) {
-            if (multiInputField == 0) {
-                int len = (int)strlen(multiJoinIP);
-                if (len > 0) {
-                    multiJoinIP[len - 1] = 0;
-                    multiIPManualEdit = true;
-                }
-            } else {
-                int len = (int)strlen(multiJoinPort);
-                if (len > 0) multiJoinPort[len - 1] = 0;
-            }
-        }
-        bsPressed = bsNow;
-        
-        static bool refreshPressed = false;
-        bool refreshNow = glfwGetKey(w, GLFW_KEY_R) == GLFW_PRESS;
-        if (refreshNow && !refreshPressed) {
-            lanDiscovery.requestScan();
-        }
-        refreshPressed = refreshNow;
-        
-        static bool pickRoomPressed = false;
-        bool pickRoomNow = glfwGetKey(w, GLFW_KEY_F) == GLFW_PRESS;
-        if (pickRoomNow && !pickRoomPressed) {
-            lanDiscovery.selectNextRoom();
-            const LanRoomInfo* room = lanDiscovery.getSelectedRoom();
-            if (room) {
-                snprintf(multiJoinIP, sizeof(multiJoinIP), "%s", room->ip);
-                snprintf(multiJoinPort, sizeof(multiJoinPort), "%hu", room->gamePort);
-                multiIPManualEdit = false;
-            }
-        }
-        pickRoomPressed = pickRoomNow;
-        
-        lanDiscovery.updateClient((float)glfwGetTime());
-        if (!multiIPManualEdit) {
-            const LanRoomInfo* room = lanDiscovery.getSelectedRoom();
-            if (room) {
-                snprintf(multiJoinIP, sizeof(multiJoinIP), "%s", room->ip);
-                snprintf(multiJoinPort, sizeof(multiJoinPort), "%hu", room->gamePort);
-            }
-        }
-        
-        if (enter && !enterPressed) {
-            triggerMenuConfirmSound();
-            if (menuSel == 0) { 
-                // Connect to host - go to waiting lobby
-                char fullAddr[64];
-                snprintf(fullAddr, 64, "%s", multiJoinIP);
-                netMgr.init();
-                if (netMgr.joinGame(fullAddr, multiNickname)) {
-                    lanDiscovery.stop();
-                    multiState = MULTI_CONNECTING;
-                    gameState = STATE_MULTI_WAIT;  // Wait for host to start
-                    menuSel = 0;
-                }
-            }
-            else { 
-                // Back
-                lanDiscovery.stop();
-                gameState = STATE_MULTI;
-                menuSel = 1;
-            }
-        }
-    }
+    else if (gameState == STATE_PAUSE) menuPauseInput(w, esc, up, down, enter);
+    else if (gameState == STATE_MULTI) menuMultiInput(w, esc, up, down, enter);
+    else if (gameState == STATE_MULTI_HOST) menuHostInput(w, esc, up, down, enter);
+    else if (gameState == STATE_MULTI_JOIN) menuJoinInput(w, esc, up, down, enter);
     else if (gameState == STATE_MULTI_WAIT) {
-        // Waiting for host to start
         if (esc && !escPressed) {
             triggerMenuConfirmSound();
             netMgr.shutdown();
@@ -528,12 +326,11 @@ inline void menuInput(GLFWwindow* w) {
             gameState = STATE_MULTI;
             menuSel = 1;
         }
-        // Keep updating network for game start signal
         netMgr.update();
     }
     
     escPressed = esc;
-    upPressed = up; 
-    downPressed = down; 
+    upPressed = up;
+    downPressed = down;
     enterPressed = enter;
 }
