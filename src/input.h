@@ -77,12 +77,13 @@ inline void handleNicknameInput(GLFWwindow* w) {
 }
 
 inline void settingsInput(GLFWwindow* w, bool fromPause) {
-    static constexpr int SETTINGS_ITEMS = 15;
+    static constexpr int SETTINGS_ITEMS = 16;
     static constexpr int SETTINGS_AA_INDEX = 10;
     static constexpr int SETTINGS_FAST_MATH_INDEX = 11;
     static constexpr int SETTINGS_FRAME_GEN_INDEX = 12;
-    static constexpr int SETTINGS_BINDS_INDEX = 13;
-    static constexpr int SETTINGS_BACK_INDEX = 14;
+    static constexpr int SETTINGS_VSYNC_INDEX = 13;
+    static constexpr int SETTINGS_BINDS_INDEX = 14;
+    static constexpr int SETTINGS_BACK_INDEX = 15;
     bool esc = glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS;
     bool up = glfwGetKey(w, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS;
     bool down = glfwGetKey(w, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS;
@@ -125,7 +126,10 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
             settings.fastMath = !settings.fastMath;
             triggerMenuAdjustSound();
         } else if (menuSel == SETTINGS_FRAME_GEN_INDEX) {
-            settings.frameGen = !settings.frameGen;
+            settings.frameGenMode = stepFrameGenMode(settings.frameGenMode, dir);
+            triggerMenuAdjustSound();
+        } else if (menuSel == SETTINGS_VSYNC_INDEX) {
+            settings.vsync = !settings.vsync;
             triggerMenuAdjustSound();
         }
     };
@@ -134,7 +138,7 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
     if (down && !downPressed) { menuSel++; if (menuSel >= SETTINGS_ITEMS) menuSel = 0; triggerMenuNavigateSound(); }
     
     int adjustDir = right ? 1 : (left ? -1 : 0);
-    if (menuSel <= SETTINGS_FRAME_GEN_INDEX) {
+    if (menuSel <= SETTINGS_VSYNC_INDEX) {
         if (adjustDir == 0) {
             adjustHoldDir = 0;
             nextAdjustTime = 0.0;
@@ -202,13 +206,13 @@ inline void keybindsInput(GLFWwindow* w, bool fromPause) {
             } else if (menuSel == KEYBINDS_BACK_INDEX) {
                 triggerMenuConfirmSound();
                 gameState = fromPause ? STATE_SETTINGS_PAUSE : STATE_SETTINGS;
-                menuSel = 13;
+                menuSel = 14;
             }
         }
         if (esc && !escPressed) {
             triggerMenuConfirmSound();
             gameState = fromPause ? STATE_SETTINGS_PAUSE : STATE_SETTINGS;
-            menuSel = 13;
+            menuSel = 14;
         }
     }
 

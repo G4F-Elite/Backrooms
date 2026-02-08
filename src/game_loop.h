@@ -610,6 +610,29 @@ void renderScene(){
 
 #include "hud.h"
 
+inline int detectActiveRefreshRateHz(GLFWwindow* w){
+    GLFWmonitor* mon = glfwGetWindowMonitor(w);
+    if(!mon) mon = glfwGetPrimaryMonitor();
+    if(!mon) return 60;
+    const GLFWvidmode* vm = glfwGetVideoMode(mon);
+    if(!vm || vm->refreshRate <= 0) return 60;
+    return vm->refreshRate;
+}
+
+inline void applyFramePacing(double frameStartTime, int targetFps){
+    if(targetFps <= 0) return;
+    double targetFrameSec = 1.0 / (double)targetFps;
+    double elapsed = glfwGetTime() - frameStartTime;
+    double remain = targetFrameSec - elapsed;
+    if(remain <= 0.0) return;
+
+    if(remain > 0.002){
+        DWORD sleepMs = (DWORD)((remain - 0.001) * 1000.0);
+        if(sleepMs > 0) Sleep(sleepMs);
+    }
+    while((glfwGetTime() - frameStartTime) < targetFrameSec){}
+}
+
 int main(){
     std::random_device rd;rng.seed(rd());
     if(!glfwInit())return -1;
@@ -619,6 +642,8 @@ int main(){
     gWin=glfwCreateWindow(winW,winH,"Backrooms - Level 0",NULL,NULL);
     if(!gWin){glfwTerminate();return -1;}
     glfwMakeContextCurrent(gWin);
+    int appliedSwapInterval = settings.vsync ? 1 : 0;
+    glfwSwapInterval(appliedSwapInterval);
     glfwSetCursorPosCallback(gWin,mouse);
     glfwSetFramebufferSizeCallback(gWin,windowResize);
     if(!gladLoadGL())return -1;
@@ -635,9 +660,21 @@ int main(){
     entityMgr.init();
     initPlayerModels(); playerModelsInit = true;
     std::thread aT(audioThread);
+    int cachedRefreshRateHz = detectActiveRefreshRateHz(gWin);
+    double nextRefreshProbeTime = 0.0;
     
     while(!glfwWindowShouldClose(gWin)){
-        float now=(float)glfwGetTime();dTime=now-lastFrame;lastFrame=now;vhsTime=now;
+        double frameStartTime = glfwGetTime();
+        float now=(float)frameStartTime;dTime=now-lastFrame;lastFrame=now;vhsTime=now;
+        if(now >= (float)nextRefreshProbeTime){
+            cachedRefreshRateHz = detectActiveRefreshRateHz(gWin);
+            nextRefreshProbeTime = (double)now + 1.0;
+        }
+        int desiredSwapInterval = settings.vsync ? 1 : 0;
+        if(desiredSwapInterval != appliedSwapInterval){
+            glfwSwapInterval(desiredSwapInterval);
+            appliedSwapInterval = desiredSwapInterval;
+        }
         int desiredRenderW = 0, desiredRenderH = 0;
         computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), desiredRenderW, desiredRenderH);
         if(desiredRenderW != renderW || desiredRenderH != renderH){
@@ -977,8 +1014,8 @@ int main(){
             glUniform1f(vhsTaaBlendLoc,0.88f);
             glUniform3f(vhsTaaJitterLoc,jitterX,jitterY,0.0f);
             glUniform1f(vhsTaaValidLoc,taaHistoryValid?1.0f:0.0f);
-            glUniform1i(vhsFrameGenLoc,settings.frameGen?1:0);
-            glUniform1f(vhsFrameGenBlendLoc,settings.frameGen?0.24f:0.0f);
+            glUniform1i(vhsFrameGenLoc,isFrameGenEnabled(settings.frameGenMode)?1:0);
+            glUniform1f(vhsFrameGenBlendLoc,frameGenBlendStrength(settings.frameGenMode));
             glBindVertexArray(quadVAO);
             glDrawArrays(GL_TRIANGLES,0,6);
 
@@ -1042,6 +1079,8 @@ int main(){
         drawUI();
         
         glfwSwapBuffers(gWin);glfwPollEvents();
+        int frameGenBaseCap = frameGenBaseFpsCap(cachedRefreshRateHz, settings.frameGenMode, settings.vsync);
+        applyFramePacing(frameStartTime, frameGenBaseCap);
     }
     audioRunning=false;SetEvent(hEvent);aT.join();glfwTerminate();return 0;
 }

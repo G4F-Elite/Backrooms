@@ -36,7 +36,8 @@ struct Settings {
     float fsrSharpness=0.35f;
     int aaMode=AA_MODE_FXAA;
     bool fastMath=false;
-    bool frameGen=false;
+    int frameGenMode=FRAME_GEN_MODE_OFF;
+    bool vsync=false;
     GameplayBinds binds = {};
 };
 inline Settings settings;
@@ -213,10 +214,10 @@ inline void drawSettings(bool fp) {
     if(fp) drawFullscreenOverlay(0.02f,0.02f,0.03f,0.72f);
     drawTextCentered("SETTINGS",0.0f,0.55f,3.0f,0.9f,0.85f,0.4f);
     const float rightColCenterX = 0.50f;
-    const char* lb[]={"MASTER VOL","MUSIC VOL","AMBIENCE VOL","SFX VOL","VOICE VOL","VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","ANTI-ALIASING","FAST MATH","FRAME GEN","KEY BINDS","BACK"};
-    float*vl[]={&settings.masterVol,&settings.musicVol,&settings.ambienceVol,&settings.sfxVol,&settings.voiceVol,&settings.vhsIntensity,&settings.mouseSens,nullptr,nullptr,&settings.fsrSharpness,nullptr,nullptr,nullptr,nullptr,nullptr};
-    float mx[]={1.0f,1.0f,1.0f,1.0f,1.0f,1.0f,0.006f,1.0f,1.0f,1.0f,1.0f,1.0f,1.0f,1.0f,1.0f};
-    for(int i=0;i<15;i++){
+    const char* lb[]={"MASTER VOL","MUSIC VOL","AMBIENCE VOL","SFX VOL","VOICE VOL","VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","ANTI-ALIASING","FAST MATH","FRAME GEN","V-SYNC","KEY BINDS","BACK"};
+    float*vl[]={&settings.masterVol,&settings.musicVol,&settings.ambienceVol,&settings.sfxVol,&settings.voiceVol,&settings.vhsIntensity,&settings.mouseSens,nullptr,nullptr,&settings.fsrSharpness,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr};
+    float mx[]={1.0f,1.0f,1.0f,1.0f,1.0f,1.0f,0.006f,1.0f,1.0f,1.0f,1.0f,1.0f,1.0f,1.0f,1.0f,1.0f};
+    for(int i=0;i<16;i++){
         float s=(menuSel==i)?1.0f:0.5f,y=0.43f-i*0.09f;
         if(menuSel==i)drawText(">",-0.55f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         drawText(lb[i],-0.48f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
@@ -235,8 +236,10 @@ inline void drawSettings(bool fp) {
         }else if(i==11){
             drawTextCentered(settings.fastMath?"ON":"OFF",rightColCenterX,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         }else if(i==12){
-            drawTextCentered(settings.frameGen?"ON":"OFF",rightColCenterX,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
+            drawTextCentered(frameGenModeLabel(settings.frameGenMode),rightColCenterX,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         }else if(i==13){
+            drawTextCentered(settings.vsync?"ON":"OFF",rightColCenterX,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
+        }else if(i==14){
             drawTextCentered("OPEN",rightColCenterX,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         }else if(vl[i]){
             float nv=*vl[i]/mx[i]; if(nv>1.0f)nv=1.0f;
