@@ -7,6 +7,7 @@
 #include <glad/glad.h>
 #include "entity_types.h"
 #include "entity_model.h"
+#include "world.h"
 
 class EntityManager {
 public:
@@ -45,6 +46,7 @@ public:
         dangerLevel = 0;
         for(auto& e : entities) {
             if(!e.active) continue;
+            EntityState prevState = e.state;
             Vec3 toP = pPos - e.pos; toP.y = 0;
             float dist = sqrtf(toP.x*toP.x + toP.z*toP.z);
             Vec3 look(sinf(pYaw), 0, cosf(pYaw)), toE = e.pos - pPos; toE.y = 0;
@@ -59,10 +61,12 @@ public:
             // Check for attacking state for shadow/crawler
             if(e.type == ENTITY_SHADOW && dist < e.attackRange && !looking) e.state = ENT_ATTACKING;
             if(e.type == ENTITY_CRAWLER && dist < e.attackRange) e.state = ENT_ATTACKING;
+            if(e.state != prevState) e.stateTimer = 0.0f;
             
             e.animPhase += dt * 3.0f; if(e.animPhase > 6.283f) e.animPhase -= 6.283f;
             e.flickerTimer += dt;
-            e.visible = (dist < 5.0f) ? ((int)(e.flickerTimer*15)%3) != 0 : true;
+            if(e.type != ENTITY_SHADOW) e.visible = true;
+            else e.visible = (dist < 4.0f) ? ((int)(e.flickerTimer*14)%3) != 0 : true;
         }
         entities.erase(std::remove_if(entities.begin(), entities.end(), [](const Entity& e) { return !e.active; }), entities.end());
     }
@@ -75,20 +79,27 @@ public:
                 Vec3 dir = pPos - e.pos; dir.y = 0; float len = sqrtf(dir.x*dir.x + dir.z*dir.z);
                 if(len > 0.1f) { dir.x /= len; dir.z /= len;
                     float nx = e.pos.x + dir.x*e.speed*dt, nz = e.pos.z + dir.z*e.speed*dt;
-                    int cx = (int)(nx/cs), cz = (int)(nz/cs);
-                    if(cx>=0 && cx<mzw && cz>=0 && cz<mzh && maze[cx][cz]==0) { e.pos.x = nx; e.pos.z = nz; }
+                    if(!collideWorld(nx,nz,0.32f)) { e.pos.x = nx; e.pos.z = nz; }
+                    else {
+                        float sx = e.pos.x + dir.z*e.speed*0.65f*dt;
+                        float sz = e.pos.z - dir.x*e.speed*0.65f*dt;
+                        if(!collideWorld(sx,sz,0.32f)) { e.pos.x = sx; e.pos.z = sz; }
+                    }
                     e.yaw = atan2f(dir.x, dir.z);
                 }
             } else { e.state = ENT_ROAMING;
-                if(e.stateTimer > 3.0f) { e.yaw += ((rand()%100)/50.0f-1.0f)*3.14159f; e.stateTimer = 0; }
+                if(e.stateTimer > 2.3f) { e.yaw += ((rand()%100)/50.0f-1.0f)*2.2f; e.stateTimer = 0; }
                 float nx = e.pos.x + sinf(e.yaw)*e.speed*0.3f*dt, nz = e.pos.z + cosf(e.yaw)*e.speed*0.3f*dt;
-                int cx = (int)(nx/cs), cz = (int)(nz/cs);
-                if(cx>=0 && cx<mzw && cz>=0 && cz<mzh && maze[cx][cz]==0) { e.pos.x = nx; e.pos.z = nz; }
-                else e.yaw += 1.5708f;
+                if(!collideWorld(nx,nz,0.32f)) { e.pos.x = nx; e.pos.z = nz; }
+                else e.yaw += 1.2f;
             }
         }
         if(e.state == ENT_FLEEING) { Vec3 dir = e.pos - pPos; dir.y = 0; float len = sqrtf(dir.x*dir.x+dir.z*dir.z);
-            if(len > 0.1f) { dir.x/=len; dir.z/=len; e.pos.x += dir.x*e.speed*3.0f*dt; e.pos.z += dir.z*e.speed*3.0f*dt; }
+            if(len > 0.1f) {
+                dir.x/=len; dir.z/=len;
+                float nx = e.pos.x + dir.x*e.speed*2.2f*dt, nz = e.pos.z + dir.z*e.speed*2.2f*dt;
+                if(!collideWorld(nx,nz,0.32f)) { e.pos.x = nx; e.pos.z = nz; }
+            }
             if(e.stateTimer > 5.0f || dist > 25.0f) e.active = false; }
         if(dist < e.attackRange && e.state == ENT_STALKING) e.state = ENT_ATTACKING;
     }
@@ -99,24 +110,52 @@ public:
             Vec3 dir = pPos - e.pos; dir.y = 0; float len = sqrtf(dir.x*dir.x + dir.z*dir.z);
             if(len > 0.1f) { dir.x /= len; dir.z /= len;
                 float nx = e.pos.x + dir.x*e.speed*dt, nz = e.pos.z + dir.z*e.speed*dt;
-                int cx = (int)(nx/cs), cz = (int)(nz/cs);
-                if(cx>=0 && cx<mzw && cz>=0 && cz<mzh && maze[cx][cz]==0) { e.pos.x = nx; e.pos.z = nz; }
+                if(!collideWorld(nx,nz,0.34f)) { e.pos.x = nx; e.pos.z = nz; }
+                else {
+                    float bx = e.pos.x - dir.z*e.speed*0.7f*dt;
+                    float bz = e.pos.z + dir.x*e.speed*0.7f*dt;
+                    if(!collideWorld(bx,bz,0.34f)) { e.pos.x = bx; e.pos.z = bz; }
+                }
                 e.yaw = atan2f(dir.x, dir.z); }
             if(dist < e.attackRange) e.state = ENT_ATTACKING;
         } else { e.state = ENT_ROAMING;
-            if(e.stateTimer > 2.0f) { e.yaw += ((rand()%100)/50.0f-1.0f)*3.14159f; e.stateTimer = 0; }
+            if(e.stateTimer > 1.8f) { e.yaw += ((rand()%100)/50.0f-1.0f)*2.6f; e.stateTimer = 0; }
             float nx = e.pos.x + sinf(e.yaw)*e.speed*0.2f*dt, nz = e.pos.z + cosf(e.yaw)*e.speed*0.2f*dt;
-            int cx = (int)(nx/cs), cz = (int)(nz/cs);
-            if(cx>=0 && cx<mzw && cz>=0 && cz<mzh && maze[cx][cz]==0) { e.pos.x = nx; e.pos.z = nz; }
-            else e.yaw += 1.5708f; }
+            if(!collideWorld(nx,nz,0.34f)) { e.pos.x = nx; e.pos.z = nz; }
+            else e.yaw += 1.3f; }
     }
     
     void updateShadow(Entity& e, float dt, Vec3 pPos, float dist, bool looking) {
-        e.visible = looking ? false : (dist < e.detectionRange);
-        if(!looking && dist < e.detectionRange && dist > e.attackRange) {
-            Vec3 dir = pPos - e.pos; dir.y = 0; float len = sqrtf(dir.x*dir.x+dir.z*dir.z);
-            if(len > 0.1f) { dir.x/=len; dir.z/=len; e.pos.x += dir.x*e.speed*dt; e.pos.z += dir.z*e.speed*dt; e.yaw = atan2f(dir.x,dir.z); }
+        if(looking && dist < 13.0f){
+            e.lastSeenTimer += dt;
+            if(e.lastSeenTimer > 1.1f){
+                for(int i=0;i<8;i++){
+                    float ang = ((float)(rand()%628) / 100.0f);
+                    float r = 5.0f + (float)(rand()%5);
+                    float nx = pPos.x + sinf(ang) * r;
+                    float nz = pPos.z + cosf(ang) * r;
+                    if(!collideWorld(nx,nz,0.32f)){
+                        e.pos.x = nx; e.pos.z = nz;
+                        break;
+                    }
+                }
+                e.lastSeenTimer = 0.0f;
+            }
+        }else{
+            e.lastSeenTimer = 0.0f;
         }
+        e.visible = !looking && (dist < e.detectionRange + 6.0f);
+        if(!looking && dist < e.detectionRange + 3.0f && dist > e.attackRange) {
+            Vec3 dir = pPos - e.pos; dir.y = 0; float len = sqrtf(dir.x*dir.x+dir.z*dir.z);
+            if(len > 0.1f) {
+                dir.x/=len; dir.z/=len;
+                float nx = e.pos.x + dir.x*e.speed*1.6f*dt;
+                float nz = e.pos.z + dir.z*e.speed*1.6f*dt;
+                if(!collideWorld(nx,nz,0.32f)){ e.pos.x = nx; e.pos.z = nz; }
+                e.yaw = atan2f(dir.x,dir.z);
+            }
+        }
+        if(dist > 28.0f) e.active = false;
     }
     
     void render(GLuint shader, Mat4& proj, Mat4& view) {

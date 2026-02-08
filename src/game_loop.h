@@ -10,6 +10,7 @@ bool playerModelsInit = false;
 #include "minimap.h"
 #include "perf_tuning.h"
 #include "content_events.h"
+#include "entity_ai.h"
 void buildGeom();
 
 enum InteractRequestType {
@@ -1129,15 +1130,14 @@ int main(){
                 // Only host spawns entities in multiplayer
                 bool canSpawnEnt = (multiState!=MULTI_IN_GAME || netMgr.isHost);
                 entitySpawnTimer-=dTime;
-                int maxEnt=1+(int)(survivalTime/60.0f);if(maxEnt>6)maxEnt=6;
-                float spawnDelay=40.0f-survivalTime*0.05f;if(spawnDelay<10.0f)spawnDelay=10.0f;
+                int maxEnt = computeEntityCap(survivalTime);
                 if(canSpawnEnt && entitySpawnTimer<=0&&(int)entityMgr.entities.size()<maxEnt){
-                    EntityType type=ENTITY_STALKER;
-                    if(survivalTime>120&&rng()%100<40)type=ENTITY_CRAWLER;
-                    if(survivalTime>240&&rng()%100<30)type=ENTITY_SHADOW;
+                    EntityType type = chooseSpawnEntityType(survivalTime, (int)rng(), (int)rng());
                     Vec3 spawnP = findSpawnPos(cam.pos,25.0f);
-                    entityMgr.spawnEntity(type,spawnP,nullptr,0,0);
-                    entitySpawnTimer=spawnDelay+(rng()%15);
+                    if(!hasEntityNearPos(entityMgr.entities, spawnP, 14.0f)){
+                        entityMgr.spawnEntity(type,spawnP,nullptr,0,0);
+                    }
+                    entitySpawnTimer = computeEntitySpawnDelay(survivalTime, (int)rng());
                 }
                 entityMgr.update(dTime,cam.pos,cam.yaw,nullptr,0,0,CS);
                 if(baitEffectTimer>0){

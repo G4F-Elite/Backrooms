@@ -30,6 +30,7 @@
 #include "entity_types.h"
 #include "entity_model.h"
 #include "entity.h"
+#include "entity_ai.h"
 #include "story.h"
 #include "menu.h"
 #include "input.h"
