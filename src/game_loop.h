@@ -141,20 +141,16 @@ inline int minimapWallSampler(int wx, int wz){
 }
 
 inline void updateMinimapCheat(GLFWwindow* w){
-    static const int cheatKeys[MINIMAP_CHEAT_CODE_LEN] = {
-        GLFW_KEY_M, GLFW_KEY_I, GLFW_KEY_N, GLFW_KEY_I, GLFW_KEY_M, GLFW_KEY_A, GLFW_KEY_P
-    };
-    static const char cheatChars[MINIMAP_CHEAT_CODE_LEN] = {'M','I','N','I','M','A','P'};
-    static bool keyPressed[MINIMAP_CHEAT_CODE_LEN] = {false,false,false,false,false,false,false};
-
-    for(int i=0;i<MINIMAP_CHEAT_CODE_LEN;i++){
-        bool now = glfwGetKey(w, cheatKeys[i]) == GLFW_PRESS;
-        if(now && !keyPressed[i]){
-            if(pushMinimapCheatChar(minimapCheatProgress, cheatChars[i])){
+    static bool letterPressed[26] = {false};
+    for(int i=0;i<26;i++){
+        bool now = glfwGetKey(w, GLFW_KEY_A + i) == GLFW_PRESS;
+        if(now && !letterPressed[i]){
+            char input = (char)('A' + i);
+            if(pushMinimapCheatChar(minimapCheatProgress, input)){
                 minimapEnabled = !minimapEnabled;
             }
         }
-        keyPressed[i] = now;
+        letterPressed[i] = now;
     }
 }
 
