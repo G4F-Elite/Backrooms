@@ -635,7 +635,19 @@ int main(){
 
         glUseProgram(vhsShader);
         bool vhsMenu=(gameState==STATE_MENU||gameState==STATE_MULTI||gameState==STATE_MULTI_HOST||gameState==STATE_MULTI_JOIN||gameState==STATE_MULTI_WAIT);
-        float vI=vhsMenu?(settings.vhsIntensity*0.55f):0.0f;
+        bool vhsGameplay=(gameState==STATE_GAME||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_KEYBINDS_PAUSE||gameState==STATE_NOTE||gameState==STATE_INTRO);
+        float vI=0.0f;
+        if(vhsMenu){
+            vI=0.22f+settings.vhsIntensity*0.58f;
+        }else if(vhsGameplay){
+            float sanityLoss=1.0f-(playerSanity/100.0f);
+            if(sanityLoss<0.0f) sanityLoss=0.0f;
+            if(sanityLoss>1.0f) sanityLoss=1.0f;
+            float stress=entityMgr.dangerLevel*0.65f+sanityLoss*0.35f;
+            if(stress<0.0f) stress=0.0f;
+            if(stress>1.0f) stress=1.0f;
+            vI=settings.vhsIntensity*(0.26f+0.44f*stress);
+        }
         static GLint vhsTmLoc = -1;
         static GLint vhsIntenLoc = -1;
         static GLint vhsUpscalerLoc = -1;

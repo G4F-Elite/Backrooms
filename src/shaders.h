@@ -250,7 +250,7 @@ vec3 resolveSample(vec2 tc){
 }
 
 void main(){
- if(inten < 0.2) {
+ if(inten < 0.02) {
   F = vec4(resolveSample(uv), 1.0);
   return;
  }
