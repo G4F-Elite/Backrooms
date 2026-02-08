@@ -7,6 +7,8 @@ struct AudioSafetyState {
     float staticNoise = 0.0f;
     float whisperNoise = 0.0f;
     float clickEnv = 0.0f;
+    float uiMoveEnv = 0.0f;
+    float uiConfirmEnv = 0.0f;
     float insaneBurst = 0.0f;
     float limiterEnv = 0.0f;
 };

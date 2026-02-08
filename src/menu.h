@@ -269,6 +269,12 @@ inline void drawIntro(int line, float timer, float lineTime, const char** introL
 
 inline void drawNote(int noteId, const char* title, const char* content) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    const char* backFill = "                                                  ";
+    for(float by = 0.96f; by >= -0.96f; by -= 0.08f) {
+        drawTextCentered(backFill, 0.0f, by, 3.4f, 0.07f, 0.05f, 0.03f, 0.90f);
+    }
+    drawTextCentered(backFill, 0.0f, 0.88f, 3.4f, 0.22f, 0.18f, 0.12f, 0.22f);
+
     const char* panelShadow = "                                                  ";
     const char* panelBody = "                                              ";
     for(float yp = 0.76f; yp >= -0.74f; yp -= 0.09f) {

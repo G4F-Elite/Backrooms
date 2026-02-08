@@ -31,6 +31,8 @@ struct SoundState {
     float ambienceVol=0.75f;
     float sfxVol=0.7f;
     float voiceVol=0.65f;
+    bool uiMoveTrig=false;
+    bool uiConfirmTrig=false;
 };
 
 extern SoundState sndState;
@@ -92,6 +94,27 @@ inline void fillAudio(short* buf, int len) {
             flashClick = safe.clickEnv * 0.25f;
             safe.clickEnv *= 0.992f;
         }
+
+        // Menu UI sounds
+        if(sndState.uiMoveTrig){
+            safe.uiMoveEnv = 1.0f;
+            sndState.uiMoveTrig = false;
+        }
+        if(sndState.uiConfirmTrig){
+            safe.uiConfirmEnv = 1.0f;
+            sndState.uiConfirmTrig = false;
+        }
+        float uiMove = 0.0f;
+        if(safe.uiMoveEnv > 0.0001f){
+            uiMove = sinf(globalPhase * 2400.0f) * safe.uiMoveEnv * 0.12f;
+            safe.uiMoveEnv *= 0.987f;
+        }
+        float uiConfirm = 0.0f;
+        if(safe.uiConfirmEnv > 0.0001f){
+            uiConfirm = sinf(globalPhase * 1700.0f) * safe.uiConfirmEnv * 0.20f;
+            uiConfirm += sinf(globalPhase * 900.0f) * safe.uiConfirmEnv * 0.08f;
+            safe.uiConfirmEnv *= 0.984f;
+        }
         
         // Danger sounds - progressive
         float creepy = 0;
@@ -147,7 +170,7 @@ inline void fillAudio(short* buf, int len) {
         }
         
         float ambienceMix = hum*sndState.humVol + amb + distant;
-        float sfxMix = step + scare + flashClick;
+        float sfxMix = step + scare + flashClick + uiMove + uiConfirm;
         float voiceMix = insane;
         float musicMix = creepy;
         float v =
@@ -163,5 +186,7 @@ inline void fillAudio(short* buf, int len) {
 }
 
 inline void triggerScare() { sndState.scareVol = 0.8f; sndState.scareTimer = 0; }
+inline void triggerMenuNavigateSound() { sndState.uiMoveTrig = true; }
+inline void triggerMenuConfirmSound() { sndState.uiConfirmTrig = true; }
 
 void audioThread();
