@@ -9,6 +9,7 @@ bool playerModelsInit = false;
 #include "cheats.h"
 #include "minimap.h"
 #include "perf_tuning.h"
+#include "content_events.h"
 void buildGeom();
 
 enum InteractRequestType {
@@ -46,6 +47,10 @@ float lightsOutTimer = 0.0f;
 float falseDoorTimer = 0.0f;
 Vec3 falseDoorPos(0,0,0);
 int invBattery = 0, invMedkit = 0, invBait = 0;
+EchoSignal echoSignal = {};
+float echoSpawnTimer = 14.0f;
+float echoStatusTimer = 0.0f;
+char echoStatusText[96] = {};
 
 inline void triggerLocalScare(float flash, float shake, float sanityDamage){
     if(damageFlash < flash) damageFlash = flash;
@@ -153,6 +158,72 @@ inline void updateMinimapCheat(GLFWwindow* w){
         }
         letterPressed[i] = now;
     }
+}
+
+inline void setEchoStatus(const char* msg){
+    snprintf(echoStatusText, sizeof(echoStatusText), "%s", msg);
+    echoStatusTimer = 4.0f;
+}
+
+inline void spawnEchoSignal(){
+    echoSignal.active = true;
+    echoSignal.type = chooseEchoTypeFromRoll((int)rng());
+    echoSignal.pos = findSpawnPos(cam.pos, 10.0f + (float)(rng()%7));
+    echoSignal.ttl = 40.0f;
+}
+
+inline void clearEchoSignal(){
+    echoSignal.active = false;
+    echoSignal.ttl = 0.0f;
+}
+
+inline void updateEchoSignal(){
+    if(multiState==MULTI_IN_GAME) return;
+    if(echoStatusTimer>0.0f) echoStatusTimer -= dTime;
+    if(echoSignal.active){
+        echoSignal.ttl -= dTime;
+        if(echoSignal.ttl <= 0.0f){
+            clearEchoSignal();
+            setEchoStatus("ECHO SIGNAL LOST");
+        }
+        return;
+    }
+    echoSpawnTimer -= dTime;
+    if(echoSpawnTimer <= 0.0f){
+        spawnEchoSignal();
+        echoSpawnTimer = nextEchoSpawnDelaySeconds((int)rng());
+        setEchoStatus("NEW ECHO SIGNAL DETECTED");
+    }
+}
+
+inline void resolveEchoInteraction(){
+    if(!echoSignal.active || multiState==MULTI_IN_GAME) return;
+    bool breach = false;
+    applyEchoOutcome(
+        echoSignal.type,
+        (int)rng(),
+        invBattery,
+        invMedkit,
+        invBait,
+        playerHealth,
+        playerSanity,
+        playerStamina,
+        breach
+    );
+    if(echoSignal.type==ECHO_CACHE){
+        setEchoStatus("ECHO CACHE: SUPPLY FOUND");
+    }else if(echoSignal.type==ECHO_RESTORE){
+        setEchoStatus("ECHO RESONANCE: VITALS RESTORED");
+    }else{
+        setEchoStatus("ECHO BREACH: HOSTILE SURGE");
+    }
+    if(breach){
+        triggerLocalScare(0.30f, 0.17f, 8.0f);
+        Vec3 ep = findSpawnPos(cam.pos, 12.0f);
+        EntityType type = ((rng()%2)==0) ? ENTITY_SHADOW : ENTITY_CRAWLER;
+        entityMgr.spawnEntity(type, ep, nullptr, 0, 0);
+    }
+    clearEchoSignal();
 }
 
 inline void drawMinimapOverlay(){
@@ -429,6 +500,10 @@ void genWorld(){
     worldItems.clear();
     nextWorldItemId = 1;
     invBattery = invMedkit = invBait = 0;
+    clearEchoSignal();
+    echoSpawnTimer = 12.0f + (float)(rng()%8);
+    echoStatusTimer = 0.0f;
+    echoStatusText[0] = '\0';
     lightsOutTimer = falseDoorTimer = 0.0f;
     baitEffectTimer = 0.0f;
     itemSpawnTimer = 8.0f;
@@ -490,6 +565,7 @@ void gameInput(GLFWwindow*w){
             break;
         }
     }
+    bool nearEchoSignal = echoSignal.active && isEchoInRange(cam.pos, echoSignal.pos, 2.5f);
     if(eNow&&!interactPressed&&nearNoteId>=0){
         if(storyMgr.checkNotePickup(cam.pos,4.0f)){
             if(tryTriggerStoryScare(scareState, storyMgr.currentNote)){
@@ -525,6 +601,8 @@ void gameInput(GLFWwindow*w){
                 break;
             }
         }
+    }else if(eNow&&!interactPressed&&nearEchoSignal){
+        resolveEchoInteraction();
     }
     interactPressed=eNow;
     
@@ -747,6 +825,25 @@ void drawUI(){
                 if(nearbyWorldItemType==0) drawText("[E] PICK BATTERY",-0.18f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.8f);
                 else if(nearbyWorldItemType==1) drawText("[E] PICK MEDKIT",-0.16f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.8f);
                 else if(nearbyWorldItemType==2) drawText("[E] PICK BAIT",-0.14f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.8f);
+            }
+            if(multiState!=MULTI_IN_GAME && echoSignal.active){
+                Vec3 d = echoSignal.pos - cam.pos;
+                d.y = 0;
+                float dist = d.len();
+                char echoBuf[72];
+                snprintf(echoBuf,72,"ECHO SIGNAL %.0fm",dist);
+                drawText(echoBuf,-0.95f,0.50f,1.15f,0.62f,0.85f,0.86f,0.76f);
+                if(isEchoInRange(cam.pos, echoSignal.pos, 2.5f)){
+                    drawText("[E] ATTUNE ECHO",-0.17f,-0.50f,1.35f,0.72f,0.88f,0.9f,0.85f);
+                }else{
+                    float sx=0, sy=0;
+                    if(projectToScreen(echoSignal.pos + Vec3(0,1.1f,0), sx, sy)){
+                        drawText("ECHO",sx-0.045f,sy,1.05f,0.7f,0.88f,0.92f,0.82f);
+                    }
+                }
+            }
+            if(multiState!=MULTI_IN_GAME && echoStatusTimer>0.0f){
+                drawText(echoStatusText,-0.25f,0.56f,1.2f,0.7f,0.86f,0.9f,0.8f);
             }
             if(minimapEnabled) drawMinimapOverlay();
             if(storyMgr.hasHallucinations())drawHallucinationEffect((50.0f-playerSanity)/50.0f);
@@ -989,6 +1086,7 @@ int main(){
                 }
                 if(falseDoorTimer>0) falseDoorTimer-=dTime;
                 if(baitEffectTimer>0) baitEffectTimer-=dTime;
+                updateEchoSignal();
                 gameInput(gWin);
                 int targetChunkX = (int)floorf(cam.pos.x / (CS * CHUNK_SIZE));
                 int targetChunkZ = (int)floorf(cam.pos.z / (CS * CHUNK_SIZE));
