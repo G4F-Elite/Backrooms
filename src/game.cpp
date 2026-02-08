@@ -27,6 +27,7 @@
 #include "render.h"
 #include "perf_tuning.h"
 #include "world.h"
+#include "map_content.h"
 #include "entity_types.h"
 #include "entity_model.h"
 #include "entity.h"
@@ -60,6 +61,7 @@ GLFWwindow* gWin;
 std::unordered_map<long long, Chunk> chunks;
 std::vector<Light> lights;
 std::vector<Vec3> pillars;
+std::vector<MapProp> mapProps;
 std::mt19937 rng;
 int playerChunkX = 0, playerChunkZ = 0;
 int lastBuildChunkX = -999, lastBuildChunkZ = -999;
@@ -101,6 +103,7 @@ GLuint wallVAO, wallVBO, floorVAO, floorVBO;
 GLuint ceilVAO, ceilVBO, lightVAO, lightVBO;
 GLuint lightOffVAO, lightOffVBO;
 GLuint pillarVAO, pillarVBO;
+GLuint decorVAO, decorVBO;
 GLuint quadVAO, quadVBO;
 GLuint fbo, fboTex, rbo;
 GLuint taaHistoryTex = 0;
@@ -108,7 +111,7 @@ GLuint taaResolveTex = 0;
 GLuint taaResolveFbo = 0;
 bool taaHistoryValid = false;
 int taaFrameIndex = 0;
-int wallVC, floorVC, ceilVC, lightVC, lightOffVC, pillarVC;
+int wallVC, floorVC, ceilVC, lightVC, lightOffVC, pillarVC, decorVC;
 
 // Audio
 SoundState sndState;

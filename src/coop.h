@@ -1,6 +1,7 @@
 #pragma once
 #include "traps.h"
 #include "coop_rules.h"
+#include "map_content.h"
 
 inline void updateCoopObjectiveHost(){
     if(!coop.initialized) return;
@@ -134,6 +135,7 @@ inline void applyRoamEvent(int type, int a, int b, float duration){
     }else if(type==ROAM_GEOM_SHIFT){
         (void)a; (void)b;
         reshuffleBehind(cam.pos.x, cam.pos.z, cam.yaw);
+        updateMapContent(playerChunkX, playerChunkZ);
         buildGeom();
     }else if(type==ROAM_FALSE_DOOR){
         falseDoorTimer = duration;
