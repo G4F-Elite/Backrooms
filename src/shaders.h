@@ -13,21 +13,6 @@ uniform int nl; uniform vec3 lp[16]; uniform float danger;
 uniform int flashOn; uniform vec3 flashDir;
 uniform int rfc; uniform vec3 rfp[4]; uniform vec3 rfd[4];
 
-float hash2D(vec2 p) {
- return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
-}
-
-float noise2D(vec2 p) {
- vec2 i = floor(p);
- vec2 f = fract(p);
- f = f * f * (3.0 - 2.0 * f);
- float a = hash2D(i);
- float b = hash2D(i + vec2(1.0, 0.0));
- float c = hash2D(i + vec2(0.0, 1.0));
- float d = hash2D(i + vec2(1.0, 1.0));
- return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-}
-
 void main(){
  vec3 tc = texture(tex,uv).rgb;
  vec3 N = normalize(nm);
@@ -72,9 +57,7 @@ void main(){
    float spotAtt = smoothstep(0.85, 0.95, spotAngle);
    float distAtt = 1.0 - dist / 15.0;
    float NdotL = max(dot(N, -toFrag), 0.0);
-   // White center, red edge when danger > 0
    vec3 flashColor = mix(vec3(1.0, 1.0, 0.9), vec3(1.0, 0.3, 0.2), danger * 0.6);
-   // Red tint at edges always when danger
    if(spotAngle < 0.9 && danger > 0.2) flashColor = vec3(0.9, 0.2, 0.1);
    res += tc * flashColor * spotAtt * distAtt * NdotL * 1.5;
   }
@@ -99,38 +82,11 @@ void main(){
   if(maxB > 0.1) res = max(res, tc * 0.15);
  }
  
- // THICK VOLUMETRIC FOG - hides LOD and pop-in
+ // FOG - moderate density to hide distant LOD
  float dist = length(vp - fp);
- 
- // Base fog - much thicker now (was 0.03, now 0.055)
- float baseFog = exp(-dist * 0.055);
- 
- // Layered height fog - thicker near floor and ceiling
- float heightFog = 1.0;
- if(fp.y < 0.8) heightFog = 0.85 + fp.y * 0.1875; // floor fog
- if(fp.y > 2.2) heightFog = 0.9; // ceiling fog
- 
- // Animated fog noise - creates rolling mist effect
- vec2 fogUV = vec2(fp.x * 0.15 + tm * 0.02, fp.z * 0.15 - tm * 0.015);
- float fogNoise = noise2D(fogUV) * 0.25 + noise2D(fogUV * 2.0) * 0.15;
- 
- // Distance-based noise intensity - more noise at distance
- float noiseIntensity = smoothstep(8.0, 20.0, dist) * 0.3;
- 
- // Combine fog factors
- float fog = baseFog * heightFog;
- fog = clamp(fog - fogNoise * noiseIntensity, 0.0, 1.0);
- 
- // Fog color with slight warmth variation
- vec3 fogColor = vec3(0.065, 0.055, 0.045);
- fogColor += vec3(0.01, 0.008, 0.005) * sin(tm * 0.5 + dist * 0.1);
- 
- // Apply fog
+ float fog = clamp(1.0 - dist * 0.038, 0.0, 1.0);
+ vec3 fogColor = vec3(0.06, 0.05, 0.04);
  res = mix(fogColor, res, fog);
- 
- // Distance darkening - additional fade at very far distances
- float distDark = smoothstep(18.0, 28.0, dist);
- res *= (1.0 - distDark * 0.6);
  
  res *= vec3(1.0, 0.97, 0.9);
  
@@ -173,17 +129,6 @@ uniform sampler2D tex; uniform float tm,inten;
 
 float rnd(vec2 s){ return fract(sin(dot(s,vec2(12.9898,78.233)))*43758.5453); }
 
-float noise(vec2 p) {
- vec2 i = floor(p);
- vec2 f = fract(p);
- f = f * f * (3.0 - 2.0 * f);
- float a = rnd(i);
- float b = rnd(i + vec2(1.0, 0.0));
- float c = rnd(i + vec2(0.0, 1.0));
- float d = rnd(i + vec2(1.0, 1.0));
- return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
-}
-
 void main(){
  if(inten < 0.2) {
   F = vec4(texture(tex, uv).rgb, 1.0);
@@ -200,39 +145,20 @@ void main(){
  // Scanlines
  c -= sin(uv.y * 600.0 + tm * 6.0) * 0.016 * inten;
  
- // Static noise
- c += (rnd(uv + vec2(tm,0)) - 0.5) * 0.045 * inten;
+ // Light static noise
+ c += (rnd(uv + vec2(tm,0)) - 0.5) * 0.035 * inten;
  
- // Horizontal distortion glitch
+ // Horizontal distortion glitch (rare)
  if(inten > 0.45 && rnd(vec2(tm * 0.08, floor(uv.y * 60))) > 0.985) {
   float of = (rnd(vec2(tm, floor(uv.y * 60))) - 0.5) * 0.018 * inten;
   c = texture(tex, uv + vec2(of, 0)).rgb;
  }
  
- // Vignette - stronger to hide screen edges
- float vig = 1.0 - length(uv - 0.5) * 0.45;
- vig = smoothstep(0.3, 1.0, vig);
- c *= vig;
- 
- // Subtle dust particles overlay
- float dust = noise(uv * 200.0 + vec2(tm * 3.0, tm * 2.0));
- dust = smoothstep(0.75, 0.95, dust) * 0.08 * inten;
- c += dust;
- 
- // Subtle light leak / haze at center
- float haze = 1.0 - length(uv - 0.5) * 1.5;
- haze = max(haze, 0.0) * 0.03 * inten;
- c += vec3(haze * 1.1, haze, haze * 0.9);
- 
- // Ghost frame (very subtle double image)
- c = mix(c, texture(tex, uv - vec2(0.003, 0.001)).rgb, 0.03 * inten);
+ // Light vignette
+ c *= 1.0 - length(uv - 0.5) * 0.3;
  
  // Warm tint
  c.g += 0.01 * inten;
- 
- // Subtle flicker
- float flicker = 1.0 - rnd(vec2(floor(tm * 15.0), 0.0)) * 0.02 * inten;
- c *= flicker;
  
  F = vec4(c, 1);
 })";
