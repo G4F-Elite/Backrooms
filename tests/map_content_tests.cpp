@@ -43,6 +43,19 @@ std::vector<PropSnapshot> makeSnapshot() {
     return out;
 }
 
+void installOpenChunk(int cx, int cz) {
+    Chunk c{};
+    c.cx = cx;
+    c.cz = cz;
+    c.gen = true;
+    for (int x = 0; x < CHUNK_SIZE; x++) {
+        for (int z = 0; z < CHUNK_SIZE; z++) {
+            c.cells[x][z] = (x == 0 || z == 0 || x == CHUNK_SIZE - 1 || z == CHUNK_SIZE - 1) ? 1 : 0;
+        }
+    }
+    chunks[chunkKey(cx, cz)] = c;
+}
+
 void generateArea(int cx, int cz) {
     updateVisibleChunks(cx * CHUNK_SIZE * CS, cz * CHUNK_SIZE * CS);
     updateMapContent(cx, cz);
@@ -84,14 +97,14 @@ void testGeneratesVariedProps() {
     }
     updateMapContent(0, 0);
 
-    assert(mapProps.size() > 35);
-    bool seen[10] = {false, false, false, false, false, false, false, false, false, false};
+    assert(mapProps.size() > 15);
+    bool seen[13] = {false, false, false, false, false, false, false, false, false, false, false, false, false};
     for (const auto& p : mapProps) {
-        if (p.type >= 0 && p.type < 10) seen[p.type] = true;
+        if (p.type >= 0 && p.type < 13) seen[p.type] = true;
     }
     int seenCount = 0;
     for (bool v : seen) if (v) seenCount++;
-    assert(seenCount >= 7);
+    assert(seenCount >= 5);
 }
 
 void testNoPropsInsideWalls() {
@@ -128,11 +141,41 @@ void testPropCollisionBlocksSolidPropsOnly() {
     assert(!collideMapProps(10.0f, 10.0f, 0.2f));
 }
 
+void testPushablePropCanMove() {
+    chunks.clear();
+    installOpenChunk(0, 0);
+    mapProps.clear();
+    MapProp crate{};
+    crate.pos = Vec3(10.0f, 0.0f, 10.0f);
+    crate.type = MAP_PROP_CRATE_STACK;
+    crate.scale = 1.0f;
+    mapProps.push_back(crate);
+    bool pushed = tryPushMapProps(10.0f, 10.0f, 0.3f, 1.0f, 0.0f);
+    assert(pushed);
+    assert(mapProps[0].pos.x > 10.0f);
+}
+
+void testNonPushablePropDoesNotMove() {
+    chunks.clear();
+    installOpenChunk(0, 0);
+    mapProps.clear();
+    MapProp locker{};
+    locker.pos = Vec3(10.0f, 0.0f, 10.0f);
+    locker.type = MAP_PROP_LOCKER_BANK;
+    locker.scale = 1.0f;
+    mapProps.push_back(locker);
+    bool pushed = tryPushMapProps(10.0f, 10.0f, 0.3f, 1.0f, 0.0f);
+    assert(!pushed);
+    assert(mapProps[0].pos.x == 10.0f);
+}
+
 int main() {
     testDeterministicPlacementBySeed();
     testGeneratesVariedProps();
     testNoPropsInsideWalls();
     testPropCollisionBlocksSolidPropsOnly();
+    testPushablePropCanMove();
+    testNonPushablePropDoesNotMove();
     std::cout << "All map content tests passed.\n";
     return 0;
 }

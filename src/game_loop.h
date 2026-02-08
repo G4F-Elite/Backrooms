@@ -66,6 +66,18 @@ void buildGeom(){
             mkBox(dv, pr.pos.x, 1.52f * pr.scale, pr.pos.z, 0.70f * pr.scale, 0.08f * pr.scale, 0.58f * pr.scale);
         }else if(pr.type==MAP_PROP_PARTITION){
             mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, 1.35f * pr.scale, 1.22f * pr.scale, 0.12f * pr.scale);
+        }else if(pr.type==MAP_PROP_BOX_PALLET){
+            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, 1.22f * pr.scale, 0.34f * pr.scale, 1.02f * pr.scale);
+            mkBox(dv, pr.pos.x, 0.34f * pr.scale, pr.pos.z, 1.10f * pr.scale, 0.78f * pr.scale, 0.96f * pr.scale);
+            mkBox(dv, pr.pos.x, 1.12f * pr.scale, pr.pos.z, 0.88f * pr.scale, 0.50f * pr.scale, 0.82f * pr.scale);
+        }else if(pr.type==MAP_PROP_DRUM_STACK){
+            mkBox(dv, pr.pos.x - 0.22f * pr.scale, 0.0f, pr.pos.z, 0.48f * pr.scale, 1.12f * pr.scale, 0.48f * pr.scale);
+            mkBox(dv, pr.pos.x + 0.22f * pr.scale, 0.0f, pr.pos.z, 0.48f * pr.scale, 1.06f * pr.scale, 0.48f * pr.scale);
+            mkBox(dv, pr.pos.x, 1.06f * pr.scale, pr.pos.z, 0.44f * pr.scale, 0.44f * pr.scale, 0.44f * pr.scale);
+        }else if(pr.type==MAP_PROP_LOCKER_BANK){
+            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, 1.18f * pr.scale, 1.74f * pr.scale, 0.46f * pr.scale);
+            mkBox(dv, pr.pos.x - 0.30f * pr.scale, 0.0f, pr.pos.z + 0.22f * pr.scale, 0.04f * pr.scale, 1.62f * pr.scale, 0.04f * pr.scale);
+            mkBox(dv, pr.pos.x + 0.30f * pr.scale, 0.0f, pr.pos.z + 0.22f * pr.scale, 0.04f * pr.scale, 1.62f * pr.scale, 0.04f * pr.scale);
         }else{
             mkBox(dv, pr.pos.x - 0.42f, 0.0f, pr.pos.z + 0.24f, 0.68f * pr.scale, 0.35f * pr.scale, 0.68f * pr.scale);
             mkBox(dv, pr.pos.x + 0.28f, 0.0f, pr.pos.z - 0.22f, 0.56f * pr.scale, 0.28f * pr.scale, 0.56f * pr.scale);
@@ -421,8 +433,23 @@ void gameInput(GLFWwindow*w){
     if(debugTools.flyMode){
         cam.pos=np;
     }else{
-        if(!collideWorld(np.x,cam.pos.z,PR)&&!collideMapProps(np.x,cam.pos.z,PR)&&!collideCoopDoor(np.x,cam.pos.z,PR)&&!(falseDoorTimer>0&&nearPoint2D(Vec3(np.x,0,cam.pos.z),falseDoorPos,1.0f)))cam.pos.x=np.x;
-        if(!collideWorld(cam.pos.x,np.z,PR)&&!collideMapProps(cam.pos.x,np.z,PR)&&!collideCoopDoor(cam.pos.x,np.z,PR)&&!(falseDoorTimer>0&&nearPoint2D(Vec3(cam.pos.x,0,np.z),falseDoorPos,1.0f)))cam.pos.z=np.z;
+        bool xBlockedWorld = collideWorld(np.x,cam.pos.z,PR) || collideCoopDoor(np.x,cam.pos.z,PR) ||
+                             (falseDoorTimer>0&&nearPoint2D(Vec3(np.x,0,cam.pos.z),falseDoorPos,1.0f));
+        bool xBlockedProps = collideMapProps(np.x,cam.pos.z,PR);
+        if(!xBlockedWorld && !xBlockedProps){
+            cam.pos.x=np.x;
+        }else if(!xBlockedWorld && xBlockedProps){
+            if(tryPushMapProps(np.x,cam.pos.z,PR,np.x-cam.pos.x,0.0f)) cam.pos.x=np.x;
+        }
+
+        bool zBlockedWorld = collideWorld(cam.pos.x,np.z,PR) || collideCoopDoor(cam.pos.x,np.z,PR) ||
+                             (falseDoorTimer>0&&nearPoint2D(Vec3(cam.pos.x,0,np.z),falseDoorPos,1.0f));
+        bool zBlockedProps = collideMapProps(cam.pos.x,np.z,PR);
+        if(!zBlockedWorld && !zBlockedProps){
+            cam.pos.z=np.z;
+        }else if(!zBlockedWorld && zBlockedProps){
+            if(tryPushMapProps(cam.pos.x,np.z,PR,0.0f,np.z-cam.pos.z)) cam.pos.z=np.z;
+        }
     }
     
     static float bobT=0,lastB=0;
