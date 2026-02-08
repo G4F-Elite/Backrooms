@@ -19,27 +19,33 @@ inline void mkWall(std::vector<float>& v, float x, float z, float dx, float dz, 
 
 inline void mkPillar(std::vector<float>& v, float cx, float cz, float s, float h) {
     float hs = s / 2;
-    Vec3 normals[4] = {{0, 0, 1}, {0, 0, -1}, {1, 0, 0}, {-1, 0, 0}};
-    float faces[4][4] = {
-        {cx + hs, cz + hs, cx - hs, cz + hs},
-        {cx - hs, cz - hs, cx + hs, cz - hs},
-        {cx + hs, cz - hs, cx + hs, cz + hs},
-        {cx - hs, cz + hs, cx - hs, cz - hs}
-    };
-    for (int f = 0; f < 4; f++) {
-        float x0 = faces[f][0], z0 = faces[f][1];
-        float x1 = faces[f][2], z1 = faces[f][3];
-        Vec3 n = normals[f];
+    float ty = h / (s * 2.0f);
+    if (ty < 1.0f) ty = 1.0f;
+
+    auto pushFace = [&](float x0, float y0, float z0,
+                        float x1, float y1, float z1,
+                        float x2, float y2, float z2,
+                        float x3, float y3, float z3,
+                        float nx, float ny, float nz) {
         float vv[] = {
-            x0, 0, z0, 0, 0, n.x, n.y, n.z,
-            x1, h, z1, 1, 1, n.x, n.y, n.z,
-            x0, h, z0, 0, 1, n.x, n.y, n.z,
-            x0, 0, z0, 0, 0, n.x, n.y, n.z,
-            x1, 0, z1, 1, 0, n.x, n.y, n.z,
-            x1, h, z1, 1, 1, n.x, n.y, n.z
+            x0, y0, z0, 0, 0, nx, ny, nz,
+            x1, y1, z1, 1, 0, nx, ny, nz,
+            x2, y2, z2, 1, ty, nx, ny, nz,
+            x0, y0, z0, 0, 0, nx, ny, nz,
+            x2, y2, z2, 1, ty, nx, ny, nz,
+            x3, y3, z3, 0, ty, nx, ny, nz
         };
         for (int i = 0; i < 48; i++) v.push_back(vv[i]);
-    }
+    };
+
+    // Front (+Z)
+    pushFace(cx - hs, 0, cz + hs, cx + hs, 0, cz + hs, cx + hs, h, cz + hs, cx - hs, h, cz + hs, 0, 0, 1);
+    // Back (-Z)
+    pushFace(cx + hs, 0, cz - hs, cx - hs, 0, cz - hs, cx - hs, h, cz - hs, cx + hs, h, cz - hs, 0, 0, -1);
+    // Right (+X)
+    pushFace(cx + hs, 0, cz + hs, cx + hs, 0, cz - hs, cx + hs, h, cz - hs, cx + hs, h, cz + hs, 1, 0, 0);
+    // Left (-X)
+    pushFace(cx - hs, 0, cz - hs, cx - hs, 0, cz + hs, cx - hs, h, cz + hs, cx - hs, h, cz - hs, -1, 0, 0);
 }
 
 inline void mkLight(std::vector<float>& v, Vec3 pos, float sx, float sz) {

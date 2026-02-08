@@ -302,6 +302,29 @@ inline Vec3 findSafeSpawn() {
     return Vec3(8 * CS, 0, 8 * CS);  // Absolute fallback
 }
 
-inline Vec3 findSpawnPos(Vec3 pPos, float minD) { for(int a=0;a<50;a++){ int dx=(rng()%30)-15, dz=(rng()%30)-15;
-    int wx=(int)floorf(pPos.x/CS)+dx, wz=(int)floorf(pPos.z/CS)+dz; if(getCellWorld(wx,wz)==0){ Vec3 p((wx+0.5f)*CS,0,(wz+0.5f)*CS);
-    if(sqrtf((p.x-pPos.x)*(p.x-pPos.x)+(p.z-pPos.z)*(p.z-pPos.z))>=minD) return p;}} return Vec3(pPos.x+20,0,pPos.z+20);}
+inline Vec3 findSpawnPos(Vec3 pPos, float minD) {
+    const float spawnRadius = 0.42f;
+    for(int a=0;a<80;a++){
+        int dx=(rng()%34)-17, dz=(rng()%34)-17;
+        int wx=(int)floorf(pPos.x/CS)+dx, wz=(int)floorf(pPos.z/CS)+dz;
+        if(getCellWorld(wx,wz)!=0) continue;
+        Vec3 p((wx+0.5f)*CS,0,(wz+0.5f)*CS);
+        float ddx = p.x-pPos.x, ddz = p.z-pPos.z;
+        if(sqrtf(ddx*ddx+ddz*ddz)<minD) continue;
+        if(collideWorld(p.x,p.z,spawnRadius)) continue;
+        return p;
+    }
+    for(int r=6;r<18;r++){
+        for(int a=0;a<16;a++){
+            float ang = (float)a * 0.3926991f;
+            float fx = pPos.x + sinf(ang) * (float)r * CS * 0.5f;
+            float fz = pPos.z + cosf(ang) * (float)r * CS * 0.5f;
+            int wx=(int)floorf(fx/CS), wz=(int)floorf(fz/CS);
+            if(getCellWorld(wx,wz)!=0) continue;
+            Vec3 p((wx+0.5f)*CS,0,(wz+0.5f)*CS);
+            if(collideWorld(p.x,p.z,spawnRadius)) continue;
+            return p;
+        }
+    }
+    return Vec3(pPos.x+20,0,pPos.z+20);
+}
