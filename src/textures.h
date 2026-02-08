@@ -166,7 +166,8 @@ inline GLuint genTex(int type) {
             d[idx + 0] = (unsigned char)(r < 0 ? 0 : (r > 255 ? 255 : (int)r));
             d[idx + 1] = (unsigned char)(g < 0 ? 0 : (g > 255 ? 255 : (int)g));
             d[idx + 2] = (unsigned char)(b < 0 ? 0 : (b > 255 ? 255 : (int)b));
-
+        }
+    }
     
     GLuint tex;
     glGenTextures(1, &tex);
