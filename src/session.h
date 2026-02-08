@@ -1,0 +1,203 @@
+#pragma once
+
+#include "reconnect_policy.h"
+#include "flashlight_behavior.h"
+#include "scare_system.h"
+#include "cheats.h"
+#include "minimap.h"
+#include "perf_tuning.h"
+#include "content_events.h"
+#include "entity_ai.h"
+#include "trap_events.h"
+
+GLuint noteVAO=0, noteVBO=0;
+int noteVC=0;
+bool playerModelsInit = false;
+
+void buildGeom();
+
+enum InteractRequestType {
+    REQ_TOGGLE_SWITCH = 1,
+    REQ_PICK_ITEM
+};
+
+enum RoamEventType {
+    ROAM_NONE = 0,
+    ROAM_LIGHTS_OUT = 1,
+    ROAM_GEOM_SHIFT = 2,
+    ROAM_FALSE_DOOR = 3
+};
+
+struct CoopObjectives {
+    Vec3 switches[2];
+    bool switchOn[2];
+    Vec3 doorPos;
+    bool doorOpen;
+    bool initialized;
+} coop = {};
+
+struct WorldItem {
+    int id;
+    int type; // 0 battery, 1 medkit, 2 bait
+    Vec3 pos;
+    bool active;
+};
+
+std::vector<WorldItem> worldItems;
+int nextWorldItemId = 1;
+float itemSpawnTimer = 12.0f;
+float baitEffectTimer = 0.0f;
+float lightsOutTimer = 0.0f;
+float falseDoorTimer = 0.0f;
+Vec3 falseDoorPos(0,0,0);
+int invBattery = 0, invMedkit = 0, invBait = 0;
+EchoSignal echoSignal = {};
+float echoSpawnTimer = 14.0f;
+float echoStatusTimer = 0.0f;
+char echoStatusText[96] = {};
+TrapCorridorState trapCorridor = {};
+float anomalyBlur = 0.0f;
+float trapStatusTimer = 0.0f;
+char trapStatusText[96] = {};
+extern int nearbyWorldItemId;
+extern int nearbyWorldItemType;
+
+inline void triggerLocalScare(float flash, float shake, float sanityDamage){
+    if(damageFlash < flash) damageFlash = flash;
+    if(camShake < shake) camShake = shake;
+    playerSanity -= sanityDamage;
+    if(playerSanity < 0.0f) playerSanity = 0.0f;
+    triggerScare();
+}
+
+struct SessionSnapshot {
+    bool valid;
+    char hostIP[64];
+    Vec3 camPos;
+    float camYaw, camPitch;
+    float health, sanity, stamina, battery;
+    float survival;
+    int invB, invM, invT;
+};
+
+SessionSnapshot lastSession = {};
+bool reconnectInProgress = false;
+bool restoreAfterReconnect = false;
+float reconnectAttemptTimer = 0.0f;
+int reconnectAttempts = 0;
+
+inline void captureSessionSnapshot(){
+    if(multiState!=MULTI_IN_GAME || netMgr.isHost) return;
+    lastSession.valid = true;
+    snprintf(lastSession.hostIP, sizeof(lastSession.hostIP), "%s", netMgr.hostIP);
+    lastSession.camPos = cam.pos;
+    lastSession.camYaw = cam.yaw;
+    lastSession.camPitch = cam.pitch;
+    lastSession.health = playerHealth;
+    lastSession.sanity = playerSanity;
+    lastSession.stamina = playerStamina;
+    lastSession.battery = flashlightBattery;
+    lastSession.survival = survivalTime;
+    lastSession.invB = invBattery;
+    lastSession.invM = invMedkit;
+    lastSession.invT = invBait;
+}
+
+inline void restoreSessionSnapshot(){
+    if(!lastSession.valid) return;
+    cam.pos = lastSession.camPos;
+    cam.yaw = lastSession.camYaw;
+    cam.pitch = lastSession.camPitch;
+    playerHealth = lastSession.health;
+    playerSanity = lastSession.sanity;
+    playerStamina = lastSession.stamina;
+    flashlightBattery = lastSession.battery;
+    survivalTime = lastSession.survival;
+    invBattery = lastSession.invB;
+    invMedkit = lastSession.invM;
+    invBait = lastSession.invT;
+}
+
+inline void initCoopObjectives(const Vec3& basePos){
+    coop.switches[0] = Vec3(basePos.x + CS * 2.0f, 0, basePos.z + CS * 1.0f);
+    coop.switches[1] = Vec3(basePos.x - CS * 2.0f, 0, basePos.z + CS * 1.0f);
+    coop.switchOn[0] = false;
+    coop.switchOn[1] = false;
+    coop.doorPos = Vec3(basePos.x, 0, basePos.z + CS * 4.0f);
+    coop.doorOpen = false;
+    coop.initialized = true;
+}
+
+inline bool nearPoint2D(const Vec3& a, const Vec3& b, float r){
+    Vec3 d = a - b; d.y = 0;
+    return sqrtf(d.x*d.x + d.z*d.z) < r;
+}
+
+inline bool projectToScreen(const Vec3& worldPos, float& sx, float& sy){
+    Vec3 d = worldPos - cam.pos;
+    float cy = cosf(cam.yaw), syaw = sinf(cam.yaw);
+    float cp = cosf(cam.pitch), sp = sinf(cam.pitch);
+
+    float cx = d.x * cy - d.z * syaw;
+    float cz0 = d.x * syaw + d.z * cy;
+    float cy2 = d.y * cp - cz0 * sp;
+    float cz = d.y * sp + cz0 * cp;
+    if(cz <= 0.05f) return false;
+
+    float fov = 1.2f;
+    float t = tanf(fov * 0.5f);
+    float asp = (float)winW / (float)winH;
+    sx = cx / (cz * asp * t);
+    sy = cy2 / (cz * t);
+    return sx > -1.2f && sx < 1.2f && sy > -1.2f && sy < 1.2f;
+}
+
+inline int minimapWallSampler(int wx, int wz){
+    return getCellWorld(wx, wz) == 1 ? 1 : 0;
+}
+
+inline void updateMinimapCheat(GLFWwindow* w){
+    static bool letterPressed[26] = {false};
+    static bool f6Pressed = false;
+    static bool f7Pressed = false;
+    static bool homePressed = false;
+
+    bool f6Now = glfwGetKey(w, GLFW_KEY_F6) == GLFW_PRESS;
+    if(f6Now && !f6Pressed){
+        minimapEnabled = !minimapEnabled;
+    }
+    f6Pressed = f6Now;
+
+    bool f7Now = glfwGetKey(w, GLFW_KEY_F7) == GLFW_PRESS;
+    if(f7Now && !f7Pressed){
+        minimapEnabled = !minimapEnabled;
+    }
+    f7Pressed = f7Now;
+
+    bool homeNow = glfwGetKey(w, GLFW_KEY_HOME) == GLFW_PRESS;
+    if(homeNow && !homePressed){
+        minimapEnabled = !minimapEnabled;
+    }
+    homePressed = homeNow;
+
+    for(int i=0;i<26;i++){
+        bool now = glfwGetKey(w, GLFW_KEY_A + i) == GLFW_PRESS;
+        if(now && !letterPressed[i]){
+            char input = (char)('A' + i);
+            if(pushMinimapCheatChar(minimapCheatProgress, input)){
+                minimapEnabled = !minimapEnabled;
+            }
+        }
+        letterPressed[i] = now;
+    }
+}
+
+inline void setEchoStatus(const char* msg){
+    snprintf(echoStatusText, sizeof(echoStatusText), "%s", msg);
+    echoStatusTimer = 4.0f;
+}
+
+inline void setTrapStatus(const char* msg){
+    snprintf(trapStatusText, sizeof(trapStatusText), "%s", msg);
+    trapStatusTimer = 4.0f;
+}

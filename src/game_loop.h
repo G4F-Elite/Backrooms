@@ -1,515 +1,6 @@
 #pragma once
 
-GLuint noteVAO=0, noteVBO=0;
-int noteVC=0;
-bool playerModelsInit = false;
-#include "reconnect_policy.h"
-#include "flashlight_behavior.h"
-#include "scare_system.h"
-#include "cheats.h"
-#include "minimap.h"
-#include "perf_tuning.h"
-#include "content_events.h"
-#include "entity_ai.h"
-#include "trap_events.h"
-void buildGeom();
-
-enum InteractRequestType {
-    REQ_TOGGLE_SWITCH = 1,
-    REQ_PICK_ITEM
-};
-
-enum RoamEventType {
-    ROAM_NONE = 0,
-    ROAM_LIGHTS_OUT = 1,
-    ROAM_GEOM_SHIFT = 2,
-    ROAM_FALSE_DOOR = 3
-};
-
-struct CoopObjectives {
-    Vec3 switches[2];
-    bool switchOn[2];
-    Vec3 doorPos;
-    bool doorOpen;
-    bool initialized;
-} coop = {};
-
-struct WorldItem {
-    int id;
-    int type; // 0 battery, 1 medkit, 2 bait
-    Vec3 pos;
-    bool active;
-};
-
-std::vector<WorldItem> worldItems;
-int nextWorldItemId = 1;
-float itemSpawnTimer = 12.0f;
-float baitEffectTimer = 0.0f;
-float lightsOutTimer = 0.0f;
-float falseDoorTimer = 0.0f;
-Vec3 falseDoorPos(0,0,0);
-int invBattery = 0, invMedkit = 0, invBait = 0;
-EchoSignal echoSignal = {};
-float echoSpawnTimer = 14.0f;
-float echoStatusTimer = 0.0f;
-char echoStatusText[96] = {};
-TrapCorridorState trapCorridor = {};
-float anomalyBlur = 0.0f;
-float trapStatusTimer = 0.0f;
-char trapStatusText[96] = {};
-
-inline void triggerLocalScare(float flash, float shake, float sanityDamage){
-    if(damageFlash < flash) damageFlash = flash;
-    if(camShake < shake) camShake = shake;
-    playerSanity -= sanityDamage;
-    if(playerSanity < 0.0f) playerSanity = 0.0f;
-    triggerScare();
-}
-
-struct SessionSnapshot {
-    bool valid;
-    char hostIP[64];
-    Vec3 camPos;
-    float camYaw, camPitch;
-    float health, sanity, stamina, battery;
-    float survival;
-    int invB, invM, invT;
-};
-
-SessionSnapshot lastSession = {};
-bool reconnectInProgress = false;
-bool restoreAfterReconnect = false;
-float reconnectAttemptTimer = 0.0f;
-int reconnectAttempts = 0;
-
-inline void captureSessionSnapshot(){
-    if(multiState!=MULTI_IN_GAME || netMgr.isHost) return;
-    lastSession.valid = true;
-    snprintf(lastSession.hostIP, sizeof(lastSession.hostIP), "%s", netMgr.hostIP);
-    lastSession.camPos = cam.pos;
-    lastSession.camYaw = cam.yaw;
-    lastSession.camPitch = cam.pitch;
-    lastSession.health = playerHealth;
-    lastSession.sanity = playerSanity;
-    lastSession.stamina = playerStamina;
-    lastSession.battery = flashlightBattery;
-    lastSession.survival = survivalTime;
-    lastSession.invB = invBattery;
-    lastSession.invM = invMedkit;
-    lastSession.invT = invBait;
-}
-
-inline void restoreSessionSnapshot(){
-    if(!lastSession.valid) return;
-    cam.pos = lastSession.camPos;
-    cam.yaw = lastSession.camYaw;
-    cam.pitch = lastSession.camPitch;
-    playerHealth = lastSession.health;
-    playerSanity = lastSession.sanity;
-    playerStamina = lastSession.stamina;
-    flashlightBattery = lastSession.battery;
-    survivalTime = lastSession.survival;
-    invBattery = lastSession.invB;
-    invMedkit = lastSession.invM;
-    invBait = lastSession.invT;
-}
-
-inline void initCoopObjectives(const Vec3& basePos){
-    coop.switches[0] = Vec3(basePos.x + CS * 2.0f, 0, basePos.z + CS * 1.0f);
-    coop.switches[1] = Vec3(basePos.x - CS * 2.0f, 0, basePos.z + CS * 1.0f);
-    coop.switchOn[0] = false;
-    coop.switchOn[1] = false;
-    coop.doorPos = Vec3(basePos.x, 0, basePos.z + CS * 4.0f);
-    coop.doorOpen = false;
-    coop.initialized = true;
-}
-
-inline bool nearPoint2D(const Vec3& a, const Vec3& b, float r){
-    Vec3 d = a - b; d.y = 0;
-    return sqrtf(d.x*d.x + d.z*d.z) < r;
-}
-
-inline bool projectToScreen(const Vec3& worldPos, float& sx, float& sy){
-    Vec3 d = worldPos - cam.pos;
-    float cy = cosf(cam.yaw), syaw = sinf(cam.yaw);
-    float cp = cosf(cam.pitch), sp = sinf(cam.pitch);
-
-    float cx = d.x * cy - d.z * syaw;
-    float cz0 = d.x * syaw + d.z * cy;
-    float cy2 = d.y * cp - cz0 * sp;
-    float cz = d.y * sp + cz0 * cp;
-    if(cz <= 0.05f) return false;
-
-    float fov = 1.2f;
-    float t = tanf(fov * 0.5f);
-    float asp = (float)winW / (float)winH;
-    sx = cx / (cz * asp * t);
-    sy = cy2 / (cz * t);
-    return sx > -1.2f && sx < 1.2f && sy > -1.2f && sy < 1.2f;
-}
-
-inline int minimapWallSampler(int wx, int wz){
-    return getCellWorld(wx, wz) == 1 ? 1 : 0;
-}
-
-inline void updateMinimapCheat(GLFWwindow* w){
-    static bool letterPressed[26] = {false};
-    static bool f6Pressed = false;
-    static bool f7Pressed = false;
-    static bool homePressed = false;
-
-    bool f6Now = glfwGetKey(w, GLFW_KEY_F6) == GLFW_PRESS;
-    if(f6Now && !f6Pressed){
-        minimapEnabled = !minimapEnabled;
-    }
-    f6Pressed = f6Now;
-
-    bool f7Now = glfwGetKey(w, GLFW_KEY_F7) == GLFW_PRESS;
-    if(f7Now && !f7Pressed){
-        minimapEnabled = !minimapEnabled;
-    }
-    f7Pressed = f7Now;
-
-    bool homeNow = glfwGetKey(w, GLFW_KEY_HOME) == GLFW_PRESS;
-    if(homeNow && !homePressed){
-        minimapEnabled = !minimapEnabled;
-    }
-    homePressed = homeNow;
-
-    for(int i=0;i<26;i++){
-        bool now = glfwGetKey(w, GLFW_KEY_A + i) == GLFW_PRESS;
-        if(now && !letterPressed[i]){
-            char input = (char)('A' + i);
-            if(pushMinimapCheatChar(minimapCheatProgress, input)){
-                minimapEnabled = !minimapEnabled;
-            }
-        }
-        letterPressed[i] = now;
-    }
-}
-
-inline void setEchoStatus(const char* msg){
-    snprintf(echoStatusText, sizeof(echoStatusText), "%s", msg);
-    echoStatusTimer = 4.0f;
-}
-
-inline void setTrapStatus(const char* msg){
-    snprintf(trapStatusText, sizeof(trapStatusText), "%s", msg);
-    trapStatusTimer = 4.0f;
-}
-
-inline void carveCellSafe(int wx, int wz){
-    setCellWorld(wx, wz, 0);
-}
-
-inline void carveLineAxisAligned(int x0, int z0, int x1, int z1){
-    int x = x0, z = z0;
-    while(x != x1){ carveCellSafe(x,z); x += (x1 > x) ? 1 : -1; }
-    while(z != z1){ carveCellSafe(x,z); z += (z1 > z) ? 1 : -1; }
-    carveCellSafe(x,z);
-}
-
-inline void initTrapCorridor(const Vec3& spawnPos){
-    trapCorridor = {};
-    if(multiState==MULTI_IN_GAME) return;
-    int sx = (int)floorf(spawnPos.x / CS);
-    int sz = (int)floorf(spawnPos.z / CS);
-    int dir = (rng()%2)==0 ? 1 : -1;
-    trapCorridor.startX = sx + 4;
-    trapCorridor.startZ = sz + dir * (3 + (rng()%3));
-    trapCorridor.length = 8 + (rng()%3);
-    trapCorridor.gateX = trapCorridor.startX - 1;
-    trapCorridor.gateZ = trapCorridor.startZ;
-
-    carveLineAxisAligned(sx, sz, trapCorridor.gateX, trapCorridor.gateZ);
-    for(int i=0;i<=trapCorridor.length;i++){
-        int x = trapCorridor.startX + i;
-        int z = trapCorridor.startZ;
-        carveCellSafe(x,z);
-        setCellWorld(x, z - 1, 1);
-        setCellWorld(x, z + 1, 1);
-    }
-    setCellWorld(trapCorridor.startX + trapCorridor.length + 1, trapCorridor.startZ, 1);
-    setCellWorld(trapCorridor.gateX, trapCorridor.gateZ, 0);
-
-    trapCorridor.active = true;
-    trapCorridor.triggered = false;
-    trapCorridor.locked = false;
-    trapCorridor.resolved = false;
-    trapCorridor.lockTimer = 0.0f;
-    trapCorridor.stareProgress = 0.0f;
-    trapCorridor.anomalyPos = Vec3((trapCorridor.startX + trapCorridor.length + 0.5f) * CS, 1.35f, (trapCorridor.startZ + 0.5f) * CS);
-}
-
-inline void triggerTrapCorridor(){
-    if(!trapCorridor.active || trapCorridor.triggered) return;
-    trapCorridor.triggered = true;
-    trapCorridor.locked = true;
-    trapCorridor.lockTimer = 18.0f;
-    trapCorridor.stareProgress = 0.0f;
-    setCellWorld(trapCorridor.gateX, trapCorridor.gateZ, 1);
-    buildGeom();
-    setTrapStatus("PASSAGE SEALED. DARKNESS LISTENS.");
-}
-
-inline void unlockTrapCorridor(){
-    if(!trapCorridor.locked) return;
-    trapCorridor.locked = false;
-    trapCorridor.resolved = true;
-    setCellWorld(trapCorridor.gateX, trapCorridor.gateZ, 0);
-    buildGeom();
-    setTrapStatus("THE PASSAGE OPENS.");
-}
-
-inline void updateTrapCorridor(){
-    if(!trapCorridor.active || multiState==MULTI_IN_GAME) return;
-    if(trapStatusTimer > 0.0f) trapStatusTimer -= dTime;
-    int wx = (int)floorf(cam.pos.x / CS);
-    int wz = (int)floorf(cam.pos.z / CS);
-    if(!trapCorridor.triggered && isInsideTrapTrigger(wx, wz, trapCorridor.startX, trapCorridor.startZ, trapCorridor.length)){
-        triggerTrapCorridor();
-    }
-
-    bool lookingAtAnomaly = isLookingAtPoint(cam.pos, cam.yaw, cam.pitch, trapCorridor.anomalyPos, 0.94f, 12.0f);
-    anomalyBlur = updateAnomalyBlur(anomalyBlur, dTime, lookingAtAnomaly);
-
-    if(trapCorridor.locked){
-        trapCorridor.lockTimer -= dTime;
-        bool progressActive = lookingAtAnomaly && !flashlightOn;
-        trapCorridor.stareProgress = updateTrapStareProgress(trapCorridor.stareProgress, dTime, progressActive);
-        if(progressActive && (rng()%100)<4){
-            setTrapStatus("DO NOT BLINK.");
-        }
-        if(trapCorridor.stareProgress >= 2.6f || trapCorridor.lockTimer <= 0.0f){
-            unlockTrapCorridor();
-        }
-    }
-}
-
-inline void spawnEchoSignal(){
-    echoSignal.active = true;
-    echoSignal.type = chooseEchoTypeFromRoll((int)rng());
-    echoSignal.pos = findSpawnPos(cam.pos, 10.0f + (float)(rng()%7));
-    echoSignal.ttl = 40.0f;
-}
-
-inline void clearEchoSignal(){
-    echoSignal.active = false;
-    echoSignal.ttl = 0.0f;
-}
-
-inline void updateEchoSignal(){
-    if(multiState==MULTI_IN_GAME) return;
-    if(echoStatusTimer>0.0f) echoStatusTimer -= dTime;
-    if(echoSignal.active){
-        echoSignal.ttl -= dTime;
-        if(echoSignal.ttl <= 0.0f){
-            clearEchoSignal();
-            setEchoStatus("ECHO SIGNAL LOST");
-        }
-        return;
-    }
-    echoSpawnTimer -= dTime;
-    if(echoSpawnTimer <= 0.0f){
-        spawnEchoSignal();
-        echoSpawnTimer = nextEchoSpawnDelaySeconds((int)rng());
-        setEchoStatus("NEW ECHO SIGNAL DETECTED");
-    }
-}
-
-inline void resolveEchoInteraction(){
-    if(!echoSignal.active || multiState==MULTI_IN_GAME) return;
-    bool breach = false;
-    applyEchoOutcome(
-        echoSignal.type,
-        (int)rng(),
-        invBattery,
-        invMedkit,
-        invBait,
-        playerHealth,
-        playerSanity,
-        playerStamina,
-        breach
-    );
-    if(echoSignal.type==ECHO_CACHE){
-        setEchoStatus("ECHO CACHE: SUPPLY FOUND");
-    }else if(echoSignal.type==ECHO_RESTORE){
-        setEchoStatus("ECHO RESONANCE: VITALS RESTORED");
-    }else{
-        setEchoStatus("ECHO BREACH: HOSTILE SURGE");
-    }
-    if(breach){
-        triggerLocalScare(0.30f, 0.17f, 8.0f);
-        Vec3 ep = findSpawnPos(cam.pos, 12.0f);
-        EntityType type = ((rng()%2)==0) ? ENTITY_SHADOW : ENTITY_CRAWLER;
-        entityMgr.spawnEntity(type, ep, nullptr, 0, 0);
-    }
-    clearEchoSignal();
-}
-
-inline void drawMinimapOverlay(){
-    int playerWX = (int)floorf(cam.pos.x / CS);
-    int playerWZ = (int)floorf(cam.pos.z / CS);
-    char rows[MINIMAP_DIAMETER][MINIMAP_DIAMETER + 1];
-    buildMinimapRows(rows, playerWX, playerWZ, minimapWallSampler);
-
-    drawText("MINIMAP",-0.95f,0.56f,1.05f,0.78f,0.83f,0.62f,0.80f);
-    float y = 0.50f;
-    for(int r=0;r<MINIMAP_DIAMETER;r++){
-        drawText(rows[r],-0.95f,y,0.86f,0.72f,0.76f,0.58f,0.74f);
-        y -= 0.038f;
-    }
-}
-
-inline void updateCoopObjectiveHost(){
-    if(!coop.initialized) return;
-    for(int s=0;s<2;s++) {
-        bool on = nearPoint2D(cam.pos, coop.switches[s], 2.4f);
-        for(int p=0;p<MAX_PLAYERS;p++){
-            if(p==netMgr.myId || !netMgr.players[p].active || !netMgr.players[p].hasValidPos) continue;
-            if(nearPoint2D(netMgr.players[p].pos, coop.switches[s], 2.4f)) { on = true; break; }
-        }
-        coop.switchOn[s] = on;
-    }
-    coop.doorOpen = coop.switchOn[0] && coop.switchOn[1];
-}
-
-inline bool collideCoopDoor(float x, float z, float r){
-    if(!coop.initialized || coop.doorOpen) return false;
-    return fabsf(x - coop.doorPos.x) < (CS * 0.6f + r) && fabsf(z - coop.doorPos.z) < (CS * 0.2f + r);
-}
-
-inline void syncCoopFromNetwork(){
-    if(!netMgr.objectiveStateReceived) return;
-    netMgr.objectiveStateReceived = false;
-    coop.switchOn[0] = netMgr.objectiveSwitches[0];
-    coop.switchOn[1] = netMgr.objectiveSwitches[1];
-    coop.doorOpen = netMgr.objectiveDoorOpen;
-}
-
-inline void hostSpawnItem(int type, const Vec3& around){
-    WorldItem it;
-    it.id = nextWorldItemId++ % 250;
-    it.type = type;
-    it.pos = findSpawnPos(around, 6.0f);
-    it.active = true;
-    worldItems.push_back(it);
-}
-
-inline void hostUpdateItems(){
-    itemSpawnTimer -= dTime;
-    if(itemSpawnTimer > 0) return;
-    itemSpawnTimer = 10.0f + (rng()%10);
-    if((int)worldItems.size() > 10) return;
-    int type = rng()%3;
-    hostSpawnItem(type, cam.pos);
-}
-
-inline void applyItemUse(int type){
-    if(type==0 && invBattery>0){
-        invBattery--;
-        flashlightBattery += 35.0f;
-        if(flashlightBattery>100.0f) flashlightBattery = 100.0f;
-    }else if(type==1 && invMedkit>0){
-        invMedkit--;
-        playerHealth += 40.0f;
-        if(playerHealth>100.0f) playerHealth = 100.0f;
-    }else if(type==2 && invBait>0){
-        invBait--;
-        baitEffectTimer = 12.0f;
-    }
-}
-
-inline void processHostInteractRequests(){
-    if(!netMgr.isHost) return;
-    for(int i=0;i<netMgr.interactRequestCount;i++){
-        if(!netMgr.interactRequests[i].valid) continue;
-        int pid = netMgr.interactRequests[i].playerId;
-        int type = netMgr.interactRequests[i].requestType;
-        int target = netMgr.interactRequests[i].targetId;
-        if(type==REQ_PICK_ITEM){
-            for(auto& it:worldItems){
-                if(!it.active || it.id!=target) continue;
-                it.active = false;
-                if(pid>=0 && pid<MAX_PLAYERS){
-                    if(it.type==0) netMgr.inventoryBattery[pid]++;
-                    else if(it.type==1) netMgr.inventoryMedkit[pid]++;
-                    else netMgr.inventoryBait[pid]++;
-                }
-                break;
-            }
-        }else if(type==REQ_TOGGLE_SWITCH){
-            if(target>=0 && target<2) coop.switchOn[target] = !coop.switchOn[target];
-        }
-    }
-    netMgr.interactRequestCount = 0;
-}
-
-inline void hostSyncFeatureState(){
-    NetWorldItemSnapshotEntry entries[MAX_SYNC_ITEMS];
-    int count = 0;
-    for(auto& it:worldItems){
-        if(count>=MAX_SYNC_ITEMS) break;
-        entries[count].id = it.id;
-        entries[count].type = it.type;
-        entries[count].pos = it.pos;
-        entries[count].active = it.active;
-        count++;
-    }
-    netMgr.sendItemSnapshot(entries, count);
-    netMgr.sendObjectiveState(coop.switchOn[0], coop.switchOn[1], coop.doorOpen);
-    netMgr.inventoryBattery[netMgr.myId] = invBattery;
-    netMgr.inventoryMedkit[netMgr.myId] = invMedkit;
-    netMgr.inventoryBait[netMgr.myId] = invBait;
-    netMgr.sendInventorySync();
-}
-
-inline void clientApplyFeatureState(){
-    if(netMgr.itemSnapshotReceived){
-        netMgr.itemSnapshotReceived = false;
-        worldItems.clear();
-        for(int i=0;i<netMgr.itemSnapshotCount;i++){
-            WorldItem it;
-            it.id = netMgr.itemSnapshot[i].id;
-            it.type = netMgr.itemSnapshot[i].type;
-            it.pos = netMgr.itemSnapshot[i].pos;
-            it.active = netMgr.itemSnapshot[i].active;
-            worldItems.push_back(it);
-        }
-    }
-    if(netMgr.inventorySyncReceived){
-        netMgr.inventorySyncReceived = false;
-        invBattery = netMgr.inventoryBattery[netMgr.myId];
-        invMedkit = netMgr.inventoryMedkit[netMgr.myId];
-        invBait = netMgr.inventoryBait[netMgr.myId];
-    }
-    syncCoopFromNetwork();
-}
-
-inline void applyRoamEvent(int type, int a, int b, float duration){
-    if(type==ROAM_LIGHTS_OUT){
-        lightsOutTimer = duration;
-        for(auto& l:lights) l.on = false;
-    }else if(type==ROAM_GEOM_SHIFT){
-        (void)a; (void)b;
-        reshuffleBehind(cam.pos.x, cam.pos.z, cam.yaw);
-        buildGeom();
-    }else if(type==ROAM_FALSE_DOOR){
-        falseDoorTimer = duration;
-        falseDoorPos = findSpawnPos(cam.pos, 2.0f);
-    }
-}
-
-inline void updateRoamEventsHost(){
-    static float roamTimer = 18.0f;
-    roamTimer -= dTime;
-    if(roamTimer > 0) return;
-    roamTimer = 18.0f + (rng()%15);
-    int type = 1 + (rng()%3);
-    float duration = (type==ROAM_GEOM_SHIFT) ? 0.1f : 8.0f;
-    applyRoamEvent(type, playerChunkX, playerChunkZ, duration);
-    netMgr.sendRoamEvent(type, playerChunkX & 0xFF, playerChunkZ & 0xFF, duration);
-}
+#include "coop.h"
 
 void buildGeom(){
     std::vector<float>wv,fv,cv,pv,lv,lvOff;
@@ -564,14 +55,12 @@ void buildNotes(float tm){
 
 void trySpawnNote(int noteId){
     if(noteId>=12||storyMgr.notesCollected[noteId])return;
-    // Only host spawns notes in multiplayer
     if(multiState==MULTI_IN_GAME && !netMgr.isHost) return;
     Vec3 sp=findSpawnPos(cam.pos,12.0f);
     Vec3 d=sp-cam.pos;d.y=0;
     if(sqrtf(d.x*d.x+d.z*d.z)>8.0f){
         storyMgr.spawnNote(sp,noteId);
         lastSpawnedNote=noteId;
-        // Sync note spawn
         if(multiState==MULTI_IN_GAME) netMgr.sendNoteSpawn(noteId, sp);
     }
 }
@@ -588,7 +77,6 @@ void cleanupFarNotes(){
 }
 
 void genWorld(){
-    // Use network seed if in multiplayer
     if(multiState==MULTI_IN_GAME && !netMgr.isHost){
         worldSeed=netMgr.worldSeed;
     }else{
@@ -602,7 +90,6 @@ void genWorld(){
     Vec3 sp=findSafeSpawn();
     Vec3 coopBase = sp;
     
-    // In multiplayer, use shared spawn position
     if(multiState==MULTI_IN_GAME){
         if(netMgr.isHost){
             netMgr.spawnPos=sp;
@@ -700,7 +187,6 @@ void gameInput(GLFWwindow*w){
             gameState=STATE_NOTE;
             playerSanity-=8.0f;
             if(playerSanity<0)playerSanity=0;
-            // Sync note collection
             if(multiState==MULTI_IN_GAME) netMgr.sendNoteCollect(nearNoteId);
         }
     }else if(eNow&&!interactPressed&&nearbyWorldItemId>=0){
@@ -887,7 +373,6 @@ void renderScene(){
     if(noteVC>0){glBindTexture(GL_TEXTURE_2D,lightTex);glBindVertexArray(noteVAO);glDrawArrays(GL_TRIANGLES,0,noteVC);}
     glEnable(GL_CULL_FACE);
     
-    // Render other players in multiplayer
     if(multiState==MULTI_IN_GAME && playerModelsInit){
         renderPlayers(mainShader, proj, view, netMgr.myId);
     }
@@ -906,208 +391,7 @@ void renderScene(){
     entityMgr.render(mainShader,proj,view);
 }
 
-void drawUI(){
-    if(gameState==STATE_MENU) drawMenu(vhsTime);
-    else if(gameState==STATE_MULTI) drawMultiMenuScreen(vhsTime);
-    else if(gameState==STATE_MULTI_HOST) drawHostLobbyScreen(vhsTime,netMgr.getPlayerCount());
-    else if(gameState==STATE_MULTI_JOIN) drawJoinMenuScreen(vhsTime);
-    else if(gameState==STATE_MULTI_WAIT) drawWaitingScreen(vhsTime);
-    else if(gameState==STATE_PAUSE){
-        if(multiState==MULTI_IN_GAME) drawMultiPause(netMgr.getPlayerCount());
-        else drawPause();
-    }else if(gameState==STATE_SETTINGS||gameState==STATE_SETTINGS_PAUSE) drawSettings(gameState==STATE_SETTINGS_PAUSE);
-    else if(gameState==STATE_INTRO) drawIntro(storyMgr.introLine,storyMgr.introTimer,storyMgr.introLineTime,INTRO_LINES);
-    else if(gameState==STATE_NOTE&&storyMgr.readingNote&&storyMgr.currentNote>=0)
-        drawNote(storyMgr.currentNote,NOTE_TITLES[storyMgr.currentNote],NOTE_CONTENTS[storyMgr.currentNote]);
-    else if(gameState==STATE_GAME){
-        gSurvivalTime=survivalTime;
-        if(isPlayerDead) drawDeath(vhsTime);
-        else{
-            drawDamageOverlay(damageFlash,playerHealth);
-            drawSurvivalTime(survivalTime);
-            if(playerHealth<100)drawHealthBar(playerHealth);
-            if(playerSanity<100)drawSanityBar(playerSanity);
-            drawStaminaBar(playerStamina);
-            if(flashlightBattery<100)drawFlashlightBattery(flashlightBattery,flashlightOn);
-            char invBuf[64];
-            snprintf(invBuf,64,"INV B:%d M:%d T:%d",invBattery,invMedkit,invBait);
-            drawText(invBuf,-0.95f,0.84f,1.35f,0.55f,0.7f,0.5f,0.75f);
-            int switchCount = (coop.switchOn[0]?1:0)+(coop.switchOn[1]?1:0);
-            drawText("OBJECTIVE",0.44f,0.82f,1.35f,0.85f,0.9f,0.65f,0.82f);
-            char objProgress[64];
-            snprintf(objProgress,64,"SWITCHES: %d / 2",switchCount);
-            drawText(objProgress,0.44f,0.75f,1.25f,0.8f,0.85f,0.6f,0.78f);
-            drawText(coop.doorOpen?"DOOR: OPEN":"DOOR: LOCKED",0.44f,0.68f,1.25f,0.85f,0.8f,0.55f,0.78f);
-            if(!coop.doorOpen) drawText("ACTION: HOLD 2 SWITCHES",0.44f,0.61f,1.15f,0.75f,0.8f,0.55f,0.72f);
-            if(!coop.doorOpen){
-                if(nearPoint2D(cam.pos, coop.switches[0], 2.6f)||nearPoint2D(cam.pos, coop.switches[1], 2.6f))
-                    drawText("HOLD SWITCH POSITION",-0.24f,-0.35f,1.4f,0.75f,0.8f,0.55f,0.85f);
-            }
-            if(falseDoorTimer>0) drawText("FALSE DOOR SHIFT",0.48f,0.67f,1.0f,0.9f,0.35f,0.25f,0.7f);
-            if(storyMgr.totalCollected>0)drawNoteCounter(storyMgr.totalCollected);
-            drawPhaseIndicator((int)storyMgr.getPhase());
-            if(nearNoteId>=0)drawInteractPrompt();
-            if(nearbyWorldItemId>=0){
-                if(nearbyWorldItemType==0) drawText("[E] PICK BATTERY",-0.18f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.8f);
-                else if(nearbyWorldItemType==1) drawText("[E] PICK MEDKIT",-0.16f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.8f);
-                else if(nearbyWorldItemType==2) drawText("[E] PICK BAIT",-0.14f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.8f);
-            }
-            if(multiState!=MULTI_IN_GAME && echoSignal.active){
-                Vec3 d = echoSignal.pos - cam.pos;
-                d.y = 0;
-                float dist = d.len();
-                char echoBuf[72];
-                snprintf(echoBuf,72,"ECHO SIGNAL %.0fm",dist);
-                drawText(echoBuf,-0.95f,0.50f,1.15f,0.62f,0.85f,0.86f,0.76f);
-                if(isEchoInRange(cam.pos, echoSignal.pos, 2.5f)){
-                    drawText("[E] ATTUNE ECHO",-0.17f,-0.50f,1.35f,0.72f,0.88f,0.9f,0.85f);
-                }else{
-                    float sx=0, sy=0;
-                    if(projectToScreen(echoSignal.pos + Vec3(0,1.1f,0), sx, sy)){
-                        drawText("ECHO",sx-0.045f,sy,1.05f,0.7f,0.88f,0.92f,0.82f);
-                    }
-                }
-            }
-            if(multiState!=MULTI_IN_GAME && echoStatusTimer>0.0f){
-                drawText(echoStatusText,-0.25f,0.56f,1.2f,0.7f,0.86f,0.9f,0.8f);
-            }
-            if(minimapEnabled) drawMinimapOverlay();
-            if(storyMgr.hasHallucinations())drawHallucinationEffect((50.0f-playerSanity)/50.0f);
-            if(multiState==MULTI_IN_GAME)drawMultiHUD(netMgr.getPlayerCount(),netMgr.isHost);
-            if(multiState==MULTI_IN_GAME){
-                for(int i=0;i<MAX_PLAYERS;i++){
-                    if(i==netMgr.myId || !netMgr.players[i].active || !netMgr.players[i].hasValidPos) continue;
-                    if(!playerInterpReady[i]) continue;
-                    Vec3 wp = playerRenderPos[i] + Vec3(0, 2.2f, 0);
-                    float sx=0, sy=0;
-                    if(!projectToScreen(wp, sx, sy)) continue;
-                    Vec3 dd = playerRenderPos[i] - cam.pos;
-                    float dist = dd.len();
-                    if(dist > 40.0f) continue;
-                    const char* nm = netMgr.players[i].name[0] ? netMgr.players[i].name : "Player";
-                    float xOff = (float)strlen(nm) * 0.012f;
-                    drawText(nm, sx - xOff, sy, 1.1f, 0.85f, 0.9f, 0.7f, 0.85f);
-                }
-            }
-            if(multiState==MULTI_IN_GAME){
-                char netBuf[96];
-                snprintf(netBuf,96,"RTT %.0fms TX %d RX %d",netMgr.rttMs,netMgr.packetsSent,netMgr.packetsRecv);
-                drawText(netBuf,0.45f,0.60f,1.0f,0.55f,0.65f,0.8f,0.7f);
-            }
-            if(trapCorridor.active && trapStatusTimer > 0.0f){
-                drawText(trapStatusText,-0.33f,0.50f,1.2f,0.82f,0.78f,0.9f,0.85f);
-            }
-            if(trapCorridor.locked){
-                float sx=0, sy=0;
-                if(projectToScreen(trapCorridor.anomalyPos, sx, sy)){
-                    float jitter = ((rng()%100)-50) * 0.0007f;
-                    float alpha = flashlightOn ? 0.45f : 0.9f;
-                    drawText(":)",sx-0.018f+jitter,sy,1.35f,0.95f,0.95f,0.95f,alpha);
-                }
-            }
-            drawText(minimapEnabled?"MINIMAP ON [F6/F7/HOME]":"MINIMAP OFF [F6/F7/HOME]",0.38f,-0.96f,0.95f,0.55f,0.7f,0.8f,0.68f);
-        }
-    }
-}
-
-void updateMultiplayer(){
-    if(multiState!=MULTI_IN_GAME) return;
-    
-    static float netSendTimer=0;
-    static float stateSyncTimer=0;
-    netSendTimer+=dTime;
-    stateSyncTimer+=dTime;
-    if(netSendTimer>=0.05f){
-        netMgr.sendPlayerState(cam.pos,cam.yaw,cam.pitch,flashlightOn);
-        netSendTimer=0;
-    }
-    netMgr.update();
-    netMgr.sendPing((float)glfwGetTime());
-    updatePlayerInterpolation(netMgr.myId, dTime);
-    if(!netMgr.isHost && netMgr.clientTimedOut((float)glfwGetTime())){
-        captureSessionSnapshot();
-        netMgr.shutdown();
-        reconnectInProgress = true;
-        restoreAfterReconnect = true;
-        reconnectAttemptTimer = 0.0f;
-        reconnectAttempts = 0;
-        multiState = MULTI_CONNECTING;
-        gameState = STATE_MULTI_WAIT;
-        return;
-    }
-    
-    if(netMgr.roamEventReceived){
-        netMgr.roamEventReceived = false;
-        applyRoamEvent(netMgr.roamEventType, netMgr.roamEventA, netMgr.roamEventB, netMgr.roamEventDuration);
-    }
-    
-    // Handle reshuffle from host
-    if(!netMgr.isHost && netMgr.reshuffleReceived){
-        netMgr.reshuffleReceived = false;
-        long long key = chunkKey(netMgr.reshuffleChunkX, netMgr.reshuffleChunkZ);
-        auto it = chunks.find(key);
-        if (it == chunks.end()) {
-            generateChunk(netMgr.reshuffleChunkX, netMgr.reshuffleChunkZ);
-            it = chunks.find(key);
-        }
-        if (it != chunks.end()) {
-            for (int x = 0; x < CHUNK_SIZE; x++) {
-                for (int z = 0; z < CHUNK_SIZE; z++) {
-                    int idx = x * CHUNK_SIZE + z;
-                    it->second.cells[x][z] = (int)netMgr.reshuffleCells[idx];
-                }
-            }
-        }
-        worldSeed = netMgr.reshuffleSeed;
-        updateLightsAndPillars(playerChunkX, playerChunkZ);
-        buildGeom();
-    }
-    
-    // Only host controls entities
-    if(!netMgr.isHost){
-        entitySpawnTimer = 999;  // Prevent clients from spawning
-        clientApplyFeatureState();
-        if(netMgr.entitySnapshotReceived){
-            netMgr.entitySnapshotReceived = false;
-            entityMgr.entities.clear();
-            for(int i=0;i<netMgr.entitySnapshotCount;i++){
-                if(!netMgr.entitySnapshot[i].active) continue;
-                Entity e;
-                e.type = (EntityType)netMgr.entitySnapshot[i].type;
-                e.pos = netMgr.entitySnapshot[i].pos;
-                e.yaw = netMgr.entitySnapshot[i].yaw;
-                e.state = (EntityState)netMgr.entitySnapshot[i].state;
-                e.active = true;
-                if(e.type==ENTITY_STALKER){ e.speed=1.5f; e.detectionRange=20.0f; e.attackRange=1.0f; }
-                else if(e.type==ENTITY_CRAWLER){ e.speed=5.0f; e.detectionRange=15.0f; e.attackRange=1.5f; e.pos.y=-0.8f; }
-                else if(e.type==ENTITY_SHADOW){ e.speed=0.5f; e.detectionRange=8.0f; e.attackRange=2.0f; }
-                entityMgr.entities.push_back(e);
-            }
-        }
-    }else{
-        processHostInteractRequests();
-        updateCoopObjectiveHost();
-        hostUpdateItems();
-        updateRoamEventsHost();
-        if(stateSyncTimer>=0.12f){
-            stateSyncTimer = 0;
-            NetEntitySnapshotEntry snap[MAX_SYNC_ENTITIES];
-            int c = 0;
-            for(auto& e:entityMgr.entities){
-                if(c>=MAX_SYNC_ENTITIES) break;
-                snap[c].id = c;
-                snap[c].type = (int)e.type;
-                snap[c].pos = e.pos;
-                snap[c].yaw = e.yaw;
-                snap[c].state = (int)e.state;
-                snap[c].active = e.active;
-                c++;
-            }
-            netMgr.sendEntitySnapshot(snap, c);
-            hostSyncFeatureState();
-        }
-    }
-}
+#include "hud.h"
 
 int main(){
     std::random_device rd;rng.seed(rd());
@@ -1257,7 +541,6 @@ int main(){
                     noteSpawnTimer=20.0f+(rng()%20);
                 }
                 
-                // Only host spawns entities in multiplayer
                 bool canSpawnEnt = (multiState!=MULTI_IN_GAME || netMgr.isHost);
                 entitySpawnTimer-=dTime;
                 int maxEnt = computeEntityCap(survivalTime);
@@ -1274,7 +557,6 @@ int main(){
                     entityMgr.dangerLevel *= 0.45f;
                 }
                 
-                // Only host does reshuffles in multiplayer
                 reshuffleTimer-=dTime;
                 float reshuffleChance=30.0f+survivalTime*0.1f;
                 if(reshuffleChance>80.0f)reshuffleChance=80.0f;
@@ -1285,7 +567,6 @@ int main(){
                 if(canReshuffle && reshuffleTimer<=0&&rng()%100<(int)reshuffleChance){
                     if(frontReshuffle||reshuffleBehind(cam.pos.x,cam.pos.z,cam.yaw)){
                         buildGeom();
-                        // Sync reshuffle to clients
                         if(multiState==MULTI_IN_GAME && netMgr.isHost){
                             netMgr.sendReshuffle(playerChunkX, playerChunkZ, worldSeed);
                         }
@@ -1317,12 +598,10 @@ int main(){
                 camShake*=0.9f;damageFlash*=0.92f;survivalTime+=dTime;
                 if(multiState==MULTI_IN_GAME && !netMgr.isHost) captureSessionSnapshot();
                 
-                // Multiplayer update
                 updateMultiplayer();
             }
         }
         
-        // Rendering
         glBindFramebuffer(GL_FRAMEBUFFER,fbo);
         glViewport(0,0,renderW,renderH);
         glClearColor(0.02f,0.02f,0.02f,1);
