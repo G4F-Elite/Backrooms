@@ -658,10 +658,14 @@ void drawUI(){
             if(flashlightBattery<100)drawFlashlightBattery(flashlightBattery,flashlightOn);
             char invBuf[64];
             snprintf(invBuf,64,"INV B:%d M:%d T:%d",invBattery,invMedkit,invBait);
-            drawText(invBuf,-0.95f,0.84f,1.2f,0.55f,0.7f,0.5f,0.75f);
-            char objBuf[64];
-            snprintf(objBuf,64,"SW:%d/%d DOOR:%s",(coop.switchOn[0]?1:0)+(coop.switchOn[1]?1:0),2,coop.doorOpen?"OPEN":"LOCK");
-            drawText(objBuf,0.50f,0.74f,1.2f,0.8f,0.85f,0.6f,0.75f);
+            drawText(invBuf,-0.95f,0.84f,1.35f,0.55f,0.7f,0.5f,0.75f);
+            int switchCount = (coop.switchOn[0]?1:0)+(coop.switchOn[1]?1:0);
+            drawText("OBJECTIVE",0.44f,0.82f,1.35f,0.85f,0.9f,0.65f,0.82f);
+            char objProgress[64];
+            snprintf(objProgress,64,"SWITCHES: %d / 2",switchCount);
+            drawText(objProgress,0.44f,0.75f,1.25f,0.8f,0.85f,0.6f,0.78f);
+            drawText(coop.doorOpen?"DOOR: OPEN":"DOOR: LOCKED",0.44f,0.68f,1.25f,0.85f,0.8f,0.55f,0.78f);
+            if(!coop.doorOpen) drawText("ACTION: HOLD 2 SWITCHES",0.44f,0.61f,1.15f,0.75f,0.8f,0.55f,0.72f);
             if(!coop.doorOpen){
                 if(nearPoint2D(cam.pos, coop.switches[0], 2.6f)||nearPoint2D(cam.pos, coop.switches[1], 2.6f))
                     drawText("HOLD SWITCH POSITION",-0.24f,-0.35f,1.4f,0.75f,0.8f,0.55f,0.85f);
