@@ -51,13 +51,16 @@ inline void fillAudio(short* buf, int len) {
     static AudioSafetyState safe;
     static float uiMoveTime = -1.0f;
     static float uiConfirmTime = -1.0f;
-    static float pipeTime = -1.0f, pipeCooldown = 2.8f, pipePitch = 92.0f, pipeDrift = 0.0f;
-    static float ventTime = -1.0f, ventCooldown = 3.6f, ventPitch = 36.0f, ventNoise = 0.0f;
-    static float buzzTime = -1.0f, buzzCooldown = 1.9f, buzzPitch = 1220.0f;
-    static float knockTime = -1.0f, knockCooldown = 4.4f;
+    static float pipeTime = -1.0f, pipePitch = 92.0f, pipeDrift = 0.0f;
+    static float ventTime = -1.0f, ventPitch = 36.0f, ventNoise = 0.0f;
+    static float buzzTime = -1.0f, buzzPitch = 1220.0f;
+    static float knockTime = -1.0f;
     static int knockStage = 0;
-    static float rustleTime = -1.0f, rustleCooldown = 5.3f, rustleNoise = 0.0f;
-    static float ringTime = -1.0f, ringCooldown = 9.5f, ringPitch = 410.0f;
+    static float rustleTime = -1.0f, rustleNoise = 0.0f;
+    static float ringTime = -1.0f, ringPitch = 410.0f;
+    static float sceneClock = 0.0f;
+    static float nextSceneEvent = 2.8f;
+    static int lastSceneEvent = -1;
     const float dt = 1.0f / (float)SAMP_RATE;
     const float twoPi = 6.283185307f;
     for(int i=0;i<len;i++) {
@@ -95,43 +98,43 @@ inline void fillAudio(short* buf, int len) {
         if(envInsanity < 0.0f) envInsanity = 0.0f;
         if(envInsanity > 1.0f) envInsanity = 1.0f;
         float envStress = envDanger * 0.65f + envInsanity * 0.35f;
+        sceneClock += dt;
+        if(sceneClock >= nextSceneEvent){
+            float baseGap = 3.6f - envStress * 1.1f;
+            if(baseGap < 2.1f) baseGap = 2.1f;
+            float jitter = (float)(rand()%1000) / 1000.0f;
+            nextSceneEvent = sceneClock + baseGap + jitter * 3.4f;
 
-        pipeCooldown -= dt;
-        ventCooldown -= dt;
-        buzzCooldown -= dt;
-        knockCooldown -= dt;
-        rustleCooldown -= dt;
-        ringCooldown -= dt;
+            int eventRoll = rand()%100;
+            int eventType = 0;
+            if(eventRoll < 24) eventType = 0;         // pipe
+            else if(eventRoll < 45) eventType = 1;    // vent
+            else if(eventRoll < 60) eventType = 2;    // rustle
+            else if(eventRoll < 75) eventType = 3;    // knock
+            else if(eventRoll < 89) eventType = 4;    // buzz
+            else eventType = 5;                       // ring
+            if(eventType == lastSceneEvent) eventType = (eventType + 1 + (rand()%2)) % 6;
+            lastSceneEvent = eventType;
 
-        if(pipeTime < 0.0f && pipeCooldown <= 0.0f && rand()%200000 < 2){
-            pipeTime = 0.0f;
-            pipeCooldown = 2.2f + (rand()%260) / 100.0f;
-            pipePitch = 78.0f + (rand()%42);
-            pipeDrift = ((rand()%100) / 100.0f) * 1.6f + 0.3f;
-        }
-        if(ventTime < 0.0f && ventCooldown <= 0.0f && rand()%220000 < 2){
-            ventTime = 0.0f;
-            ventCooldown = 3.1f + (rand()%320) / 100.0f;
-            ventPitch = 28.0f + (rand()%18);
-        }
-        if(buzzTime < 0.0f && buzzCooldown <= 0.0f && rand()%170000 < 2){
-            buzzTime = 0.0f;
-            buzzCooldown = 1.4f + (rand()%260) / 100.0f;
-            buzzPitch = 960.0f + (rand()%560);
-        }
-        if(knockTime < 0.0f && knockCooldown <= 0.0f && rand()%260000 < 2){
-            knockTime = 0.0f;
-            knockCooldown = 4.0f + (rand()%260) / 100.0f;
-            knockStage = 0;
-        }
-        if(rustleTime < 0.0f && rustleCooldown <= 0.0f && rand()%230000 < 2){
-            rustleTime = 0.0f;
-            rustleCooldown = 4.4f + (rand()%340) / 100.0f;
-        }
-        if(ringTime < 0.0f && ringCooldown <= 0.0f && rand()%340000 < 2){
-            ringTime = 0.0f;
-            ringCooldown = 8.2f + (rand()%360) / 100.0f;
-            ringPitch = 360.0f + (rand()%160);
+            if(eventType == 0 && pipeTime < 0.0f){
+                pipeTime = 0.0f;
+                pipePitch = 78.0f + (rand()%42);
+                pipeDrift = ((rand()%100) / 100.0f) * 1.6f + 0.3f;
+            }else if(eventType == 1 && ventTime < 0.0f){
+                ventTime = 0.0f;
+                ventPitch = 28.0f + (rand()%18);
+            }else if(eventType == 2 && rustleTime < 0.0f){
+                rustleTime = 0.0f;
+            }else if(eventType == 3 && knockTime < 0.0f){
+                knockTime = 0.0f;
+                knockStage = 0;
+            }else if(eventType == 4 && buzzTime < 0.0f){
+                buzzTime = 0.0f;
+                buzzPitch = 960.0f + (rand()%560);
+            }else if(eventType == 5 && ringTime < 0.0f){
+                ringTime = 0.0f;
+                ringPitch = 360.0f + (rand()%160);
+            }
         }
 
         float pipeTone = 0.0f;
