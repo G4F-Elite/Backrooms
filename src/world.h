@@ -22,6 +22,94 @@ extern int playerChunkX, playerChunkZ;
 
 inline long long chunkKey(int cx, int cz) { return ((long long)cx << 32) | (cz & 0xFFFFFFFF); }
 
+inline bool isInnerCell(int x, int z) {
+    return x > 0 && x < CHUNK_SIZE - 1 && z > 0 && z < CHUNK_SIZE - 1;
+}
+
+inline void carveRect(Chunk& c, int x0, int z0, int w, int h) {
+    for (int x = x0; x < x0 + w; x++) {
+        for (int z = z0; z < z0 + h; z++) {
+            if (isInnerCell(x, z)) c.cells[x][z] = 0;
+        }
+    }
+}
+
+inline void fillRect(Chunk& c, int x0, int z0, int w, int h) {
+    for (int x = x0; x < x0 + w; x++) {
+        for (int z = z0; z < z0 + h; z++) {
+            if (isInnerCell(x, z)) c.cells[x][z] = 1;
+        }
+    }
+}
+
+inline int countOpenCells(const Chunk& c) {
+    int open = 0;
+    for (int x = 1; x < CHUNK_SIZE - 1; x++) {
+        for (int z = 1; z < CHUNK_SIZE - 1; z++) {
+            if (c.cells[x][z] == 0) open++;
+        }
+    }
+    return open;
+}
+
+inline void applyAtriumPattern(Chunk& c, std::mt19937& cr) {
+    int x0 = 2 + (int)(cr() % 2);
+    int z0 = 2 + (int)(cr() % 2);
+    int w = CHUNK_SIZE - 4 - (int)(cr() % 2);
+    int h = CHUNK_SIZE - 4 - (int)(cr() % 2);
+    carveRect(c, x0, z0, w, h);
+
+    int cx = CHUNK_SIZE / 2;
+    int cz = CHUNK_SIZE / 2;
+    fillRect(c, cx - 1, cz - 1, 3, 3);
+    c.cells[cx][cz] = 0;
+    c.cells[cx - 2][cz] = 0;
+    c.cells[cx + 2][cz] = 0;
+    c.cells[cx][cz - 2] = 0;
+    c.cells[cx][cz + 2] = 0;
+}
+
+inline void applyOfficePattern(Chunk& c, std::mt19937& cr) {
+    carveRect(c, 1, 1, CHUNK_SIZE - 2, CHUNK_SIZE - 2);
+
+    int step = 3 + (int)(cr() % 2);
+    for (int x = 3; x < CHUNK_SIZE - 3; x += step) {
+        for (int z = 2; z < CHUNK_SIZE - 2; z++) {
+            c.cells[x][z] = 1;
+        }
+        int doorZ = 2 + (int)(cr() % (CHUNK_SIZE - 4));
+        c.cells[x][doorZ] = 0;
+        if (doorZ + 1 < CHUNK_SIZE - 1) c.cells[x][doorZ + 1] = 0;
+    }
+}
+
+inline void applyServicePattern(Chunk& c, std::mt19937& cr) {
+    carveRect(c, 1, 1, CHUNK_SIZE - 2, CHUNK_SIZE - 2);
+    int laneA = 3 + (int)(cr() % 3);
+    int laneB = CHUNK_SIZE - 4 - (int)(cr() % 3);
+    for (int z = 2; z < CHUNK_SIZE - 2; z++) {
+        c.cells[laneA][z] = 1;
+        c.cells[laneB][z] = 1;
+    }
+    for (int i = 0; i < 4; i++) {
+        int gate = 2 + (int)(cr() % (CHUNK_SIZE - 4));
+        c.cells[laneA][gate] = 0;
+        c.cells[laneB][gate] = 0;
+    }
+    for (int i = 0; i < 6; i++) {
+        int bx = 2 + (int)(cr() % (CHUNK_SIZE - 4));
+        int bz = 2 + (int)(cr() % (CHUNK_SIZE - 4));
+        fillRect(c, bx, bz, 2, 2);
+    }
+}
+
+inline void applyChunkArchitecturePattern(Chunk& c, std::mt19937& cr) {
+    int p = (int)(cr() % 100);
+    if (p < 18) applyAtriumPattern(c, cr);
+    else if (p < 34) applyOfficePattern(c, cr);
+    else if (p < 49) applyServicePattern(c, cr);
+}
+
 inline int getCellWorld(int wx, int wz) {
     int cx = wx >= 0 ? wx / CHUNK_SIZE : (wx - CHUNK_SIZE + 1) / CHUNK_SIZE;
     int cz = wz >= 0 ? wz / CHUNK_SIZE : (wz - CHUNK_SIZE + 1) / CHUNK_SIZE;
@@ -58,10 +146,12 @@ inline void generateChunk(int cx, int cz) {
         if (dirs.empty()) stk.pop_back();
         else { int d = dirs[cr() % dirs.size()]; c.cells[x+dx[d]/2][z+dz[d]/2] = 0; c.cells[x+dx[d]][z+dz[d]] = 0; stk.push_back({x+dx[d], z+dz[d]}); }
     }
+    applyChunkArchitecturePattern(c, cr);
     for (int i = 0; i < 3; i++) { int rx = 1+cr()%(CHUNK_SIZE-4), rz = 1+cr()%(CHUNK_SIZE-4), rw = 2+cr()%2, rh = 2+cr()%2;
         for (int x = rx; x < rx+rw && x < CHUNK_SIZE-1; x++) for (int z = rz; z < rz+rh && z < CHUNK_SIZE-1; z++) c.cells[x][z] = 0; }
     for (int x = 1; x < CHUNK_SIZE-1; x++) for (int z = 1; z < CHUNK_SIZE-1; z++) if (c.cells[x][z] == 1 && cr()%100 < 15) c.cells[x][z] = 0;
     for (int i = 2; i < CHUNK_SIZE-2; i += 3) { c.cells[0][i] = 0; c.cells[CHUNK_SIZE-1][i] = 0; c.cells[i][0] = 0; c.cells[i][CHUNK_SIZE-1] = 0; }
+    if (countOpenCells(c) < 40) carveRect(c, 2, 2, CHUNK_SIZE - 4, CHUNK_SIZE - 4);
     chunks[key] = c;
 }
 
@@ -115,10 +205,35 @@ inline void updateLightsAndPillars(int pcx, int pcz) {
         auto it = chunks.find(chunkKey(pcx+dcx, pcz+dcz)); if (it==chunks.end()) continue;
         unsigned int seed = worldSeed ^ (unsigned)((pcx+dcx)*12345+(pcz+dcz)*67890);
         std::mt19937 lr(seed);
-        for (int lx=1; lx<CHUNK_SIZE-1; lx+=2) for (int lz=1; lz<CHUNK_SIZE-1; lz+=2) { if (it->second.cells[lx][lz]!=0) continue;
+        for (int lx=1; lx<CHUNK_SIZE-1; lx+=2) for (int lz=1; lz<CHUNK_SIZE-1; lz+=2) {
+            if (it->second.cells[lx][lz]!=0) continue;
             float wx = ((pcx+dcx)*CHUNK_SIZE+lx+0.5f)*CS, wz = ((pcz+dcz)*CHUNK_SIZE+lz+0.5f)*CS;
             bool ex=false; for(auto&l:lights)if(fabsf(l.pos.x-wx)<0.1f&&fabsf(l.pos.z-wz)<0.1f){ex=true;break;}
-            if(!ex && lr()%100<50){ Light l; l.pos=Vec3(wx,WH-0.02f,wz); l.sizeX=l.sizeZ=1.2f; l.intensity=1.0f; l.on=(lr()%100>=20); lights.push_back(l);}}}}
+            if(!ex && lr()%100<50){
+                Light l; l.pos=Vec3(wx,WH-0.02f,wz); l.sizeX=l.sizeZ=1.2f; l.intensity=1.0f; l.on=(lr()%100>=20); lights.push_back(l);
+            }
+        }
+    }
+    for (int dcx=-VIEW_CHUNKS; dcx<=VIEW_CHUNKS; dcx++) for (int dcz=-VIEW_CHUNKS; dcz<=VIEW_CHUNKS; dcz++) {
+        auto it = chunks.find(chunkKey(pcx+dcx, pcz+dcz)); if (it==chunks.end()) continue;
+        unsigned int seed = worldSeed ^ (unsigned)((pcx+dcx)*9871+(pcz+dcz)*4231);
+        std::mt19937 pr(seed);
+        for (int lx=2; lx<CHUNK_SIZE-2; lx++) for (int lz=2; lz<CHUNK_SIZE-2; lz++) {
+            if (it->second.cells[lx][lz]!=0) continue;
+            int wallAdj = 0;
+            if (it->second.cells[lx-1][lz]==1) wallAdj++;
+            if (it->second.cells[lx+1][lz]==1) wallAdj++;
+            if (it->second.cells[lx][lz-1]==1) wallAdj++;
+            if (it->second.cells[lx][lz+1]==1) wallAdj++;
+            if (wallAdj < 2) continue;
+            if (pr()%100 >= 6) continue;
+            float wx = ((pcx+dcx)*CHUNK_SIZE+lx+0.5f)*CS;
+            float wz = ((pcz+dcz)*CHUNK_SIZE+lz+0.5f)*CS;
+            bool ex=false; for(auto& p:pillars) if(fabsf(p.x-wx)<0.1f&&fabsf(p.z-wz)<0.1f){ex=true;break;}
+            if(!ex) pillars.push_back(Vec3(wx,0,wz));
+        }
+    }
+}
 
 // Find safe spawn position near a light
 inline Vec3 findSafeSpawn() {
