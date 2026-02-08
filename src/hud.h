@@ -109,6 +109,20 @@ void drawUI(){
             const char* mmState = minimapEnabled ? "MINIMAP ON [M]" : "MINIMAP OFF [M]";
             drawText(mmState,-0.95f,0.95f,1.15f,0.0f,0.0f,0.0f,0.72f);
             drawText(mmState,-0.95f,0.95f,1.15f,0.88f,0.93f,0.78f,0.98f);
+            if(debugTools.flyMode){
+                drawText("DEBUG FLY: ON",0.52f,0.95f,1.10f,0.78f,0.95f,0.85f,0.96f);
+            }
+            if(debugTools.open){
+                drawFullscreenOverlay(0.02f,0.03f,0.04f,0.62f);
+                drawText("DEBUG TOOLS",-0.28f,0.56f,1.8f,0.9f,0.95f,0.82f,0.98f);
+                for(int i=0;i<DEBUG_ACTION_COUNT;i++){
+                    float y = 0.47f - i*0.08f;
+                    float s = (debugTools.selectedAction==i)?1.0f:0.65f;
+                    if(debugTools.selectedAction==i) drawText(">",-0.39f,y,1.4f,0.92f,0.9f,0.65f,0.95f);
+                    drawText(debugActionLabel(i),-0.34f,y,1.35f,0.82f*s,0.88f*s,0.72f*s,0.92f);
+                }
+                drawText("F10 TOGGLE  ENTER APPLY  ESC CLOSE",-0.42f,-0.20f,1.15f,0.67f,0.72f,0.78f,0.86f);
+            }
         }
     }
 }

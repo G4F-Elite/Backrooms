@@ -10,6 +10,7 @@
 #include "content_events.h"
 #include "entity_ai.h"
 #include "trap_events.h"
+#include "debug_tools.h"
 
 GLuint noteVAO=0, noteVBO=0;
 int noteVC=0;
@@ -67,6 +68,7 @@ float echoSpawnTimer = 14.0f;
 float echoStatusTimer = 0.0f;
 char echoStatusText[96] = {};
 TrapCorridorState trapCorridor = {};
+DebugToolsState debugTools = {};
 float anomalyBlur = 0.0f;
 float trapStatusTimer = 0.0f;
 char trapStatusText[96] = {};

@@ -191,6 +191,72 @@ void teleportToPlayer(){
     buildGeom();
 }
 
+void executeDebugAction(int action){
+    action = clampDebugActionIndex(action);
+    bool canMutateWorld = (multiState!=MULTI_IN_GAME || netMgr.isHost);
+    if(action==DEBUG_ACT_TOGGLE_FLY){
+        debugTools.flyMode = !debugTools.flyMode;
+        setTrapStatus(debugTools.flyMode ? "DEBUG: FLY ENABLED" : "DEBUG: FLY DISABLED");
+        return;
+    }
+    if(action==DEBUG_ACT_TP_NOTE){
+        int target = -1;
+        for(auto& n:storyMgr.notes){
+            if(!n.active || n.collected) continue;
+            target = n.id;
+            break;
+        }
+        if(target < 0 && lastSpawnedNote < 11){
+            trySpawnNote(lastSpawnedNote + 1);
+            for(auto& n:storyMgr.notes){
+                if(!n.active || n.collected) continue;
+                target = n.id;
+                break;
+            }
+        }
+        if(target >= 0){
+            Vec3 p = storyMgr.notes[target].pos;
+            cam.pos = Vec3(p.x, PH, p.z);
+            updateVisibleChunks(cam.pos.x, cam.pos.z);
+            updateLightsAndPillars(playerChunkX,playerChunkZ);
+            updateMapContent(playerChunkX,playerChunkZ);
+            buildGeom();
+            setEchoStatus("DEBUG: TELEPORTED TO NOTE");
+        }
+        return;
+    }
+    if(action==DEBUG_ACT_TP_ECHO){
+        if(!echoSignal.active) spawnEchoSignal();
+        cam.pos = Vec3(echoSignal.pos.x, PH, echoSignal.pos.z);
+        updateVisibleChunks(cam.pos.x, cam.pos.z);
+        updateLightsAndPillars(playerChunkX,playerChunkZ);
+        updateMapContent(playerChunkX,playerChunkZ);
+        buildGeom();
+        setEchoStatus("DEBUG: TELEPORTED TO ECHO");
+        return;
+    }
+    if(!canMutateWorld){
+        setTrapStatus("DEBUG ACTION: HOST ONLY");
+        return;
+    }
+    if(debugActionSpawnsEntity(action)){
+        EntityType t = debugActionEntityType(action);
+        Vec3 sp = findSpawnPos(cam.pos, 6.0f);
+        entityMgr.spawnEntity(t, sp, nullptr, 0, 0);
+        setEchoStatus("DEBUG: ENTITY SPAWNED");
+        return;
+    }
+    if(action==DEBUG_ACT_FORCE_HOLES){
+        spawnFloorHoleEvent(cam.pos, floorHoleCountFromRoll((int)rng()), floorHoleDurationFromRoll((int)rng()));
+        buildGeom();
+        return;
+    }
+    if(action==DEBUG_ACT_FORCE_SUPPLY){
+        applyRoamEvent(ROAM_SUPPLY_CACHE, playerChunkX, playerChunkZ, 10.0f);
+        return;
+    }
+}
+
 void mouse(GLFWwindow*,double xp,double yp){
     if(gameState!=STATE_GAME&&gameState!=STATE_INTRO)return;
     if(firstMouse){lastX=(float)xp;lastY=(float)yp;firstMouse=false;}
@@ -201,6 +267,46 @@ void mouse(GLFWwindow*,double xp,double yp){
 }
 
 void gameInput(GLFWwindow*w){
+    static bool debugTogglePressed = false;
+    static bool debugUpPressed = false;
+    static bool debugDownPressed = false;
+    static bool debugEnterPressed = false;
+    static bool debugEscPressed = false;
+    bool debugToggleNow = glfwGetKey(w,GLFW_KEY_F10)==GLFW_PRESS;
+    if(debugToggleNow && !debugTogglePressed){
+        debugTools.open = !debugTools.open;
+    }
+    debugTogglePressed = debugToggleNow;
+
+    if(debugTools.open){
+        bool upNow = glfwGetKey(w,GLFW_KEY_UP)==GLFW_PRESS || glfwGetKey(w,GLFW_KEY_W)==GLFW_PRESS;
+        bool downNow = glfwGetKey(w,GLFW_KEY_DOWN)==GLFW_PRESS || glfwGetKey(w,GLFW_KEY_S)==GLFW_PRESS;
+        bool enterNow = glfwGetKey(w,GLFW_KEY_ENTER)==GLFW_PRESS || glfwGetKey(w,GLFW_KEY_SPACE)==GLFW_PRESS;
+        bool escNow = glfwGetKey(w,GLFW_KEY_ESCAPE)==GLFW_PRESS;
+        if(upNow && !debugUpPressed){
+            debugTools.selectedAction = clampDebugActionIndex(debugTools.selectedAction - 1);
+            triggerMenuNavigateSound();
+        }
+        if(downNow && !debugDownPressed){
+            debugTools.selectedAction = clampDebugActionIndex(debugTools.selectedAction + 1);
+            triggerMenuNavigateSound();
+        }
+        if(enterNow && !debugEnterPressed){
+            triggerMenuConfirmSound();
+            executeDebugAction(debugTools.selectedAction);
+        }
+        if(escNow && !debugEscPressed){
+            debugTools.open = false;
+            triggerMenuConfirmSound();
+        }
+        debugUpPressed = upNow;
+        debugDownPressed = downNow;
+        debugEnterPressed = enterNow;
+        debugEscPressed = escNow;
+        escPressed=glfwGetKey(w,settings.binds.pause)==GLFW_PRESS;
+        return;
+    }
+
     if(glfwGetKey(w,settings.binds.pause)==GLFW_PRESS&&!escPressed){
         gameState=STATE_PAUSE;menuSel=0;
         glfwSetInputMode(w,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
@@ -290,10 +396,16 @@ void gameInput(GLFWwindow*w){
     }
     if(staminaCooldown>0)staminaCooldown-=dTime;
     
-    if(glfwGetKey(w,settings.binds.crouch)==GLFW_PRESS){
-        cam.targetH=PH_CROUCH;cam.crouch=true;spd*=0.5f;
-    }else{cam.targetH=PH;cam.crouch=false;}
-    cam.curH+=(cam.targetH-cam.curH)*10.0f*dTime;
+    if(debugTools.flyMode){
+        cam.crouch=false;
+        cam.targetH=PH;
+        cam.curH=PH;
+    }else{
+        if(glfwGetKey(w,settings.binds.crouch)==GLFW_PRESS){
+            cam.targetH=PH_CROUCH;cam.crouch=true;spd*=0.5f;
+        }else{cam.targetH=PH;cam.crouch=false;}
+        cam.curH+=(cam.targetH-cam.curH)*10.0f*dTime;
+    }
     
     Vec3 fwd(sinf(cam.yaw),0,cosf(cam.yaw)),right(cosf(cam.yaw),0,-sinf(cam.yaw));
     Vec3 np=cam.pos;bool mv=false;
@@ -301,12 +413,20 @@ void gameInput(GLFWwindow*w){
     if(glfwGetKey(w,settings.binds.back)==GLFW_PRESS){np=np-fwd*spd;mv=true;}
     if(glfwGetKey(w,settings.binds.left)==GLFW_PRESS){np=np+right*spd;mv=true;}
     if(glfwGetKey(w,settings.binds.right)==GLFW_PRESS){np=np-right*spd;mv=true;}
+    if(debugTools.flyMode){
+        if(glfwGetKey(w,GLFW_KEY_SPACE)==GLFW_PRESS){np.y += spd; mv=true;}
+        if(glfwGetKey(w,settings.binds.crouch)==GLFW_PRESS){np.y -= spd; mv=true;}
+    }
     
-    if(!collideWorld(np.x,cam.pos.z,PR)&&!collideMapProps(np.x,cam.pos.z,PR)&&!collideCoopDoor(np.x,cam.pos.z,PR)&&!(falseDoorTimer>0&&nearPoint2D(Vec3(np.x,0,cam.pos.z),falseDoorPos,1.0f)))cam.pos.x=np.x;
-    if(!collideWorld(cam.pos.x,np.z,PR)&&!collideMapProps(cam.pos.x,np.z,PR)&&!collideCoopDoor(cam.pos.x,np.z,PR)&&!(falseDoorTimer>0&&nearPoint2D(Vec3(cam.pos.x,0,np.z),falseDoorPos,1.0f)))cam.pos.z=np.z;
+    if(debugTools.flyMode){
+        cam.pos=np;
+    }else{
+        if(!collideWorld(np.x,cam.pos.z,PR)&&!collideMapProps(np.x,cam.pos.z,PR)&&!collideCoopDoor(np.x,cam.pos.z,PR)&&!(falseDoorTimer>0&&nearPoint2D(Vec3(np.x,0,cam.pos.z),falseDoorPos,1.0f)))cam.pos.x=np.x;
+        if(!collideWorld(cam.pos.x,np.z,PR)&&!collideMapProps(cam.pos.x,np.z,PR)&&!collideCoopDoor(cam.pos.x,np.z,PR)&&!(falseDoorTimer>0&&nearPoint2D(Vec3(cam.pos.x,0,np.z),falseDoorPos,1.0f)))cam.pos.z=np.z;
+    }
     
     static float bobT=0,lastB=0;
-    if(mv){
+    if(mv && !debugTools.flyMode){
         bobT+=dTime*(spd>5.0f?12.0f:8.0f);
         float cb=sinf(bobT);cam.pos.y=cam.curH+cb*0.04f;
         if(lastB>-0.7f&&cb<=-0.7f&&!sndState.stepTrig){
