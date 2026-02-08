@@ -5,6 +5,7 @@
 #include "scare_system.h"
 #include "cheats.h"
 #include "minimap.h"
+#include "minimap_bindings.h"
 #include "perf_tuning.h"
 #include "content_events.h"
 #include "entity_ai.h"
@@ -158,27 +159,15 @@ inline int minimapWallSampler(int wx, int wz){
 
 inline void updateMinimapCheat(GLFWwindow* w){
     static bool letterPressed[26] = {false};
-    static bool f6Pressed = false;
-    static bool f7Pressed = false;
-    static bool homePressed = false;
+    static MinimapBindingState minimapBindingState = {};
 
     bool f6Now = glfwGetKey(w, GLFW_KEY_F6) == GLFW_PRESS;
-    if(f6Now && !f6Pressed){
-        minimapEnabled = !minimapEnabled;
-    }
-    f6Pressed = f6Now;
-
     bool f7Now = glfwGetKey(w, GLFW_KEY_F7) == GLFW_PRESS;
-    if(f7Now && !f7Pressed){
-        minimapEnabled = !minimapEnabled;
-    }
-    f7Pressed = f7Now;
-
     bool homeNow = glfwGetKey(w, GLFW_KEY_HOME) == GLFW_PRESS;
-    if(homeNow && !homePressed){
+    bool mNow = glfwGetKey(w, GLFW_KEY_M) == GLFW_PRESS;
+    if(shouldToggleMinimapFromBindings(f6Now, f7Now, homeNow, mNow, minimapBindingState)){
         minimapEnabled = !minimapEnabled;
     }
-    homePressed = homeNow;
 
     for(int i=0;i<26;i++){
         bool now = glfwGetKey(w, GLFW_KEY_A + i) == GLFW_PRESS;

@@ -100,7 +100,7 @@ void drawUI(){
                     drawText(":)",sx-0.018f+jitter,sy,1.35f,0.95f,0.95f,0.95f,alpha);
                 }
             }
-            drawText(minimapEnabled?"MINIMAP ON [F6/F7/HOME]":"MINIMAP OFF [F6/F7/HOME]",0.38f,-0.96f,0.95f,0.55f,0.7f,0.8f,0.68f);
+            drawText(minimapEnabled?"MINIMAP ON [F6/F7/HOME/M]":"MINIMAP OFF [F6/F7/HOME/M]",0.36f,-0.96f,0.95f,0.55f,0.7f,0.8f,0.68f);
         }
     }
 }
