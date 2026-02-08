@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdio>
 #include "upscaler_settings.h"
+#include "keybinds.h"
 
 const unsigned char FONT_DATA[96][7] = {
     {0,0,0,0,0,0,0},{4,4,4,4,0,4,0},{10,10,0,0,0,0,0},{10,31,10,31,10,0,0},{4,15,20,14,5,30,4},{24,25,2,4,8,19,3},{8,20,20,8,21,18,13},{4,4,0,0,0,0,0},
@@ -31,11 +32,13 @@ struct Settings {
     int upscalerMode=UPSCALER_MODE_OFF;
     int renderScalePreset=RENDER_SCALE_PRESET_DEFAULT;
     float fsrSharpness=0.35f;
+    GameplayBinds binds = {};
 };
 inline Settings settings;
-enum GameState { STATE_MENU, STATE_GAME, STATE_PAUSE, STATE_SETTINGS, STATE_SETTINGS_PAUSE, STATE_INTRO, STATE_NOTE, STATE_MULTI, STATE_MULTI_HOST, STATE_MULTI_JOIN, STATE_MULTI_WAIT };
+enum GameState { STATE_MENU, STATE_GAME, STATE_PAUSE, STATE_SETTINGS, STATE_SETTINGS_PAUSE, STATE_KEYBINDS, STATE_KEYBINDS_PAUSE, STATE_INTRO, STATE_NOTE, STATE_MULTI, STATE_MULTI_HOST, STATE_MULTI_JOIN, STATE_MULTI_WAIT };
 inline GameState gameState = STATE_MENU;
 inline int menuSel=0, currentWinW=1280, currentWinH=720;
+inline int keybindCaptureIndex = -1;
 inline float gSurvivalTime = 0;
 
 inline const char* textVS = R"(#version 330 core
@@ -121,11 +124,12 @@ inline void drawMenu(float tm) {
 
 inline void drawSettings(bool fp) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    if(fp) drawText("                                        ",-1.0f,-1.0f,50.0f,0.03f,0.03f,0.04f,0.70f);
     drawTextCentered("SETTINGS",0.0f,0.55f,3.0f,0.9f,0.85f,0.4f);
-    const char* lb[]={"MASTER VOL","MUSIC VOL","AMBIENCE VOL","SFX VOL","VOICE VOL","VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","BACK"};
-    float*vl[]={&settings.masterVol,&settings.musicVol,&settings.ambienceVol,&settings.sfxVol,&settings.voiceVol,&settings.vhsIntensity,&settings.mouseSens,nullptr,nullptr,&settings.fsrSharpness,nullptr};
-    float mx[]={1.0f,1.0f,1.0f,1.0f,1.0f,1.0f,0.006f,1.0f,1.0f,1.0f,1.0f};
-    for(int i=0;i<11;i++){
+    const char* lb[]={"MASTER VOL","MUSIC VOL","AMBIENCE VOL","SFX VOL","VOICE VOL","VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","KEY BINDS","BACK"};
+    float*vl[]={&settings.masterVol,&settings.musicVol,&settings.ambienceVol,&settings.sfxVol,&settings.voiceVol,&settings.vhsIntensity,&settings.mouseSens,nullptr,nullptr,&settings.fsrSharpness,nullptr,nullptr};
+    float mx[]={1.0f,1.0f,1.0f,1.0f,1.0f,1.0f,0.006f,1.0f,1.0f,1.0f,1.0f,1.0f};
+    for(int i=0;i<12;i++){
         float s=(menuSel==i)?1.0f:0.5f,y=0.43f-i*0.09f;
         if(menuSel==i)drawText(">",-0.55f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         drawText(lb[i],-0.48f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
@@ -135,6 +139,8 @@ inline void drawSettings(bool fp) {
             int scalePercent = renderScalePercentFromPreset(settings.renderScalePreset);
             char rb[24]; snprintf(rb,24,"%d%%",scalePercent);
             drawText(rb,0.48f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
+        }else if(i==10){
+            drawText("OPEN",0.48f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         }else if(vl[i]){
             float nv=*vl[i]/mx[i]; if(nv>1.0f)nv=1.0f;
             drawSlider(0.1f,y,0.45f,nv,0.9f*s,0.85f*s,0.4f*s);
@@ -147,6 +153,7 @@ inline void drawSettings(bool fp) {
 
 inline void drawPause() {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    drawText("                                        ",-1.0f,-1.0f,50.0f,0.03f,0.03f,0.04f,0.70f);
     drawTextCentered("PAUSED",0.0f,0.25f,3.0f,0.9f,0.85f,0.4f);
     const char* it[]={"RESUME","SETTINGS","MAIN MENU","QUIT"};
     for(int i=0;i<4;i++){
@@ -176,6 +183,28 @@ inline void drawSurvivalTime(float t) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     int m=(int)(t/60),s=(int)t%60; char b[16]; snprintf(b,16,"%d:%02d",m,s);
     drawText(b,0.72f,0.9f,2.0f,0.78f,0.72f,0.48f,0.96f);
+    glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
+}
+
+inline void drawKeybindsMenu(bool fromPause, int selected, int captureIndex) {
+    glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    if(fromPause) drawText("                                        ",-1.0f,-1.0f,50.0f,0.03f,0.03f,0.04f,0.70f);
+    drawTextCentered("KEY BINDS",0.0f,0.62f,2.6f,0.9f,0.85f,0.4f);
+    for(int i=0;i<GAMEPLAY_BIND_COUNT;i++){
+        float s=(selected==i)?1.0f:0.55f;
+        float y=0.48f-i*0.075f;
+        if(selected==i) drawText(">",-0.62f,y,1.45f,0.92f*s,0.86f*s,0.42f*s);
+        drawText(gameplayBindLabel(i),-0.56f,y,1.38f,0.9f*s,0.85f*s,0.4f*s);
+        const char* keyName = keyNameForUi(*gameplayBindByIndex(settings.binds, i));
+        if(captureIndex==i) keyName = "...";
+        drawText(keyName,0.38f,y,1.38f,0.82f*s,0.9f*s,0.72f*s,0.95f);
+    }
+    float bs=(selected==KEYBINDS_BACK_INDEX)?1.0f:0.55f;
+    float by=0.48f-GAMEPLAY_BIND_COUNT*0.075f;
+    if(selected==KEYBINDS_BACK_INDEX) drawText(">",-0.62f,by,1.45f,0.92f*bs,0.86f*bs,0.42f*bs);
+    drawText("BACK",-0.56f,by,1.45f,0.9f*bs,0.85f*bs,0.4f*bs);
+    drawTextCentered(captureIndex>=0?"PRESS ANY KEY TO REBIND":"ENTER TO REBIND  ESC TO BACK",0.0f,-0.84f,1.35f,0.58f,0.58f,0.46f,0.86f);
+    if(fromPause) drawTextCentered("APPLIES IN CURRENT RUN",0.0f,-0.92f,1.1f,0.5f,0.55f,0.45f,0.7f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 

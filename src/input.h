@@ -10,6 +10,20 @@ extern bool escPressed, upPressed, downPressed, enterPressed, leftPressed, right
 extern bool firstMouse;
 extern float lastX, lastY;
 
+inline bool isAnyKeyboardKeyDown(GLFWwindow* w) {
+    for (int k = GLFW_KEY_SPACE; k <= GLFW_KEY_MENU; k++) {
+        if (glfwGetKey(w, k) == GLFW_PRESS) return true;
+    }
+    return false;
+}
+
+inline int firstPressedKeyboardKey(GLFWwindow* w) {
+    for (int k = GLFW_KEY_SPACE; k <= GLFW_KEY_MENU; k++) {
+        if (glfwGetKey(w, k) == GLFW_PRESS) return k;
+    }
+    return -1;
+}
+
 inline void pushNicknameChar(char c) {
     char next[PLAYER_NAME_BUF_LEN + 1] = {};
     int len = (int)strlen(multiNickname);
@@ -63,8 +77,9 @@ inline void handleNicknameInput(GLFWwindow* w) {
 }
 
 inline void settingsInput(GLFWwindow* w, bool fromPause) {
-    static constexpr int SETTINGS_ITEMS = 11;
-    static constexpr int SETTINGS_BACK_INDEX = 10;
+    static constexpr int SETTINGS_ITEMS = 12;
+    static constexpr int SETTINGS_BINDS_INDEX = 10;
+    static constexpr int SETTINGS_BACK_INDEX = 11;
     bool esc = glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS;
     bool up = glfwGetKey(w, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS;
     bool down = glfwGetKey(w, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS;
@@ -102,6 +117,13 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
     } else if (menuSel == 9) {
         if (left && !leftPressed) { settings.fsrSharpness = clampFsrSharpness(settings.fsrSharpness - 0.05f); triggerMenuNavigateSound(); }
         if (right && !rightPressed) { settings.fsrSharpness = clampFsrSharpness(settings.fsrSharpness + 0.05f); triggerMenuNavigateSound(); }
+    } else if (menuSel == SETTINGS_BINDS_INDEX) {
+        if (enter && !enterPressed) {
+            triggerMenuConfirmSound();
+            gameState = fromPause ? STATE_KEYBINDS_PAUSE : STATE_KEYBINDS;
+            menuSel = 0;
+            keybindCaptureIndex = -1;
+        }
     }
     
     if ((enter && !enterPressed && menuSel == SETTINGS_BACK_INDEX) || (esc && !escPressed)) { 
@@ -115,6 +137,55 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
     downPressed = down; 
     leftPressed = left; 
     rightPressed = right; 
+    enterPressed = enter;
+}
+
+inline void keybindsInput(GLFWwindow* w, bool fromPause) {
+    static bool waitRelease = false;
+    bool esc = glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS;
+    bool up = glfwGetKey(w, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS;
+    bool down = glfwGetKey(w, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS;
+    bool enter = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS;
+
+    if (keybindCaptureIndex >= 0) {
+        if (waitRelease) {
+            if (!isAnyKeyboardKeyDown(w)) waitRelease = false;
+        } else {
+            int pressed = firstPressedKeyboardKey(w);
+            if (pressed >= 0) {
+                int* keyRef = gameplayBindByIndex(settings.binds, keybindCaptureIndex);
+                if (keyRef) *keyRef = pressed;
+                keybindCaptureIndex = -1;
+                triggerMenuConfirmSound();
+            } else if (esc && !escPressed) {
+                keybindCaptureIndex = -1;
+                triggerMenuConfirmSound();
+            }
+        }
+    } else {
+        if (up && !upPressed) { menuSel = clampKeybindMenuIndex(menuSel - 1); triggerMenuNavigateSound(); }
+        if (down && !downPressed) { menuSel = clampKeybindMenuIndex(menuSel + 1); triggerMenuNavigateSound(); }
+        if (enter && !enterPressed) {
+            if (isGameplayBindIndex(menuSel)) {
+                keybindCaptureIndex = menuSel;
+                waitRelease = true;
+                triggerMenuConfirmSound();
+            } else if (menuSel == KEYBINDS_BACK_INDEX) {
+                triggerMenuConfirmSound();
+                gameState = fromPause ? STATE_SETTINGS_PAUSE : STATE_SETTINGS;
+                menuSel = 10;
+            }
+        }
+        if (esc && !escPressed) {
+            triggerMenuConfirmSound();
+            gameState = fromPause ? STATE_SETTINGS_PAUSE : STATE_SETTINGS;
+            menuSel = 10;
+        }
+    }
+
+    escPressed = esc;
+    upPressed = up;
+    downPressed = down;
     enterPressed = enter;
 }
 

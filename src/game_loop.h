@@ -150,14 +150,14 @@ void mouse(GLFWwindow*,double xp,double yp){
 }
 
 void gameInput(GLFWwindow*w){
-    if(glfwGetKey(w,GLFW_KEY_ESCAPE)==GLFW_PRESS&&!escPressed){
+    if(glfwGetKey(w,settings.binds.pause)==GLFW_PRESS&&!escPressed){
         gameState=STATE_PAUSE;menuSel=0;
         glfwSetInputMode(w,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
     }
-    escPressed=glfwGetKey(w,GLFW_KEY_ESCAPE)==GLFW_PRESS;
+    escPressed=glfwGetKey(w,settings.binds.pause)==GLFW_PRESS;
     updateMinimapCheat(w);
     
-    bool fNow=glfwGetKey(w,GLFW_KEY_F)==GLFW_PRESS;
+    bool fNow=glfwGetKey(w,settings.binds.flashlight)==GLFW_PRESS;
     if(fNow&&!flashlightPressed&&flashlightBattery>5.0f){
         flashlightOn=!flashlightOn;
         if(!flashlightOn){
@@ -168,7 +168,7 @@ void gameInput(GLFWwindow*w){
     }
     flashlightPressed=fNow;
     
-    bool eNow=glfwGetKey(w,GLFW_KEY_E)==GLFW_PRESS;
+    bool eNow=glfwGetKey(w,settings.binds.interact)==GLFW_PRESS;
     nearbyWorldItemId = -1;
     nearbyWorldItemType = -1;
     for(auto& it:worldItems){
@@ -220,16 +220,16 @@ void gameInput(GLFWwindow*w){
     interactPressed=eNow;
     
     static bool key1Pressed=false,key2Pressed=false,key3Pressed=false;
-    bool k1=glfwGetKey(w,GLFW_KEY_1)==GLFW_PRESS;
-    bool k2=glfwGetKey(w,GLFW_KEY_2)==GLFW_PRESS;
-    bool k3=glfwGetKey(w,GLFW_KEY_3)==GLFW_PRESS;
+    bool k1=glfwGetKey(w,settings.binds.item1)==GLFW_PRESS;
+    bool k2=glfwGetKey(w,settings.binds.item2)==GLFW_PRESS;
+    bool k3=glfwGetKey(w,settings.binds.item3)==GLFW_PRESS;
     if(k1&&!key1Pressed) applyItemUse(0);
     if(k2&&!key2Pressed) applyItemUse(1);
     if(k3&&!key3Pressed) applyItemUse(2);
     key1Pressed=k1; key2Pressed=k2; key3Pressed=k3;
     
     float spd=4.0f*dTime;
-    bool sprinting=glfwGetKey(w,GLFW_KEY_LEFT_SHIFT)==GLFW_PRESS&&playerStamina>0&&staminaCooldown<=0;
+    bool sprinting=glfwGetKey(w,settings.binds.sprint)==GLFW_PRESS&&playerStamina>0&&staminaCooldown<=0;
     if(sprinting){
         spd*=1.6f;playerStamina-=20.0f*dTime;
         if(playerStamina<0){playerStamina=0;staminaCooldown=1.5f;}
@@ -239,17 +239,17 @@ void gameInput(GLFWwindow*w){
     }
     if(staminaCooldown>0)staminaCooldown-=dTime;
     
-    if(glfwGetKey(w,GLFW_KEY_LEFT_CONTROL)==GLFW_PRESS){
+    if(glfwGetKey(w,settings.binds.crouch)==GLFW_PRESS){
         cam.targetH=PH_CROUCH;cam.crouch=true;spd*=0.5f;
     }else{cam.targetH=PH;cam.crouch=false;}
     cam.curH+=(cam.targetH-cam.curH)*10.0f*dTime;
     
     Vec3 fwd(sinf(cam.yaw),0,cosf(cam.yaw)),right(cosf(cam.yaw),0,-sinf(cam.yaw));
     Vec3 np=cam.pos;bool mv=false;
-    if(glfwGetKey(w,GLFW_KEY_W)==GLFW_PRESS){np=np+fwd*spd;mv=true;}
-    if(glfwGetKey(w,GLFW_KEY_S)==GLFW_PRESS){np=np-fwd*spd;mv=true;}
-    if(glfwGetKey(w,GLFW_KEY_A)==GLFW_PRESS){np=np+right*spd;mv=true;}
-    if(glfwGetKey(w,GLFW_KEY_D)==GLFW_PRESS){np=np-right*spd;mv=true;}
+    if(glfwGetKey(w,settings.binds.forward)==GLFW_PRESS){np=np+fwd*spd;mv=true;}
+    if(glfwGetKey(w,settings.binds.back)==GLFW_PRESS){np=np-fwd*spd;mv=true;}
+    if(glfwGetKey(w,settings.binds.left)==GLFW_PRESS){np=np+right*spd;mv=true;}
+    if(glfwGetKey(w,settings.binds.right)==GLFW_PRESS){np=np-right*spd;mv=true;}
     
     if(!collideWorld(np.x,cam.pos.z,PR)&&!collideCoopDoor(np.x,cam.pos.z,PR)&&!(falseDoorTimer>0&&nearPoint2D(Vec3(np.x,0,cam.pos.z),falseDoorPos,1.0f)))cam.pos.x=np.x;
     if(!collideWorld(cam.pos.x,np.z,PR)&&!collideCoopDoor(cam.pos.x,np.z,PR)&&!(falseDoorTimer>0&&nearPoint2D(Vec3(cam.pos.x,0,np.z),falseDoorPos,1.0f)))cam.pos.z=np.z;
@@ -463,6 +463,8 @@ int main(){
             }
         }else if(gameState==STATE_SETTINGS) settingsInput(gWin,false);
         else if(gameState==STATE_SETTINGS_PAUSE) settingsInput(gWin,true);
+        else if(gameState==STATE_KEYBINDS) keybindsInput(gWin,false);
+        else if(gameState==STATE_KEYBINDS_PAUSE) keybindsInput(gWin,true);
         else if(gameState==STATE_MENU||gameState==STATE_PAUSE||
                  gameState==STATE_MULTI||gameState==STATE_MULTI_HOST||gameState==STATE_MULTI_JOIN||gameState==STATE_MULTI_WAIT){
             menuInput(gWin);
@@ -622,7 +624,7 @@ int main(){
         glClearColor(0.02f,0.02f,0.02f,1);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         
-        if(gameState==STATE_GAME||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_NOTE)
+        if(gameState==STATE_GAME||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_KEYBINDS_PAUSE||gameState==STATE_NOTE)
             renderScene();
         
         glBindFramebuffer(GL_FRAMEBUFFER,0);

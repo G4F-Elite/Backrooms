@@ -11,6 +11,7 @@ void drawUI(){
         if(multiState==MULTI_IN_GAME) drawMultiPause(netMgr.getPlayerCount());
         else drawPause();
     }else if(gameState==STATE_SETTINGS||gameState==STATE_SETTINGS_PAUSE) drawSettings(gameState==STATE_SETTINGS_PAUSE);
+    else if(gameState==STATE_KEYBINDS||gameState==STATE_KEYBINDS_PAUSE) drawKeybindsMenu(gameState==STATE_KEYBINDS_PAUSE, menuSel, keybindCaptureIndex);
     else if(gameState==STATE_INTRO) drawIntro(storyMgr.introLine,storyMgr.introTimer,storyMgr.introLineTime,INTRO_LINES);
     else if(gameState==STATE_NOTE&&storyMgr.readingNote&&storyMgr.currentNote>=0)
         drawNote(storyMgr.currentNote,NOTE_TITLES[storyMgr.currentNote],NOTE_CONTENTS[storyMgr.currentNote]);
