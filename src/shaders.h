@@ -13,6 +13,10 @@ uniform int nl; uniform vec3 lp[16]; uniform float danger;
 uniform int flashOn; uniform vec3 flashDir;
 uniform int rfc; uniform vec3 rfp[4]; uniform vec3 rfd[4];
 
+float hash(vec3 p) {
+ return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
+}
+
 void main(){
  vec3 tc = texture(tex,uv).rgb;
  vec3 N = normalize(nm);
@@ -24,6 +28,16 @@ void main(){
  
  for(int i = 0; i < nl && i < 16; i++) {
   vec3 toLight = lp[i] - fp;
+  
+  // Calculate distance-based fade for smooth light transitions at edges
+  float lightDistFromCam = length(lp[i] - vp);
+  float fade = 1.0;
+  if(lightDistFromCam > 35.0) {
+   fade = 1.0 - (lightDistFromCam - 35.0) / 15.0;
+   fade = clamp(fade, 0.0, 1.0);
+  }
+  if(fade < 0.001) continue;
+  
   float d2 = dot(toLight, toLight);
   float d = sqrt(d2);
   vec3 L = toLight / max(d, 0.001);
@@ -45,7 +59,9 @@ void main(){
   float panicFlick = sin(tm*30.0 + float(i)*3.7) * 0.05 * danger;
   float fl = 1.0 + baseFlick + panicFlick;
   vec3 lightColor = vec3(1.0, 0.92, 0.75);
-  res += df * lightColor * fl * tc * att * 0.5;
+  
+  // Apply fade factor for smooth light transitions
+  res += df * lightColor * fl * tc * att * 0.5 * fade;
  }
  
  // FLASHLIGHT - white cone with red danger edge
@@ -82,11 +98,39 @@ void main(){
   if(maxB > 0.1) res = max(res, tc * 0.15);
  }
  
- // FOG - moderate density to hide distant LOD
+ // THICK FOG - exponential falloff to hide distant LOD transitions
  float dist = length(vp - fp);
- float fog = clamp(1.0 - dist * 0.038, 0.0, 1.0);
- vec3 fogColor = vec3(0.06, 0.05, 0.04);
+ 
+ // Exponential fog - much thicker, starts closer
+ float fogDensity = 0.065;
+ float fog = exp(-dist * fogDensity);
+ fog = clamp(fog, 0.0, 1.0);
+ 
+ // Add noise to fog edge to break up hard transitions
+ float fogNoise = hash(floor(fp * 2.0) + vec3(tm * 0.1));
+ fog = fog * (0.92 + fogNoise * 0.08);
+ 
+ // Darker, warmer fog color
+ vec3 fogColor = vec3(0.045, 0.04, 0.035);
+ 
+ // Add subtle "dust particles" effect based on distance
+ float dustDist = dist * 0.08;
+ float dust = hash(fp * 0.5 + vec3(tm * 0.3, 0, 0)) * 0.015 * min(dustDist, 1.0);
+ 
+ // Distance-based color desaturation (far objects lose color)
+ float desat = smoothstep(8.0, 20.0, dist);
+ float gray = dot(res, vec3(0.3, 0.6, 0.1));
+ res = mix(res, vec3(gray), desat * 0.4);
+ 
+ // Distance-based darkening before fog (smooth LOD transition)
+ float distDarken = smoothstep(15.0, 25.0, dist);
+ res *= (1.0 - distDarken * 0.5);
+ 
+ // Apply fog
  res = mix(fogColor, res, fog);
+ 
+ // Add dust on top
+ res += vec3(dust);
  
  res *= vec3(1.0, 0.97, 0.9);
  
@@ -97,8 +141,8 @@ void main(){
  }
  
  if(danger > 0.0) {
-  float gray = dot(res, vec3(0.3, 0.6, 0.1));
-  res = mix(res, vec3(gray), danger * 0.2);
+  float grayD = dot(res, vec3(0.3, 0.6, 0.1));
+  res = mix(res, vec3(grayD), danger * 0.2);
  }
  
  F = vec4(clamp(res, 0.0, 1.0), 1.0);
@@ -111,12 +155,13 @@ void main(){ uv=t; gl_Position=P*V*M*vec4(p,1); })";
 
 const char* lightFS=R"(#version 330
 out vec4 F; in vec2 uv;
-uniform sampler2D tex; uniform float inten,tm;
+uniform sampler2D tex; uniform float inten,tm,fade;
 float hash(float n){ return fract(sin(n)*43758.5453); }
 void main(){
  vec3 c = texture(tex,uv).rgb * inten;
  float flick = 0.97 + sin(tm*25.0)*0.015 + hash(floor(tm*7.0))*0.015;
- F = vec4(c * flick, 1);
+ // Apply fade for smooth light sprite transitions
+ F = vec4(c * flick * fade, fade);
 })";
 
 const char* vhsVS=R"(#version 330

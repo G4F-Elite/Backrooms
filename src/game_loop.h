@@ -85,6 +85,7 @@ void genWorld(){
     }
     
     chunks.clear();lights.clear();pillars.clear();
+    g_lightStates.clear(); // Reset light temporal states on world gen
     updateVisibleChunks(0,0);
     updateLightsAndPillars(0,0);
     Vec3 sp=findSafeSpawn();
@@ -301,10 +302,10 @@ void renderScene(){
         GLint P, V, M, vp, tm, danger, flashOn, flashDir, rfc, rfp, rfd, nl, lp;
     };
     struct LightUniforms {
-        GLint P, V, M, inten, tm;
+        GLint P, V, M, inten, tm, fade;
     };
     static MainUniforms mu = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
-    static LightUniforms lu = {-1,-1,-1,-1,-1};
+    static LightUniforms lu = {-1,-1,-1,-1,-1,-1};
     if(mu.P < 0){
         mu.P = glGetUniformLocation(mainShader,"P");
         mu.V = glGetUniformLocation(mainShader,"V");
@@ -326,6 +327,7 @@ void renderScene(){
         lu.M = glGetUniformLocation(lightShader,"M");
         lu.inten = glGetUniformLocation(lightShader,"inten");
         lu.tm = glGetUniformLocation(lightShader,"tm");
+        lu.fade = glGetUniformLocation(lightShader,"fade");
     }
 
     glUseProgram(mainShader);
@@ -360,10 +362,11 @@ void renderScene(){
         glUniform3fv(mu.rfd,remoteFlashCount,remoteFlashDir);
     }
     
+    // Gather nearest lights - fade is now computed in shader based on distance
     float lpos[SCENE_LIGHT_LIMIT * 3] = {0};
     int nl = gatherNearestSceneLights(lights, cam.pos, lpos);
     glUniform1i(mu.nl,nl);
-    if(nl>0)glUniform3fv(mu.lp,nl,lpos);
+    if(nl>0) glUniform3fv(mu.lp,nl,lpos);
     
     glBindTexture(GL_TEXTURE_2D,wallTex);glBindVertexArray(wallVAO);glDrawArrays(GL_TRIANGLES,0,wallVC);
     glBindVertexArray(pillarVAO);glDrawArrays(GL_TRIANGLES,0,pillarVC);
@@ -383,9 +386,11 @@ void renderScene(){
     glUniformMatrix4fv(lu.M,1,GL_FALSE,model.m);
     glUniform1f(lu.inten,1.2f);
     glUniform1f(lu.tm,vhsTime);
+    glUniform1f(lu.fade,1.0f); // Light sprites always full brightness when visible
     glBindTexture(GL_TEXTURE_2D,lightTex);glBindVertexArray(lightVAO);glDrawArrays(GL_TRIANGLES,0,lightVC);
     if(lightOffVC>0){
         glUniform1f(lu.inten,0.15f);
+        glUniform1f(lu.fade,1.0f);
         glBindVertexArray(lightOffVAO);glDrawArrays(GL_TRIANGLES,0,lightOffVC);
     }
     entityMgr.render(mainShader,proj,view);
