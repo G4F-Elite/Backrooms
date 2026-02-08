@@ -633,7 +633,8 @@ int main(){
         glUseProgram(vhsShader);
         glBindTexture(GL_TEXTURE_2D,fboTex);
         float sP=(100-playerSanity)/100*0.4f;
-        float vI=settings.vhsIntensity+entityMgr.dangerLevel*0.5f+sP + anomalyBlur * 0.55f;
+        bool vhsMenu=(gameState==STATE_MENU);
+        float vI=vhsMenu?(settings.vhsIntensity+entityMgr.dangerLevel*0.5f+sP + anomalyBlur * 0.55f):0.0f;
         static GLint vhsTmLoc = -1;
         static GLint vhsIntenLoc = -1;
         static GLint vhsUpscalerLoc = -1;
