@@ -35,6 +35,8 @@ struct SoundState {
     bool uiMoveTrig=false;
     bool uiAdjustTrig=false;
     bool uiConfirmTrig=false;
+    float uiMovePitch=1.0f;
+    float uiAdjustPitch=1.0f;
 };
 
 extern SoundState sndState;
@@ -257,8 +259,11 @@ inline void fillAudio(short* buf, int len) {
             float attack = (t < 0.012f) ? (t / 0.012f) : 1.0f;
             float env = attack * expf(-t * 12.0f);
             float wob = 1.0f + 0.015f * sinf(t * 30.0f);
-            float f1 = 590.0f * wob;
-            float f2 = 880.0f;
+            float pitch = sndState.uiMovePitch;
+            if(pitch < 0.65f) pitch = 0.65f;
+            if(pitch > 1.55f) pitch = 1.55f;
+            float f1 = 590.0f * wob * pitch;
+            float f2 = 880.0f * pitch;
             uiMove = (sinf(twoPi * f1 * t) * 0.55f + sinf(twoPi * f2 * t) * 0.25f) * env;
             uiMoveTime += dt;
             if(uiMoveTime > 0.22f) uiMoveTime = -1.0f;
@@ -269,8 +274,11 @@ inline void fillAudio(short* buf, int len) {
             float t = uiAdjustTime;
             float attack = (t < 0.008f) ? (t / 0.008f) : 1.0f;
             float env = attack * expf(-t * 13.5f);
-            float f1 = 690.0f + sinf(t * 34.0f) * 14.0f;
-            float f2 = 1030.0f;
+            float pitch = sndState.uiAdjustPitch;
+            if(pitch < 0.65f) pitch = 0.65f;
+            if(pitch > 1.55f) pitch = 1.55f;
+            float f1 = (690.0f + sinf(t * 34.0f) * 14.0f) * pitch;
+            float f2 = 1030.0f * pitch;
             uiAdjust = (sinf(twoPi * f1 * t) * 0.62f + sinf(twoPi * f2 * t) * 0.16f) * env;
             uiAdjustTime += dt;
             if(uiAdjustTime > 0.15f) uiAdjustTime = -1.0f;
@@ -367,8 +375,20 @@ inline void fillAudio(short* buf, int len) {
 }
 
 inline void triggerScare() { sndState.scareVol = 0.8f; sndState.scareTimer = 0; }
-inline void triggerMenuNavigateSound() { sndState.uiMoveTrig = true; }
-inline void triggerMenuAdjustSound() { sndState.uiAdjustTrig = true; }
+inline void triggerMenuNavigateSound() {
+    static int noteStep = 0;
+    const float scale[6] = {1.0f, 1.059f, 1.122f, 1.189f, 1.122f, 1.059f};
+    sndState.uiMovePitch = scale[noteStep % 6];
+    noteStep++;
+    sndState.uiMoveTrig = true;
+}
+inline void triggerMenuAdjustSound() {
+    static int noteStep = 0;
+    const float scale[5] = {0.944f, 1.0f, 1.059f, 1.122f, 1.189f};
+    sndState.uiAdjustPitch = scale[noteStep % 5];
+    noteStep++;
+    sndState.uiAdjustTrig = true;
+}
 inline void triggerMenuConfirmSound() { sndState.uiConfirmTrig = true; }
 
 void audioThread();

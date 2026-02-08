@@ -33,25 +33,24 @@ void buildGeom(){
     for(auto&p:pillars)mkPillar(pv,p.x,p.z,0.6f,WH);
     for(auto&pr:mapProps){
         if(pr.type==MAP_PROP_CRATE_STACK){
-            float b = 1.25f * pr.scale;
-            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, b, 1.0f * pr.scale, b);
-            mkBox(dv, pr.pos.x + 0.25f * CS, 1.0f * pr.scale, pr.pos.z - 0.20f * CS,
-                  0.85f * pr.scale, 0.7f * pr.scale, 0.85f * pr.scale);
+            float b = 1.05f * pr.scale;
+            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, b, 0.82f * pr.scale, b);
+            mkBox(dv, pr.pos.x + 0.36f, 0.0f, pr.pos.z - 0.30f, 0.70f * pr.scale, 0.62f * pr.scale, 0.70f * pr.scale);
         }else if(pr.type==MAP_PROP_CONE_CLUSTER){
-            float base = 0.22f * CS * pr.scale;
-            mkBox(dv, pr.pos.x - 0.18f * CS, 0.0f, pr.pos.z, base, 0.45f * pr.scale, base);
-            mkBox(dv, pr.pos.x + 0.15f * CS, 0.0f, pr.pos.z + 0.12f * CS, base, 0.42f * pr.scale, base);
-            mkBox(dv, pr.pos.x + 0.05f * CS, 0.0f, pr.pos.z - 0.15f * CS, base, 0.38f * pr.scale, base);
+            float base = 0.42f * pr.scale;
+            mkBox(dv, pr.pos.x - 0.35f, 0.0f, pr.pos.z, base, 0.45f * pr.scale, base);
+            mkBox(dv, pr.pos.x + 0.28f, 0.0f, pr.pos.z + 0.25f, base, 0.42f * pr.scale, base);
+            mkBox(dv, pr.pos.x + 0.10f, 0.0f, pr.pos.z - 0.32f, base, 0.38f * pr.scale, base);
         }else if(pr.type==MAP_PROP_BARRIER){
-            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, 1.8f * pr.scale, 0.85f * pr.scale, 0.45f * pr.scale);
+            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, 1.55f * pr.scale, 0.74f * pr.scale, 0.42f * pr.scale);
         }else if(pr.type==MAP_PROP_CABLE_REEL){
-            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, 0.95f * pr.scale, 0.6f * pr.scale, 0.95f * pr.scale);
-            mkBox(dv, pr.pos.x, 0.6f * pr.scale, pr.pos.z, 0.35f * pr.scale, 0.6f * pr.scale, 0.35f * pr.scale);
+            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, 0.92f * pr.scale, 0.45f * pr.scale, 0.92f * pr.scale);
+            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, 0.30f * pr.scale, 0.78f * pr.scale, 0.30f * pr.scale);
         }else if(pr.type==MAP_PROP_PUDDLE){
             mkFloorDecal(dv, pr.pos.x, 0.02f, pr.pos.z, 1.7f * pr.scale, 1.3f * pr.scale);
         }else{
-            mkBox(dv, pr.pos.x - 0.20f * CS, 0.0f, pr.pos.z + 0.16f * CS, 0.7f * pr.scale, 0.35f * pr.scale, 0.7f * pr.scale);
-            mkBox(dv, pr.pos.x + 0.10f * CS, 0.0f, pr.pos.z - 0.10f * CS, 0.6f * pr.scale, 0.28f * pr.scale, 0.6f * pr.scale);
+            mkBox(dv, pr.pos.x - 0.42f, 0.0f, pr.pos.z + 0.24f, 0.68f * pr.scale, 0.35f * pr.scale, 0.68f * pr.scale);
+            mkBox(dv, pr.pos.x + 0.28f, 0.0f, pr.pos.z - 0.22f, 0.56f * pr.scale, 0.28f * pr.scale, 0.56f * pr.scale);
         }
     }
     for(auto&l:lights){
@@ -279,8 +278,8 @@ void gameInput(GLFWwindow*w){
     if(glfwGetKey(w,settings.binds.left)==GLFW_PRESS){np=np+right*spd;mv=true;}
     if(glfwGetKey(w,settings.binds.right)==GLFW_PRESS){np=np-right*spd;mv=true;}
     
-    if(!collideWorld(np.x,cam.pos.z,PR)&&!collideCoopDoor(np.x,cam.pos.z,PR)&&!(falseDoorTimer>0&&nearPoint2D(Vec3(np.x,0,cam.pos.z),falseDoorPos,1.0f)))cam.pos.x=np.x;
-    if(!collideWorld(cam.pos.x,np.z,PR)&&!collideCoopDoor(cam.pos.x,np.z,PR)&&!(falseDoorTimer>0&&nearPoint2D(Vec3(cam.pos.x,0,np.z),falseDoorPos,1.0f)))cam.pos.z=np.z;
+    if(!collideWorld(np.x,cam.pos.z,PR)&&!collideMapProps(np.x,cam.pos.z,PR)&&!collideCoopDoor(np.x,cam.pos.z,PR)&&!(falseDoorTimer>0&&nearPoint2D(Vec3(np.x,0,cam.pos.z),falseDoorPos,1.0f)))cam.pos.x=np.x;
+    if(!collideWorld(cam.pos.x,np.z,PR)&&!collideMapProps(cam.pos.x,np.z,PR)&&!collideCoopDoor(cam.pos.x,np.z,PR)&&!(falseDoorTimer>0&&nearPoint2D(Vec3(cam.pos.x,0,np.z),falseDoorPos,1.0f)))cam.pos.z=np.z;
     
     static float bobT=0,lastB=0;
     if(mv){

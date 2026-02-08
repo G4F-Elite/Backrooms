@@ -110,10 +110,29 @@ void testNoPropsInsideWalls() {
     }
 }
 
+void testPropCollisionBlocksSolidPropsOnly() {
+    mapProps.clear();
+    MapProp solid{};
+    solid.pos = Vec3(10.0f, 0.0f, 10.0f);
+    solid.type = MAP_PROP_CRATE_STACK;
+    solid.scale = 1.0f;
+    mapProps.push_back(solid);
+    assert(collideMapProps(10.0f, 10.0f, 0.2f));
+
+    mapProps.clear();
+    MapProp puddle{};
+    puddle.pos = Vec3(10.0f, 0.0f, 10.0f);
+    puddle.type = MAP_PROP_PUDDLE;
+    puddle.scale = 1.0f;
+    mapProps.push_back(puddle);
+    assert(!collideMapProps(10.0f, 10.0f, 0.2f));
+}
+
 int main() {
     testDeterministicPlacementBySeed();
     testGeneratesVariedProps();
     testNoPropsInsideWalls();
+    testPropCollisionBlocksSolidPropsOnly();
     std::cout << "All map content tests passed.\n";
     return 0;
 }

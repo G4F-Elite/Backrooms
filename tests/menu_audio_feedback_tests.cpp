@@ -12,6 +12,7 @@ void testMenuNavigateTriggerSetsFlag() {
     sndState.uiMoveTrig = false;
     triggerMenuNavigateSound();
     assert(sndState.uiMoveTrig);
+    assert(sndState.uiMovePitch > 0.8f);
 }
 
 void testMenuConfirmTriggerSetsFlag() {
@@ -24,6 +25,21 @@ void testMenuAdjustTriggerSetsFlag() {
     sndState.uiAdjustTrig = false;
     triggerMenuAdjustSound();
     assert(sndState.uiAdjustTrig);
+    assert(sndState.uiAdjustPitch > 0.8f);
+}
+
+void testMenuPitchVariesAcrossTriggers() {
+    triggerMenuNavigateSound();
+    float p1 = sndState.uiMovePitch;
+    triggerMenuNavigateSound();
+    float p2 = sndState.uiMovePitch;
+    assert(p1 != p2);
+
+    triggerMenuAdjustSound();
+    float a1 = sndState.uiAdjustPitch;
+    triggerMenuAdjustSound();
+    float a2 = sndState.uiAdjustPitch;
+    assert(a1 != a2);
 }
 
 void testFillAudioConsumesUiFlags() {
@@ -40,6 +56,7 @@ void testFillAudioConsumesUiFlags() {
 int main() {
     testMenuNavigateTriggerSetsFlag();
     testMenuAdjustTriggerSetsFlag();
+    testMenuPitchVariesAcrossTriggers();
     testMenuConfirmTriggerSetsFlag();
     testFillAudioConsumesUiFlags();
     std::cout << "All menu audio feedback tests passed.\n";

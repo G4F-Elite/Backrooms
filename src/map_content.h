@@ -39,6 +39,24 @@ inline bool hasMapPropNear(const Vec3& p, float radius) {
     return false;
 }
 
+inline float mapPropCollisionRadius(const MapProp& p) {
+    if (p.type == MAP_PROP_PUDDLE) return 0.0f;
+    if (p.type == MAP_PROP_CONE_CLUSTER) return 0.34f * CS;
+    if (p.type == MAP_PROP_BARRIER) return 0.48f * CS;
+    if (p.type == MAP_PROP_CABLE_REEL) return 0.30f * CS;
+    if (p.type == MAP_PROP_DEBRIS) return 0.27f * CS;
+    return 0.36f * CS;
+}
+
+inline bool collideMapProps(float x, float z, float pr) {
+    for (const auto& p : mapProps) {
+        float r = mapPropCollisionRadius(p);
+        if (r <= 0.001f) continue;
+        if (fabsf(x - p.pos.x) < (r + pr) && fabsf(z - p.pos.z) < (r + pr)) return true;
+    }
+    return false;
+}
+
 inline int countOpenNeighbors(const Chunk& c, int lx, int lz) {
     int open = 0;
     if (lx > 0 && c.cells[lx - 1][lz] == 0) open++;
@@ -71,7 +89,7 @@ inline void pushMapPropUnique(int cx, int cz, int lx, int lz, int type, float sc
 
 inline void spawnChunkProps(const Chunk& c) {
     std::mt19937 cr(chunkMapContentSeed(c.cx, c.cz, 0xA18F331u));
-    int baseCount = 8 + (int)(cr() % 10);
+    int baseCount = 4 + (int)(cr() % 7);
     int maxAttempts = 60;
 
     for (int i = 0; i < baseCount && maxAttempts > 0; i++) {
@@ -81,7 +99,14 @@ inline void spawnChunkProps(const Chunk& c) {
             maxAttempts--;
             continue;
         }
-        int type = (int)(cr() % 6);
+        int weighted = (int)(cr() % 100);
+        int type = MAP_PROP_DEBRIS;
+        if (weighted < 26) type = MAP_PROP_CRATE_STACK;
+        else if (weighted < 40) type = MAP_PROP_CABLE_REEL;
+        else if (weighted < 54) type = MAP_PROP_CONE_CLUSTER;
+        else if (weighted < 68) type = MAP_PROP_BARRIER;
+        else if (weighted < 84) type = MAP_PROP_DEBRIS;
+        else type = MAP_PROP_PUDDLE;
         float scale = 0.78f + ((float)(cr() % 45) / 100.0f);
         float yaw = ((float)(cr() % 628) / 100.0f);
         pushMapPropUnique(c.cx, c.cz, lx, lz, type, scale, yaw);
@@ -90,7 +115,7 @@ inline void spawnChunkProps(const Chunk& c) {
 
 inline void spawnChunkPoiClusters(const Chunk& c) {
     std::mt19937 cr(chunkMapContentSeed(c.cx, c.cz, 0x39BC21u));
-    int clusterCount = 1 + (int)(cr() % 3);
+    int clusterCount = 1 + (int)(cr() % 2);
 
     for (int cl = 0; cl < clusterCount; cl++) {
         int centerX = 3 + (int)(cr() % (CHUNK_SIZE - 6));
@@ -98,7 +123,7 @@ inline void spawnChunkPoiClusters(const Chunk& c) {
         if (!isMapPropCellValid(c, centerX, centerZ)) continue;
 
         int theme = (int)(cr() % 3);
-        int inCluster = 3 + (int)(cr() % 3);
+        int inCluster = 2 + (int)(cr() % 2);
         for (int j = 0; j < inCluster; j++) {
             int ox = (int)(cr() % 5) - 2;
             int oz = (int)(cr() % 5) - 2;
