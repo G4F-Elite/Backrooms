@@ -209,6 +209,155 @@ void mouse(GLFWwindow*,double xp,double yp){
     lastY=(float)yp;
 }
 
+void gameInput(GLFWwindow*w){
+    if(glfwGetKey(w,settings.binds.pause)==GLFW_PRESS&&!escPressed){
+        gameState=STATE_PAUSE;menuSel=0;
+        glfwSetInputMode(w,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
+    }
+    escPressed=glfwGetKey(w,settings.binds.pause)==GLFW_PRESS;
+    updateMinimapCheat(w);
+    
+    bool fNow=glfwGetKey(w,settings.binds.flashlight)==GLFW_PRESS;
+    if(fNow&&!flashlightPressed&&flashlightBattery>5.0f){
+        flashlightOn=!flashlightOn;
+        if(!flashlightOn){
+            flashlightShutdownBlinkActive = false;
+            flashlightShutdownBlinkTimer = 0.0f;
+        }
+        sndState.flashlightOn=flashlightOn?1.0f:0.0f;
+    }
+    flashlightPressed=fNow;
+    
+    bool eNow=glfwGetKey(w,settings.binds.interact)==GLFW_PRESS;
+    nearbyWorldItemId = -1;
+    nearbyWorldItemType = -1;
+    for(auto& it:worldItems){
+        if(!it.active) continue;
+        if(nearPoint2D(cam.pos, it.pos, 2.2f)){
+            nearbyWorldItemId = it.id;
+            nearbyWorldItemType = it.type;
+            break;
+        }
+    }
+    bool nearEchoSignal = echoSignal.active && isEchoInRange(cam.pos, echoSignal.pos, 2.5f);
+    if(eNow&&!interactPressed&&nearNoteId>=0){
+        if(storyMgr.checkNotePickup(cam.pos,4.0f)){
+            if(tryTriggerStoryScare(scareState, storyMgr.currentNote)){
+                triggerLocalScare(0.34f, 0.18f, 5.0f);
+            }
+            gameState=STATE_NOTE;
+            playerSanity-=8.0f;
+            if(playerSanity<0)playerSanity=0;
+            if(multiState==MULTI_IN_GAME) netMgr.sendNoteCollect(nearNoteId);
+        }
+    }else if(eNow&&!interactPressed&&nearbyWorldItemId>=0){
+        if(multiState==MULTI_IN_GAME){
+            if(netMgr.isHost){
+                for(auto& it:worldItems){
+                    if(!it.active||it.id!=nearbyWorldItemId) continue;
+                    it.active=false;
+                    if(it.type==0) invBattery++;
+                    else if(it.type==1) invMedkit++;
+                    else invBait++;
+                    break;
+                }
+            }else{
+                netMgr.sendInteractRequest(REQ_PICK_ITEM, nearbyWorldItemId);
+            }
+        }else{
+            for(auto& it:worldItems){
+                if(!it.active||it.id!=nearbyWorldItemId) continue;
+                it.active=false;
+                if(it.type==0) invBattery++;
+                else if(it.type==1) invMedkit++;
+                else invBait++;
+                break;
+            }
+        }
+    }else if(eNow&&!interactPressed&&nearEchoSignal){
+        resolveEchoInteraction();
+    }
+    interactPressed=eNow;
+    
+    static bool key1Pressed=false,key2Pressed=false,key3Pressed=false;
+    bool k1=glfwGetKey(w,settings.binds.item1)==GLFW_PRESS;
+    bool k2=glfwGetKey(w,settings.binds.item2)==GLFW_PRESS;
+    bool k3=glfwGetKey(w,settings.binds.item3)==GLFW_PRESS;
+    if(k1&&!key1Pressed) applyItemUse(0);
+    if(k2&&!key2Pressed) applyItemUse(1);
+    if(k3&&!key3Pressed) applyItemUse(2);
+    key1Pressed=k1; key2Pressed=k2; key3Pressed=k3;
+    
+    float spd=4.0f*dTime;
+    bool sprinting=glfwGetKey(w,settings.binds.sprint)==GLFW_PRESS&&playerStamina>0&&staminaCooldown<=0;
+    if(sprinting){
+        spd*=1.6f;playerStamina-=20.0f*dTime;
+        if(playerStamina<0){playerStamina=0;staminaCooldown=1.5f;}
+    }else{
+        playerStamina+=15.0f*dTime;
+        if(playerStamina>100)playerStamina=100;
+    }
+    if(staminaCooldown>0)staminaCooldown-=dTime;
+    
+    if(glfwGetKey(w,settings.binds.crouch)==GLFW_PRESS){
+        cam.targetH=PH_CROUCH;cam.crouch=true;spd*=0.5f;
+    }else{cam.targetH=PH;cam.crouch=false;}
+    cam.curH+=(cam.targetH-cam.curH)*10.0f*dTime;
+    
+    Vec3 fwd(sinf(cam.yaw),0,cosf(cam.yaw)),right(cosf(cam.yaw),0,-sinf(cam.yaw));
+    Vec3 np=cam.pos;bool mv=false;
+    if(glfwGetKey(w,settings.binds.forward)==GLFW_PRESS){np=np+fwd*spd;mv=true;}
+    if(glfwGetKey(w,settings.binds.back)==GLFW_PRESS){np=np-fwd*spd;mv=true;}
+    if(glfwGetKey(w,settings.binds.left)==GLFW_PRESS){np=np+right*spd;mv=true;}
+    if(glfwGetKey(w,settings.binds.right)==GLFW_PRESS){np=np-right*spd;mv=true;}
+    
+    if(!collideWorld(np.x,cam.pos.z,PR)&&!collideCoopDoor(np.x,cam.pos.z,PR)&&!(falseDoorTimer>0&&nearPoint2D(Vec3(np.x,0,cam.pos.z),falseDoorPos,1.0f)))cam.pos.x=np.x;
+    if(!collideWorld(cam.pos.x,np.z,PR)&&!collideCoopDoor(cam.pos.x,np.z,PR)&&!(falseDoorTimer>0&&nearPoint2D(Vec3(cam.pos.x,0,np.z),falseDoorPos,1.0f)))cam.pos.z=np.z;
+    
+    static float bobT=0,lastB=0;
+    if(mv){
+        bobT+=dTime*(spd>5.0f?12.0f:8.0f);
+        float cb=sinf(bobT);cam.pos.y=cam.curH+cb*0.04f;
+        if(lastB>-0.7f&&cb<=-0.7f&&!sndState.stepTrig){
+            sndState.stepTrig=true;sndState.footPhase=0;
+        }
+        lastB=cb;
+    }else{
+        cam.pos.y=cam.curH+(cam.pos.y-cam.curH)*0.9f;bobT=0;lastB=0;
+    }
+    
+    if(flashlightOn){
+        if(!flashlightShutdownBlinkActive && shouldStartFlashlightShutdownBlink(flashlightBattery)){
+            flashlightShutdownBlinkActive = true;
+            flashlightShutdownBlinkTimer = 0.0f;
+        }
+
+        if(flashlightShutdownBlinkActive){
+            flashlightShutdownBlinkTimer += dTime;
+            sndState.flashlightOn = isFlashlightOnDuringShutdownBlink(flashlightShutdownBlinkTimer) ? 1.0f : 0.0f;
+            flashlightBattery -= dTime * 1.67f;
+            if(flashlightBattery < 0.0f) flashlightBattery = 0.0f;
+            if(isFlashlightShutdownBlinkFinished(flashlightShutdownBlinkTimer)){
+                flashlightBattery = 0.0f;
+                flashlightOn = false;
+                flashlightShutdownBlinkActive = false;
+                flashlightShutdownBlinkTimer = 0.0f;
+                sndState.flashlightOn = 0.0f;
+            }
+        }else{
+            sndState.flashlightOn = 1.0f;
+            flashlightBattery-=dTime*1.67f;
+            if(flashlightBattery<=0){flashlightBattery=0;flashlightOn=false;sndState.flashlightOn=0;}
+        }
+    }else{
+        flashlightShutdownBlinkActive = false;
+        flashlightShutdownBlinkTimer = 0.0f;
+        flashlightBattery+=dTime*10.0f;
+        if(flashlightBattery>100)flashlightBattery=100;
+    }
+
+}
+
 void renderScene(){
     struct MainUniforms {
         GLint P, V, M, vp, tm, danger, flashOn, flashDir, rfc, rfp, rfd, nl, lp;
@@ -386,8 +535,9 @@ int main(){
     vhsShader=mkShader(vhsVS,vhsFS);
     
     buildGeom();
-    computeRenderTargetSize(winW, winH, renderScaleFromPreset(settings.renderScalePreset), renderW, renderH);
+    computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), renderW, renderH);
     initFBO(fbo,fboTex,rbo,renderW,renderH);
+    initTaaTargets();
     initText();
     entityMgr.init();
     initPlayerModels();
@@ -402,8 +552,7 @@ int main(){
         vhsTime=now;
         
         int desiredRenderW = 0, desiredRenderH = 0;
-        computeRenderTargetSize(winW, winH, renderScaleFromPreset(settings.renderScalePreset), 
-                               desiredRenderW, desiredRenderH);
+        computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), desiredRenderW, desiredRenderH);
         
         if(desiredRenderW != renderW || desiredRenderH != renderH){
             renderW = desiredRenderW;
@@ -431,8 +580,7 @@ int main(){
         glClearColor(0.02f,0.02f,0.02f,1);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         
-        if(gameState==STATE_GAME||gameState==STATE_PAUSE||
-           gameState==STATE_SETTINGS_PAUSE||gameState==STATE_NOTE){
+        if(gameState==STATE_GAME||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_KEYBINDS_PAUSE||gameState==STATE_NOTE){
             renderScene();
         }
         
@@ -440,46 +588,140 @@ int main(){
         glViewport(0,0,winW,winH);
         glClear(GL_COLOR_BUFFER_BIT);
         glDisable(GL_DEPTH_TEST);
-        
+
         glUseProgram(vhsShader);
-        glBindTexture(GL_TEXTURE_2D,fboTex);
-        
+
         float sP=(100-playerSanity)/100*0.4f;
         float vI=settings.vhsIntensity+entityMgr.dangerLevel*0.5f+sP + anomalyBlur * 0.55f;
-        
+
         static GLint vhsTmLoc = -1;
         static GLint vhsIntenLoc = -1;
         static GLint vhsUpscalerLoc = -1;
+        static GLint vhsAaModeLoc = -1;
         static GLint vhsSharpnessLoc = -1;
         static GLint vhsTexelXLoc = -1;
         static GLint vhsTexelYLoc = -1;
         static GLint vhsInMenuLoc = -1;
-        
+        static GLint vhsTaaHistLoc = -1;
+        static GLint vhsTaaBlendLoc = -1;
+        static GLint vhsTaaJitterLoc = -1;
+        static GLint vhsTaaValidLoc = -1;
+
         if(vhsTmLoc<0){
+            glUniform1i(glGetUniformLocation(vhsShader,"tex"),0);
             vhsTmLoc = glGetUniformLocation(vhsShader,"tm");
             vhsIntenLoc = glGetUniformLocation(vhsShader,"inten");
             vhsUpscalerLoc = glGetUniformLocation(vhsShader,"upscaler");
+            vhsAaModeLoc = glGetUniformLocation(vhsShader,"aaMode");
             vhsSharpnessLoc = glGetUniformLocation(vhsShader,"sharpness");
             vhsTexelXLoc = glGetUniformLocation(vhsShader,"texelX");
             vhsTexelYLoc = glGetUniformLocation(vhsShader,"texelY");
             vhsInMenuLoc = glGetUniformLocation(vhsShader,"inMenu");
+            vhsTaaHistLoc = glGetUniformLocation(vhsShader,"histTex");
+            vhsTaaBlendLoc = glGetUniformLocation(vhsShader,"taaBlend");
+            vhsTaaJitterLoc = glGetUniformLocation(vhsShader,"taaJitter");
+            vhsTaaValidLoc = glGetUniformLocation(vhsShader,"taaValid");
         }
         
-        // Dust particles only in menu states
         int inMenu = (gameState == STATE_MENU || gameState == STATE_MULTI || 
                       gameState == STATE_MULTI_HOST || gameState == STATE_MULTI_JOIN ||
                       gameState == STATE_MULTI_WAIT || gameState == STATE_SETTINGS) ? 1 : 0;
         
-        glUniform1f(vhsTmLoc,vhsTime);
-        glUniform1f(vhsIntenLoc,vI);
-        glUniform1i(vhsUpscalerLoc,clampUpscalerMode(settings.upscalerMode));
-        glUniform1f(vhsSharpnessLoc,clampFsrSharpness(settings.fsrSharpness));
-        glUniform1f(vhsTexelXLoc,1.0f/(float)renderW);
-        glUniform1f(vhsTexelYLoc,1.0f/(float)renderH);
-        glUniform1i(vhsInMenuLoc,inMenu);
-        
-        glBindVertexArray(quadVAO);
-        glDrawArrays(GL_TRIANGLES,0,6);
+        static int prevAaMode = -1;
+        int aaMode = clampAaMode(settings.aaMode);
+        if(aaMode != prevAaMode){
+            prevAaMode = aaMode;
+            taaHistoryValid = false;
+            taaFrameIndex = 0;
+        }
+        float jitterX = 0.0f;
+        float jitterY = 0.0f;
+        if(aaMode == AA_MODE_TAA){
+            static const float jitterSeq[8][2] = {
+                {0.5f, 0.5f}, {0.75f, 0.25f}, {0.25f, 0.75f}, {0.875f, 0.625f},
+                {0.375f, 0.125f}, {0.625f, 0.875f}, {0.125f, 0.375f}, {0.9375f, 0.9375f}
+            };
+            jitterX = jitterSeq[taaFrameIndex & 7][0] - 0.5f;
+            jitterY = jitterSeq[taaFrameIndex & 7][1] - 0.5f;
+        }
+
+        if(aaMode==AA_MODE_TAA){
+            glBindFramebuffer(GL_FRAMEBUFFER,taaResolveFbo);
+            glViewport(0,0,winW,winH);
+            glClear(GL_COLOR_BUFFER_BIT);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D,fboTex);
+            glActiveTexture(GL_TEXTURE0 + 1);
+            glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
+            glUniform1i(vhsTaaHistLoc,1);
+            glActiveTexture(GL_TEXTURE0);
+            glUniform1f(vhsTmLoc,vhsTime);
+            glUniform1f(vhsIntenLoc,vI);
+            glUniform1i(vhsUpscalerLoc,clampUpscalerMode(settings.upscalerMode));
+            glUniform1i(vhsAaModeLoc,AA_MODE_TAA);
+            glUniform1f(vhsSharpnessLoc,clampFsrSharpness(settings.fsrSharpness));
+            glUniform1f(vhsTexelXLoc,1.0f/(float)renderW);
+            glUniform1f(vhsTexelYLoc,1.0f/(float)renderH);
+            glUniform1f(vhsTaaBlendLoc,0.88f);
+            glUniform3f(vhsTaaJitterLoc,jitterX,jitterY,0.0f);
+            glUniform1f(vhsTaaValidLoc,taaHistoryValid?1.0f:0.0f);
+            glUniform1i(vhsInMenuLoc,inMenu);
+            glBindVertexArray(quadVAO);
+            glDrawArrays(GL_TRIANGLES,0,6);
+
+            taaHistoryValid = true;
+            taaFrameIndex = (taaFrameIndex + 1) & 7;
+
+            GLuint taaTmp = taaHistoryTex;
+            taaHistoryTex = taaResolveTex;
+            taaResolveTex = taaTmp;
+            glBindFramebuffer(GL_FRAMEBUFFER,taaResolveFbo);
+            glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,taaResolveTex,0);
+
+            glBindFramebuffer(GL_FRAMEBUFFER,0);
+            glViewport(0,0,winW,winH);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
+            glActiveTexture(GL_TEXTURE0 + 1);
+            glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
+            glUniform1i(vhsTaaHistLoc,1);
+            glActiveTexture(GL_TEXTURE0);
+            glUniform1f(vhsTmLoc,vhsTime);
+            glUniform1f(vhsIntenLoc,0.0f);
+            glUniform1i(vhsUpscalerLoc,UPSCALER_MODE_OFF);
+            glUniform1i(vhsAaModeLoc,AA_MODE_OFF);
+            glUniform1f(vhsSharpnessLoc,0.0f);
+            glUniform1f(vhsTexelXLoc,1.0f/(float)winW);
+            glUniform1f(vhsTexelYLoc,1.0f/(float)winH);
+            glUniform1f(vhsTaaBlendLoc,0.0f);
+            glUniform3f(vhsTaaJitterLoc,0.0f,0.0f,0.0f);
+            glUniform1f(vhsTaaValidLoc,0.0f);
+            glUniform1i(vhsInMenuLoc,inMenu);
+            glBindVertexArray(quadVAO);
+            glDrawArrays(GL_TRIANGLES,0,6);
+        }else{
+            taaHistoryValid = false;
+            taaFrameIndex = 0;
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D,fboTex);
+            glActiveTexture(GL_TEXTURE0 + 1);
+            glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
+            glUniform1i(vhsTaaHistLoc,1);
+            glActiveTexture(GL_TEXTURE0);
+            glUniform1f(vhsTmLoc,vhsTime);
+            glUniform1f(vhsIntenLoc,vI);
+            glUniform1i(vhsUpscalerLoc,clampUpscalerMode(settings.upscalerMode));
+            glUniform1i(vhsAaModeLoc,aaMode);
+            glUniform1f(vhsSharpnessLoc,clampFsrSharpness(settings.fsrSharpness));
+            glUniform1f(vhsTexelXLoc,1.0f/(float)renderW);
+            glUniform1f(vhsTexelYLoc,1.0f/(float)renderH);
+            glUniform1f(vhsTaaBlendLoc,0.0f);
+            glUniform3f(vhsTaaJitterLoc,0.0f,0.0f,0.0f);
+            glUniform1f(vhsTaaValidLoc,0.0f);
+            glUniform1i(vhsInMenuLoc,inMenu);
+            glBindVertexArray(quadVAO);
+            glDrawArrays(GL_TRIANGLES,0,6);
+        }
         glEnable(GL_DEPTH_TEST);
         
         drawUI();

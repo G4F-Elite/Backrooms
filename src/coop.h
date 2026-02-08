@@ -1,5 +1,6 @@
 #pragma once
 #include "traps.h"
+#include "coop_rules.h"
 
 inline void updateCoopObjectiveHost(){
     if(!coop.initialized) return;
@@ -15,7 +16,7 @@ inline void updateCoopObjectiveHost(){
 }
 
 inline bool collideCoopDoor(float x, float z, float r){
-    if(!coop.initialized || coop.doorOpen) return false;
+    if(!shouldBlockCoopDoor(coop.initialized, coop.doorOpen, multiState, MULTI_IN_GAME)) return false;
     return fabsf(x - coop.doorPos.x) < (CS * 0.6f + r) && fabsf(z - coop.doorPos.z) < (CS * 0.2f + r);
 }
 

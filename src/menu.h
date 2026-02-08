@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdio>
 #include "upscaler_settings.h"
+#include "keybinds.h"
 
 const unsigned char FONT_DATA[96][7] = {
     {0,0,0,0,0,0,0}, {4,4,4,4,0,4,0}, {10,10,0,0,0,0,0}, {10,31,10,31,10,0,0},
@@ -34,6 +35,7 @@ const unsigned char FONT_DATA[96][7] = {
 };
 
 inline GLuint fontTex=0, textShader=0, textVAO=0, textVBO=0;
+inline GLuint overlayShader=0, overlayVAO=0, overlayVBO=0;
 struct Settings {
     float masterVol=0.7f;
     float musicVol=0.55f;
@@ -45,11 +47,14 @@ struct Settings {
     int upscalerMode=UPSCALER_MODE_OFF;
     int renderScalePreset=RENDER_SCALE_PRESET_DEFAULT;
     float fsrSharpness=0.35f;
+    int aaMode=AA_MODE_FXAA;
+    GameplayBinds binds = {};
 };
 inline Settings settings;
-enum GameState { STATE_MENU, STATE_GAME, STATE_PAUSE, STATE_SETTINGS, STATE_SETTINGS_PAUSE, STATE_INTRO, STATE_NOTE, STATE_MULTI, STATE_MULTI_HOST, STATE_MULTI_JOIN, STATE_MULTI_WAIT };
+enum GameState { STATE_MENU, STATE_GAME, STATE_PAUSE, STATE_SETTINGS, STATE_SETTINGS_PAUSE, STATE_KEYBINDS, STATE_KEYBINDS_PAUSE, STATE_INTRO, STATE_NOTE, STATE_MULTI, STATE_MULTI_HOST, STATE_MULTI_JOIN, STATE_MULTI_WAIT };
 inline GameState gameState = STATE_MENU;
 inline int menuSel=0, currentWinW=1280, currentWinH=720;
+inline int keybindCaptureIndex = -1;
 inline float gSurvivalTime = 0;
 
 inline const char* textVS = R"(#version 330 core
@@ -58,6 +63,14 @@ void main() { gl_Position = vec4(p, 0.0, 1.0); uv = t; })";
 inline const char* textFS = R"(#version 330 core
 in vec2 uv; out vec4 fc; uniform sampler2D tex; uniform vec3 col; uniform float alpha;
 void main() { float a = texture(tex, uv).r; fc = vec4(col, a * alpha); })";
+inline const char* overlayVS = R"(#version 330 core
+layout(location=0) in vec2 p;
+void main() { gl_Position = vec4(p, 0.0, 1.0); })";
+inline const char* overlayFS = R"(#version 330 core
+out vec4 fc;
+uniform vec3 col;
+uniform float alpha;
+void main() { fc = vec4(col, alpha); })";
 
 inline GLuint genFontTex() {
     unsigned char* data = new unsigned char[96*8*8*3];
@@ -85,28 +98,31 @@ inline GLuint genFontTex() {
 }
 
 inline void initText() {
-    fontTex = genFontTex();
-    GLuint vs = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(vs, 1, &textVS, 0);
-    glCompileShader(vs);
-    GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(fs, 1, &textFS, 0);
-    glCompileShader(fs);
-    textShader = glCreateProgram();
-    glAttachShader(textShader, vs);
-    glAttachShader(textShader, fs);
-    glLinkProgram(textShader);
-    glDeleteShader(vs);
-    glDeleteShader(fs);
-    glGenVertexArrays(1, &textVAO);
-    glGenBuffers(1, &textVBO);
-    glBindVertexArray(textVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, textVBO);
-    glBufferData(GL_ARRAY_BUFFER, 1024*24, NULL, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, (void*)0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 16, (void*)8);
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
+    fontTex=genFontTex(); GLuint vs=glCreateShader(GL_VERTEX_SHADER); glShaderSource(vs,1,&textVS,0); glCompileShader(vs);
+    GLuint fs=glCreateShader(GL_FRAGMENT_SHADER); glShaderSource(fs,1,&textFS,0); glCompileShader(fs);
+    textShader=glCreateProgram(); glAttachShader(textShader,vs); glAttachShader(textShader,fs); glLinkProgram(textShader);
+    glDeleteShader(vs); glDeleteShader(fs); glGenVertexArrays(1,&textVAO); glGenBuffers(1,&textVBO);
+    glBindVertexArray(textVAO); glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferData(GL_ARRAY_BUFFER,1024*24,NULL,GL_STATIC_DRAW);
+    glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,16,(void*)0); glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,16,(void*)8);
+    glEnableVertexAttribArray(0); glEnableVertexAttribArray(1);
+
+    GLuint ovs=glCreateShader(GL_VERTEX_SHADER); glShaderSource(ovs,1,&overlayVS,0); glCompileShader(ovs);
+    GLuint ofs=glCreateShader(GL_FRAGMENT_SHADER); glShaderSource(ofs,1,&overlayFS,0); glCompileShader(ofs);
+    overlayShader=glCreateProgram(); glAttachShader(overlayShader,ovs); glAttachShader(overlayShader,ofs); glLinkProgram(overlayShader);
+    glDeleteShader(ovs); glDeleteShader(ofs);
+    float quad[12] = {-1.0f,-1.0f,  1.0f,-1.0f,  1.0f,1.0f,  -1.0f,-1.0f,  1.0f,1.0f,  -1.0f,1.0f};
+    glGenVertexArrays(1,&overlayVAO); glGenBuffers(1,&overlayVBO);
+    glBindVertexArray(overlayVAO); glBindBuffer(GL_ARRAY_BUFFER,overlayVBO);
+    glBufferData(GL_ARRAY_BUFFER,sizeof(quad),quad,GL_STATIC_DRAW);
+    glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,8,(void*)0); glEnableVertexAttribArray(0);
+}
+
+inline void drawFullscreenOverlay(float r, float g, float b, float a) {
+    glUseProgram(overlayShader);
+    glUniform3f(glGetUniformLocation(overlayShader,"col"),r,g,b);
+    glUniform1f(glGetUniformLocation(overlayShader,"alpha"),a);
+    glBindVertexArray(overlayVAO);
+    glDrawArrays(GL_TRIANGLES,0,6);
 }
 
 inline void drawText(const char* s, float x, float y, float sc, float r, float g, float b, float a=1.0f) {
@@ -223,6 +239,8 @@ inline void drawMenu(float tm) {
     drawSpinner(-0.85f, 0.0f, tm * 1.3f, 1.8f);
     drawSpinner(0.85f, 0.0f, tm * 1.3f + 0.3f, 1.8f);
     
+    drawFullscreenOverlay(0.035f,0.03f,0.028f,1.0f);
+    drawFullscreenOverlay(0.17f,0.13f,0.08f,0.18f + 0.04f*sinf(tm*0.9f));
     float p=0.8f+0.05f*sinf(tm*2.0f), gl=(rand()%100<3)?(rand()%10-5)*0.003f:0;
     drawTextCentered("THE BACKROOMS",0.0f+gl,0.5f,4.0f,0.9f,0.85f,0.4f,p);
     drawTextCentered("LEVEL 0",0.0f,0.35f,2.5f,0.7f,0.65f,0.3f,0.8f);
@@ -239,20 +257,29 @@ inline void drawMenu(float tm) {
 
 inline void drawSettings(bool fp) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    if(fp) drawFullscreenOverlay(0.02f,0.02f,0.03f,0.72f);
     drawTextCentered("SETTINGS",0.0f,0.55f,3.0f,0.9f,0.85f,0.4f);
-    const char* lb[]={"MASTER VOL","MUSIC VOL","AMBIENCE VOL","SFX VOL","VOICE VOL","VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","BACK"};
-    float*vl[]={&settings.masterVol,&settings.musicVol,&settings.ambienceVol,&settings.sfxVol,&settings.voiceVol,&settings.vhsIntensity,&settings.mouseSens,nullptr,nullptr,&settings.fsrSharpness,nullptr};
-    float mx[]={1.0f,1.0f,1.0f,1.0f,1.0f,1.0f,0.006f,1.0f,1.0f,1.0f,1.0f};
-    for(int i=0;i<11;i++){
+    const char* lb[]={"MASTER VOL","MUSIC VOL","AMBIENCE VOL","SFX VOL","VOICE VOL","VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","ANTI-ALIASING","KEY BINDS","BACK"};
+    float*vl[]={&settings.masterVol,&settings.musicVol,&settings.ambienceVol,&settings.sfxVol,&settings.voiceVol,&settings.vhsIntensity,&settings.mouseSens,nullptr,nullptr,&settings.fsrSharpness,nullptr,nullptr,nullptr};
+    float mx[]={1.0f,1.0f,1.0f,1.0f,1.0f,1.0f,0.006f,1.0f,1.0f,1.0f,1.0f,1.0f,1.0f};
+    for(int i=0;i<13;i++){
         float s=(menuSel==i)?1.0f:0.5f,y=0.43f-i*0.09f;
         if(menuSel==i)drawText(">",-0.55f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         drawText(lb[i],-0.48f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         if(i==7){
             drawText(upscalerModeLabel(settings.upscalerMode),0.36f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         }else if(i==8){
-            int scalePercent = renderScalePercentFromPreset(settings.renderScalePreset);
-            char rb[24]; snprintf(rb,24,"%d%%",scalePercent);
+            char rb[24];
+            if(clampUpscalerMode(settings.upscalerMode)==UPSCALER_MODE_OFF) snprintf(rb,24,"NATIVE");
+            else {
+                int scalePercent = renderScalePercentFromPreset(settings.renderScalePreset);
+                snprintf(rb,24,"%d%%",scalePercent);
+            }
             drawText(rb,0.48f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
+        }else if(i==10){
+            drawText(aaModeLabel(settings.aaMode),0.43f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
+        }else if(i==11){
+            drawText("OPEN",0.48f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         }else if(vl[i]){
             float nv=*vl[i]/mx[i]; if(nv>1.0f)nv=1.0f;
             drawSlider(0.1f,y,0.45f,nv,0.9f*s,0.85f*s,0.4f*s);
@@ -265,6 +292,7 @@ inline void drawSettings(bool fp) {
 
 inline void drawPause() {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    drawFullscreenOverlay(0.02f,0.02f,0.03f,0.72f);
     drawTextCentered("PAUSED",0.0f,0.25f,3.0f,0.9f,0.85f,0.4f);
     const char* it[]={"RESUME","SETTINGS","MAIN MENU","QUIT"};
     for(int i=0;i<4;i++){
@@ -291,17 +319,34 @@ inline void drawDeath(float tm) {
 }
 
 inline void drawSurvivalTime(float t) {
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    int m = (int)(t / 60);
-    int s = (int)t % 60;
-    char b[16];
-    snprintf(b, 16, "%d:%02d", m, s);
-    drawText(b, 0.72f, 0.9f, 2.0f, 0.6f, 0.55f, 0.35f, 0.7f);
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
+    glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    int m=(int)(t/60),s=(int)t%60; char b[16]; snprintf(b,16,"%d:%02d",m,s);
+    drawText(b,0.72f,0.9f,2.0f,0.78f,0.72f,0.48f,0.96f);
+    glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
+
+inline void drawKeybindsMenu(bool fromPause, int selected, int captureIndex) {
+    glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    if(fromPause) drawFullscreenOverlay(0.02f,0.02f,0.03f,0.72f);
+    drawTextCentered("KEY BINDS",0.0f,0.62f,2.6f,0.9f,0.85f,0.4f);
+    for(int i=0;i<GAMEPLAY_BIND_COUNT;i++){
+        float s=(selected==i)?1.0f:0.55f;
+        float y=0.48f-i*0.075f;
+        if(selected==i) drawText(">",-0.62f,y,1.45f,0.92f*s,0.86f*s,0.42f*s);
+        drawText(gameplayBindLabel(i),-0.56f,y,1.38f,0.9f*s,0.85f*s,0.4f*s);
+        const char* keyName = keyNameForUi(*gameplayBindByIndex(settings.binds, i));
+        if(captureIndex==i) keyName = "...";
+        drawText(keyName,0.38f,y,1.38f,0.82f*s,0.9f*s,0.72f*s,0.95f);
+    }
+    float bs=(selected==KEYBINDS_BACK_INDEX)?1.0f:0.55f;
+    float by=0.48f-GAMEPLAY_BIND_COUNT*0.075f;
+    if(selected==KEYBINDS_BACK_INDEX) drawText(">",-0.62f,by,1.45f,0.92f*bs,0.86f*bs,0.42f*bs);
+    drawText("BACK",-0.56f,by,1.45f,0.9f*bs,0.85f*bs,0.4f*bs);
+    drawTextCentered(captureIndex>=0?"PRESS ANY KEY TO REBIND":"ENTER TO REBIND  ESC TO BACK",0.0f,-0.84f,1.35f,0.58f,0.58f,0.46f,0.86f);
+    if(fromPause) drawTextCentered("APPLIES IN CURRENT RUN",0.0f,-0.92f,1.1f,0.5f,0.55f,0.45f,0.7f);
+    glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
+}
+
 
 inline void drawHealthBar(float hp) {
     glDisable(GL_DEPTH_TEST);
@@ -423,15 +468,18 @@ inline void drawIntro(int line, float timer, float lineTime, const char** introL
 
 inline void drawNote(int noteId, const char* title, const char* content) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    drawFullscreenOverlay(0.0f,0.0f,0.0f,0.94f);
+    drawFullscreenOverlay(0.10f,0.08f,0.05f,0.38f);
+
     const char* panelShadow = "                                                  ";
     const char* panelBody = "                                              ";
     for(float yp = 0.76f; yp >= -0.74f; yp -= 0.09f) {
-        drawTextCentered(panelShadow, 0.0f, yp - 0.01f, 3.0f, 0.06f, 0.04f, 0.02f, 0.55f);
-        drawTextCentered(panelBody, 0.0f, yp, 3.0f, 0.84f, 0.79f, 0.64f, 0.97f);
+        drawTextCentered(panelShadow, 0.0f, yp - 0.012f, 3.05f, 0.0f, 0.0f, 0.0f, 0.82f);
+        drawTextCentered(panelBody, 0.0f, yp, 3.05f, 0.91f, 0.86f, 0.72f, 1.0f);
     }
 
-    drawTextCentered(title, 0.0f, 0.56f, 2.5f, 0.3f, 0.25f, 0.15f, 1.0f);
-    drawTextCentered("________________________________", 0.0f, 0.46f, 1.5f, 0.4f, 0.35f, 0.2f, 0.6f);
+    drawTextCentered(title, 0.0f, 0.56f, 2.6f, 0.10f, 0.08f, 0.05f, 1.0f);
+    drawTextCentered("________________________________", 0.0f, 0.46f, 1.5f, 0.16f, 0.12f, 0.08f, 1.0f);
 
     float ty = 0.30f;
     char line[64];
@@ -439,8 +487,8 @@ inline void drawNote(int noteId, const char* title, const char* content) {
     for(const char* p = content; *p; p++) {
         if(*p == '\n' || li >= 50) {
             line[li] = 0;
-            drawTextCentered(line, 0.0f, ty, 1.5f, 0.25f, 0.2f, 0.1f, 0.9f);
-            ty -= 0.08f;
+            drawTextCentered(line, 0.0f, ty, 1.62f, 0.08f, 0.07f, 0.05f, 1.0f);
+            ty -= 0.084f;
             li = 0;
         } else {
             line[li++] = *p;
@@ -448,8 +496,8 @@ inline void drawNote(int noteId, const char* title, const char* content) {
     }
     if(li > 0) {
         line[li] = 0;
-        drawTextCentered(line, 0.0f, ty, 1.5f, 0.25f, 0.2f, 0.1f, 0.9f);
+        drawTextCentered(line, 0.0f, ty, 1.62f, 0.08f, 0.07f, 0.05f, 1.0f);
     }
-    drawTextCentered("PRESS E OR ESC TO CLOSE", 0.0f, -0.75f, 1.5f, 0.4f, 0.35f, 0.2f, 0.7f);
+    drawTextCentered("PRESS E OR ESC TO CLOSE", 0.0f, -0.75f, 1.55f, 0.17f, 0.13f, 0.08f, 1.0f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }

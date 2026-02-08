@@ -1,6 +1,7 @@
 #pragma once
 #include <GLFW/glfw3.h>
 #include "menu.h"
+#include "audio.h"
 #include "net.h"
 #include "menu_multi.h"
 #include "lan_discovery.h"
@@ -8,6 +9,20 @@
 extern bool escPressed, upPressed, downPressed, enterPressed, leftPressed, rightPressed;
 extern bool firstMouse;
 extern float lastX, lastY;
+
+inline bool isAnyKeyboardKeyDown(GLFWwindow* w) {
+    for (int k = GLFW_KEY_SPACE; k <= GLFW_KEY_MENU; k++) {
+        if (glfwGetKey(w, k) == GLFW_PRESS) return true;
+    }
+    return false;
+}
+
+inline int firstPressedKeyboardKey(GLFWwindow* w) {
+    for (int k = GLFW_KEY_SPACE; k <= GLFW_KEY_MENU; k++) {
+        if (glfwGetKey(w, k) == GLFW_PRESS) return k;
+    }
+    return -1;
+}
 
 inline void pushNicknameChar(char c) {
     char next[PLAYER_NAME_BUF_LEN + 1] = {};
@@ -62,8 +77,10 @@ inline void handleNicknameInput(GLFWwindow* w) {
 }
 
 inline void settingsInput(GLFWwindow* w, bool fromPause) {
-    static constexpr int SETTINGS_ITEMS = 11;
-    static constexpr int SETTINGS_BACK_INDEX = 10;
+    static constexpr int SETTINGS_ITEMS = 13;
+    static constexpr int SETTINGS_AA_INDEX = 10;
+    static constexpr int SETTINGS_BINDS_INDEX = 11;
+    static constexpr int SETTINGS_BACK_INDEX = 12;
     bool esc = glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS;
     bool up = glfwGetKey(w, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS;
     bool down = glfwGetKey(w, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS;
@@ -71,8 +88,8 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
     bool right = glfwGetKey(w, GLFW_KEY_RIGHT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_D) == GLFW_PRESS;
     bool enter = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS;
     
-    if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = SETTINGS_ITEMS - 1; }
-    if (down && !downPressed) { menuSel++; if (menuSel >= SETTINGS_ITEMS) menuSel = 0; }
+    if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = SETTINGS_ITEMS - 1; triggerMenuNavigateSound(); }
+    if (down && !downPressed) { menuSel++; if (menuSel >= SETTINGS_ITEMS) menuSel = 0; triggerMenuNavigateSound(); }
     
     if (menuSel <= 6) {
         float* vals[] = {
@@ -85,23 +102,36 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
         if (left && !leftPressed) { 
             *vals[menuSel] -= step[menuSel]; 
             if (*vals[menuSel] < minV[menuSel]) *vals[menuSel] = minV[menuSel]; 
+            triggerMenuNavigateSound();
         }
         if (right && !rightPressed) { 
             *vals[menuSel] += step[menuSel]; 
             if (*vals[menuSel] > maxV[menuSel]) *vals[menuSel] = maxV[menuSel]; 
+            triggerMenuNavigateSound();
         }
     } else if (menuSel == 7) {
-        if (left && !leftPressed) settings.upscalerMode = clampUpscalerMode(settings.upscalerMode - 1);
-        if (right && !rightPressed) settings.upscalerMode = clampUpscalerMode(settings.upscalerMode + 1);
+        if (left && !leftPressed) { settings.upscalerMode = clampUpscalerMode(settings.upscalerMode - 1); triggerMenuNavigateSound(); }
+        if (right && !rightPressed) { settings.upscalerMode = clampUpscalerMode(settings.upscalerMode + 1); triggerMenuNavigateSound(); }
     } else if (menuSel == 8) {
-        if (left && !leftPressed) settings.renderScalePreset = stepRenderScalePreset(settings.renderScalePreset, -1);
-        if (right && !rightPressed) settings.renderScalePreset = stepRenderScalePreset(settings.renderScalePreset, 1);
+        if (left && !leftPressed) { settings.renderScalePreset = stepRenderScalePreset(settings.renderScalePreset, -1); triggerMenuNavigateSound(); }
+        if (right && !rightPressed) { settings.renderScalePreset = stepRenderScalePreset(settings.renderScalePreset, 1); triggerMenuNavigateSound(); }
     } else if (menuSel == 9) {
-        if (left && !leftPressed) settings.fsrSharpness = clampFsrSharpness(settings.fsrSharpness - 0.05f);
-        if (right && !rightPressed) settings.fsrSharpness = clampFsrSharpness(settings.fsrSharpness + 0.05f);
+        if (left && !leftPressed) { settings.fsrSharpness = clampFsrSharpness(settings.fsrSharpness - 0.05f); triggerMenuNavigateSound(); }
+        if (right && !rightPressed) { settings.fsrSharpness = clampFsrSharpness(settings.fsrSharpness + 0.05f); triggerMenuNavigateSound(); }
+    } else if (menuSel == SETTINGS_AA_INDEX) {
+        if (left && !leftPressed) { settings.aaMode = stepAaMode(settings.aaMode, -1); triggerMenuNavigateSound(); }
+        if (right && !rightPressed) { settings.aaMode = stepAaMode(settings.aaMode, 1); triggerMenuNavigateSound(); }
+    } else if (menuSel == SETTINGS_BINDS_INDEX) {
+        if (enter && !enterPressed) {
+            triggerMenuConfirmSound();
+            gameState = fromPause ? STATE_KEYBINDS_PAUSE : STATE_KEYBINDS;
+            menuSel = 0;
+            keybindCaptureIndex = -1;
+        }
     }
     
     if ((enter && !enterPressed && menuSel == SETTINGS_BACK_INDEX) || (esc && !escPressed)) { 
+        triggerMenuConfirmSound();
         gameState = fromPause ? STATE_PAUSE : STATE_MENU; 
         menuSel = fromPause ? 1 : 2;  // Settings position in respective menu
     }
@@ -114,6 +144,55 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
     enterPressed = enter;
 }
 
+inline void keybindsInput(GLFWwindow* w, bool fromPause) {
+    static bool waitRelease = false;
+    bool esc = glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS;
+    bool up = glfwGetKey(w, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS;
+    bool down = glfwGetKey(w, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS;
+    bool enter = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS;
+
+    if (keybindCaptureIndex >= 0) {
+        if (waitRelease) {
+            if (!isAnyKeyboardKeyDown(w)) waitRelease = false;
+        } else {
+            int pressed = firstPressedKeyboardKey(w);
+            if (pressed >= 0) {
+                int* keyRef = gameplayBindByIndex(settings.binds, keybindCaptureIndex);
+                if (keyRef) *keyRef = pressed;
+                keybindCaptureIndex = -1;
+                triggerMenuConfirmSound();
+            } else if (esc && !escPressed) {
+                keybindCaptureIndex = -1;
+                triggerMenuConfirmSound();
+            }
+        }
+    } else {
+        if (up && !upPressed) { menuSel = clampKeybindMenuIndex(menuSel - 1); triggerMenuNavigateSound(); }
+        if (down && !downPressed) { menuSel = clampKeybindMenuIndex(menuSel + 1); triggerMenuNavigateSound(); }
+        if (enter && !enterPressed) {
+            if (isGameplayBindIndex(menuSel)) {
+                keybindCaptureIndex = menuSel;
+                waitRelease = true;
+                triggerMenuConfirmSound();
+            } else if (menuSel == KEYBINDS_BACK_INDEX) {
+                triggerMenuConfirmSound();
+                gameState = fromPause ? STATE_SETTINGS_PAUSE : STATE_SETTINGS;
+                menuSel = 11;
+            }
+        }
+        if (esc && !escPressed) {
+            triggerMenuConfirmSound();
+            gameState = fromPause ? STATE_SETTINGS_PAUSE : STATE_SETTINGS;
+            menuSel = 11;
+        }
+    }
+
+    escPressed = esc;
+    upPressed = up;
+    downPressed = down;
+    enterPressed = enter;
+}
+
 inline void menuInput(GLFWwindow* w) {
     bool esc = glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS;
     bool up = glfwGetKey(w, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS;
@@ -122,9 +201,10 @@ inline void menuInput(GLFWwindow* w) {
     
     if (gameState == STATE_MENU) {
         // Main menu: START GAME, MULTIPLAYER, SETTINGS, QUIT (4 items: 0-3)
-        if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 3; }
-        if (down && !downPressed) { menuSel++; if (menuSel > 3) menuSel = 0; }
+        if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 3; triggerMenuNavigateSound(); }
+        if (down && !downPressed) { menuSel++; if (menuSel > 3) menuSel = 0; triggerMenuNavigateSound(); }
         if (enter && !enterPressed) {
+            triggerMenuConfirmSound();
             if (menuSel == 0) { 
                 // Start game - go to intro first
                 gameState = STATE_INTRO;
@@ -148,14 +228,16 @@ inline void menuInput(GLFWwindow* w) {
     else if (gameState == STATE_PAUSE) {
         if (multiState == MULTI_IN_GAME) {
             // Multiplayer pause: RESUME, TELEPORT, SETTINGS, DISCONNECT, QUIT (5 items)
-            if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 4; }
-            if (down && !downPressed) { menuSel++; if (menuSel > 4) menuSel = 0; }
+            if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 4; triggerMenuNavigateSound(); }
+            if (down && !downPressed) { menuSel++; if (menuSel > 4) menuSel = 0; triggerMenuNavigateSound(); }
             if (esc && !escPressed) { 
+                triggerMenuConfirmSound();
                 gameState = STATE_GAME; 
                 glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED); 
                 firstMouse = true; 
             }
             if (enter && !enterPressed) {
+                triggerMenuConfirmSound();
                 if (menuSel == 0) { 
                     gameState = STATE_GAME; 
                     glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED); 
@@ -187,14 +269,16 @@ inline void menuInput(GLFWwindow* w) {
             }
         } else {
             // Single player pause: RESUME, SETTINGS, MAIN MENU, QUIT (4 items)
-            if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 3; }
-            if (down && !downPressed) { menuSel++; if (menuSel > 3) menuSel = 0; }
+            if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 3; triggerMenuNavigateSound(); }
+            if (down && !downPressed) { menuSel++; if (menuSel > 3) menuSel = 0; triggerMenuNavigateSound(); }
             if (esc && !escPressed) { 
+                triggerMenuConfirmSound();
                 gameState = STATE_GAME; 
                 glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED); 
                 firstMouse = true; 
             }
             if (enter && !enterPressed) {
+                triggerMenuConfirmSound();
                 if (menuSel == 0) { 
                     gameState = STATE_GAME; 
                     glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED); 
@@ -238,13 +322,15 @@ inline void menuInput(GLFWwindow* w) {
         }
 
         // Multiplayer menu: HOST GAME, JOIN GAME, BACK (3 items: 0-2)
-        if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 2; }
-        if (down && !downPressed) { menuSel++; if (menuSel > 2) menuSel = 0; }
+        if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 2; triggerMenuNavigateSound(); }
+        if (down && !downPressed) { menuSel++; if (menuSel > 2) menuSel = 0; triggerMenuNavigateSound(); }
         if (esc && !escPressed) { 
+            triggerMenuConfirmSound();
             gameState = STATE_MENU; 
             menuSel = 1;  // Back to Multiplayer option
         }
         if (enter && !enterPressed) {
+            triggerMenuConfirmSound();
             if (menuSel == 0) { 
                 // Host game - initialize network and start hosting
                 netMgr.init();
@@ -273,9 +359,10 @@ inline void menuInput(GLFWwindow* w) {
     }
     else if (gameState == STATE_MULTI_HOST) {
         // Host lobby: START GAME, BACK (2 items: 0-1)
-        if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 1; }
-        if (down && !downPressed) { menuSel++; if (menuSel > 1) menuSel = 0; }
+        if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 1; triggerMenuNavigateSound(); }
+        if (down && !downPressed) { menuSel++; if (menuSel > 1) menuSel = 0; triggerMenuNavigateSound(); }
         if (esc && !escPressed) { 
+            triggerMenuConfirmSound();
             netMgr.shutdown();
             lanDiscovery.stop();
             multiState = MULTI_NONE;
@@ -283,6 +370,7 @@ inline void menuInput(GLFWwindow* w) {
             menuSel = 0;
         }
         if (enter && !enterPressed) {
+            triggerMenuConfirmSound();
             if (menuSel == 0) { 
                 // Start multiplayer game with all connected players
                 // First set multiState so genWorld knows we're in multiplayer
@@ -311,9 +399,10 @@ inline void menuInput(GLFWwindow* w) {
     }
     else if (gameState == STATE_MULTI_JOIN) {
         // Join menu: CONNECT, BACK (2 items: 0-1)
-        if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 1; }
-        if (down && !downPressed) { menuSel++; if (menuSel > 1) menuSel = 0; }
+        if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 1; triggerMenuNavigateSound(); }
+        if (down && !downPressed) { menuSel++; if (menuSel > 1) menuSel = 0; triggerMenuNavigateSound(); }
         if (esc && !escPressed) { 
+            triggerMenuConfirmSound();
             lanDiscovery.stop();
             gameState = STATE_MULTI; 
             menuSel = 1;
@@ -408,6 +497,7 @@ inline void menuInput(GLFWwindow* w) {
         }
         
         if (enter && !enterPressed) {
+            triggerMenuConfirmSound();
             if (menuSel == 0) { 
                 // Connect to host - go to waiting lobby
                 char fullAddr[64];
@@ -431,6 +521,7 @@ inline void menuInput(GLFWwindow* w) {
     else if (gameState == STATE_MULTI_WAIT) {
         // Waiting for host to start
         if (esc && !escPressed) {
+            triggerMenuConfirmSound();
             netMgr.shutdown();
             lanDiscovery.stop();
             multiState = MULTI_NONE;

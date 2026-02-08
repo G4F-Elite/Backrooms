@@ -18,19 +18,12 @@ void drawUI(){
         drawWaitingScreen(vhsTime);
     }
     else if(gameState==STATE_PAUSE){
-        if(multiState==MULTI_IN_GAME) {
-            drawMultiPause(netMgr.getPlayerCount());
-        } else {
-            drawPause();
-        }
-    }
-    else if(gameState==STATE_SETTINGS||gameState==STATE_SETTINGS_PAUSE) {
-        drawSettings(gameState==STATE_SETTINGS_PAUSE);
-    }
-    else if(gameState==STATE_INTRO) {
-        drawIntro(storyMgr.introLine,storyMgr.introTimer,storyMgr.introLineTime,INTRO_LINES);
-    }
-    else if(gameState==STATE_NOTE&&storyMgr.readingNote&&storyMgr.currentNote>=0) {
+        if(multiState==MULTI_IN_GAME) drawMultiPause(netMgr.getPlayerCount());
+        else drawPause();
+    }else if(gameState==STATE_SETTINGS||gameState==STATE_SETTINGS_PAUSE) drawSettings(gameState==STATE_SETTINGS_PAUSE);
+    else if(gameState==STATE_KEYBINDS||gameState==STATE_KEYBINDS_PAUSE) drawKeybindsMenu(gameState==STATE_KEYBINDS_PAUSE, menuSel, keybindCaptureIndex);
+    else if(gameState==STATE_INTRO) drawIntro(storyMgr.introLine,storyMgr.introTimer,storyMgr.introLineTime,INTRO_LINES);
+    else if(gameState==STATE_NOTE&&storyMgr.readingNote&&storyMgr.currentNote>=0)
         drawNote(storyMgr.currentNote,NOTE_TITLES[storyMgr.currentNote],NOTE_CONTENTS[storyMgr.currentNote]);
     }
     else if(gameState==STATE_GAME){
@@ -55,19 +48,12 @@ void drawUI(){
             drawText(invBuf,-0.95f,0.84f,1.35f,0.55f,0.7f,0.5f,0.75f);
             
             int switchCount = (coop.switchOn[0]?1:0)+(coop.switchOn[1]?1:0);
-            drawText("OBJECTIVE",0.44f,0.82f,1.35f,0.85f,0.9f,0.65f,0.82f);
-            
+            drawText("OBJECTIVE",0.44f,0.82f,1.35f,0.88f,0.92f,0.68f,0.97f);
             char objProgress[64];
             snprintf(objProgress,64,"SWITCHES: %d / 2",switchCount);
-            drawText(objProgress,0.44f,0.75f,1.25f,0.8f,0.85f,0.6f,0.78f);
-            
-            if(coop.doorOpen) {
-                drawText("DOOR: OPEN",0.44f,0.68f,1.25f,0.85f,0.8f,0.55f,0.78f);
-            } else {
-                drawText("DOOR: LOCKED",0.44f,0.68f,1.25f,0.85f,0.8f,0.55f,0.78f);
-                drawText("ACTION: HOLD 2 SWITCHES",0.44f,0.61f,1.15f,0.75f,0.8f,0.55f,0.72f);
-            }
-            
+            drawText(objProgress,0.44f,0.75f,1.25f,0.84f,0.88f,0.64f,0.95f);
+            drawText(coop.doorOpen?"DOOR: OPEN":"DOOR: LOCKED",0.44f,0.68f,1.25f,0.88f,0.83f,0.6f,0.95f);
+            if(!coop.doorOpen) drawText("ACTION: HOLD 2 SWITCHES",0.44f,0.61f,1.15f,0.8f,0.84f,0.6f,0.92f);
             if(!coop.doorOpen){
                 bool nearSwitch0 = nearPoint2D(cam.pos, coop.switches[0], 2.6f);
                 bool nearSwitch1 = nearPoint2D(cam.pos, coop.switches[1], 2.6f);
