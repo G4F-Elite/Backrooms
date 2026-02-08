@@ -2,6 +2,7 @@
 #include <cstring>
 #include <cmath>
 #include <cstdio>
+#include "upscaler_settings.h"
 
 const unsigned char FONT_DATA[96][7] = {
     {0,0,0,0,0,0,0},{4,4,4,4,0,4,0},{10,10,0,0,0,0,0},{10,31,10,31,10,0,0},{4,15,20,14,5,30,4},{24,25,2,4,8,19,3},{8,20,20,8,21,18,13},{4,4,0,0,0,0,0},
@@ -27,6 +28,9 @@ struct Settings {
     float voiceVol=0.65f;
     float vhsIntensity=0.65f;
     float mouseSens=0.002f;
+    int upscalerMode=UPSCALER_MODE_OFF;
+    int renderScalePreset=RENDER_SCALE_PRESET_DEFAULT;
+    float fsrSharpness=0.35f;
 };
 inline Settings settings;
 enum GameState { STATE_MENU, STATE_GAME, STATE_PAUSE, STATE_SETTINGS, STATE_SETTINGS_PAUSE, STATE_INTRO, STATE_NOTE, STATE_MULTI, STATE_MULTI_HOST, STATE_MULTI_JOIN, STATE_MULTI_WAIT };
@@ -118,14 +122,20 @@ inline void drawMenu(float tm) {
 inline void drawSettings(bool fp) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     drawTextCentered("SETTINGS",0.0f,0.55f,3.0f,0.9f,0.85f,0.4f);
-    const char* lb[]={"MASTER VOL","MUSIC VOL","AMBIENCE VOL","SFX VOL","VOICE VOL","VHS EFFECT","MOUSE SENS","BACK"};
-    float*vl[]={&settings.masterVol,&settings.musicVol,&settings.ambienceVol,&settings.sfxVol,&settings.voiceVol,&settings.vhsIntensity,&settings.mouseSens,nullptr};
-    float mx[]={1.0f,1.0f,1.0f,1.0f,1.0f,1.0f,0.006f};
-    for(int i=0;i<8;i++){
-        float s=(menuSel==i)?1.0f:0.5f,y=0.40f-i*0.11f;
+    const char* lb[]={"MASTER VOL","MUSIC VOL","AMBIENCE VOL","SFX VOL","VOICE VOL","VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","BACK"};
+    float*vl[]={&settings.masterVol,&settings.musicVol,&settings.ambienceVol,&settings.sfxVol,&settings.voiceVol,&settings.vhsIntensity,&settings.mouseSens,nullptr,nullptr,&settings.fsrSharpness,nullptr};
+    float mx[]={1.0f,1.0f,1.0f,1.0f,1.0f,1.0f,0.006f,1.0f,1.0f,1.0f,1.0f};
+    for(int i=0;i<11;i++){
+        float s=(menuSel==i)?1.0f:0.5f,y=0.43f-i*0.09f;
         if(menuSel==i)drawText(">",-0.55f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         drawText(lb[i],-0.48f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
-        if(vl[i]){
+        if(i==7){
+            drawText(upscalerModeLabel(settings.upscalerMode),0.36f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
+        }else if(i==8){
+            int scalePercent = renderScalePercentFromPreset(settings.renderScalePreset);
+            char rb[24]; snprintf(rb,24,"%d%%",scalePercent);
+            drawText(rb,0.48f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
+        }else if(vl[i]){
             float nv=*vl[i]/mx[i]; if(nv>1.0f)nv=1.0f;
             drawSlider(0.1f,y,0.45f,nv,0.9f*s,0.85f*s,0.4f*s);
             char b[16]; snprintf(b,16,"%d%%",(int)(nv*100)); drawText(b,0.58f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
