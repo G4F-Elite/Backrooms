@@ -259,16 +259,33 @@ inline void drawIntro(int line, float timer, float lineTime, const char** introL
 
 inline void drawNote(int noteId, const char* title, const char* content) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    for(float yp = 0.7f; yp >= -0.6f; yp -= 0.12f)
-        drawText("                              ", -0.55f, yp, 3.0f, 0.85f, 0.8f, 0.65f, 0.95f);
-    drawText(title, -0.45f, 0.55f, 2.5f, 0.3f, 0.25f, 0.15f, 1.0f);
-    drawText("________________________________", -0.50f, 0.45f, 1.5f, 0.4f, 0.35f, 0.2f, 0.6f);
-    float ty = 0.30f; char line[64]; int li = 0;
-    for(const char* p = content; *p; p++) {
-        if(*p == '\n' || li >= 50) { line[li] = 0; drawText(line, -0.45f, ty, 1.5f, 0.25f, 0.2f, 0.1f, 0.9f); ty -= 0.08f; li = 0; }
-        else line[li++] = *p;
+    const char* panelShadow = "                                                  ";
+    const char* panelBody = "                                              ";
+    for(float yp = 0.76f; yp >= -0.74f; yp -= 0.09f) {
+        drawTextCentered(panelShadow, 0.0f, yp - 0.01f, 3.0f, 0.06f, 0.04f, 0.02f, 0.55f);
+        drawTextCentered(panelBody, 0.0f, yp, 3.0f, 0.84f, 0.79f, 0.64f, 0.97f);
     }
-    if(li > 0) { line[li] = 0; drawText(line, -0.45f, ty, 1.5f, 0.25f, 0.2f, 0.1f, 0.9f); }
-    drawText("PRESS E OR ESC TO CLOSE", -0.32f, -0.75f, 1.5f, 0.4f, 0.35f, 0.2f, 0.7f);
+
+    drawTextCentered(title, 0.0f, 0.56f, 2.5f, 0.3f, 0.25f, 0.15f, 1.0f);
+    drawTextCentered("________________________________", 0.0f, 0.46f, 1.5f, 0.4f, 0.35f, 0.2f, 0.6f);
+
+    float ty = 0.30f;
+    char line[64];
+    int li = 0;
+    for(const char* p = content; *p; p++) {
+        if(*p == '\n' || li >= 50) {
+            line[li] = 0;
+            drawTextCentered(line, 0.0f, ty, 1.5f, 0.25f, 0.2f, 0.1f, 0.9f);
+            ty -= 0.08f;
+            li = 0;
+        } else {
+            line[li++] = *p;
+        }
+    }
+    if(li > 0) {
+        line[li] = 0;
+        drawTextCentered(line, 0.0f, ty, 1.5f, 0.25f, 0.2f, 0.1f, 0.9f);
+    }
+    drawTextCentered("PRESS E OR ESC TO CLOSE", 0.0f, -0.75f, 1.5f, 0.4f, 0.35f, 0.2f, 0.7f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
