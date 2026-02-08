@@ -197,6 +197,39 @@ inline bool reshuffleBehind(float camX, float camZ, float camYaw) {
     return true;
 }
 
+// Check if cell is a corridor (walls on opposite sides - would block passage if pillar placed)
+inline bool isCorridor(const Chunk& chunk, int lx, int lz) {
+    bool wallLeft = (lx > 0) ? chunk.cells[lx-1][lz] == 1 : true;
+    bool wallRight = (lx < CHUNK_SIZE-1) ? chunk.cells[lx+1][lz] == 1 : true;
+    bool wallUp = (lz > 0) ? chunk.cells[lx][lz-1] == 1 : true;
+    bool wallDown = (lz < CHUNK_SIZE-1) ? chunk.cells[lx][lz+1] == 1 : true;
+    
+    // Horizontal corridor (walls above and below)
+    if (wallUp && wallDown) return true;
+    // Vertical corridor (walls left and right)
+    if (wallLeft && wallRight) return true;
+    
+    return false;
+}
+
+// Check if placing pillar would block a narrow passage
+inline bool wouldBlockPassage(const Chunk& chunk, int lx, int lz) {
+    // Don't place in corridors
+    if (isCorridor(chunk, lx, lz)) return true;
+    
+    // Count open neighbors - need at least 3 open sides for pillar placement
+    int openSides = 0;
+    if (lx > 0 && chunk.cells[lx-1][lz] == 0) openSides++;
+    if (lx < CHUNK_SIZE-1 && chunk.cells[lx+1][lz] == 0) openSides++;
+    if (lz > 0 && chunk.cells[lx][lz-1] == 0) openSides++;
+    if (lz < CHUNK_SIZE-1 && chunk.cells[lx][lz+1] == 0) openSides++;
+    
+    // Only place pillar if at least 3 sides are open (corner placement OK)
+    if (openSides < 3) return true;
+    
+    return false;
+}
+
 inline void updateLightsAndPillars(int pcx, int pcz) {
     float cx = (pcx+0.5f)*CHUNK_SIZE*CS, cz = (pcz+0.5f)*CHUNK_SIZE*CS, md = (VIEW_CHUNKS+1)*CHUNK_SIZE*CS;
     lights.erase(std::remove_if(lights.begin(),lights.end(),[&](Light&l){ return fabsf(l.pos.x-cx)>md||fabsf(l.pos.z-cz)>md; }),lights.end());
@@ -220,6 +253,10 @@ inline void updateLightsAndPillars(int pcx, int pcz) {
         std::mt19937 pr(seed);
         for (int lx=2; lx<CHUNK_SIZE-2; lx++) for (int lz=2; lz<CHUNK_SIZE-2; lz++) {
             if (it->second.cells[lx][lz]!=0) continue;
+            
+            // NEW: Skip if this would block a passage
+            if (wouldBlockPassage(it->second, lx, lz)) continue;
+            
             int wallAdj = 0;
             if (it->second.cells[lx-1][lz]==1) wallAdj++;
             if (it->second.cells[lx+1][lz]==1) wallAdj++;
