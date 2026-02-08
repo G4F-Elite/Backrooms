@@ -25,6 +25,7 @@
 #include "textures.h"
 #include "geometry.h"
 #include "render.h"
+#include "perf_tuning.h"
 #include "world.h"
 #include "entity_types.h"
 #include "entity_model.h"
@@ -49,6 +50,7 @@ const float PR = 0.3f;
 
 // Window
 int winW = 1280, winH = 720;
+int renderW = 960, renderH = 540;
 GLFWwindow* gWin;
 
 // World data
@@ -154,10 +156,11 @@ void windowResize(GLFWwindow*, int w, int h) {
     if (h < 100) h = 100;
     winW = w;
     winH = h;
+    computeRenderTargetSize(winW, winH, SCENE_RENDER_SCALE, renderW, renderH);
     if (fbo) glDeleteFramebuffers(1, &fbo);
     if (fboTex) glDeleteTextures(1, &fboTex);
     if (rbo) glDeleteRenderbuffers(1, &rbo);
-    initFBO(fbo, fboTex, rbo, winW, winH);
+    initFBO(fbo, fboTex, rbo, renderW, renderH);
 }
 
 // Shader compiler

@@ -8,6 +8,7 @@ bool playerModelsInit = false;
 #include "scare_system.h"
 #include "cheats.h"
 #include "minimap.h"
+#include "perf_tuning.h"
 void buildGeom();
 
 enum InteractRequestType {
@@ -669,15 +670,10 @@ void renderScene(){
         glUniform3fv(mu.rfd,remoteFlashCount,remoteFlashDir);
     }
     
-    static std::vector<float> lpos;
-    lpos.clear();
-    lpos.reserve(lights.size()*3);
-    for(auto&l:lights)if(l.on){
-        lpos.push_back(l.pos.x);lpos.push_back(l.pos.y);lpos.push_back(l.pos.z);
-    }
-    int nl=(int)lpos.size()/3;if(nl>64)nl=64;
+    float lpos[SCENE_LIGHT_LIMIT * 3] = {0};
+    int nl = gatherNearestSceneLights(lights, cam.pos, lpos);
     glUniform1i(mu.nl,nl);
-    if(!lpos.empty())glUniform3fv(mu.lp,nl,lpos.data());
+    if(nl>0)glUniform3fv(mu.lp,nl,lpos);
     
     glBindTexture(GL_TEXTURE_2D,wallTex);glBindVertexArray(wallVAO);glDrawArrays(GL_TRIANGLES,0,wallVC);
     glBindVertexArray(pillarVAO);glDrawArrays(GL_TRIANGLES,0,pillarVC);
@@ -895,7 +891,11 @@ int main(){
     genWorld();
     wallTex=genTex(0);floorTex=genTex(1);ceilTex=genTex(2);lightTex=genTex(3);
     mainShader=mkShader(mainVS,mainFS);lightShader=mkShader(lightVS,lightFS);vhsShader=mkShader(vhsVS,vhsFS);
-    buildGeom();initFBO(fbo,fboTex,rbo,winW,winH);initText();entityMgr.init();
+    buildGeom();
+    computeRenderTargetSize(winW, winH, SCENE_RENDER_SCALE, renderW, renderH);
+    initFBO(fbo,fboTex,rbo,renderW,renderH);
+    initText();
+    entityMgr.init();
     initPlayerModels(); playerModelsInit = true;
     std::thread aT(audioThread);
     
@@ -1088,7 +1088,7 @@ int main(){
         
         // Rendering
         glBindFramebuffer(GL_FRAMEBUFFER,fbo);
-        glViewport(0,0,winW,winH);
+        glViewport(0,0,renderW,renderH);
         glClearColor(0.02f,0.02f,0.02f,1);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         
