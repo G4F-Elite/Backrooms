@@ -2,6 +2,7 @@
 
 inline void settingsInput(GLFWwindow* w, bool fromPause) {
     static constexpr int SETTINGS_ITEMS = 13;
+    static constexpr int SETTINGS_AA_INDEX = 10;
     static constexpr int SETTINGS_BINDS_INDEX = 11;
     static constexpr int SETTINGS_BACK_INDEX = 12;
     
@@ -11,6 +12,41 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
     bool left = glfwGetKey(w, GLFW_KEY_LEFT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_A) == GLFW_PRESS;
     bool right = glfwGetKey(w, GLFW_KEY_RIGHT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_D) == GLFW_PRESS;
     bool enter = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS;
+    
+    const double now = glfwGetTime();
+    static int adjustHoldDir = 0;
+    static double nextAdjustTime = 0.0;
+    const double adjustFirstDelay = 0.28;
+    const double adjustRepeatInterval = 0.055;
+
+    auto applyAdjust = [&](int dir) {
+        if (dir == 0) return;
+        if (menuSel <= 6) {
+            float* vals[] = {
+                &settings.masterVol, &settings.musicVol, &settings.ambienceVol, &settings.sfxVol,
+                &settings.voiceVol, &settings.vhsIntensity, &settings.mouseSens
+            };
+            float maxV[] = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.006f};
+            float minV[] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0005f};
+            float step[] = {0.05f, 0.05f, 0.05f, 0.05f, 0.05f, 0.05f, 0.0003f};
+            *vals[menuSel] += step[menuSel] * (float)dir;
+            if (*vals[menuSel] < minV[menuSel]) *vals[menuSel] = minV[menuSel];
+            if (*vals[menuSel] > maxV[menuSel]) *vals[menuSel] = maxV[menuSel];
+            triggerMenuNavigateSound();
+        } else if (menuSel == 7) {
+            settings.upscalerMode = clampUpscalerMode(settings.upscalerMode + dir);
+            triggerMenuNavigateSound();
+        } else if (menuSel == 8) {
+            settings.renderScalePreset = stepRenderScalePreset(settings.renderScalePreset, dir);
+            triggerMenuNavigateSound();
+        } else if (menuSel == 9) {
+            settings.fsrSharpness = clampFsrSharpness(settings.fsrSharpness + 0.05f * (float)dir);
+            triggerMenuNavigateSound();
+        } else if (menuSel == SETTINGS_AA_INDEX) {
+            settings.aaMode = stepAaMode(settings.aaMode, dir);
+            triggerMenuNavigateSound();
+        }
+    };
     
     if (up && !upPressed) {
         menuSel--;
@@ -23,60 +59,18 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
         triggerMenuNavigateSound();
     }
     
-    float* vals[] = {
-        &settings.masterVol, &settings.musicVol, &settings.ambienceVol, 
-        &settings.sfxVol, &settings.voiceVol, &settings.vhsIntensity, &settings.mouseSens
-    };
-    float maxV[] = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.006f};
-    float minV[] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0005f};
-    float step[] = {0.05f, 0.05f, 0.05f, 0.05f, 0.05f, 0.05f, 0.0003f};
-    
-    if (menuSel <= 6) {
-        if (left && !leftPressed) { 
-            *vals[menuSel] -= step[menuSel]; 
-            if (*vals[menuSel] < minV[menuSel]) *vals[menuSel] = minV[menuSel]; 
-            triggerMenuNavigateSound();
-        }
-        if (right && !rightPressed) { 
-            *vals[menuSel] += step[menuSel]; 
-            if (*vals[menuSel] > maxV[menuSel]) *vals[menuSel] = maxV[menuSel]; 
-            triggerMenuNavigateSound();
-        }
-    } else if (menuSel == 7) {
-        if (left && !leftPressed) {
-            settings.upscalerMode = clampUpscalerMode(settings.upscalerMode - 1);
-            triggerMenuNavigateSound();
-        }
-        if (right && !rightPressed) {
-            settings.upscalerMode = clampUpscalerMode(settings.upscalerMode + 1);
-            triggerMenuNavigateSound();
-        }
-    } else if (menuSel == 8) {
-        if (left && !leftPressed) {
-            settings.renderScalePreset = stepRenderScalePreset(settings.renderScalePreset, -1);
-            triggerMenuNavigateSound();
-        }
-        if (right && !rightPressed) {
-            settings.renderScalePreset = stepRenderScalePreset(settings.renderScalePreset, 1);
-            triggerMenuNavigateSound();
-        }
-    } else if (menuSel == 9) {
-        if (left && !leftPressed) {
-            settings.fsrSharpness = clampFsrSharpness(settings.fsrSharpness - 0.05f);
-            triggerMenuNavigateSound();
-        }
-        if (right && !rightPressed) {
-            settings.fsrSharpness = clampFsrSharpness(settings.fsrSharpness + 0.05f);
-            triggerMenuNavigateSound();
-        }
-    } else if (menuSel == 10) {
-        if (left && !leftPressed) {
-            settings.aaMode = stepAaMode(settings.aaMode, -1);
-            triggerMenuNavigateSound();
-        }
-        if (right && !rightPressed) {
-            settings.aaMode = stepAaMode(settings.aaMode, 1);
-            triggerMenuNavigateSound();
+    int adjustDir = right ? 1 : (left ? -1 : 0);
+    if (menuSel <= SETTINGS_AA_INDEX) {
+        if (adjustDir == 0) {
+            adjustHoldDir = 0;
+            nextAdjustTime = 0.0;
+        } else if (adjustHoldDir != adjustDir) {
+            adjustHoldDir = adjustDir;
+            applyAdjust(adjustDir);
+            nextAdjustTime = now + adjustFirstDelay;
+        } else if (now >= nextAdjustTime) {
+            applyAdjust(adjustDir);
+            nextAdjustTime = now + adjustRepeatInterval;
         }
     } else if (menuSel == SETTINGS_BINDS_INDEX && enter && !enterPressed) {
         triggerMenuConfirmSound();
