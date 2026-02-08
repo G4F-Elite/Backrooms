@@ -33,6 +33,7 @@ struct SoundState {
     float sfxVol=0.7f;
     float voiceVol=0.65f;
     bool uiMoveTrig=false;
+    bool uiAdjustTrig=false;
     bool uiConfirmTrig=false;
 };
 
@@ -50,6 +51,7 @@ inline void fillAudio(short* buf, int len) {
     static float globalPhase = 0;
     static AudioSafetyState safe;
     static float uiMoveTime = -1.0f;
+    static float uiAdjustTime = -1.0f;
     static float uiConfirmTime = -1.0f;
     static float pipeTime = -1.0f, pipePitch = 92.0f, pipeDrift = 0.0f;
     static float ventTime = -1.0f, ventPitch = 36.0f, ventNoise = 0.0f;
@@ -239,6 +241,10 @@ inline void fillAudio(short* buf, int len) {
             uiMoveTime = 0.0f;
             sndState.uiMoveTrig = false;
         }
+        if(sndState.uiAdjustTrig){
+            uiAdjustTime = 0.0f;
+            sndState.uiAdjustTrig = false;
+        }
         if(sndState.uiConfirmTrig){
             uiConfirmTime = 0.0f;
             sndState.uiConfirmTrig = false;
@@ -256,6 +262,17 @@ inline void fillAudio(short* buf, int len) {
             if(uiMoveTime > 0.22f) uiMoveTime = -1.0f;
         }
         float uiConfirm = 0.0f;
+        float uiAdjust = 0.0f;
+        if(uiAdjustTime >= 0.0f){
+            float t = uiAdjustTime;
+            float attack = (t < 0.008f) ? (t / 0.008f) : 1.0f;
+            float env = attack * expf(-t * 13.5f);
+            float f1 = 690.0f + sinf(t * 34.0f) * 14.0f;
+            float f2 = 1030.0f;
+            uiAdjust = (sinf(twoPi * f1 * t) * 0.62f + sinf(twoPi * f2 * t) * 0.16f) * env;
+            uiAdjustTime += dt;
+            if(uiAdjustTime > 0.15f) uiAdjustTime = -1.0f;
+        }
         if(uiConfirmTime >= 0.0f){
             float t = uiConfirmTime;
             float attack = (t < 0.010f) ? (t / 0.010f) : 1.0f;
@@ -331,7 +348,7 @@ inline void fillAudio(short* buf, int len) {
 
         float ambienceMix = hum*sndState.humVol + amb + distant + roomEventsAmb;
         float sfxMix = step + scare + flashClick + roomEventsSfx;
-        float uiMix = (uiMove + uiConfirm) * (0.45f + 0.55f * sndState.sfxVol);
+        float uiMix = (uiMove + uiAdjust + uiConfirm) * (0.45f + 0.55f * sndState.sfxVol);
         float voiceMix = insane;
         float musicMix = creepy;
         float v =
@@ -349,6 +366,7 @@ inline void fillAudio(short* buf, int len) {
 
 inline void triggerScare() { sndState.scareVol = 0.8f; sndState.scareTimer = 0; }
 inline void triggerMenuNavigateSound() { sndState.uiMoveTrig = true; }
+inline void triggerMenuAdjustSound() { sndState.uiAdjustTrig = true; }
 inline void triggerMenuConfirmSound() { sndState.uiConfirmTrig = true; }
 
 void audioThread();
