@@ -76,11 +76,27 @@ void testPillarsGenerated() {
     assert(!pillars.empty());
 }
 
+void testFindSpawnPosAvoidsPillars() {
+    chunks.clear();
+    lights.clear();
+    pillars.clear();
+    worldSeed = 2026;
+    generateChunk(0, 0);
+    Vec3 around(8 * CS, 0, 8 * CS);
+    Vec3 forced((int)floorf(around.x / CS) * CS + CS * 0.5f, 0, (int)floorf(around.z / CS) * CS + CS * 0.5f);
+    pillars.push_back(forced);
+    Vec3 sp = findSpawnPos(around, 0.0f);
+    float dx = sp.x - forced.x;
+    float dz = sp.z - forced.z;
+    assert((dx * dx + dz * dz) > 0.25f);
+}
+
 int main() {
     testRectHelpers();
     testPatternsCreateOpenArea();
     testChunkGenerationHasVariedDensity();
     testPillarsGenerated();
+    testFindSpawnPosAvoidsPillars();
     std::cout << "All world variation tests passed.\n";
     return 0;
 }
