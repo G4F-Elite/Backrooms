@@ -4,6 +4,7 @@ GLuint noteVAO=0, noteVBO=0;
 int noteVC=0;
 bool playerModelsInit = false;
 #include "reconnect_policy.h"
+#include "flashlight_behavior.h"
 void buildGeom();
 
 enum InteractRequestType {
@@ -370,6 +371,8 @@ void genWorld(){
     itemSpawnTimer = 8.0f;
     playerHealth=playerSanity=playerStamina=100;
     flashlightBattery=100;flashlightOn=false;isPlayerDead=false;
+    flashlightShutdownBlinkActive = false;
+    flashlightShutdownBlinkTimer = 0.0f;
     entitySpawnTimer=30;survivalTime=0;reshuffleTimer=15;
     lastSpawnedNote=-1;noteSpawnTimer=15.0f;
 }
@@ -403,6 +406,10 @@ void gameInput(GLFWwindow*w){
     bool fNow=glfwGetKey(w,GLFW_KEY_F)==GLFW_PRESS;
     if(fNow&&!flashlightPressed&&flashlightBattery>5.0f){
         flashlightOn=!flashlightOn;
+        if(!flashlightOn){
+            flashlightShutdownBlinkActive = false;
+            flashlightShutdownBlinkTimer = 0.0f;
+        }
         sndState.flashlightOn=flashlightOn?1.0f:0.0f;
     }
     flashlightPressed=fNow;
@@ -496,16 +503,31 @@ void gameInput(GLFWwindow*w){
     }
     
     if(flashlightOn){
-        if(flashlightBattery<18.0f){
-            float blinkT = vhsTime * (6.0f + (18.0f - flashlightBattery) * 0.35f);
-            bool blinkOff = sinf(blinkT) > 0.78f;
-            sndState.flashlightOn = blinkOff ? 0.0f : 1.0f;
+        if(!flashlightShutdownBlinkActive && shouldStartFlashlightShutdownBlink(flashlightBattery)){
+            flashlightShutdownBlinkActive = true;
+            flashlightShutdownBlinkTimer = 0.0f;
+        }
+
+        if(flashlightShutdownBlinkActive){
+            flashlightShutdownBlinkTimer += dTime;
+            sndState.flashlightOn = isFlashlightOnDuringShutdownBlink(flashlightShutdownBlinkTimer) ? 1.0f : 0.0f;
+            flashlightBattery -= dTime * 1.67f;
+            if(flashlightBattery < 0.0f) flashlightBattery = 0.0f;
+            if(isFlashlightShutdownBlinkFinished(flashlightShutdownBlinkTimer)){
+                flashlightBattery = 0.0f;
+                flashlightOn = false;
+                flashlightShutdownBlinkActive = false;
+                flashlightShutdownBlinkTimer = 0.0f;
+                sndState.flashlightOn = 0.0f;
+            }
         }else{
             sndState.flashlightOn = 1.0f;
+            flashlightBattery-=dTime*1.67f;
+            if(flashlightBattery<=0){flashlightBattery=0;flashlightOn=false;sndState.flashlightOn=0;}
         }
-        flashlightBattery-=dTime*1.67f;
-        if(flashlightBattery<=0){flashlightBattery=0;flashlightOn=false;sndState.flashlightOn=0;}
     }else{
+        flashlightShutdownBlinkActive = false;
+        flashlightShutdownBlinkTimer = 0.0f;
         flashlightBattery+=dTime*10.0f;
         if(flashlightBattery>100)flashlightBattery=100;
     }
@@ -526,9 +548,8 @@ void renderScene(){
     glUniform1f(glGetUniformLocation(mainShader,"tm"),vhsTime);
     glUniform1f(glGetUniformLocation(mainShader,"danger"),entityMgr.dangerLevel);
     bool flashVisualOn = flashlightOn;
-    if(flashlightOn && flashlightBattery < 18.0f){
-        float blinkT = vhsTime * (6.0f + (18.0f - flashlightBattery) * 0.35f);
-        if(sinf(blinkT) > 0.78f) flashVisualOn = false;
+    if(flashlightOn && flashlightShutdownBlinkActive){
+        flashVisualOn = isFlashlightOnDuringShutdownBlink(flashlightShutdownBlinkTimer);
     }
     glUniform1i(glGetUniformLocation(mainShader,"flashOn"),flashVisualOn?1:0);
     glUniform3f(glGetUniformLocation(mainShader,"flashDir"),sinf(cam.yaw)*cosf(cam.pitch),

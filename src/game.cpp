@@ -72,6 +72,8 @@ float entitySpawnTimer, playerHealth = 100, playerSanity = 100;
 float camShake, damageFlash, survivalTime, reshuffleTimer;
 float playerStamina = 100, staminaCooldown = 0, flashlightBattery = 100;
 bool flashlightOn = false, flashlightPressed = false;
+bool flashlightShutdownBlinkActive = false;
+float flashlightShutdownBlinkTimer = 0.0f;
 bool interactPressed = false, spacePressed = false;
 int nearNoteId = -1, lastSpawnedNote = -1;
 float noteSpawnTimer = 0;
