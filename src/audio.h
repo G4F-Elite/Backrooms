@@ -48,8 +48,12 @@ inline float carpetStep(float t) {
 inline void fillAudio(short* buf, int len) {
     static float globalPhase = 0;
     static AudioSafetyState safe;
+    static float uiMoveTime = -1.0f;
+    static float uiConfirmTime = -1.0f;
+    const float dt = 1.0f / (float)SAMP_RATE;
+    const float twoPi = 6.283185307f;
     for(int i=0;i<len;i++) {
-        globalPhase += 1.0f / SAMP_RATE;
+        globalPhase += dt;
         
         // Fluorescent hum - louder base
         float hum = sinf(sndState.humPhase)*0.25f;
@@ -97,24 +101,37 @@ inline void fillAudio(short* buf, int len) {
 
         // Menu UI sounds
         if(sndState.uiMoveTrig){
-            safe.uiMoveEnv = 1.0f;
+            uiMoveTime = 0.0f;
             sndState.uiMoveTrig = false;
         }
         if(sndState.uiConfirmTrig){
-            safe.uiConfirmEnv = 1.0f;
+            uiConfirmTime = 0.0f;
             sndState.uiConfirmTrig = false;
         }
         float uiMove = 0.0f;
-        if(safe.uiMoveEnv > 0.0001f){
-            uiMove = sinf(globalPhase * 980.0f) * safe.uiMoveEnv * 0.42f;
-            uiMove += sinf(globalPhase * 1320.0f) * safe.uiMoveEnv * 0.22f;
-            safe.uiMoveEnv *= 0.972f;
+        if(uiMoveTime >= 0.0f){
+            float t = uiMoveTime;
+            float attack = (t < 0.012f) ? (t / 0.012f) : 1.0f;
+            float env = attack * expf(-t * 12.0f);
+            float wob = 1.0f + 0.015f * sinf(t * 30.0f);
+            float f1 = 590.0f * wob;
+            float f2 = 880.0f;
+            uiMove = (sinf(twoPi * f1 * t) * 0.55f + sinf(twoPi * f2 * t) * 0.25f) * env;
+            uiMoveTime += dt;
+            if(uiMoveTime > 0.22f) uiMoveTime = -1.0f;
         }
         float uiConfirm = 0.0f;
-        if(safe.uiConfirmEnv > 0.0001f){
-            uiConfirm = sinf(globalPhase * 760.0f) * safe.uiConfirmEnv * 0.58f;
-            uiConfirm += sinf(globalPhase * 1120.0f) * safe.uiConfirmEnv * 0.28f;
-            safe.uiConfirmEnv *= 0.968f;
+        if(uiConfirmTime >= 0.0f){
+            float t = uiConfirmTime;
+            float attack = (t < 0.010f) ? (t / 0.010f) : 1.0f;
+            float env = attack * expf(-t * 8.2f);
+            float lerpT = t / 0.32f;
+            if(lerpT > 1.0f) lerpT = 1.0f;
+            float f1 = 760.0f + (520.0f - 760.0f) * lerpT;
+            float f2 = f1 * 1.5f;
+            uiConfirm = (sinf(twoPi * f1 * t) * 0.75f + sinf(twoPi * f2 * t) * 0.22f) * env;
+            uiConfirmTime += dt;
+            if(uiConfirmTime > 0.32f) uiConfirmTime = -1.0f;
         }
         
         // Danger sounds - progressive
@@ -172,7 +189,7 @@ inline void fillAudio(short* buf, int len) {
         
         float ambienceMix = hum*sndState.humVol + amb + distant;
         float sfxMix = step + scare + flashClick;
-        float uiMix = (uiMove + uiConfirm) * (0.35f + 0.65f * sndState.sfxVol);
+        float uiMix = (uiMove + uiConfirm) * (0.45f + 0.55f * sndState.sfxVol);
         float voiceMix = insane;
         float musicMix = creepy;
         float v =

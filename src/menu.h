@@ -22,6 +22,7 @@ const unsigned char FONT_DATA[96][7] = {
 
 inline GLuint fontTex=0, textShader=0, textVAO=0, textVBO=0;
 inline GLuint overlayShader=0, overlayVAO=0, overlayVBO=0;
+inline GLuint menuBgShader=0;
 struct Settings {
     float masterVol=0.7f;
     float musicVol=0.55f;
@@ -57,6 +58,26 @@ out vec4 fc;
 uniform vec3 col;
 uniform float alpha;
 void main() { fc = vec4(col, alpha); })";
+inline const char* menuBgVS = R"(#version 330 core
+layout(location=0) in vec2 p; out vec2 uv;
+void main() { gl_Position = vec4(p, 0.0, 1.0); uv = p * 0.5 + 0.5; })";
+inline const char* menuBgFS = R"(#version 330 core
+in vec2 uv; out vec4 fc; uniform float tm;
+float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+void main() {
+    vec2 p = uv * 2.0 - 1.0;
+    float tunnel = 1.0 - smoothstep(0.18, 1.25, abs(p.x) * (1.0 - uv.y * 0.35));
+    float wave = sin((uv.y * 28.0 - tm * 1.4) + sin(uv.x * 7.0 + tm * 0.5) * 1.2);
+    float scan = 0.5 + 0.5 * wave;
+    float drift = 0.5 + 0.5 * sin(tm * 0.35 + uv.x * 5.0 + uv.y * 2.0);
+    float dust = hash(floor(vec2(uv.x * 180.0 + tm * 5.0, uv.y * 120.0 + tm * 3.0)));
+    vec3 base = mix(vec3(0.03, 0.025, 0.02), vec3(0.12, 0.10, 0.06), tunnel * 0.7);
+    vec3 lines = vec3(0.18, 0.14, 0.08) * (scan * 0.35 + drift * 0.2);
+    vec3 col = base + lines * tunnel;
+    col += vec3(0.08, 0.06, 0.03) * smoothstep(0.82, 1.0, uv.y) * 0.25;
+    col += (dust - 0.5) * 0.02;
+    fc = vec4(col, 1.0);
+})";
 
 inline GLuint genFontTex() {
     unsigned char* data = new unsigned char[96*8*8*3]; memset(data,0,96*8*8*3);
@@ -81,6 +102,12 @@ inline void initText() {
     GLuint ofs=glCreateShader(GL_FRAGMENT_SHADER); glShaderSource(ofs,1,&overlayFS,0); glCompileShader(ofs);
     overlayShader=glCreateProgram(); glAttachShader(overlayShader,ovs); glAttachShader(overlayShader,ofs); glLinkProgram(overlayShader);
     glDeleteShader(ovs); glDeleteShader(ofs);
+
+    GLuint bvs=glCreateShader(GL_VERTEX_SHADER); glShaderSource(bvs,1,&menuBgVS,0); glCompileShader(bvs);
+    GLuint bfs=glCreateShader(GL_FRAGMENT_SHADER); glShaderSource(bfs,1,&menuBgFS,0); glCompileShader(bfs);
+    menuBgShader=glCreateProgram(); glAttachShader(menuBgShader,bvs); glAttachShader(menuBgShader,bfs); glLinkProgram(menuBgShader);
+    glDeleteShader(bvs); glDeleteShader(bfs);
+
     float quad[12] = {-1.0f,-1.0f,  1.0f,-1.0f,  1.0f,1.0f,  -1.0f,-1.0f,  1.0f,1.0f,  -1.0f,1.0f};
     glGenVertexArrays(1,&overlayVAO); glGenBuffers(1,&overlayVBO);
     glBindVertexArray(overlayVAO); glBindBuffer(GL_ARRAY_BUFFER,overlayVBO);
@@ -92,6 +119,13 @@ inline void drawFullscreenOverlay(float r, float g, float b, float a) {
     glUseProgram(overlayShader);
     glUniform3f(glGetUniformLocation(overlayShader,"col"),r,g,b);
     glUniform1f(glGetUniformLocation(overlayShader,"alpha"),a);
+    glBindVertexArray(overlayVAO);
+    glDrawArrays(GL_TRIANGLES,0,6);
+}
+
+inline void drawMainMenuBackdrop(float tm) {
+    glUseProgram(menuBgShader);
+    glUniform1f(glGetUniformLocation(menuBgShader,"tm"),tm);
     glBindVertexArray(overlayVAO);
     glDrawArrays(GL_TRIANGLES,0,6);
 }
@@ -136,8 +170,9 @@ inline void drawSlider(float x,float y,float w,float val,float r,float g,float b
 
 inline void drawMenu(float tm) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    drawFullscreenOverlay(0.035f,0.03f,0.028f,1.0f);
-    drawFullscreenOverlay(0.17f,0.13f,0.08f,0.18f + 0.04f*sinf(tm*0.9f));
+    drawMainMenuBackdrop(tm);
+    drawFullscreenOverlay(0.015f,0.013f,0.012f,0.72f);
+    drawFullscreenOverlay(0.17f,0.13f,0.08f,0.22f + 0.05f*sinf(tm*0.9f));
     float p=0.8f+0.05f*sinf(tm*2.0f), gl=(rand()%100<3)?(rand()%10-5)*0.003f:0;
     drawTextCentered("THE BACKROOMS",0.0f+gl,0.5f,4.0f,0.9f,0.85f,0.4f,p);
     drawTextCentered("LEVEL 0",0.0f,0.35f,2.5f,0.7f,0.65f,0.3f,0.8f);
