@@ -36,6 +36,7 @@
 #include "net.h"
 #include "player_model.h"
 #include "menu_multi.h"
+#include "scare_system.h"
 
 // Constants
 const float CS = 5.0f;
@@ -74,6 +75,7 @@ float playerStamina = 100, staminaCooldown = 0, flashlightBattery = 100;
 bool flashlightOn = false, flashlightPressed = false;
 bool flashlightShutdownBlinkActive = false;
 float flashlightShutdownBlinkTimer = 0.0f;
+ScareSystemState scareState = {};
 bool interactPressed = false, spacePressed = false;
 int nearNoteId = -1, lastSpawnedNote = -1;
 float noteSpawnTimer = 0;

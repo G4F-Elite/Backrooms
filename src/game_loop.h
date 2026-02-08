@@ -5,6 +5,7 @@ int noteVC=0;
 bool playerModelsInit = false;
 #include "reconnect_policy.h"
 #include "flashlight_behavior.h"
+#include "scare_system.h"
 void buildGeom();
 
 enum InteractRequestType {
@@ -42,6 +43,14 @@ float lightsOutTimer = 0.0f;
 float falseDoorTimer = 0.0f;
 Vec3 falseDoorPos(0,0,0);
 int invBattery = 0, invMedkit = 0, invBait = 0;
+
+inline void triggerLocalScare(float flash, float shake, float sanityDamage){
+    if(damageFlash < flash) damageFlash = flash;
+    if(camShake < shake) camShake = shake;
+    playerSanity -= sanityDamage;
+    if(playerSanity < 0.0f) playerSanity = 0.0f;
+    triggerScare();
+}
 
 struct SessionSnapshot {
     bool valid;
@@ -373,6 +382,7 @@ void genWorld(){
     flashlightBattery=100;flashlightOn=false;isPlayerDead=false;
     flashlightShutdownBlinkActive = false;
     flashlightShutdownBlinkTimer = 0.0f;
+    resetScareSystemState(scareState);
     entitySpawnTimer=30;survivalTime=0;reshuffleTimer=15;
     lastSpawnedNote=-1;noteSpawnTimer=15.0f;
 }
@@ -422,6 +432,9 @@ void gameInput(GLFWwindow*w){
     }
     if(eNow&&!interactPressed&&nearNoteId>=0){
         if(storyMgr.checkNotePickup(cam.pos,4.0f)){
+            if(tryTriggerStoryScare(scareState, storyMgr.currentNote)){
+                triggerLocalScare(0.34f, 0.18f, 5.0f);
+            }
             gameState=STATE_NOTE;
             playerSanity-=8.0f;
             if(playerSanity<0)playerSanity=0;
@@ -874,6 +887,9 @@ int main(){
                     updateLightsAndPillars(playerChunkX,playerChunkZ);buildGeom();
                 }
                 storyMgr.update(dTime,survivalTime,playerSanity,rng);
+                if(tryTriggerRandomScare(scareState, dTime, storyMgr.getPhase(), playerSanity, (int)(rng()%100))){
+                    triggerLocalScare(0.26f, 0.14f, 3.0f);
+                }
                 
                 for(auto&n:storyMgr.notes)if(n.active&&!n.collected)n.bobPhase+=dTime*3.0f;
                 buildNotes(vhsTime);
