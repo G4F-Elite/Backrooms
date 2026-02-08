@@ -126,20 +126,55 @@ out vec2 uv; void main(){ uv=t; gl_Position=vec4(p,0,1); })";
 const char* vhsFS=R"(#version 330
 out vec4 F; in vec2 uv;
 uniform sampler2D tex; uniform float tm,inten;
+uniform int upscaler;
+uniform float sharpness;
+uniform float texelX;
+uniform float texelY;
 
 float rnd(vec2 s){ return fract(sin(dot(s,vec2(12.9898,78.233)))*43758.5453); }
 
+float noise(vec2 p) {
+ vec2 i = floor(p);
+ vec2 f = fract(p);
+ f = f * f * (3.0 - 2.0 * f);
+ float a = rnd(i);
+ float b = rnd(i + vec2(1.0, 0.0));
+ float c = rnd(i + vec2(0.0, 1.0));
+ float d = rnd(i + vec2(1.0, 1.0));
+ return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+vec3 fsr1Sample(vec2 tc){
+ vec3 c = texture(tex, tc).rgb;
+ vec3 n = texture(tex, tc + vec2(0.0, texelY)).rgb;
+ vec3 s = texture(tex, tc - vec2(0.0, texelY)).rgb;
+ vec3 e = texture(tex, tc + vec2(texelX, 0.0)).rgb;
+ vec3 w = texture(tex, tc - vec2(texelX, 0.0)).rgb;
+ vec3 mn = min(c, min(min(n, s), min(e, w)));
+ vec3 mx = max(c, max(max(n, s), max(e, w)));
+ vec3 lap = (n + s + e + w) - c * 4.0;
+ float span = max(max(mx.r - mn.r, mx.g - mn.g), mx.b - mn.b);
+ float adaptive = 1.0 / (1.0 + span * 16.0);
+ vec3 rcas = c - lap * (0.22 + sharpness * 0.58) * adaptive;
+ return clamp(rcas, 0.0, 1.0);
+}
+
+vec3 upscaledSample(vec2 tc){
+ if(upscaler == 1) return fsr1Sample(tc);
+ return texture(tex, tc).rgb;
+}
+
 void main(){
  if(inten < 0.2) {
-  F = vec4(texture(tex, uv).rgb, 1.0);
+  F = vec4(upscaledSample(uv), 1.0);
   return;
  }
  
  // Chromatic aberration
  float ab = 0.0015 * inten;
- float r = texture(tex, uv + vec2(ab,0)).r;
- float g = texture(tex, uv).g;
- float b = texture(tex, uv - vec2(ab,0)).b;
+ float r = upscaledSample(uv + vec2(ab,0)).r;
+ float g = upscaledSample(uv).g;
+ float b = upscaledSample(uv - vec2(ab,0)).b;
  vec3 c = vec3(r,g,b);
  
  // Scanlines
@@ -151,14 +186,30 @@ void main(){
  // Horizontal distortion glitch (rare)
  if(inten > 0.45 && rnd(vec2(tm * 0.08, floor(uv.y * 60))) > 0.985) {
   float of = (rnd(vec2(tm, floor(uv.y * 60))) - 0.5) * 0.018 * inten;
-  c = texture(tex, uv + vec2(of, 0)).rgb;
+  c = upscaledSample(uv + vec2(of, 0));
  }
  
- // Light vignette
- c *= 1.0 - length(uv - 0.5) * 0.3;
+ // Vignette - stronger to hide screen edges
+ float vig = 1.0 - length(uv - 0.5) * 0.45;
+ vig = smoothstep(0.3, 1.0, vig);
+ c *= vig;
+ 
+ // Subtle dust particles overlay
+ float dust = noise(uv * 200.0 + vec2(tm * 3.0, tm * 2.0));
+ dust = smoothstep(0.75, 0.95, dust) * 0.08 * inten;
+ c += dust;
+ 
+ // Subtle light leak / haze at center
+ float haze = 1.0 - length(uv - 0.5) * 1.5;
+ haze = max(haze, 0.0) * 0.03 * inten;
+ c += vec3(haze * 1.1, haze, haze * 0.9);
+ 
+ // Ghost frame (very subtle double image)
+ c = mix(c, upscaledSample(uv - vec2(0.003, 0.001)), 0.03 * inten);
  
  // Warm tint
  c.g += 0.01 * inten;
  
  F = vec4(c, 1);
 })";
+

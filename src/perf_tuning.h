@@ -7,7 +7,6 @@
 
 inline constexpr int SCENE_LIGHT_LIMIT = 16;
 inline constexpr float SCENE_LIGHT_MAX_DIST = 22.0f;
-inline constexpr float SCENE_RENDER_SCALE = 0.75f;
 
 inline void computeRenderTargetSize(int winW, int winH, float scale, int& outW, int& outH) {
     if (scale < 0.5f) scale = 0.5f;

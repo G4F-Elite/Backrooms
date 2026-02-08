@@ -62,6 +62,8 @@ inline void handleNicknameInput(GLFWwindow* w) {
 }
 
 inline void settingsInput(GLFWwindow* w, bool fromPause) {
+    static constexpr int SETTINGS_ITEMS = 11;
+    static constexpr int SETTINGS_BACK_INDEX = 10;
     bool esc = glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS;
     bool up = glfwGetKey(w, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS;
     bool down = glfwGetKey(w, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS;
@@ -69,10 +71,10 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
     bool right = glfwGetKey(w, GLFW_KEY_RIGHT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_D) == GLFW_PRESS;
     bool enter = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS;
     
-    if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 7; }
-    if (down && !downPressed) { menuSel++; if (menuSel > 7) menuSel = 0; }
+    if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = SETTINGS_ITEMS - 1; }
+    if (down && !downPressed) { menuSel++; if (menuSel >= SETTINGS_ITEMS) menuSel = 0; }
     
-    if (menuSel < 7) {
+    if (menuSel <= 6) {
         float* vals[] = {
             &settings.masterVol, &settings.musicVol, &settings.ambienceVol, &settings.sfxVol,
             &settings.voiceVol, &settings.vhsIntensity, &settings.mouseSens
@@ -88,9 +90,18 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
             *vals[menuSel] += step[menuSel]; 
             if (*vals[menuSel] > maxV[menuSel]) *vals[menuSel] = maxV[menuSel]; 
         }
+    } else if (menuSel == 7) {
+        if (left && !leftPressed) settings.upscalerMode = clampUpscalerMode(settings.upscalerMode - 1);
+        if (right && !rightPressed) settings.upscalerMode = clampUpscalerMode(settings.upscalerMode + 1);
+    } else if (menuSel == 8) {
+        if (left && !leftPressed) settings.renderScalePreset = stepRenderScalePreset(settings.renderScalePreset, -1);
+        if (right && !rightPressed) settings.renderScalePreset = stepRenderScalePreset(settings.renderScalePreset, 1);
+    } else if (menuSel == 9) {
+        if (left && !leftPressed) settings.fsrSharpness = clampFsrSharpness(settings.fsrSharpness - 0.05f);
+        if (right && !rightPressed) settings.fsrSharpness = clampFsrSharpness(settings.fsrSharpness + 0.05f);
     }
     
-    if ((enter && !enterPressed && menuSel == 7) || (esc && !escPressed)) { 
+    if ((enter && !enterPressed && menuSel == SETTINGS_BACK_INDEX) || (esc && !escPressed)) { 
         gameState = fromPause ? STATE_PAUSE : STATE_MENU; 
         menuSel = fromPause ? 1 : 2;  // Settings position in respective menu
     }

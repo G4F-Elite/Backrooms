@@ -411,7 +411,7 @@ int main(){
     wallTex=genTex(0);floorTex=genTex(1);ceilTex=genTex(2);lightTex=genTex(3);
     mainShader=mkShader(mainVS,mainFS);lightShader=mkShader(lightVS,lightFS);vhsShader=mkShader(vhsVS,vhsFS);
     buildGeom();
-    computeRenderTargetSize(winW, winH, SCENE_RENDER_SCALE, renderW, renderH);
+    computeRenderTargetSize(winW, winH, renderScaleFromPreset(settings.renderScalePreset), renderW, renderH);
     initFBO(fbo,fboTex,rbo,renderW,renderH);
     initText();
     entityMgr.init();
@@ -420,6 +420,16 @@ int main(){
     
     while(!glfwWindowShouldClose(gWin)){
         float now=(float)glfwGetTime();dTime=now-lastFrame;lastFrame=now;vhsTime=now;
+        int desiredRenderW = 0, desiredRenderH = 0;
+        computeRenderTargetSize(winW, winH, renderScaleFromPreset(settings.renderScalePreset), desiredRenderW, desiredRenderH);
+        if(desiredRenderW != renderW || desiredRenderH != renderH){
+            renderW = desiredRenderW;
+            renderH = desiredRenderH;
+            if(fbo) glDeleteFramebuffers(1, &fbo);
+            if(fboTex) glDeleteTextures(1, &fboTex);
+            if(rbo) glDeleteRenderbuffers(1, &rbo);
+            initFBO(fbo, fboTex, rbo, renderW, renderH);
+        }
         sndState.masterVol=settings.masterVol;sndState.dangerLevel=entityMgr.dangerLevel;
         sndState.musicVol=settings.musicVol;
         sndState.ambienceVol=settings.ambienceVol;
@@ -621,12 +631,24 @@ int main(){
         float vI=settings.vhsIntensity+entityMgr.dangerLevel*0.5f+sP + anomalyBlur * 0.55f;
         static GLint vhsTmLoc = -1;
         static GLint vhsIntenLoc = -1;
+        static GLint vhsUpscalerLoc = -1;
+        static GLint vhsSharpnessLoc = -1;
+        static GLint vhsTexelXLoc = -1;
+        static GLint vhsTexelYLoc = -1;
         if(vhsTmLoc<0){
             vhsTmLoc = glGetUniformLocation(vhsShader,"tm");
             vhsIntenLoc = glGetUniformLocation(vhsShader,"inten");
+            vhsUpscalerLoc = glGetUniformLocation(vhsShader,"upscaler");
+            vhsSharpnessLoc = glGetUniformLocation(vhsShader,"sharpness");
+            vhsTexelXLoc = glGetUniformLocation(vhsShader,"texelX");
+            vhsTexelYLoc = glGetUniformLocation(vhsShader,"texelY");
         }
         glUniform1f(vhsTmLoc,vhsTime);
         glUniform1f(vhsIntenLoc,vI);
+        glUniform1i(vhsUpscalerLoc,clampUpscalerMode(settings.upscalerMode));
+        glUniform1f(vhsSharpnessLoc,clampFsrSharpness(settings.fsrSharpness));
+        glUniform1f(vhsTexelXLoc,1.0f/(float)renderW);
+        glUniform1f(vhsTexelYLoc,1.0f/(float)renderH);
         glBindVertexArray(quadVAO);glDrawArrays(GL_TRIANGLES,0,6);
         glEnable(GL_DEPTH_TEST);
         
