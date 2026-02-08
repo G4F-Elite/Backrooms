@@ -48,6 +48,24 @@ void buildGeom(){
             mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, 0.30f * pr.scale, 0.78f * pr.scale, 0.30f * pr.scale);
         }else if(pr.type==MAP_PROP_PUDDLE){
             mkFloorDecal(dv, pr.pos.x, 0.02f, pr.pos.z, 1.7f * pr.scale, 1.3f * pr.scale);
+        }else if(pr.type==MAP_PROP_DESK){
+            mkBox(dv, pr.pos.x, 0.72f * pr.scale, pr.pos.z, 1.05f * pr.scale, 0.14f * pr.scale, 0.70f * pr.scale);
+            mkBox(dv, pr.pos.x - 0.42f * pr.scale, 0.0f, pr.pos.z - 0.24f * pr.scale, 0.12f * pr.scale, 0.72f * pr.scale, 0.12f * pr.scale);
+            mkBox(dv, pr.pos.x + 0.42f * pr.scale, 0.0f, pr.pos.z - 0.24f * pr.scale, 0.12f * pr.scale, 0.72f * pr.scale, 0.12f * pr.scale);
+            mkBox(dv, pr.pos.x - 0.42f * pr.scale, 0.0f, pr.pos.z + 0.24f * pr.scale, 0.12f * pr.scale, 0.72f * pr.scale, 0.12f * pr.scale);
+            mkBox(dv, pr.pos.x + 0.42f * pr.scale, 0.0f, pr.pos.z + 0.24f * pr.scale, 0.12f * pr.scale, 0.72f * pr.scale, 0.12f * pr.scale);
+        }else if(pr.type==MAP_PROP_CHAIR){
+            mkBox(dv, pr.pos.x, 0.36f * pr.scale, pr.pos.z, 0.48f * pr.scale, 0.10f * pr.scale, 0.48f * pr.scale);
+            mkBox(dv, pr.pos.x, 0.46f * pr.scale, pr.pos.z - 0.18f * pr.scale, 0.48f * pr.scale, 0.42f * pr.scale, 0.10f * pr.scale);
+            mkBox(dv, pr.pos.x - 0.18f * pr.scale, 0.0f, pr.pos.z + 0.18f * pr.scale, 0.10f * pr.scale, 0.36f * pr.scale, 0.10f * pr.scale);
+            mkBox(dv, pr.pos.x + 0.18f * pr.scale, 0.0f, pr.pos.z + 0.18f * pr.scale, 0.10f * pr.scale, 0.36f * pr.scale, 0.10f * pr.scale);
+            mkBox(dv, pr.pos.x - 0.18f * pr.scale, 0.0f, pr.pos.z - 0.18f * pr.scale, 0.10f * pr.scale, 0.36f * pr.scale, 0.10f * pr.scale);
+            mkBox(dv, pr.pos.x + 0.18f * pr.scale, 0.0f, pr.pos.z - 0.18f * pr.scale, 0.10f * pr.scale, 0.36f * pr.scale, 0.10f * pr.scale);
+        }else if(pr.type==MAP_PROP_CABINET){
+            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, 0.64f * pr.scale, 1.55f * pr.scale, 0.52f * pr.scale);
+            mkBox(dv, pr.pos.x, 1.52f * pr.scale, pr.pos.z, 0.70f * pr.scale, 0.08f * pr.scale, 0.58f * pr.scale);
+        }else if(pr.type==MAP_PROP_PARTITION){
+            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, 1.35f * pr.scale, 1.22f * pr.scale, 0.12f * pr.scale);
         }else{
             mkBox(dv, pr.pos.x - 0.42f, 0.0f, pr.pos.z + 0.24f, 0.68f * pr.scale, 0.35f * pr.scale, 0.68f * pr.scale);
             mkBox(dv, pr.pos.x + 0.28f, 0.0f, pr.pos.z - 0.22f, 0.56f * pr.scale, 0.28f * pr.scale, 0.56f * pr.scale);

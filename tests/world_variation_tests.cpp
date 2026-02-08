@@ -64,6 +64,23 @@ void testChunkGenerationHasVariedDensity() {
     assert(o0 > 35);
     assert(o1 > 35);
     assert(o0 != o1);
+    assert(o0 < 190);
+    assert(o1 < 190);
+}
+
+void testChunkDeadEndsAreControlled() {
+    chunks.clear();
+    worldSeed = 314159;
+    generateChunk(0, 0);
+    const Chunk& c = chunks[chunkKey(0, 0)];
+    int deadEnds = 0;
+    for (int x = 1; x < CHUNK_SIZE - 1; x++) {
+        for (int z = 1; z < CHUNK_SIZE - 1; z++) {
+            if (c.cells[x][z] != 0) continue;
+            if (countWallsAround(c, x, z) >= 3) deadEnds++;
+        }
+    }
+    assert(deadEnds < 30);
 }
 
 void testPillarsGenerated() {
@@ -100,6 +117,7 @@ int main() {
     testRectHelpers();
     testPatternsCreateOpenArea();
     testChunkGenerationHasVariedDensity();
+    testChunkDeadEndsAreControlled();
     testPillarsGenerated();
     testFindSpawnPosAvoidsPillars();
     std::cout << "All world variation tests passed.\n";

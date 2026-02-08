@@ -85,13 +85,13 @@ void testGeneratesVariedProps() {
     updateMapContent(0, 0);
 
     assert(mapProps.size() > 35);
-    bool seen[6] = {false, false, false, false, false, false};
+    bool seen[10] = {false, false, false, false, false, false, false, false, false, false};
     for (const auto& p : mapProps) {
-        if (p.type >= 0 && p.type < 6) seen[p.type] = true;
+        if (p.type >= 0 && p.type < 10) seen[p.type] = true;
     }
     int seenCount = 0;
     for (bool v : seen) if (v) seenCount++;
-    assert(seenCount >= 5);
+    assert(seenCount >= 7);
 }
 
 void testNoPropsInsideWalls() {

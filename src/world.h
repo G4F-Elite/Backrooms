@@ -66,7 +66,7 @@ inline int countWallsAround(const Chunk& c, int x, int z) {
 inline void removeDeadEnds(Chunk& c, std::mt19937& cr) {
     bool changed = true;
     int iterations = 0;
-    while (changed && iterations < 5) {
+    while (changed && iterations < 7) {
         changed = false;
         iterations++;
         for (int x = 1; x < CHUNK_SIZE - 1; x++) {
@@ -75,8 +75,8 @@ inline void removeDeadEnds(Chunk& c, std::mt19937& cr) {
                 
                 int walls = countWallsAround(c, x, z);
                 if (walls >= 3) {  // Dead-end detected (3 walls = only 1 exit)
-                    // 70% chance to remove dead-end
-                    if (cr() % 100 < 70) {
+                    // Higher chance to remove dead-ends for better flow.
+                    if (cr() % 100 < 88) {
                         // Find a wall to remove
                         std::vector<std::pair<int,int>> wallDirs;
                         if (x > 1 && c.cells[x-1][z] == 1) wallDirs.push_back({x-1, z});
@@ -98,7 +98,7 @@ inline void removeDeadEnds(Chunk& c, std::mt19937& cr) {
 
 // Add extra connections to reduce isolation
 inline void addExtraConnections(Chunk& c, std::mt19937& cr) {
-    int connections = 4 + cr() % 4;  // Add 4-7 extra connections
+    int connections = 2 + cr() % 3;  // Add 2-4 extra connections
     for (int i = 0; i < connections; i++) {
         int x = 2 + cr() % (CHUNK_SIZE - 4);
         int z = 2 + cr() % (CHUNK_SIZE - 4);
@@ -228,8 +228,8 @@ inline void generateChunk(int cx, int cz) {
     // Apply architecture patterns
     applyChunkArchitecturePattern(c, cr);
     
-    // Add random rooms (4-5 instead of 3)
-    for (int i = 0; i < 4 + cr() % 2; i++) { 
+    // Add random rooms (3-4) to avoid too many giant open zones.
+    for (int i = 0; i < 3 + cr() % 2; i++) { 
         int rx = 1+cr()%(CHUNK_SIZE-4), rz = 1+cr()%(CHUNK_SIZE-4);
         int rw = 2+cr()%3, rh = 2+cr()%3;  // Slightly larger rooms
         for (int x = rx; x < rx+rw && x < CHUNK_SIZE-1; x++) 
@@ -237,10 +237,10 @@ inline void generateChunk(int cx, int cz) {
                 c.cells[x][z] = 0; 
     }
     
-    // Random wall removal (increased from 15% to 22%)
+    // Controlled wall removal to keep layout readable and less over-open.
     for (int x = 1; x < CHUNK_SIZE-1; x++) 
         for (int z = 1; z < CHUNK_SIZE-1; z++) 
-            if (c.cells[x][z] == 1 && cr()%100 < 22) 
+            if (c.cells[x][z] == 1 && cr()%100 < 14) 
                 c.cells[x][z] = 0;
     
     // Remove dead-ends

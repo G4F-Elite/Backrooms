@@ -12,7 +12,11 @@ enum MapPropType {
     MAP_PROP_BARRIER = 2,
     MAP_PROP_CABLE_REEL = 3,
     MAP_PROP_PUDDLE = 4,
-    MAP_PROP_DEBRIS = 5
+    MAP_PROP_DEBRIS = 5,
+    MAP_PROP_DESK = 6,
+    MAP_PROP_CHAIR = 7,
+    MAP_PROP_CABINET = 8,
+    MAP_PROP_PARTITION = 9
 };
 
 struct MapProp {
@@ -45,6 +49,10 @@ inline float mapPropCollisionRadius(const MapProp& p) {
     if (p.type == MAP_PROP_BARRIER) return 0.48f * CS;
     if (p.type == MAP_PROP_CABLE_REEL) return 0.30f * CS;
     if (p.type == MAP_PROP_DEBRIS) return 0.27f * CS;
+    if (p.type == MAP_PROP_CHAIR) return 0.24f * CS;
+    if (p.type == MAP_PROP_DESK) return 0.42f * CS;
+    if (p.type == MAP_PROP_CABINET) return 0.36f * CS;
+    if (p.type == MAP_PROP_PARTITION) return 0.46f * CS;
     return 0.36f * CS;
 }
 
@@ -101,11 +109,15 @@ inline void spawnChunkProps(const Chunk& c) {
         }
         int weighted = (int)(cr() % 100);
         int type = MAP_PROP_DEBRIS;
-        if (weighted < 26) type = MAP_PROP_CRATE_STACK;
-        else if (weighted < 40) type = MAP_PROP_CABLE_REEL;
-        else if (weighted < 54) type = MAP_PROP_CONE_CLUSTER;
-        else if (weighted < 68) type = MAP_PROP_BARRIER;
-        else if (weighted < 84) type = MAP_PROP_DEBRIS;
+        if (weighted < 18) type = MAP_PROP_CRATE_STACK;
+        else if (weighted < 30) type = MAP_PROP_CABLE_REEL;
+        else if (weighted < 42) type = MAP_PROP_CONE_CLUSTER;
+        else if (weighted < 56) type = MAP_PROP_BARRIER;
+        else if (weighted < 72) type = MAP_PROP_DEBRIS;
+        else if (weighted < 80) type = MAP_PROP_DESK;
+        else if (weighted < 86) type = MAP_PROP_CHAIR;
+        else if (weighted < 92) type = MAP_PROP_CABINET;
+        else if (weighted < 97) type = MAP_PROP_PARTITION;
         else type = MAP_PROP_PUDDLE;
         float scale = 0.78f + ((float)(cr() % 45) / 100.0f);
         float yaw = ((float)(cr() % 628) / 100.0f);
@@ -134,7 +146,7 @@ inline void spawnChunkPoiClusters(const Chunk& c) {
             int type = MAP_PROP_DEBRIS;
             if (theme == 0) type = (j % 2 == 0) ? MAP_PROP_CRATE_STACK : MAP_PROP_BARRIER;
             if (theme == 1) type = (j % 2 == 0) ? MAP_PROP_CABLE_REEL : MAP_PROP_CONE_CLUSTER;
-            if (theme == 2) type = (j % 2 == 0) ? MAP_PROP_PUDDLE : MAP_PROP_DEBRIS;
+            if (theme == 2) type = (j % 2 == 0) ? MAP_PROP_DESK : MAP_PROP_CHAIR;
             float scale = 0.88f + ((float)(cr() % 35) / 100.0f);
             float yaw = ((float)(cr() % 628) / 100.0f);
             pushMapPropUnique(c.cx, c.cz, lx, lz, type, scale, yaw);
@@ -142,9 +154,44 @@ inline void spawnChunkPoiClusters(const Chunk& c) {
     }
 }
 
+inline bool isLikelyOfficeChunk(const Chunk& c) {
+    int stripWalls = 0;
+    for (int x = 2; x < CHUNK_SIZE - 2; x++) {
+        int w = 0;
+        for (int z = 2; z < CHUNK_SIZE - 2; z++) {
+            if (c.cells[x][z] == 1) w++;
+        }
+        if (w >= CHUNK_SIZE - 6) stripWalls++;
+    }
+    return stripWalls >= 2;
+}
+
+inline void spawnOfficeFurniture(const Chunk& c) {
+    if (!isLikelyOfficeChunk(c)) return;
+    std::mt19937 cr(chunkMapContentSeed(c.cx, c.cz, 0xB44231u));
+    int rows = 2 + (int)(cr() % 3);
+    for (int i = 0; i < rows; i++) {
+        int lx = 2 + (int)(cr() % (CHUNK_SIZE - 4));
+        int lz = 2 + (int)(cr() % (CHUNK_SIZE - 4));
+        if (!isMapPropCellValid(c, lx, lz)) continue;
+
+        pushMapPropUnique(c.cx, c.cz, lx, lz, MAP_PROP_DESK, 0.95f, 0.0f);
+        if (isMapPropCellValid(c, lx + 1, lz)) {
+            pushMapPropUnique(c.cx, c.cz, lx + 1, lz, MAP_PROP_CHAIR, 0.9f, 0.0f);
+        }
+        if (isMapPropCellValid(c, lx, lz + 1) && (cr() % 100) < 55) {
+            pushMapPropUnique(c.cx, c.cz, lx, lz + 1, MAP_PROP_CABINET, 0.95f, 0.0f);
+        }
+        if (isMapPropCellValid(c, lx - 1, lz) && (cr() % 100) < 45) {
+            pushMapPropUnique(c.cx, c.cz, lx - 1, lz, MAP_PROP_PARTITION, 1.0f, 0.0f);
+        }
+    }
+}
+
 inline void rebuildChunkMapContent(const Chunk& c) {
     spawnChunkProps(c);
     spawnChunkPoiClusters(c);
+    spawnOfficeFurniture(c);
 }
 
 inline bool isMapPropTooFar(const MapProp& p, float cx, float cz, float md) {
