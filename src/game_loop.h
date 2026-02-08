@@ -1,9 +1,10 @@
 #pragma once
 
 #include "coop.h"
+#include "map_content.h"
 
 void buildGeom(){
-    std::vector<float>wv,fv,cv,pv,lv,lvOff;
+    std::vector<float>wv,fv,cv,pv,lv,lvOff,dv;
     int pcx=playerChunkX,pcz=playerChunkZ;
     for(int dcx=-VIEW_CHUNKS;dcx<=VIEW_CHUNKS;dcx++){
         for(int dcz=-VIEW_CHUNKS;dcz<=VIEW_CHUNKS;dcz++){
@@ -30,14 +31,38 @@ void buildGeom(){
         }
     }
     for(auto&p:pillars)mkPillar(pv,p.x,p.z,0.6f,WH);
+    for(auto&pr:mapProps){
+        if(pr.type==MAP_PROP_CRATE_STACK){
+            float b = 1.25f * pr.scale;
+            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, b, 1.0f * pr.scale, b);
+            mkBox(dv, pr.pos.x + 0.25f * CS, 1.0f * pr.scale, pr.pos.z - 0.20f * CS,
+                  0.85f * pr.scale, 0.7f * pr.scale, 0.85f * pr.scale);
+        }else if(pr.type==MAP_PROP_CONE_CLUSTER){
+            float base = 0.22f * CS * pr.scale;
+            mkBox(dv, pr.pos.x - 0.18f * CS, 0.0f, pr.pos.z, base, 0.45f * pr.scale, base);
+            mkBox(dv, pr.pos.x + 0.15f * CS, 0.0f, pr.pos.z + 0.12f * CS, base, 0.42f * pr.scale, base);
+            mkBox(dv, pr.pos.x + 0.05f * CS, 0.0f, pr.pos.z - 0.15f * CS, base, 0.38f * pr.scale, base);
+        }else if(pr.type==MAP_PROP_BARRIER){
+            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, 1.8f * pr.scale, 0.85f * pr.scale, 0.45f * pr.scale);
+        }else if(pr.type==MAP_PROP_CABLE_REEL){
+            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, 0.95f * pr.scale, 0.6f * pr.scale, 0.95f * pr.scale);
+            mkBox(dv, pr.pos.x, 0.6f * pr.scale, pr.pos.z, 0.35f * pr.scale, 0.6f * pr.scale, 0.35f * pr.scale);
+        }else if(pr.type==MAP_PROP_PUDDLE){
+            mkFloorDecal(dv, pr.pos.x, 0.02f, pr.pos.z, 1.7f * pr.scale, 1.3f * pr.scale);
+        }else{
+            mkBox(dv, pr.pos.x - 0.20f * CS, 0.0f, pr.pos.z + 0.16f * CS, 0.7f * pr.scale, 0.35f * pr.scale, 0.7f * pr.scale);
+            mkBox(dv, pr.pos.x + 0.10f * CS, 0.0f, pr.pos.z - 0.10f * CS, 0.6f * pr.scale, 0.28f * pr.scale, 0.6f * pr.scale);
+        }
+    }
     for(auto&l:lights){
         if(l.on)mkLight(lv,l.pos,l.sizeX,l.sizeZ);
         else mkLight(lvOff,l.pos,l.sizeX,l.sizeZ);
     }
     wallVC=(int)wv.size()/8;floorVC=(int)fv.size()/8;ceilVC=(int)cv.size()/8;
-    pillarVC=(int)pv.size()/8;lightVC=(int)lv.size()/5;lightOffVC=(int)lvOff.size()/5;
+    pillarVC=(int)pv.size()/8;decorVC=(int)dv.size()/8;lightVC=(int)lv.size()/5;lightOffVC=(int)lvOff.size()/5;
     setupVAO(wallVAO,wallVBO,wv,true);setupVAO(floorVAO,floorVBO,fv,true);
     setupVAO(ceilVAO,ceilVBO,cv,true);setupVAO(pillarVAO,pillarVBO,pv,true);
+    if(decorVC>0)setupVAO(decorVAO,decorVBO,dv,true);
     setupVAO(lightVAO,lightVBO,lv,false);
     if(!lvOff.empty())setupVAO(lightOffVAO,lightOffVBO,lvOff,false);
     initQuad(quadVAO,quadVBO);lastBuildChunkX=pcx;lastBuildChunkZ=pcz;
@@ -84,10 +109,11 @@ void genWorld(){
         if(multiState==MULTI_IN_GAME) netMgr.worldSeed = worldSeed;
     }
     
-    chunks.clear();lights.clear();pillars.clear();
+    chunks.clear();lights.clear();pillars.clear();mapProps.clear();
     g_lightStates.clear(); // Reset light temporal states on world gen
     updateVisibleChunks(0,0);
     updateLightsAndPillars(0,0);
+    updateMapContent(0,0);
     Vec3 sp=findSafeSpawn();
     Vec3 coopBase = sp;
     
@@ -104,6 +130,7 @@ void genWorld(){
     cam.pos=Vec3(sp.x,PH,sp.z);cam.yaw=cam.pitch=0;
     updateVisibleChunks(cam.pos.x,cam.pos.z);
     updateLightsAndPillars(playerChunkX,playerChunkZ);
+    updateMapContent(playerChunkX,playerChunkZ);
     entityMgr.reset();storyMgr.init();
     initTrapCorridor(sp);
     resetPlayerInterpolation();
@@ -137,6 +164,7 @@ void teleportToPlayer(){
     cam.pos=Vec3(tp.x+1.0f,PH,tp.z);
     updateVisibleChunks(cam.pos.x,cam.pos.z);
     updateLightsAndPillars(playerChunkX,playerChunkZ);
+    updateMapContent(playerChunkX,playerChunkZ);
     buildGeom();
 }
 
@@ -370,6 +398,7 @@ void renderScene(){
     
     glBindTexture(GL_TEXTURE_2D,wallTex);glBindVertexArray(wallVAO);glDrawArrays(GL_TRIANGLES,0,wallVC);
     glBindVertexArray(pillarVAO);glDrawArrays(GL_TRIANGLES,0,pillarVC);
+    if(decorVC>0){glBindVertexArray(decorVAO);glDrawArrays(GL_TRIANGLES,0,decorVC);}
     glBindTexture(GL_TEXTURE_2D,floorTex);glBindVertexArray(floorVAO);glDrawArrays(GL_TRIANGLES,0,floorVC);
     glDisable(GL_CULL_FACE);
     glBindTexture(GL_TEXTURE_2D,ceilTex);glBindVertexArray(ceilVAO);glDrawArrays(GL_TRIANGLES,0,ceilVC);
@@ -521,6 +550,7 @@ int main(){
                     if(lightsOutTimer<=0){
                         lightsOutTimer=0;
                         updateLightsAndPillars(playerChunkX,playerChunkZ);
+                        updateMapContent(playerChunkX,playerChunkZ);
                         buildGeom();
                     }
                 }
@@ -535,7 +565,9 @@ int main(){
                     updateVisibleChunks(cam.pos.x,cam.pos.z);
                 }
                 if(playerChunkX!=lastBuildChunkX||playerChunkZ!=lastBuildChunkZ){
-                    updateLightsAndPillars(playerChunkX,playerChunkZ);buildGeom();
+                    updateLightsAndPillars(playerChunkX,playerChunkZ);
+                    updateMapContent(playerChunkX,playerChunkZ);
+                    buildGeom();
                 }
                 storyMgr.update(dTime,survivalTime,playerSanity,rng);
                 if(tryTriggerRandomScare(scareState, dTime, storyMgr.getPhase(), playerSanity, (int)(rng()%100))){
@@ -584,6 +616,7 @@ int main(){
                 bool frontReshuffle=survivalTime>300&&rng()%100<20;
                 if(canReshuffle && reshuffleTimer<=0&&rng()%100<(int)reshuffleChance){
                     if(frontReshuffle||reshuffleBehind(cam.pos.x,cam.pos.z,cam.yaw)){
+                        updateMapContent(playerChunkX,playerChunkZ);
                         buildGeom();
                         if(multiState==MULTI_IN_GAME && netMgr.isHost){
                             netMgr.sendReshuffle(playerChunkX, playerChunkZ, worldSeed);

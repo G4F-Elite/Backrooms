@@ -61,6 +61,53 @@ inline void mkLight(std::vector<float>& v, Vec3 pos, float sx, float sz) {
     for (int i = 0; i < 30; i++) v.push_back(vv[i]);
 }
 
+inline void mkBox(std::vector<float>& v, float cx, float y0, float cz, float sx, float sy, float sz) {
+    float hx = sx * 0.5f;
+    float hz = sz * 0.5f;
+    float y1 = y0 + sy;
+
+    auto pushFace = [&](float x0, float z0, float x1, float z1, float nx, float nz) {
+        float vv[] = {
+            x0, y0, z0, 0, 0, nx, 0, nz,
+            x1, y0, z1, 1, 0, nx, 0, nz,
+            x1, y1, z1, 1, 1, nx, 0, nz,
+            x0, y0, z0, 0, 0, nx, 0, nz,
+            x1, y1, z1, 1, 1, nx, 0, nz,
+            x0, y1, z0, 0, 1, nx, 0, nz
+        };
+        for (int i = 0; i < 48; i++) v.push_back(vv[i]);
+    };
+
+    pushFace(cx - hx, cz + hz, cx + hx, cz + hz, 0, 1);
+    pushFace(cx + hx, cz - hz, cx - hx, cz - hz, 0, -1);
+    pushFace(cx + hx, cz + hz, cx + hx, cz - hz, 1, 0);
+    pushFace(cx - hx, cz - hz, cx - hx, cz + hz, -1, 0);
+
+    float top[] = {
+        cx - hx, y1, cz - hz, 0, 0, 0, 1, 0,
+        cx + hx, y1, cz - hz, 1, 0, 0, 1, 0,
+        cx + hx, y1, cz + hz, 1, 1, 0, 1, 0,
+        cx - hx, y1, cz - hz, 0, 0, 0, 1, 0,
+        cx + hx, y1, cz + hz, 1, 1, 0, 1, 0,
+        cx - hx, y1, cz + hz, 0, 1, 0, 1, 0
+    };
+    for (int i = 0; i < 48; i++) v.push_back(top[i]);
+}
+
+inline void mkFloorDecal(std::vector<float>& v, float cx, float y, float cz, float sx, float sz) {
+    float hx = sx * 0.5f;
+    float hz = sz * 0.5f;
+    float vv[] = {
+        cx - hx, y, cz - hz, 0, 0, 0, 1, 0,
+        cx - hx, y, cz + hz, 0, 1, 0, 1, 0,
+        cx + hx, y, cz + hz, 1, 1, 0, 1, 0,
+        cx - hx, y, cz - hz, 0, 0, 0, 1, 0,
+        cx + hx, y, cz + hz, 1, 1, 0, 1, 0,
+        cx + hx, y, cz - hz, 1, 0, 0, 1, 0
+    };
+    for (int i = 0; i < 48; i++) v.push_back(vv[i]);
+}
+
 // Note paper model - floating sheet with slight rotation
 inline void mkNotePaper(std::vector<float>& v, Vec3 pos, float bob, float tm) {
     float y = 0.8f + sinf(bob) * 0.1f;
