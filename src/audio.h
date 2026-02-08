@@ -8,7 +8,8 @@
 
 const int SAMP_RATE=44100;
 const int BUF_COUNT=3;
-const int BUF_LEN=8192;
+// Smaller audio blocks reduce menu SFX input latency.
+const int BUF_LEN=1024;
 
 struct SoundState {
     float humPhase=0;
