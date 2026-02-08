@@ -106,19 +106,19 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
             *vals[menuSel] += step[menuSel] * (float)dir;
             if (*vals[menuSel] < minV[menuSel]) *vals[menuSel] = minV[menuSel];
             if (*vals[menuSel] > maxV[menuSel]) *vals[menuSel] = maxV[menuSel];
-            triggerMenuNavigateSound();
+            triggerMenuAdjustSound();
         } else if (menuSel == 7) {
             settings.upscalerMode = clampUpscalerMode(settings.upscalerMode + dir);
-            triggerMenuNavigateSound();
+            triggerMenuAdjustSound();
         } else if (menuSel == 8) {
             settings.renderScalePreset = stepRenderScalePreset(settings.renderScalePreset, dir);
-            triggerMenuNavigateSound();
+            triggerMenuAdjustSound();
         } else if (menuSel == 9) {
             settings.fsrSharpness = clampFsrSharpness(settings.fsrSharpness + 0.05f * (float)dir);
-            triggerMenuNavigateSound();
+            triggerMenuAdjustSound();
         } else if (menuSel == SETTINGS_AA_INDEX) {
             settings.aaMode = stepAaMode(settings.aaMode, dir);
-            triggerMenuNavigateSound();
+            triggerMenuAdjustSound();
         }
     };
     

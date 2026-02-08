@@ -164,8 +164,27 @@ inline void drawTextCentered(const char* s, float centerX, float y, float sc, fl
 }
 
 inline void drawSlider(float x,float y,float w,float val,float r,float g,float b) {
-    char bar[21]; int f=(int)(val*20); for(int i=0;i<20;i++)bar[i]=(i<f)?'=':'-'; bar[20]=0;
-    drawText("[",x,y,1.8f,r*0.5f,g*0.5f,b*0.5f); drawText(bar,x+0.02f,y,1.8f,r,g,b); drawText("]",x+w-0.02f,y,1.8f,r*0.5f,g*0.5f,b*0.5f);
+    (void)w;
+    const int slots = 18;
+    int filled = (int)(val * (float)slots + 0.5f);
+    if(filled < 0) filled = 0;
+    if(filled > slots) filled = slots;
+
+    char base[slots + 1];
+    for(int i=0;i<slots;i++) base[i]='.';
+    base[slots]=0;
+    drawText(base,x,y,1.55f,r*0.33f,g*0.33f,b*0.33f,0.92f);
+
+    if(filled > 0){
+        char fill[slots + 1];
+        for(int i=0;i<filled;i++) fill[i]='#';
+        fill[filled]=0;
+        drawText(fill,x,y,1.55f,r,g,b,0.98f);
+    }
+
+    int knobIndex = filled > 0 ? (filled - 1) : 0;
+    float knobX = x + textAdvanceNdc(1.55f) * (float)knobIndex;
+    drawText("|",knobX,y,1.55f,0.98f,0.96f,0.88f,0.98f);
 }
 
 inline void drawMenu(float tm) {
