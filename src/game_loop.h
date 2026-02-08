@@ -150,12 +150,26 @@ inline int minimapWallSampler(int wx, int wz){
 inline void updateMinimapCheat(GLFWwindow* w){
     static bool letterPressed[26] = {false};
     static bool f6Pressed = false;
+    static bool f7Pressed = false;
+    static bool homePressed = false;
 
     bool f6Now = glfwGetKey(w, GLFW_KEY_F6) == GLFW_PRESS;
     if(f6Now && !f6Pressed){
         minimapEnabled = !minimapEnabled;
     }
     f6Pressed = f6Now;
+
+    bool f7Now = glfwGetKey(w, GLFW_KEY_F7) == GLFW_PRESS;
+    if(f7Now && !f7Pressed){
+        minimapEnabled = !minimapEnabled;
+    }
+    f7Pressed = f7Now;
+
+    bool homeNow = glfwGetKey(w, GLFW_KEY_HOME) == GLFW_PRESS;
+    if(homeNow && !homePressed){
+        minimapEnabled = !minimapEnabled;
+    }
+    homePressed = homeNow;
 
     for(int i=0;i<26;i++){
         bool now = glfwGetKey(w, GLFW_KEY_A + i) == GLFW_PRESS;
@@ -877,6 +891,7 @@ void drawUI(){
                 snprintf(netBuf,96,"RTT %.0fms TX %d RX %d",netMgr.rttMs,netMgr.packetsSent,netMgr.packetsRecv);
                 drawText(netBuf,0.45f,0.60f,1.0f,0.55f,0.65f,0.8f,0.7f);
             }
+            drawText(minimapEnabled?"MINIMAP ON [F6/F7/HOME]":"MINIMAP OFF [F6/F7/HOME]",0.38f,-0.96f,0.95f,0.55f,0.7f,0.8f,0.68f);
         }
     }
 }
