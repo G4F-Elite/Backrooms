@@ -5,19 +5,17 @@
 
 void testEchoTypeRollRanges() {
     assert(chooseEchoTypeFromRoll(0) == ECHO_CACHE);
-    assert(chooseEchoTypeFromRoll(39) == ECHO_CACHE);
-    assert(chooseEchoTypeFromRoll(40) == ECHO_RESTORE);
-    assert(chooseEchoTypeFromRoll(64) == ECHO_RESTORE);
-    assert(chooseEchoTypeFromRoll(65) == ECHO_BREACH);
-    assert(chooseEchoTypeFromRoll(84) == ECHO_BREACH);
-    assert(chooseEchoTypeFromRoll(85) == ECHO_FLOOR_HOLE);
+    assert(chooseEchoTypeFromRoll(49) == ECHO_CACHE);
+    assert(chooseEchoTypeFromRoll(50) == ECHO_RESTORE);
+    assert(chooseEchoTypeFromRoll(79) == ECHO_RESTORE);
+    assert(chooseEchoTypeFromRoll(80) == ECHO_BREACH);
 }
 
 void testSpawnDelayRange() {
     float d1 = nextEchoSpawnDelaySeconds(0);
     float d2 = nextEchoSpawnDelaySeconds(19);
-    assert(d1 == 12.0f);
-    assert(d2 == 31.0f);
+    assert(d1 == 18.0f);
+    assert(d2 == 37.0f);
 }
 
 void testCacheOutcomeAddsOneItem() {
@@ -57,23 +55,6 @@ void testRangeCheckIgnoresHeight() {
     assert(isEchoInRange(p, e, 2.0f));
 }
 
-void testFloorHoleOutcome() {
-    int b = 0, m = 0, t = 0;
-    float hp = 80.0f, sn = 60.0f, st = 40.0f;
-    bool breach = false;
-    applyEchoOutcome(ECHO_FLOOR_HOLE, 0, b, m, t, hp, sn, st, breach);
-    assert(!breach);
-    assert(hp == 0.0f);
-    assert(sn == 0.0f);
-}
-
-void testIsOnFloorHole() {
-    Vec3 player(5.0f, 0.0f, 5.0f);
-    Vec3 hole(5.5f, 0.0f, 5.0f);
-    assert(isOnFloorHole(player, hole, 1.0f));
-    assert(!isOnFloorHole(player, hole, 0.3f));
-}
-
 int main() {
     testEchoTypeRollRanges();
     testSpawnDelayRange();
@@ -81,8 +62,6 @@ int main() {
     testRestoreOutcomeClampsVitals();
     testBreachOutcome();
     testRangeCheckIgnoresHeight();
-    testFloorHoleOutcome();
-    testIsOnFloorHole();
     std::cout << "All content events tests passed.\n";
     return 0;
 }

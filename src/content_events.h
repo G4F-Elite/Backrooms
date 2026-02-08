@@ -5,8 +5,7 @@
 enum EchoEventType {
     ECHO_CACHE = 0,
     ECHO_RESTORE = 1,
-    ECHO_BREACH = 2,
-    ECHO_FLOOR_HOLE = 3
+    ECHO_BREACH = 2
 };
 
 struct EchoSignal {
@@ -18,15 +17,14 @@ struct EchoSignal {
 
 inline int chooseEchoTypeFromRoll(int roll) {
     int norm = roll % 100;
-    if (norm < 40) return ECHO_CACHE;
-    if (norm < 65) return ECHO_RESTORE;
-    if (norm < 85) return ECHO_BREACH;
-    return ECHO_FLOOR_HOLE;
+    if (norm < 50) return ECHO_CACHE;
+    if (norm < 80) return ECHO_RESTORE;
+    return ECHO_BREACH;
 }
 
 inline float nextEchoSpawnDelaySeconds(int roll) {
     int norm = roll % 20;
-    return 12.0f + (float)norm;
+    return 18.0f + (float)norm;
 }
 
 inline int chooseCacheItemType(int roll) {
@@ -76,22 +74,7 @@ inline void applyEchoOutcome(
         clampVitals(hp, sanity, stamina);
         return;
     }
-    if (echoType == ECHO_FLOOR_HOLE) {
-        // Falling into a floor hole is instant death
-        hp = 0.0f;
-        sanity = 0.0f;
-        return;
-    }
     breachTriggered = true;
     sanity -= 14.0f;
     if (sanity < 0.0f) sanity = 0.0f;
-}
-
-// Check if player is standing on a floor hole
-inline bool isOnFloorHole(
-    const Vec3& playerPos, const Vec3& holePos, float holeRadius
-) {
-    Vec3 d = holePos - playerPos;
-    d.y = 0;
-    return d.len() < holeRadius;
 }

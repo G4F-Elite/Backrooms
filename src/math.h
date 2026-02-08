@@ -1,48 +1,6 @@
 #pragma once
 #include <cmath>
 
-// Fast math toggle - when enabled, uses polynomial approximations
-// instead of standard sin/cos. Faster on CPU but may cause minor glitches.
-inline bool gFastMathEnabled = false;
-
-inline float fastSinf(float x) {
-    // Normalize to [-PI, PI] range
-    const float PI = 3.14159265f;
-    const float TWO_PI = 6.28318530f;
-    const float INV_TWO_PI = 1.0f / TWO_PI;
-
-    // Fast modular reduction
-    x = x - floorf(x * INV_TWO_PI + 0.5f) * TWO_PI;
-
-    // Bhaskara I approximation (max error ~0.2%)
-    float absx = fabsf(x);
-    float q = absx * (PI - absx);
-    return (16.0f * x * (PI - absx)) / (5.0f * PI * PI - 4.0f * q);
-}
-
-inline float fastCosf(float x) {
-    return fastSinf(x + 1.5707963f);
-}
-
-inline float fastTanf(float x) {
-    float c = fastCosf(x);
-    if (fabsf(c) < 0.0001f) c = 0.0001f;
-    return fastSinf(x) / c;
-}
-
-// Wrappers that respect the gFastMathEnabled toggle
-inline float gameSinf(float x) {
-    return gFastMathEnabled ? fastSinf(x) : sinf(x);
-}
-
-inline float gameCosf(float x) {
-    return gFastMathEnabled ? fastCosf(x) : cosf(x);
-}
-
-inline float gameTanf(float x) {
-    return gFastMathEnabled ? fastTanf(x) : tanf(x);
-}
-
 struct Vec3 {
     float x, y, z;
     Vec3(float a=0, float b=0, float c=0): x(a), y(b), z(c) {}
