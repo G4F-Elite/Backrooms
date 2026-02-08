@@ -224,16 +224,18 @@ inline void fillAudio(short* buf, int len) {
             if(sndState.footPhase > 0.2f) { sndState.stepTrig=false; sndState.footPhase=0; }
         }
         
-        // Flashlight click
-        float flashClick = 0;
+        // Flashlight switch tone (soft, no hard click peaks)
+        float flashlightSwitch = 0;
         static float lastFlash = 0;
         if(sndState.flashlightOn != lastFlash) {
-            safe.clickEnv = 1.0f;
+            safe.flashlightEnv = 1.0f;
             lastFlash = sndState.flashlightOn;
         }
-        if(safe.clickEnv > 0.0001f) {
-            flashClick = safe.clickEnv * 0.25f;
-            safe.clickEnv *= 0.992f;
+        if(safe.flashlightEnv > 0.0001f) {
+            float swf = 420.0f + (1.0f - safe.flashlightEnv) * 180.0f;
+            flashlightSwitch = (sinf(twoPi * swf * globalPhase) * 0.26f +
+                                sinf(twoPi * swf * 1.7f * globalPhase) * 0.10f) * safe.flashlightEnv;
+            safe.flashlightEnv *= 0.965f;
         }
 
         // Menu UI sounds
@@ -347,7 +349,7 @@ inline void fillAudio(short* buf, int len) {
                             + buzzTick * 0.11f;
 
         float ambienceMix = hum*sndState.humVol + amb + distant + roomEventsAmb;
-        float sfxMix = step + scare + flashClick + roomEventsSfx;
+        float sfxMix = step + scare + flashlightSwitch + roomEventsSfx;
         float uiMix = (uiMove + uiAdjust + uiConfirm) * (0.45f + 0.55f * sndState.sfxVol);
         float voiceMix = insane;
         float musicMix = creepy;
