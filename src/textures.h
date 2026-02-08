@@ -22,7 +22,7 @@ inline float perlin(float x, float y, int oct) {
 }
 
 inline GLuint genTex(int type) {
-    const int sz=(type==3)?256:512;
+    const int sz=((type==3)||(type==4))?256:512;
     unsigned char* d=new unsigned char[sz*sz*3];
     for(int y=0;y<sz;y++) for(int x=0;x<sz;x++) {
         float r=128,g=128,b=128;
@@ -58,11 +58,38 @@ inline GLuint genTex(int type) {
             r-=ao*60; g-=ao*55; b-=ao*45;
             // Subtle random variation
             if(perlin(x*0.12f,y*0.12f,2)>0.65f) { r-=8; g-=10; b-=6; }
-        } else if(type==3) { // light panel
+        } else if(type==3) { // note/light glow sprite
             float cx=x-sz/2, cy=y-sz/2;
             float dd=sqrtf(cx*cx*0.5f+cy*cy*0.5f)/sz;
             float glow=1.0f-dd*1.8f; if(glow<0) glow=0;
             r=255*glow; g=252*glow; b=240*glow;
+        } else if(type==4) { // ceiling lamp fixture texture
+            float cx = x - sz * 0.5f;
+            float cy = y - sz * 0.5f;
+            float nx = cx / (sz * 0.5f);
+            float ny = cy / (sz * 0.5f);
+            float adx = fabsf(nx), ady = fabsf(ny);
+            float frame = (adx > 0.86f || ady > 0.86f) ? 1.0f : 0.0f;
+            float diffuserMask = (adx < 0.80f && ady < 0.80f) ? 1.0f : 0.0f;
+            float grid = (sinf(x * 0.24f) * sinf(y * 0.24f) + 1.0f) * 0.5f;
+            float dirt = perlin(x * 0.06f + 3.0f, y * 0.06f + 9.0f, 3) * 10.0f;
+            float vignette = 1.0f - sqrtf(nx * nx + ny * ny) * 0.35f;
+            if(vignette < 0.55f) vignette = 0.55f;
+            if(frame > 0.5f) {
+                r = 94 + perlin(x * 0.11f, y * 0.11f, 2) * 7;
+                g = 91 + perlin(x * 0.11f + 1.0f, y * 0.11f + 3.0f, 2) * 6;
+                b = 84 + perlin(x * 0.11f + 4.0f, y * 0.11f + 2.0f, 2) * 5;
+            } else if(diffuserMask > 0.5f) {
+                float base = 206.0f + grid * 11.0f - dirt;
+                r = base * vignette + 20.0f;
+                g = (base + 3.0f) * vignette + 18.0f;
+                b = (base - 6.0f) * vignette + 14.0f;
+            } else {
+                float border = 150.0f + perlin(x * 0.08f, y * 0.08f, 2) * 8.0f;
+                r = border;
+                g = border - 4.0f;
+                b = border - 10.0f;
+            }
         }
         d[(y*sz+x)*3+0]=(unsigned char)(r<0?0:(r>255?255:(int)r));
         d[(y*sz+x)*3+1]=(unsigned char)(g<0?0:(g>255?255:(int)g));

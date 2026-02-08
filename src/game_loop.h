@@ -387,7 +387,7 @@ void renderScene(){
     glUniform1f(lu.inten,1.2f);
     glUniform1f(lu.tm,vhsTime);
     glUniform1f(lu.fade,1.0f); // Light sprites always full brightness when visible
-    glBindTexture(GL_TEXTURE_2D,lightTex);glBindVertexArray(lightVAO);glDrawArrays(GL_TRIANGLES,0,lightVC);
+    glBindTexture(GL_TEXTURE_2D,lampTex);glBindVertexArray(lightVAO);glDrawArrays(GL_TRIANGLES,0,lightVC);
     if(lightOffVC>0){
         glUniform1f(lu.inten,0.15f);
         glUniform1f(lu.fade,1.0f);
@@ -413,7 +413,7 @@ int main(){
     
     glEnable(GL_DEPTH_TEST);glEnable(GL_CULL_FACE);
     genWorld();
-    wallTex=genTex(0);floorTex=genTex(1);ceilTex=genTex(2);lightTex=genTex(3);
+    wallTex=genTex(0);floorTex=genTex(1);ceilTex=genTex(2);lightTex=genTex(3);lampTex=genTex(4);
     mainShader=mkShader(mainVS,mainFS);lightShader=mkShader(lightVS,lightFS);vhsShader=mkShader(vhsVS,vhsFS);
     buildGeom();
     computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), renderW, renderH);

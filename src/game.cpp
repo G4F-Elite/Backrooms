@@ -95,7 +95,7 @@ bool escPressed, enterPressed, isPlayerDead;
 bool upPressed, downPressed, leftPressed, rightPressed;
 
 // OpenGL resources
-GLuint wallTex, floorTex, ceilTex, lightTex;
+GLuint wallTex, floorTex, ceilTex, lightTex, lampTex;
 GLuint mainShader, vhsShader, lightShader;
 GLuint wallVAO, wallVBO, floorVAO, floorVBO;
 GLuint ceilVAO, ceilVBO, lightVAO, lightVBO;

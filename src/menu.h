@@ -351,8 +351,8 @@ inline void drawPhaseIndicator(int phase) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     const char* pn[]={"EXPLORATION","TENSION","PURSUIT","ESCAPE"};
     if(phase>=0&&phase<4){
-        drawText("PHASE:",0.49f,0.85f,1.25f,0.45f,0.4f,0.28f,0.55f);
-        drawText(pn[phase],0.60f,0.82f,1.35f,0.5f,0.45f,0.3f,0.58f);
+        drawText("PHASE:",0.49f,0.85f,1.25f,0.80f,0.75f,0.52f,0.88f);
+        drawText(pn[phase],0.60f,0.82f,1.35f,0.86f,0.80f,0.56f,0.92f);
     }
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
