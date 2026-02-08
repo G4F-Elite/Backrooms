@@ -27,7 +27,7 @@ inline bool isLookingAtPoint(const Vec3& camPos, float yaw, float pitch, const V
     float dist = to.len();
     if (dist > maxDist || dist < 0.001f) return false;
     to = to * (1.0f / dist);
-    Vec3 fwd(sinf(yaw) * cosf(pitch), sinf(pitch), cosf(yaw) * cosf(pitch));
+    Vec3 fwd(mSin(yaw) * mCos(pitch), mSin(pitch), mCos(yaw) * mCos(pitch));
     return fwd.dot(to) >= minDot;
 }
 

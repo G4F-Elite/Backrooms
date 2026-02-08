@@ -1,6 +1,38 @@
 #pragma once
 #include <cmath>
 
+inline bool g_fastMathEnabled = false;
+
+inline float wrapFastTrigAngle(float x) {
+    const float PI = 3.1415926535f;
+    const float TAU = 6.283185307f;
+    while (x > PI) x -= TAU;
+    while (x < -PI) x += TAU;
+    return x;
+}
+
+inline float fastSinApprox(float x) {
+    x = wrapFastTrigAngle(x);
+    const float B = 1.2732395447f;   // 4/pi
+    const float C = -0.4052847346f;  // -4/pi^2
+    float y = B * x + C * x * fabsf(x);
+    const float P = 0.225f;
+    y = P * (y * fabsf(y) - y) + y;
+    return y;
+}
+
+inline float fastCosApprox(float x) {
+    return fastSinApprox(x + 1.5707963267f);
+}
+
+inline float mSin(float x) {
+    return g_fastMathEnabled ? fastSinApprox(x) : sinf(x);
+}
+
+inline float mCos(float x) {
+    return g_fastMathEnabled ? fastCosApprox(x) : cosf(x);
+}
+
 struct Vec3 {
     float x, y, z;
     Vec3(float a=0, float b=0, float c=0): x(a), y(b), z(c) {}

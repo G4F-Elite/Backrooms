@@ -49,7 +49,7 @@ public:
             EntityState prevState = e.state;
             Vec3 toP = pPos - e.pos; toP.y = 0;
             float dist = sqrtf(toP.x*toP.x + toP.z*toP.z);
-            Vec3 look(sinf(pYaw), 0, cosf(pYaw)), toE = e.pos - pPos; toE.y = 0;
+            Vec3 look(mSin(pYaw), 0, mCos(pYaw)), toE = e.pos - pPos; toE.y = 0;
             float toEL = sqrtf(toE.x*toE.x + toE.z*toE.z);
             if(toEL > 0.01f) { toE.x /= toEL; toE.z /= toEL; }
             bool looking = (look.x*toE.x + look.z*toE.z) > 0.85f && dist < e.detectionRange;
@@ -89,7 +89,7 @@ public:
                 }
             } else { e.state = ENT_ROAMING;
                 if(e.stateTimer > 2.3f) { e.yaw += ((rand()%100)/50.0f-1.0f)*2.2f; e.stateTimer = 0; }
-                float nx = e.pos.x + sinf(e.yaw)*e.speed*0.3f*dt, nz = e.pos.z + cosf(e.yaw)*e.speed*0.3f*dt;
+                float nx = e.pos.x + mSin(e.yaw)*e.speed*0.3f*dt, nz = e.pos.z + mCos(e.yaw)*e.speed*0.3f*dt;
                 if(!collideWorld(nx,nz,0.32f)) { e.pos.x = nx; e.pos.z = nz; }
                 else e.yaw += 1.2f;
             }
@@ -120,7 +120,7 @@ public:
             if(dist < e.attackRange) e.state = ENT_ATTACKING;
         } else { e.state = ENT_ROAMING;
             if(e.stateTimer > 1.8f) { e.yaw += ((rand()%100)/50.0f-1.0f)*2.6f; e.stateTimer = 0; }
-            float nx = e.pos.x + sinf(e.yaw)*e.speed*0.2f*dt, nz = e.pos.z + cosf(e.yaw)*e.speed*0.2f*dt;
+            float nx = e.pos.x + mSin(e.yaw)*e.speed*0.2f*dt, nz = e.pos.z + mCos(e.yaw)*e.speed*0.2f*dt;
             if(!collideWorld(nx,nz,0.34f)) { e.pos.x = nx; e.pos.z = nz; }
             else e.yaw += 1.3f; }
     }
@@ -132,8 +132,8 @@ public:
                 for(int i=0;i<8;i++){
                     float ang = ((float)(rand()%628) / 100.0f);
                     float r = 5.0f + (float)(rand()%5);
-                    float nx = pPos.x + sinf(ang) * r;
-                    float nz = pPos.z + cosf(ang) * r;
+                    float nx = pPos.x + mSin(ang) * r;
+                    float nz = pPos.z + mCos(ang) * r;
                     if(!collideWorld(nx,nz,0.32f)){
                         e.pos.x = nx; e.pos.z = nz;
                         break;
@@ -165,9 +165,9 @@ public:
         glBindTexture(GL_TEXTURE_2D, entityTex); glBindVertexArray(entityVAO);
         for(auto& e : entities) {
             if(!e.active || !e.visible) continue;
-            Mat4 model; float c=cosf(e.yaw), s=sinf(e.yaw);
+            Mat4 model; float c=mCos(e.yaw), s=mSin(e.yaw);
             model.m[0]=c; model.m[2]=s; model.m[8]=-s; model.m[10]=c;
-            model.m[12]=e.pos.x+sinf(e.animPhase)*0.02f; model.m[13]=e.pos.y; model.m[14]=e.pos.z;
+            model.m[12]=e.pos.x+mSin(e.animPhase)*0.02f; model.m[13]=e.pos.y; model.m[14]=e.pos.z;
             glUniformMatrix4fv(glGetUniformLocation(shader,"M"),1,GL_FALSE,model.m);
             glDrawArrays(GL_TRIANGLES, 0, entityVC);
         }

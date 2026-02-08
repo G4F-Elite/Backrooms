@@ -173,6 +173,8 @@ uniform sampler2D histTex;
 uniform float taaBlend;
 uniform vec3 taaJitter;
 uniform float taaValid;
+uniform int frameGen;
+uniform float frameGenBlend;
 
 float rnd(vec2 s){ return fract(sin(dot(s,vec2(12.9898,78.233)))*43758.5453); }
 
@@ -252,15 +254,19 @@ vec3 resolveSample(vec2 tc){
 void main(){
  if(inten < 0.02) {
   F = vec4(resolveSample(uv), 1.0);
-  return;
+ return;
+}
+
+// Chromatic aberration
+float ab = 0.0015 * inten;
+float r = resolveSample(uv + vec2(ab,0)).r;
+float g = resolveSample(uv).g;
+float b = resolveSample(uv - vec2(ab,0)).b;
+vec3 c = vec3(r,g,b);
+ if(frameGen == 1 && taaValid > 0.5){
+  vec3 prev = texture(histTex, uv).rgb;
+  c = mix(c, prev, clamp(frameGenBlend, 0.0, 0.6));
  }
- 
- // Chromatic aberration
- float ab = 0.0015 * inten;
- float r = resolveSample(uv + vec2(ab,0)).r;
- float g = resolveSample(uv).g;
- float b = resolveSample(uv - vec2(ab,0)).b;
- vec3 c = vec3(r,g,b);
  
  // Scanlines
  c -= sin(uv.y * 600.0 + tm * 6.0) * 0.016 * inten;

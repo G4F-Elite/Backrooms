@@ -148,8 +148,8 @@ inline bool nearPoint2D(const Vec3& a, const Vec3& b, float r){
 
 inline bool projectToScreen(const Vec3& worldPos, float& sx, float& sy){
     Vec3 d = worldPos - cam.pos;
-    float cy = cosf(cam.yaw), syaw = sinf(cam.yaw);
-    float cp = cosf(cam.pitch), sp = sinf(cam.pitch);
+    float cy = mCos(cam.yaw), syaw = mSin(cam.yaw);
+    float cp = mCos(cam.pitch), sp = mSin(cam.pitch);
 
     float cx = d.x * cy - d.z * syaw;
     float cz0 = d.x * syaw + d.z * cy;

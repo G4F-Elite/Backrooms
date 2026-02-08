@@ -407,7 +407,7 @@ void gameInput(GLFWwindow*w){
         cam.curH+=(cam.targetH-cam.curH)*10.0f*dTime;
     }
     
-    Vec3 fwd(sinf(cam.yaw),0,cosf(cam.yaw)),right(cosf(cam.yaw),0,-sinf(cam.yaw));
+    Vec3 fwd(mSin(cam.yaw),0,mCos(cam.yaw)),right(mCos(cam.yaw),0,-mSin(cam.yaw));
     Vec3 np=cam.pos;bool mv=false;
     if(glfwGetKey(w,settings.binds.forward)==GLFW_PRESS){np=np+fwd*spd;mv=true;}
     if(glfwGetKey(w,settings.binds.back)==GLFW_PRESS){np=np-fwd*spd;mv=true;}
@@ -428,7 +428,7 @@ void gameInput(GLFWwindow*w){
     static float bobT=0,lastB=0;
     if(mv && !debugTools.flyMode){
         bobT+=dTime*(spd>5.0f?12.0f:8.0f);
-        float cb=sinf(bobT);cam.pos.y=cam.curH+cb*0.04f;
+        float cb=mSin(bobT);cam.pos.y=cam.curH+cb*0.04f;
         if(lastB>-0.7f&&cb<=-0.7f&&!sndState.stepTrig){
             sndState.stepTrig=true;sndState.footPhase=0;
         }
@@ -513,8 +513,8 @@ void renderScene(){
     glUseProgram(mainShader);
     Mat4 proj=Mat4::persp(1.2f,(float)winW/winH,0.1f,100.0f);
     float shX=camShake*(rand()%100-50)/500.0f,shY=camShake*(rand()%100-50)/500.0f;
-    Vec3 la=cam.pos+Vec3(sinf(cam.yaw+shX)*cosf(cam.pitch+shY),sinf(cam.pitch+shY),
-                         cosf(cam.yaw+shX)*cosf(cam.pitch+shY));
+    Vec3 la=cam.pos+Vec3(mSin(cam.yaw+shX)*mCos(cam.pitch+shY),mSin(cam.pitch+shY),
+                         mCos(cam.yaw+shX)*mCos(cam.pitch+shY));
     Mat4 view=Mat4::look(cam.pos,la,Vec3(0,1,0)),model;
     
     glUniformMatrix4fv(mu.P,1,GL_FALSE,proj.m);
@@ -528,8 +528,8 @@ void renderScene(){
         flashVisualOn = isFlashlightOnDuringShutdownBlink(flashlightShutdownBlinkTimer);
     }
     glUniform1i(mu.flashOn,flashVisualOn?1:0);
-    glUniform3f(mu.flashDir,sinf(cam.yaw)*cosf(cam.pitch),
-                sinf(cam.pitch),cosf(cam.yaw)*cosf(cam.pitch));
+    glUniform3f(mu.flashDir,mSin(cam.yaw)*mCos(cam.pitch),
+                mSin(cam.pitch),mCos(cam.yaw)*mCos(cam.pitch));
     float remoteFlashPos[12] = {0};
     float remoteFlashDir[12] = {0};
     int remoteFlashCount = 0;
@@ -627,6 +627,7 @@ int main(){
         sndState.sfxVol=settings.sfxVol;
         sndState.voiceVol=settings.voiceVol;
         sndState.sanityLevel=playerSanity/100.0f;currentWinW=winW;currentWinH=winH;
+        g_fastMathEnabled = settings.fastMath;
         if(gameState!=STATE_GAME){
             sndState.moveIntensity *= 0.88f;
             sndState.sprintIntensity *= 0.86f;
@@ -894,6 +895,8 @@ int main(){
         static GLint vhsTaaBlendLoc = -1;
         static GLint vhsTaaJitterLoc = -1;
         static GLint vhsTaaValidLoc = -1;
+        static GLint vhsFrameGenLoc = -1;
+        static GLint vhsFrameGenBlendLoc = -1;
         if(vhsTmLoc<0){
             glUniform1i(glGetUniformLocation(vhsShader,"tex"),0);
             vhsTmLoc = glGetUniformLocation(vhsShader,"tm");
@@ -907,6 +910,8 @@ int main(){
             vhsTaaBlendLoc = glGetUniformLocation(vhsShader,"taaBlend");
             vhsTaaJitterLoc = glGetUniformLocation(vhsShader,"taaJitter");
             vhsTaaValidLoc = glGetUniformLocation(vhsShader,"taaValid");
+            vhsFrameGenLoc = glGetUniformLocation(vhsShader,"frameGen");
+            vhsFrameGenBlendLoc = glGetUniformLocation(vhsShader,"frameGenBlend");
         }
         static int prevAaMode = -1;
         int aaMode = clampAaMode(settings.aaMode);
@@ -945,6 +950,8 @@ int main(){
             glUniform1f(vhsTaaBlendLoc,0.88f);
             glUniform3f(vhsTaaJitterLoc,jitterX,jitterY,0.0f);
             glUniform1f(vhsTaaValidLoc,taaHistoryValid?1.0f:0.0f);
+            glUniform1i(vhsFrameGenLoc,settings.frameGen?1:0);
+            glUniform1f(vhsFrameGenBlendLoc,settings.frameGen?0.24f:0.0f);
             glBindVertexArray(quadVAO);
             glDrawArrays(GL_TRIANGLES,0,6);
 
@@ -975,6 +982,8 @@ int main(){
             glUniform1f(vhsTaaBlendLoc,0.0f);
             glUniform3f(vhsTaaJitterLoc,0.0f,0.0f,0.0f);
             glUniform1f(vhsTaaValidLoc,0.0f);
+            glUniform1i(vhsFrameGenLoc,0);
+            glUniform1f(vhsFrameGenBlendLoc,0.0f);
             glBindVertexArray(quadVAO);
             glDrawArrays(GL_TRIANGLES,0,6);
         }else{
@@ -996,6 +1005,8 @@ int main(){
             glUniform1f(vhsTaaBlendLoc,0.0f);
             glUniform3f(vhsTaaJitterLoc,0.0f,0.0f,0.0f);
             glUniform1f(vhsTaaValidLoc,0.0f);
+            glUniform1i(vhsFrameGenLoc,0);
+            glUniform1f(vhsFrameGenBlendLoc,0.0f);
             glBindVertexArray(quadVAO);
             glDrawArrays(GL_TRIANGLES,0,6);
         }
