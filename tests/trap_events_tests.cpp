@@ -32,11 +32,19 @@ void testBlurUpdate() {
     assert(b < 0.5f);
 }
 
+void testFloorHoleRolls() {
+    assert(floorHoleCountFromRoll(0) == 4);
+    assert(floorHoleCountFromRoll(3) == 7);
+    assert(floorHoleDurationFromRoll(0) == 9.0f);
+    assert(floorHoleDurationFromRoll(5) == 14.0f);
+}
+
 int main() {
     testInsideTrapTrigger();
     testLookingAtPoint();
     testStareProgressUpdate();
     testBlurUpdate();
+    testFloorHoleRolls();
     std::cout << "All trap events tests passed.\n";
     return 0;
 }

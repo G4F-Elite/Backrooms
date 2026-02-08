@@ -140,16 +140,35 @@ inline void applyRoamEvent(int type, int a, int b, float duration){
     }else if(type==ROAM_FALSE_DOOR){
         falseDoorTimer = duration;
         falseDoorPos = findSpawnPos(cam.pos, 2.0f);
+    }else if(type==ROAM_FLOOR_HOLES){
+        int count = floorHoleCountFromRoll(a + b + (int)rng());
+        float ttl = floorHoleDurationFromRoll((int)duration + a);
+        spawnFloorHoleEvent(cam.pos, count, ttl);
+    }else if(type==ROAM_SUPPLY_CACHE){
+        int amount = 2 + ((a + b) % 2);
+        for(int i=0;i<amount;i++){
+            int itemType = (int)(rng()%3);
+            hostSpawnItem(itemType, cam.pos);
+        }
+        setEchoStatus("SUPPLY CACHE SHIFTED NEARBY");
     }
 }
 
 inline void updateRoamEventsHost(){
-    static float roamTimer = 18.0f;
+    static float roamTimer = 11.0f;
     roamTimer -= dTime;
     if(roamTimer > 0) return;
-    roamTimer = 18.0f + (rng()%15);
-    int type = 1 + (rng()%3);
-    float duration = (type==ROAM_GEOM_SHIFT) ? 0.1f : 8.0f;
+    roamTimer = 11.0f + (rng()%11);
+    int typeRoll = (int)(rng()%100);
+    int type = ROAM_FALSE_DOOR;
+    if(typeRoll < 24) type = ROAM_LIGHTS_OUT;
+    else if(typeRoll < 42) type = ROAM_GEOM_SHIFT;
+    else if(typeRoll < 64) type = ROAM_FALSE_DOOR;
+    else if(typeRoll < 84) type = ROAM_FLOOR_HOLES;
+    else type = ROAM_SUPPLY_CACHE;
+    float duration = (type==ROAM_GEOM_SHIFT) ? 0.1f : 8.0f + (float)(rng()%5);
     applyRoamEvent(type, playerChunkX, playerChunkZ, duration);
-    netMgr.sendRoamEvent(type, playerChunkX & 0xFF, playerChunkZ & 0xFF, duration);
+    if(multiState==MULTI_IN_GAME && netMgr.isHost){
+        netMgr.sendRoamEvent(type, playerChunkX & 0xFF, playerChunkZ & 0xFF, duration);
+    }
 }

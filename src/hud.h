@@ -93,6 +93,11 @@ void drawUI(){
             if(trapCorridor.active && trapStatusTimer > 0.0f){
                 drawText(trapStatusText,-0.33f,0.50f,1.2f,0.82f,0.78f,0.9f,0.85f);
             }
+            if(!floorHoles.empty()){
+                char holeBuf[64];
+                snprintf(holeBuf,64,"FLOOR HAZARDS: %d", (int)floorHoles.size());
+                drawText(holeBuf,-0.95f,0.44f,1.10f,0.92f,0.58f,0.38f,0.84f);
+            }
             if(trapCorridor.locked){
                 float sx=0, sy=0;
                 if(projectToScreen(trapCorridor.anomalyPos, sx, sy)){

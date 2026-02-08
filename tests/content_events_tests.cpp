@@ -13,9 +13,16 @@ void testEchoTypeRollRanges() {
 
 void testSpawnDelayRange() {
     float d1 = nextEchoSpawnDelaySeconds(0);
-    float d2 = nextEchoSpawnDelaySeconds(19);
-    assert(d1 == 18.0f);
-    assert(d2 == 37.0f);
+    float d2 = nextEchoSpawnDelaySeconds(14);
+    assert(d1 == 10.0f);
+    assert(d2 == 24.0f);
+}
+
+void testNoteSpawnDelayRange() {
+    float d1 = nextNoteSpawnDelaySeconds(0);
+    float d2 = nextNoteSpawnDelaySeconds(10);
+    assert(d1 == 12.0f);
+    assert(d2 == 22.0f);
 }
 
 void testCacheOutcomeAddsOneItem() {
@@ -58,6 +65,7 @@ void testRangeCheckIgnoresHeight() {
 int main() {
     testEchoTypeRollRanges();
     testSpawnDelayRange();
+    testNoteSpawnDelayRange();
     testCacheOutcomeAddsOneItem();
     testRestoreOutcomeClampsVitals();
     testBreachOutcome();

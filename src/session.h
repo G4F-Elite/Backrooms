@@ -26,7 +26,9 @@ enum RoamEventType {
     ROAM_NONE = 0,
     ROAM_LIGHTS_OUT = 1,
     ROAM_GEOM_SHIFT = 2,
-    ROAM_FALSE_DOOR = 3
+    ROAM_FALSE_DOOR = 3,
+    ROAM_FLOOR_HOLES = 4,
+    ROAM_SUPPLY_CACHE = 5
 };
 
 struct CoopObjectives {
@@ -44,7 +46,15 @@ struct WorldItem {
     bool active;
 };
 
+struct FloorHole {
+    int wx;
+    int wz;
+    float ttl;
+    bool active;
+};
+
 std::vector<WorldItem> worldItems;
+std::vector<FloorHole> floorHoles;
 int nextWorldItemId = 1;
 float itemSpawnTimer = 12.0f;
 float baitEffectTimer = 0.0f;

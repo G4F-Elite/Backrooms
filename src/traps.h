@@ -1,5 +1,6 @@
 #pragma once
 #include "session.h"
+#include <algorithm>
 
 inline void carveCellSafe(int wx, int wz){
     setCellWorld(wx, wz, 0);
@@ -99,6 +100,55 @@ inline void spawnEchoSignal(){
 inline void clearEchoSignal(){
     echoSignal.active = false;
     echoSignal.ttl = 0.0f;
+}
+
+inline void clearFloorHoles(){
+    floorHoles.clear();
+}
+
+inline bool isFloorHoleCell(int wx, int wz){
+    for(const auto& h:floorHoles){
+        if(!h.active) continue;
+        if(h.wx==wx && h.wz==wz) return true;
+    }
+    return false;
+}
+
+inline void spawnFloorHoleEvent(const Vec3& around, int count, float ttl){
+    clearFloorHoles();
+    int cx = (int)floorf(around.x / CS);
+    int cz = (int)floorf(around.z / CS);
+    int attempts = 0;
+    while((int)floorHoles.size() < count && attempts < count * 40){
+        attempts++;
+        int wx = cx + ((int)(rng()%18) - 9);
+        int wz = cz + ((int)(rng()%18) - 9);
+        if(getCellWorld(wx, wz) != 0) continue;
+        if(abs(wx - cx) <= 1 && abs(wz - cz) <= 1) continue;
+        if(isFloorHoleCell(wx, wz)) continue;
+        FloorHole h{};
+        h.wx = wx;
+        h.wz = wz;
+        h.ttl = ttl;
+        h.active = true;
+        floorHoles.push_back(h);
+    }
+    if(!floorHoles.empty()){
+        setTrapStatus("FLOOR INSTABILITY DETECTED.");
+    }
+}
+
+inline void updateFloorHoles(){
+    if(floorHoles.empty()) return;
+    for(auto& h:floorHoles){
+        if(!h.active) continue;
+        h.ttl -= dTime;
+        if(h.ttl <= 0.0f) h.active = false;
+    }
+    floorHoles.erase(
+        std::remove_if(floorHoles.begin(), floorHoles.end(), [](const FloorHole& h){ return !h.active; }),
+        floorHoles.end()
+    );
 }
 
 inline void updateEchoSignal(){

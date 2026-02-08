@@ -52,3 +52,15 @@ inline float updateAnomalyBlur(float current, float dt, bool looking) {
     }
     return current;
 }
+
+inline int floorHoleCountFromRoll(int roll) {
+    int norm = roll % 4;
+    if (norm < 0) norm += 4;
+    return 4 + norm; // 4..7 holes
+}
+
+inline float floorHoleDurationFromRoll(int roll) {
+    int norm = roll % 6;
+    if (norm < 0) norm += 6;
+    return 9.0f + (float)norm; // 9..14s
+}

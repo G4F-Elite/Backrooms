@@ -71,6 +71,11 @@ void buildGeom(){
             mkBox(dv, pr.pos.x + 0.28f, 0.0f, pr.pos.z - 0.22f, 0.56f * pr.scale, 0.28f * pr.scale, 0.56f * pr.scale);
         }
     }
+    for(auto& h:floorHoles){
+        if(!h.active) continue;
+        float hx=((float)h.wx+0.5f)*CS, hz=((float)h.wz+0.5f)*CS;
+        mkFloorDecal(dv,hx,0.03f,hz,CS*0.72f,CS*0.72f);
+    }
     for(auto&l:lights){
         if(l.on)mkLight(lv,l.pos,l.sizeX,l.sizeZ);
         else mkLight(lvOff,l.pos,l.sizeX,l.sizeZ);
@@ -156,7 +161,7 @@ void genWorld(){
     nextWorldItemId = 1;
     invBattery = invMedkit = invBait = 0;
     clearEchoSignal();
-    echoSpawnTimer = 12.0f + (float)(rng()%8);
+    echoSpawnTimer = 7.0f + (float)(rng()%6);
     echoStatusTimer = 0.0f;
     echoStatusText[0] = '\0';
     trapStatusTimer = 0.0f;
@@ -164,14 +169,15 @@ void genWorld(){
     anomalyBlur = 0.0f;
     lightsOutTimer = falseDoorTimer = 0.0f;
     baitEffectTimer = 0.0f;
-    itemSpawnTimer = 8.0f;
+    itemSpawnTimer = 6.0f;
     playerHealth=playerSanity=playerStamina=100;
     flashlightBattery=100;flashlightOn=false;isPlayerDead=false;
     flashlightShutdownBlinkActive = false;
     flashlightShutdownBlinkTimer = 0.0f;
     resetScareSystemState(scareState);
     entitySpawnTimer=30;survivalTime=0;reshuffleTimer=15;
-    lastSpawnedNote=-1;noteSpawnTimer=15.0f;
+    floorHoles.clear();
+    lastSpawnedNote=-1;noteSpawnTimer=8.0f;
 }
 
 void teleportToPlayer(){
@@ -571,6 +577,7 @@ int main(){
                 }
             }
         }else if(gameState==STATE_GAME){
+            static int lastHoleCount = -1;
             if(isPlayerDead){
                 bool eN=glfwGetKey(gWin,GLFW_KEY_ENTER)==GLFW_PRESS||
                         glfwGetKey(gWin,GLFW_KEY_SPACE)==GLFW_PRESS;
@@ -595,7 +602,14 @@ int main(){
                 if(baitEffectTimer>0) baitEffectTimer-=dTime;
                 updateEchoSignal();
                 updateTrapCorridor();
+                if(multiState!=MULTI_IN_GAME) updateRoamEventsHost();
+                updateFloorHoles();
                 gameInput(gWin);
+                int holeCountNow = (int)floorHoles.size();
+                if(holeCountNow != lastHoleCount){
+                    buildGeom();
+                    lastHoleCount = holeCountNow;
+                }
                 int targetChunkX = (int)floorf(cam.pos.x / (CS * CHUNK_SIZE));
                 int targetChunkZ = (int)floorf(cam.pos.z / (CS * CHUNK_SIZE));
                 if(targetChunkX!=playerChunkX || targetChunkZ!=playerChunkZ){
@@ -625,7 +639,7 @@ int main(){
                 noteSpawnTimer-=dTime;
                 if(noteSpawnTimer<=0&&lastSpawnedNote<11){
                     int nn=lastSpawnedNote+1;trySpawnNote(nn);
-                    noteSpawnTimer=20.0f+(rng()%20);
+                    noteSpawnTimer=nextNoteSpawnDelaySeconds((int)rng());
                 }
                 
                 bool canSpawnEnt = (multiState!=MULTI_IN_GAME || netMgr.isHost);
@@ -688,6 +702,14 @@ int main(){
                 if(entityMgr.dangerLevel>0.1f)playerSanity-=entityMgr.dangerLevel*8.0f*dTime;
                 else playerSanity+=2.0f*dTime;
                 playerSanity=playerSanity>100?100:(playerSanity<0?0:playerSanity);
+                int cellX = (int)floorf(cam.pos.x / CS);
+                int cellZ = (int)floorf(cam.pos.z / CS);
+                if(isFloorHoleCell(cellX, cellZ)){
+                    playerHealth = 0.0f;
+                    isPlayerDead = true;
+                    setTrapStatus("FLOOR COLLAPSE. YOU FELL.");
+                    glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
+                }
                 if(playerSanity<=0&&rng()%1000<5){
                     isPlayerDead=true;playerHealth=0;
                     glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL);

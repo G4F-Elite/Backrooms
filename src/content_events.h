@@ -23,8 +23,15 @@ inline int chooseEchoTypeFromRoll(int roll) {
 }
 
 inline float nextEchoSpawnDelaySeconds(int roll) {
-    int norm = roll % 20;
-    return 18.0f + (float)norm;
+    int norm = roll % 15;
+    if (norm < 0) norm += 15;
+    return 10.0f + (float)norm;
+}
+
+inline float nextNoteSpawnDelaySeconds(int roll) {
+    int norm = roll % 11;
+    if (norm < 0) norm += 11;
+    return 12.0f + (float)norm;
 }
 
 inline int chooseCacheItemType(int roll) {
