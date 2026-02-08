@@ -74,6 +74,26 @@ inline void drawText(const char* s, float x, float y, float sc, float r, float g
     glBindTexture(GL_TEXTURE_2D,fontTex); glBindVertexArray(textVAO); glDrawArrays(GL_TRIANGLES,0,vc/4);
 }
 
+inline float textAdvanceNdc(float sc) {
+    float cw = sc * 8.0f / (float)currentWinW * 2.0f;
+    return cw * 0.75f;
+}
+
+inline float measureTextWidthNdc(const char* s, float sc) {
+    if(!s) return 0.0f;
+    int cur = 0, mx = 0;
+    for(const char* p = s; *p; p++) {
+        if(*p == '\n') { if(cur > mx) mx = cur; cur = 0; continue; }
+        cur++;
+    }
+    if(cur > mx) mx = cur;
+    return (float)mx * textAdvanceNdc(sc);
+}
+
+inline void drawTextCentered(const char* s, float centerX, float y, float sc, float r, float g, float b, float a=1.0f) {
+    drawText(s, centerX - measureTextWidthNdc(s, sc) * 0.5f, y, sc, r, g, b, a);
+}
+
 inline void drawSlider(float x,float y,float w,float val,float r,float g,float b) {
     char bar[21]; int f=(int)(val*20); for(int i=0;i<20;i++)bar[i]=(i<f)?'=':'-'; bar[20]=0;
     drawText("[",x,y,1.8f,r*0.5f,g*0.5f,b*0.5f); drawText(bar,x+0.02f,y,1.8f,r,g,b); drawText("]",x+w-0.02f,y,1.8f,r*0.5f,g*0.5f,b*0.5f);
@@ -82,21 +102,22 @@ inline void drawSlider(float x,float y,float w,float val,float r,float g,float b
 inline void drawMenu(float tm) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     float p=0.8f+0.05f*sinf(tm*2.0f), gl=(rand()%100<3)?(rand()%10-5)*0.003f:0;
-    drawText("THE BACKROOMS",-0.45f+gl,0.5f,4.0f,0.9f,0.85f,0.4f,p);
-    drawText("LEVEL 0",-0.22f,0.35f,2.5f,0.7f,0.65f,0.3f,0.8f);
+    drawTextCentered("THE BACKROOMS",0.0f+gl,0.5f,4.0f,0.9f,0.85f,0.4f,p);
+    drawTextCentered("LEVEL 0",0.0f,0.35f,2.5f,0.7f,0.65f,0.3f,0.8f);
     const char* it[]={"START GAME","MULTIPLAYER","SETTINGS","QUIT"};
     for(int i=0;i<4;i++){
         float s=(menuSel==i)?1.0f:0.5f; float y=0.08f-i*0.12f;
-        if(menuSel==i)drawText(">",-0.30f,y,2.0f,0.9f*s,0.85f*s,0.4f*s);
-        drawText(it[i],-0.23f,y,2.0f,0.9f*s,0.85f*s,0.4f*s);
+        float baseX = -measureTextWidthNdc(it[i], 2.0f) * 0.5f;
+        if(menuSel==i)drawText(">", baseX - 0.08f, y, 2.0f, 0.9f*s,0.85f*s,0.4f*s);
+        drawText(it[i], baseX, y, 2.0f,0.9f*s,0.85f*s,0.4f*s);
     }
-    drawText("UP/DOWN - SELECT    ENTER - CONFIRM",-0.52f,-0.6f,1.5f,0.5f,0.5f,0.4f,0.6f);
+    drawTextCentered("UP/DOWN - SELECT    ENTER - CONFIRM",0.0f,-0.6f,1.5f,0.5f,0.5f,0.4f,0.6f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 
 inline void drawSettings(bool fp) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    drawText("SETTINGS",-0.25f,0.55f,3.0f,0.9f,0.85f,0.4f);
+    drawTextCentered("SETTINGS",0.0f,0.55f,3.0f,0.9f,0.85f,0.4f);
     const char* lb[]={"MASTER VOL","MUSIC VOL","AMBIENCE VOL","SFX VOL","VOICE VOL","VHS EFFECT","MOUSE SENS","BACK"};
     float*vl[]={&settings.masterVol,&settings.musicVol,&settings.ambienceVol,&settings.sfxVol,&settings.voiceVol,&settings.vhsIntensity,&settings.mouseSens,nullptr};
     float mx[]={1.0f,1.0f,1.0f,1.0f,1.0f,1.0f,0.006f};
@@ -110,33 +131,34 @@ inline void drawSettings(bool fp) {
             char b[16]; snprintf(b,16,"%d%%",(int)(nv*100)); drawText(b,0.58f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         }
     }
-    drawText("LEFT/RIGHT - ADJUST    ENTER - BACK",-0.52f,-0.55f,1.5f,0.5f,0.5f,0.4f,0.6f);
+    drawTextCentered("LEFT/RIGHT - ADJUST    ENTER - BACK",0.0f,-0.55f,1.5f,0.5f,0.5f,0.4f,0.6f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 
 inline void drawPause() {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    drawText("PAUSED",-0.2f,0.25f,3.0f,0.9f,0.85f,0.4f);
+    drawTextCentered("PAUSED",0.0f,0.25f,3.0f,0.9f,0.85f,0.4f);
     const char* it[]={"RESUME","SETTINGS","MAIN MENU","QUIT"};
     for(int i=0;i<4;i++){
         float s=(menuSel==i)?1.0f:0.5f,y=-i*0.1f;
-        if(menuSel==i)drawText(">",-0.25f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
-        drawText(it[i],-0.18f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
+        float baseX = -measureTextWidthNdc(it[i], 1.8f) * 0.5f;
+        if(menuSel==i)drawText(">",baseX - 0.07f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
+        drawText(it[i],baseX,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
     }
-    drawText("ESC - RESUME",-0.18f,-0.55f,1.5f,0.5f,0.5f,0.4f,0.6f);
+    drawTextCentered("ESC - RESUME",0.0f,-0.55f,1.5f,0.5f,0.5f,0.4f,0.6f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 
 inline void drawDeath(float tm) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     float fl=(rand()%100<15)?0.3f:1.0f, p=0.7f+0.15f*sinf(tm*3.0f);
-    drawText("YOU DIED",-0.28f,0.2f,4.0f,0.8f*fl,0.1f*fl,0.1f*fl,p);
-    drawText("IT GOT YOU...",-0.22f,0.02f,2.0f,0.6f,0.15f,0.15f,0.7f);
+    drawTextCentered("YOU DIED",0.0f,0.2f,4.0f,0.8f*fl,0.1f*fl,0.1f*fl,p);
+    drawTextCentered("IT GOT YOU...",0.0f,0.02f,2.0f,0.6f,0.15f,0.15f,0.7f);
     int m=(int)(gSurvivalTime/60),s=(int)gSurvivalTime%60;
     char tb[32]; snprintf(tb,32,"SURVIVED: %d:%02d",m,s);
-    drawText(tb,-0.22f,-0.12f,2.0f,0.7f,0.6f,0.3f,0.8f);
-    drawText("PRESS ENTER TO RESTART",-0.38f,-0.35f,1.8f,0.5f,0.4f,0.35f,0.6f);
-    drawText("PRESS ESC FOR MAIN MENU",-0.40f,-0.47f,1.8f,0.5f,0.4f,0.35f,0.6f);
+    drawTextCentered(tb,0.0f,-0.12f,2.0f,0.7f,0.6f,0.3f,0.8f);
+    drawTextCentered("PRESS ENTER TO RESTART",0.0f,-0.35f,1.8f,0.5f,0.4f,0.35f,0.6f);
+    drawTextCentered("PRESS ESC FOR MAIN MENU",0.0f,-0.47f,1.8f,0.5f,0.4f,0.35f,0.6f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 
@@ -225,11 +247,10 @@ inline void drawIntro(int line, float timer, float lineTime, const char** introL
     if(alpha > 1) alpha = 1;
     if(line >= 0 && line < 12) {
         const char* text = introLines[line];
-        float len = (float)strlen(text) * 0.018f;
-        if(line == 11) drawText(text, -0.42f, 0.0f, 3.5f, 0.9f, 0.85f, 0.4f, alpha);
-        else if(line != 10) drawText(text, -len, 0.0f, 2.0f, 0.7f, 0.65f, 0.5f, alpha * 0.9f);
+        if(line == 11) drawTextCentered(text, 0.0f, 0.0f, 3.5f, 0.9f, 0.85f, 0.4f, alpha);
+        else if(line != 10) drawTextCentered(text, 0.0f, 0.0f, 2.0f, 0.7f, 0.65f, 0.5f, alpha * 0.9f);
     }
-    drawText("PRESS SPACE TO SKIP", -0.28f, -0.8f, 1.5f, 0.4f, 0.4f, 0.35f, 0.4f);
+    drawTextCentered("PRESS SPACE TO SKIP", 0.0f, -0.8f, 1.5f, 0.4f, 0.4f, 0.35f, 0.4f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 

@@ -28,26 +28,27 @@ inline void drawMultiMenuScreen(float tm) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
-    drawText("MULTIPLAYER", -0.32f, 0.45f, 3.0f, 0.9f, 0.85f, 0.4f, 0.9f);
+    drawTextCentered("MULTIPLAYER", 0.0f, 0.45f, 3.0f, 0.9f, 0.85f, 0.4f, 0.9f);
     
     const char* opts[] = {"HOST GAME", "JOIN GAME", "BACK"};
     for (int i = 0; i < 3; i++) {
         float s = (menuSel == i) ? 1.0f : 0.5f;
         float y = 0.1f - i * 0.12f;
-        if (menuSel == i) drawText(">", -0.25f, y, 2.0f, 0.9f * s, 0.85f * s, 0.4f * s);
-        drawText(opts[i], -0.18f, y, 2.0f, 0.9f * s, 0.85f * s, 0.4f * s);
+        float baseX = -measureTextWidthNdc(opts[i], 2.0f) * 0.5f;
+        if (menuSel == i) drawText(">", baseX - 0.08f, y, 2.0f, 0.9f * s, 0.85f * s, 0.4f * s);
+        drawText(opts[i], baseX, y, 2.0f, 0.9f * s, 0.85f * s, 0.4f * s);
     }
     
-    drawText("USE RADMIN VPN OR HAMACHI FOR LAN", -0.48f, -0.3f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);
-    drawText("PORT: 27015 UDP", -0.22f, -0.42f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);
+    drawTextCentered("USE RADMIN VPN OR HAMACHI FOR LAN", 0.0f, -0.3f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);
+    drawTextCentered("PORT: 27015 UDP", 0.0f, -0.42f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);
     char nickBuf[80];
     snprintf(nickBuf, 80, "NICKNAME: [%s%s]", multiNickname, multiEditingNickname ? "_" : "");
-    drawText(nickBuf, -0.48f, -0.54f, 1.4f, 0.75f, 0.8f, 0.55f, 0.85f);
-    drawText("TAB TO EDIT NICKNAME", -0.31f, -0.64f, 1.1f, 0.55f, 0.6f, 0.45f, 0.7f);
+    drawTextCentered(nickBuf, 0.0f, -0.54f, 1.4f, 0.75f, 0.8f, 0.55f, 0.85f);
+    drawTextCentered("TAB TO EDIT NICKNAME", 0.0f, -0.64f, 1.1f, 0.55f, 0.6f, 0.45f, 0.7f);
     lanDiscovery.ensureLocalIP();
     char ipLine[96];
     snprintf(ipLine, 96, "LOCAL IP: %s", lanDiscovery.localIP);
-    drawText(ipLine, -0.4f, -0.74f, 1.2f, 0.55f, 0.65f, 0.45f, 0.75f);
+    drawTextCentered(ipLine, 0.0f, -0.74f, 1.2f, 0.55f, 0.65f, 0.45f, 0.75f);
     
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
@@ -59,7 +60,7 @@ inline void drawJoinMenuScreen(float tm) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
-    drawText("JOIN GAME", -0.25f, 0.55f, 3.0f, 0.9f, 0.85f, 0.4f, 0.9f);
+    drawTextCentered("JOIN GAME", 0.0f, 0.55f, 3.0f, 0.9f, 0.85f, 0.4f, 0.9f);
     
     // IP Field
     float ipSel = (multiInputField == 0) ? 1.0f : 0.5f;
@@ -117,12 +118,12 @@ inline void drawHostLobbyScreen(float tm, int playerCount) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
-    drawText("HOST LOBBY", -0.28f, 0.45f, 3.0f, 0.9f, 0.85f, 0.4f, 0.9f);
-    drawText("WAITING FOR PLAYERS...", -0.32f, 0.2f, 1.8f, 0.6f, 0.7f, 0.5f, 0.7f);
+    drawTextCentered("HOST LOBBY", 0.0f, 0.45f, 3.0f, 0.9f, 0.85f, 0.4f, 0.9f);
+    drawTextCentered("WAITING FOR PLAYERS...", 0.0f, 0.2f, 1.8f, 0.6f, 0.7f, 0.5f, 0.7f);
     
     char buf[48];
     snprintf(buf, 48, "PLAYERS CONNECTED: %d/%d", playerCount, MAX_PLAYERS);
-    drawText(buf, -0.32f, 0.05f, 1.4f, 0.5f, 0.6f, 0.4f, 0.8f);
+    drawTextCentered(buf, 0.0f, 0.05f, 1.4f, 0.5f, 0.6f, 0.4f, 0.8f);
     
     const char* opts[] = {"START GAME", "BACK"};
     for (int i = 0; i < 2; i++) {
@@ -161,11 +162,11 @@ inline void drawWaitingScreen(float tm) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
-    drawText("CONNECTED TO HOST", -0.35f, 0.3f, 2.5f, 0.3f, 0.8f, 0.3f, 0.9f);
-    drawText("WAITING FOR HOST TO START...", -0.42f, 0.1f, 2.0f, 0.9f, 0.85f, 0.6f, 0.7f+0.2f*sinf(tm*2.0f));
+    drawTextCentered("CONNECTED TO HOST", 0.0f, 0.3f, 2.5f, 0.3f, 0.8f, 0.3f, 0.9f);
+    drawTextCentered("WAITING FOR HOST TO START...", 0.0f, 0.1f, 2.0f, 0.9f, 0.85f, 0.6f, 0.7f+0.2f*sinf(tm*2.0f));
     char pc[48];
     snprintf(pc, 48, "LOBBY: %d/%d PLAYERS", netMgr.getPlayerCount(), MAX_PLAYERS);
-    drawText(pc, -0.27f, -0.05f, 1.4f, 0.65f, 0.75f, 0.55f, 0.8f);
+    drawTextCentered(pc, 0.0f, -0.05f, 1.4f, 0.65f, 0.75f, 0.55f, 0.8f);
     float py = -0.18f;
     for (int i = 0; i < MAX_PLAYERS; i++) {
         if (!netMgr.players[i].active) continue;
@@ -176,7 +177,7 @@ inline void drawWaitingScreen(float tm) {
         py -= 0.07f;
     }
     
-    drawText("PRESS ESC TO DISCONNECT", -0.35f, -0.7f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);
+    drawTextCentered("PRESS ESC TO DISCONNECT", 0.0f, -0.7f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);
     
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
@@ -188,11 +189,11 @@ inline void drawMultiPause(int playerCount) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
-    drawText("PAUSED", -0.2f, 0.35f, 3.0f, 0.9f, 0.85f, 0.4f);
+    drawTextCentered("PAUSED", 0.0f, 0.35f, 3.0f, 0.9f, 0.85f, 0.4f);
     
     char buf[32];
     snprintf(buf, 32, "PLAYERS: %d", playerCount);
-    drawText(buf, -0.15f, 0.2f, 1.5f, 0.5f, 0.7f, 0.5f, 0.7f);
+    drawTextCentered(buf, 0.0f, 0.2f, 1.5f, 0.5f, 0.7f, 0.5f, 0.7f);
     
     const char* opts[] = {"RESUME", "TELEPORT TO PLAYER", "SETTINGS", "DISCONNECT", "QUIT"};
     for (int i = 0; i < 5; i++) {
@@ -202,7 +203,7 @@ inline void drawMultiPause(int playerCount) {
         drawText(opts[i], -0.28f, y, 1.8f, 0.9f * s, 0.85f * s, 0.4f * s);
     }
     
-    drawText("ESC - RESUME", -0.18f, -0.65f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);
+    drawTextCentered("ESC - RESUME", 0.0f, -0.65f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);
     
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
