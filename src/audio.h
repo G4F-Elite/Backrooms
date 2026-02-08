@@ -37,6 +37,11 @@ struct SoundState {
     bool uiConfirmTrig=false;
     float uiMovePitch=1.0f;
     float uiAdjustPitch=1.0f;
+    float moveIntensity=0.0f;
+    float sprintIntensity=0.0f;
+    float lowStamina=0.0f;
+    float monsterProximity=0.0f;
+    float monsterMenace=0.0f;
 };
 
 extern SoundState sndState;
@@ -47,6 +52,20 @@ inline float carpetStep(float t) {
     float thud = sinf(t * 55.0f) * expf(-t * 35.0f) * 1.2f;
     float rustle = sinf(t * 30.0f) * expf(-t * 50.0f) * 0.4f;
     return (thud + rustle) * 0.5f;
+}
+
+inline float clamp01Audio(float v) {
+    if (v < 0.0f) return 0.0f;
+    if (v > 1.0f) return 1.0f;
+    return v;
+}
+
+inline void updateGameplayAudioState(float moveIntensity, float sprintIntensity, float staminaNorm, float monsterProximity, float monsterMenace) {
+    sndState.moveIntensity = clamp01Audio(moveIntensity);
+    sndState.sprintIntensity = clamp01Audio(sprintIntensity);
+    sndState.lowStamina = 1.0f - clamp01Audio(staminaNorm);
+    sndState.monsterProximity = clamp01Audio(monsterProximity);
+    sndState.monsterMenace = clamp01Audio(monsterMenace);
 }
 
 inline void fillAudio(short* buf, int len) {
@@ -65,6 +84,10 @@ inline void fillAudio(short* buf, int len) {
     static float sceneClock = 0.0f;
     static float nextSceneEvent = 2.8f;
     static int lastSceneEvent = -1;
+    static float breathPhase = 0.0f;
+    static float runPhase = 0.0f;
+    static float runNoise = 0.0f;
+    static float monsterPhase = 0.0f;
     const float dt = 1.0f / (float)SAMP_RATE;
     const float twoPi = 6.283185307f;
     for(int i=0;i<len;i++) {
@@ -239,6 +262,12 @@ inline void fillAudio(short* buf, int len) {
                                 sinf(twoPi * swf * 1.7f * globalPhase) * 0.10f) * safe.flashlightEnv;
             safe.flashlightEnv *= 0.965f;
         }
+        float flashlightLoop = 0.0f;
+        if(sndState.flashlightOn > 0.5f){
+            float fz = 108.0f + sndState.lowStamina * 28.0f;
+            flashlightLoop = (sinf(twoPi * fz * globalPhase) * 0.018f +
+                              sinf(twoPi * fz * 2.0f * globalPhase) * 0.006f);
+        }
 
         // Menu UI sounds
         if(sndState.uiMoveTrig){
@@ -356,11 +385,53 @@ inline void fillAudio(short* buf, int len) {
         float roomEventsSfx = knock * (0.10f + envStress * 0.26f)
                             + buzzTick * 0.11f;
 
+        float move = clamp01Audio(sndState.moveIntensity);
+        float sprint = clamp01Audio(sndState.sprintIntensity);
+        float lowSt = clamp01Audio(sndState.lowStamina);
+        float monsterProx = clamp01Audio(sndState.monsterProximity);
+        float monsterMenace = clamp01Audio(sndState.monsterMenace);
+
+        float runBed = 0.0f;
+        if(move > 0.02f){
+            float cadence = 5.4f + sprint * 4.6f;
+            runPhase += dt * cadence;
+            if(runPhase > 1.0f) runPhase -= 1.0f;
+            float nTarget = ((float)(rand()%100) / 100.0f) * 2.0f - 1.0f;
+            runNoise = mixNoise(runNoise, nTarget, 0.035f);
+            float gait = sinf(twoPi * runPhase);
+            float gait2 = sinf(twoPi * runPhase * 2.0f);
+            runBed = (gait * 0.06f + gait2 * 0.03f + runNoise * 0.025f) * move * (0.55f + sprint * 0.65f);
+        }
+
+        float breath = 0.0f;
+        float breathIntensity = lowSt * 0.82f + sprint * 0.35f + monsterProx * 0.22f;
+        if(breathIntensity > 0.04f){
+            breathPhase += dt * (0.34f + breathIntensity * 0.95f);
+            if(breathPhase > 1.0f) breathPhase -= 1.0f;
+            float cyc = sinf(twoPi * breathPhase);
+            float airy = sinf(twoPi * breathPhase * 2.0f) * 0.4f;
+            float inhale = (cyc > 0.0f) ? cyc : 0.0f;
+            float exhale = (cyc < 0.0f) ? -cyc : 0.0f;
+            breath = (inhale * 0.06f + exhale * 0.09f + airy * 0.025f) * breathIntensity;
+        }
+
+        float monsterTone = 0.0f;
+        if(monsterProx > 0.03f){
+            float freq = 34.0f + monsterMenace * 18.0f;
+            monsterPhase += dt * (0.5f + monsterProx * 1.9f);
+            if(monsterPhase > 1.0f) monsterPhase -= 1.0f;
+            float wob = 1.0f + sinf(twoPi * monsterPhase) * 0.08f;
+            float baseGrowl = sinf(twoPi * (freq * wob) * globalPhase) * 0.085f;
+            float overGrowl = sinf(twoPi * (freq * 2.06f) * globalPhase) * 0.025f;
+            float pulse = 0.55f + 0.45f * sinf(twoPi * monsterPhase * 0.5f);
+            monsterTone = (baseGrowl + overGrowl) * monsterProx * (0.5f + monsterMenace * 0.7f) * pulse;
+        }
+
         float ambienceMix = hum*sndState.humVol + amb + distant + roomEventsAmb;
-        float sfxMix = step + scare + flashlightSwitch + roomEventsSfx;
+        float sfxMix = step + runBed + scare + flashlightSwitch + flashlightLoop + roomEventsSfx;
         float uiMix = (uiMove + uiAdjust + uiConfirm) * (0.45f + 0.55f * sndState.sfxVol);
-        float voiceMix = insane;
-        float musicMix = creepy;
+        float voiceMix = insane + breath;
+        float musicMix = creepy + monsterTone;
         float v =
             (ambienceMix * sndState.ambienceVol +
              sfxMix * sndState.sfxVol +

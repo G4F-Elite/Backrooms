@@ -292,6 +292,15 @@ void gameInput(GLFWwindow*w){
     }else{
         cam.pos.y=cam.curH+(cam.pos.y-cam.curH)*0.9f;bobT=0;lastB=0;
     }
+
+    float moveIntensity = mv ? (sprinting ? 1.0f : 0.62f) : 0.0f;
+    updateGameplayAudioState(
+        moveIntensity,
+        sprinting ? 1.0f : 0.0f,
+        playerStamina / 100.0f,
+        sndState.monsterProximity,
+        sndState.monsterMenace
+    );
     
     if(flashlightOn){
         if(!flashlightShutdownBlinkActive && shouldStartFlashlightShutdownBlink(flashlightBattery)){
@@ -474,6 +483,13 @@ int main(){
         sndState.sfxVol=settings.sfxVol;
         sndState.voiceVol=settings.voiceVol;
         sndState.sanityLevel=playerSanity/100.0f;currentWinW=winW;currentWinH=winH;
+        if(gameState!=STATE_GAME){
+            sndState.moveIntensity *= 0.88f;
+            sndState.sprintIntensity *= 0.86f;
+            sndState.lowStamina *= 0.92f;
+            sndState.monsterProximity *= 0.84f;
+            sndState.monsterMenace *= 0.84f;
+        }
         
         if(gameState==STATE_INTRO){
             bool spNow=glfwGetKey(gWin,GLFW_KEY_SPACE)==GLFW_PRESS;
@@ -609,6 +625,29 @@ int main(){
                 if(baitEffectTimer>0){
                     entityMgr.dangerLevel *= 0.45f;
                 }
+                float nearestMonster = 9999.0f;
+                float menace = 0.0f;
+                for(const auto& e:entityMgr.entities){
+                    if(!e.active) continue;
+                    Vec3 dd = e.pos - cam.pos;
+                    dd.y = 0;
+                    float dist = dd.len();
+                    if(dist < nearestMonster) nearestMonster = dist;
+                    float localMenace = 0.35f;
+                    if(e.type==ENTITY_STALKER) localMenace = 0.45f;
+                    else if(e.type==ENTITY_CRAWLER) localMenace = 0.75f;
+                    else if(e.type==ENTITY_SHADOW) localMenace = 1.0f;
+                    if(e.state==ENT_ATTACKING || e.state==ENT_CHASING) localMenace += 0.20f;
+                    if(localMenace > menace) menace = localMenace;
+                }
+                float monsterProx = 0.0f;
+                if(nearestMonster < 30.0f){
+                    monsterProx = 1.0f - nearestMonster / 30.0f;
+                    if(monsterProx < 0.0f) monsterProx = 0.0f;
+                    if(monsterProx > 1.0f) monsterProx = 1.0f;
+                }
+                sndState.monsterProximity = monsterProx;
+                sndState.monsterMenace = menace > 1.0f ? 1.0f : menace;
                 
                 reshuffleTimer-=dTime;
                 float reshuffleChance=30.0f+survivalTime*0.1f;
