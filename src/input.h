@@ -1,13 +1,65 @@
 #pragma once
 #include <GLFW/glfw3.h>
 #include "menu.h"
-#include "menu_multi.h"
 #include "net.h"
+#include "menu_multi.h"
 #include "lan_discovery.h"
 
 extern bool escPressed, upPressed, downPressed, enterPressed, leftPressed, rightPressed;
 extern bool firstMouse;
 extern float lastX, lastY;
+
+inline void pushNicknameChar(char c) {
+    char next[PLAYER_NAME_BUF_LEN + 1] = {};
+    int len = (int)strlen(multiNickname);
+    if (len >= PLAYER_NAME_BUF_LEN - 1) return;
+    memcpy(next, multiNickname, len);
+    next[len] = c;
+    next[len + 1] = '\0';
+    sanitizePlayerName(next, multiNickname);
+}
+
+inline void popNicknameChar() {
+    int len = (int)strlen(multiNickname);
+    if (len <= 0) return;
+    multiNickname[len - 1] = '\0';
+    sanitizePlayerName(multiNickname, multiNickname);
+}
+
+inline void handleNicknameInput(GLFWwindow* w) {
+    static bool letterPressed[26] = {false};
+    static bool digitPressed[10] = {false};
+    static bool spacePressedNick = false;
+    static bool minusPressedNick = false;
+    static bool underscorePressedNick = false;
+    static bool backspacePressedNick = false;
+
+    for (int i = 0; i < 26; i++) {
+        bool now = glfwGetKey(w, GLFW_KEY_A + i) == GLFW_PRESS;
+        if (now && !letterPressed[i]) pushNicknameChar((char)('a' + i));
+        letterPressed[i] = now;
+    }
+    for (int i = 0; i < 10; i++) {
+        bool now = glfwGetKey(w, GLFW_KEY_0 + i) == GLFW_PRESS;
+        if (now && !digitPressed[i]) pushNicknameChar((char)('0' + i));
+        digitPressed[i] = now;
+    }
+    bool spaceNow = glfwGetKey(w, GLFW_KEY_SPACE) == GLFW_PRESS;
+    if (spaceNow && !spacePressedNick) pushNicknameChar(' ');
+    spacePressedNick = spaceNow;
+
+    bool underNow = glfwGetKey(w, GLFW_KEY_MINUS) == GLFW_PRESS &&
+                    (glfwGetKey(w, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS);
+    bool minusNow = glfwGetKey(w, GLFW_KEY_MINUS) == GLFW_PRESS;
+    if (underNow && !underscorePressedNick) pushNicknameChar('_');
+    else if (minusNow && !minusPressedNick) pushNicknameChar('-');
+    underscorePressedNick = underNow;
+    minusPressedNick = minusNow;
+
+    bool bsNow = glfwGetKey(w, GLFW_KEY_BACKSPACE) == GLFW_PRESS;
+    if (bsNow && !backspacePressedNick) popNicknameChar();
+    backspacePressedNick = bsNow;
+}
 
 inline void settingsInput(GLFWwindow* w, bool fromPause) {
     bool esc = glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS;
@@ -157,6 +209,23 @@ inline void menuInput(GLFWwindow* w) {
         }
     }
     else if (gameState == STATE_MULTI) {
+        static bool tabPressed = false;
+        bool tabNow = glfwGetKey(w, GLFW_KEY_TAB) == GLFW_PRESS;
+        if (tabNow && !tabPressed) multiEditingNickname = !multiEditingNickname;
+        tabPressed = tabNow;
+
+        if (multiEditingNickname) {
+            handleNicknameInput(w);
+            bool confirmNick = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS;
+            if (confirmNick && !enterPressed) multiEditingNickname = false;
+            if (esc && !escPressed) multiEditingNickname = false;
+            escPressed = esc;
+            upPressed = up;
+            downPressed = down;
+            enterPressed = enter;
+            return;
+        }
+
         // Multiplayer menu: HOST GAME, JOIN GAME, BACK (3 items: 0-2)
         if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 2; }
         if (down && !downPressed) { menuSel++; if (menuSel > 2) menuSel = 0; }
@@ -169,6 +238,7 @@ inline void menuInput(GLFWwindow* w) {
                 // Host game - initialize network and start hosting
                 netMgr.init();
                 if (netMgr.hostGame((unsigned int)time(nullptr))) {
+                    netMgr.setLocalPlayerName(multiNickname);
                     lanDiscovery.startHost();
                     multiState = MULTI_HOST_LOBBY;
                     gameState = STATE_MULTI_HOST;
@@ -332,7 +402,7 @@ inline void menuInput(GLFWwindow* w) {
                 char fullAddr[64];
                 snprintf(fullAddr, 64, "%s", multiJoinIP);
                 netMgr.init();
-                if (netMgr.joinGame(fullAddr)) {
+                if (netMgr.joinGame(fullAddr, multiNickname)) {
                     lanDiscovery.stop();
                     multiState = MULTI_CONNECTING;
                     gameState = STATE_MULTI_WAIT;  // Wait for host to start

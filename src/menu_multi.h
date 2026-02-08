@@ -2,6 +2,7 @@
 // Multiplayer menu UI - requires menu.h and net.h to be included first
 // Include order: glad.h -> menu.h -> net.h -> menu_multi.h
 #include "lan_discovery.h"
+#include "player_name.h"
 
 // Multiplayer state
 enum MultiState {
@@ -18,6 +19,8 @@ inline char multiJoinIP[64] = "192.168.0.1";
 inline char multiJoinPort[8] = "27015";
 inline int multiInputField = 0;  // 0 = IP, 1 = Port
 inline bool multiIPManualEdit = false;
+inline bool multiEditingNickname = false;
+inline char multiNickname[PLAYER_NAME_BUF_LEN] = "Player";
 
 // Draw multiplayer main menu
 inline void drawMultiMenuScreen(float tm) {
@@ -37,10 +40,14 @@ inline void drawMultiMenuScreen(float tm) {
     
     drawText("USE RADMIN VPN OR HAMACHI FOR LAN", -0.48f, -0.3f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);
     drawText("PORT: 27015 UDP", -0.22f, -0.42f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);
+    char nickBuf[80];
+    snprintf(nickBuf, 80, "NICKNAME: [%s%s]", multiNickname, multiEditingNickname ? "_" : "");
+    drawText(nickBuf, -0.48f, -0.54f, 1.4f, 0.75f, 0.8f, 0.55f, 0.85f);
+    drawText("TAB TO EDIT NICKNAME", -0.31f, -0.64f, 1.1f, 0.55f, 0.6f, 0.45f, 0.7f);
     lanDiscovery.ensureLocalIP();
     char ipLine[96];
     snprintf(ipLine, 96, "LOCAL IP: %s", lanDiscovery.localIP);
-    drawText(ipLine, -0.4f, -0.52f, 1.3f, 0.55f, 0.65f, 0.45f, 0.75f);
+    drawText(ipLine, -0.4f, -0.74f, 1.2f, 0.55f, 0.65f, 0.45f, 0.75f);
     
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
@@ -113,9 +120,9 @@ inline void drawHostLobbyScreen(float tm, int playerCount) {
     drawText("HOST LOBBY", -0.28f, 0.45f, 3.0f, 0.9f, 0.85f, 0.4f, 0.9f);
     drawText("WAITING FOR PLAYERS...", -0.32f, 0.2f, 1.8f, 0.6f, 0.7f, 0.5f, 0.7f);
     
-    char buf[32];
-    snprintf(buf, 32, "PLAYERS CONNECTED: %d", playerCount);
-    drawText(buf, -0.28f, 0.05f, 1.5f, 0.5f, 0.6f, 0.4f, 0.8f);
+    char buf[48];
+    snprintf(buf, 48, "PLAYERS CONNECTED: %d/%d", playerCount, MAX_PLAYERS);
+    drawText(buf, -0.32f, 0.05f, 1.4f, 0.5f, 0.6f, 0.4f, 0.8f);
     
     const char* opts[] = {"START GAME", "BACK"};
     for (int i = 0; i < 2; i++) {
@@ -125,11 +132,24 @@ inline void drawHostLobbyScreen(float tm, int playerCount) {
         drawText(opts[i], -0.15f, y, 2.0f, 0.9f * s, 0.85f * s, 0.4f * s);
     }
     
-    drawText("SHARE YOUR RADMIN/HAMACHI IP", -0.42f, -0.5f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);
+    float listY = -0.42f;
+    drawText("PLAYERS IN LOBBY:", -0.42f, listY, 1.3f, 0.65f, 0.75f, 0.55f, 0.8f);
+    listY -= 0.08f;
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        char playerLine[80];
+        const bool active = netMgr.players[i].active;
+        const char* name = active ? netMgr.players[i].name : "(empty)";
+        if (active && i == 0) snprintf(playerLine, 80, "%d. %s [HOST]", i + 1, name);
+        else snprintf(playerLine, 80, "%d. %s", i + 1, name);
+        drawText(playerLine, -0.42f, listY, 1.1f, active ? 0.7f : 0.45f, active ? 0.8f : 0.45f, active ? 0.55f : 0.4f, active ? 0.85f : 0.6f);
+        listY -= 0.07f;
+    }
+
+    drawText("SHARE YOUR RADMIN/HAMACHI IP", -0.42f, -0.75f, 1.3f, 0.5f, 0.5f, 0.4f, 0.6f);
     lanDiscovery.ensureLocalIP();
     char ipLine[96];
     snprintf(ipLine, 96, "YOUR LAN IP: %s", lanDiscovery.localIP);
-    drawText(ipLine, -0.38f, -0.6f, 1.3f, 0.6f, 0.75f, 0.5f, 0.8f);
+    drawText(ipLine, -0.38f, -0.84f, 1.2f, 0.6f, 0.75f, 0.5f, 0.8f);
     
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
@@ -143,8 +163,20 @@ inline void drawWaitingScreen(float tm) {
     
     drawText("CONNECTED TO HOST", -0.35f, 0.3f, 2.5f, 0.3f, 0.8f, 0.3f, 0.9f);
     drawText("WAITING FOR HOST TO START...", -0.42f, 0.1f, 2.0f, 0.9f, 0.85f, 0.6f, 0.7f+0.2f*sinf(tm*2.0f));
+    char pc[48];
+    snprintf(pc, 48, "LOBBY: %d/%d PLAYERS", netMgr.getPlayerCount(), MAX_PLAYERS);
+    drawText(pc, -0.27f, -0.05f, 1.4f, 0.65f, 0.75f, 0.55f, 0.8f);
+    float py = -0.18f;
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        if (!netMgr.players[i].active) continue;
+        char line[72];
+        const char* nm = netMgr.players[i].name[0] ? netMgr.players[i].name : "Player";
+        snprintf(line, 72, "%d. %s%s", i + 1, nm, i == 0 ? " [HOST]" : "");
+        drawText(line, -0.3f, py, 1.1f, 0.72f, 0.82f, 0.62f, 0.78f);
+        py -= 0.07f;
+    }
     
-    drawText("PRESS ESC TO DISCONNECT", -0.35f, -0.2f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);
+    drawText("PRESS ESC TO DISCONNECT", -0.35f, -0.7f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);
     
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);

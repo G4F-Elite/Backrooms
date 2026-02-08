@@ -2,6 +2,7 @@
 // Network manager - host/join/sync logic
 #include "net_types.h"
 #include "net_sync_codec.h"
+#include "player_name.h"
 #include <cstring>
 
 struct NetEntitySnapshotEntry {
@@ -38,6 +39,7 @@ public:
     unsigned int worldSeed;
     Vec3 spawnPos;
     char hostIP[64];
+    char localPlayerName[PLAYER_NAME_BUF_LEN];
     
     // Sync flags
     bool reshuffleReceived;
@@ -124,6 +126,7 @@ public:
         for (int i = 0; i < MAX_SYNC_ITEMS; i++) itemSnapshot[i].active = false;
         for (int i = 0; i < 16; i++) interactRequests[i].valid = false;
         strcpy(hostIP, "192.168.0.1");
+        sanitizePlayerName("Player", localPlayerName);
     }
     
     bool init() {
@@ -151,32 +154,62 @@ public:
         players[0].isHost = true;
         players[0].id = 0;
         players[0].hasValidPos = false;
-        strcpy(players[0].name, "Host");
+        sanitizePlayerName("Host", players[0].name);
         return true;
     }
     
-    bool joinGame(const char* ip) {
+    bool joinGame(const char* ip, const char* nickname = nullptr) {
         strcpy(hostIP, ip);
+        if (nickname) sanitizePlayerName(nickname, localPlayerName);
         sockaddr_in local;
         local.sin_family = AF_INET;
         local.sin_addr.s_addr = INADDR_ANY;
         local.sin_port = 0;
         bind(sock, (sockaddr*)&local, sizeof(local));
-        sendJoinRequest();
+        sendJoinRequest(localPlayerName);
         connected = true;
         lastPacketRecvTime = (float)glfwGetTime();
         return true;
     }
     
-    void sendJoinRequest() {
-        char buf[PACKET_SIZE];
+    void sendJoinRequest(const char* nickname) {
+        char cleanName[PLAYER_NAME_BUF_LEN];
+        sanitizePlayerName(nickname, cleanName);
+        char buf[PACKET_SIZE] = {};
         buf[0] = PKT_JOIN;
-        strcpy(buf + 1, "Player");
+        memcpy(buf + 1, cleanName, PLAYER_NAME_BUF_LEN);
         sockaddr_in dest;
         dest.sin_family = AF_INET;
         inet_pton(AF_INET, hostIP, &dest.sin_addr);
         dest.sin_port = htons(NET_PORT);
         sendto(sock, buf, 64, 0, (sockaddr*)&dest, sizeof(dest));
+    }
+
+    void setLocalPlayerName(const char* nickname) {
+        sanitizePlayerName(nickname, localPlayerName);
+        sanitizePlayerName(localPlayerName, players[myId].name);
+    }
+
+    void sendPlayerNamePacketTo(int playerId, const sockaddr_in* target) {
+        if (!isHost || !connected || !target) return;
+        if (playerId < 0 || playerId >= MAX_PLAYERS || !players[playerId].active) return;
+        char buf[PACKET_SIZE] = {};
+        buf[0] = PKT_PLAYER_NAME;
+        buf[1] = (char)playerId;
+        memcpy(buf + 2, players[playerId].name, PLAYER_NAME_BUF_LEN);
+        sendto(sock, buf, 2 + PLAYER_NAME_BUF_LEN, 0, (sockaddr*)target, sizeof(*target));
+        packetsSent++;
+        bytesSent += 2 + PLAYER_NAME_BUF_LEN;
+    }
+
+    void broadcastPlayerName(int playerId) {
+        if (!isHost || !connected) return;
+        if (playerId < 0 || playerId >= MAX_PLAYERS || !players[playerId].active) return;
+        char buf[PACKET_SIZE] = {};
+        buf[0] = PKT_PLAYER_NAME;
+        buf[1] = (char)playerId;
+        memcpy(buf + 2, players[playerId].name, PLAYER_NAME_BUF_LEN);
+        broadcast(buf, 2 + PLAYER_NAME_BUF_LEN);
     }
     
     void sendPlayerState(Vec3 pos, float yaw, float pitch, bool flashlight) {
@@ -408,6 +441,7 @@ public:
         else if (type == PKT_PLAYER_STATE) handlePlayerState(buf);
         else if (type == PKT_GAME_START) handleGameStart(buf);
         else if (type == PKT_RESHUFFLE) handleReshuffle(buf, len);
+        else if (type == PKT_PLAYER_NAME) handlePlayerName(buf, len);
         else if (type == PKT_SCARE) handleScare(buf, len);
         else if (type == PKT_NOTE_COLLECT) handleNoteCollect(buf);
         else if (type == PKT_ENTITY_SNAPSHOT) handleEntitySnapshot(buf, len);
@@ -463,7 +497,7 @@ public:
             players[i].addr = from.sin_addr.s_addr;
             players[i].port = from.sin_port;
             players[i].hasValidPos = false;
-            strcpy(players[i].name, buf + 1);
+            sanitizePlayerName(buf + 1, players[i].name);
             char resp[PACKET_SIZE];
             resp[0] = PKT_WELCOME;
             resp[1] = (char)i;
@@ -480,6 +514,11 @@ public:
                 packetsSent++;
                 bytesSent += 32;
             }
+            for (int p = 0; p < MAX_PLAYERS; p++) {
+                if (!players[p].active) continue;
+                sendPlayerNamePacketTo(p, &from);
+            }
+            broadcastPlayerName(i);
             break;
         }
     }
@@ -527,6 +566,15 @@ public:
         players[myId].active = true;
         players[myId].id = myId;
         players[myId].hasValidPos = false;
+        sanitizePlayerName(localPlayerName, players[myId].name);
+    }
+
+    void handlePlayerName(char* buf, int len) {
+        if (len < 2 + PLAYER_NAME_BUF_LEN) return;
+        int id = (unsigned char)buf[1];
+        if (id < 0 || id >= MAX_PLAYERS) return;
+        sanitizePlayerName(buf + 2, players[id].name);
+        players[id].active = true;
     }
     
     void handlePlayerState(char* buf) {

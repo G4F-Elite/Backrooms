@@ -115,6 +115,25 @@ inline bool nearPoint2D(const Vec3& a, const Vec3& b, float r){
     return sqrtf(d.x*d.x + d.z*d.z) < r;
 }
 
+inline bool projectToScreen(const Vec3& worldPos, float& sx, float& sy){
+    Vec3 d = worldPos - cam.pos;
+    float cy = cosf(cam.yaw), syaw = sinf(cam.yaw);
+    float cp = cosf(cam.pitch), sp = sinf(cam.pitch);
+
+    float cx = d.x * cy - d.z * syaw;
+    float cz0 = d.x * syaw + d.z * cy;
+    float cy2 = d.y * cp - cz0 * sp;
+    float cz = d.y * sp + cz0 * cp;
+    if(cz <= 0.05f) return false;
+
+    float fov = 1.2f;
+    float t = tanf(fov * 0.5f);
+    float asp = (float)winW / (float)winH;
+    sx = cx / (cz * asp * t);
+    sy = cy2 / (cz * t);
+    return sx > -1.2f && sx < 1.2f && sy > -1.2f && sy < 1.2f;
+}
+
 inline void updateCoopObjectiveHost(){
     if(!coop.initialized) return;
     for(int s=0;s<2;s++) {
@@ -662,6 +681,21 @@ void drawUI(){
             }
             if(storyMgr.hasHallucinations())drawHallucinationEffect((50.0f-playerSanity)/50.0f);
             if(multiState==MULTI_IN_GAME)drawMultiHUD(netMgr.getPlayerCount(),netMgr.isHost);
+            if(multiState==MULTI_IN_GAME){
+                for(int i=0;i<MAX_PLAYERS;i++){
+                    if(i==netMgr.myId || !netMgr.players[i].active || !netMgr.players[i].hasValidPos) continue;
+                    if(!playerInterpReady[i]) continue;
+                    Vec3 wp = playerRenderPos[i] + Vec3(0, 2.2f, 0);
+                    float sx=0, sy=0;
+                    if(!projectToScreen(wp, sx, sy)) continue;
+                    Vec3 dd = playerRenderPos[i] - cam.pos;
+                    float dist = dd.len();
+                    if(dist > 40.0f) continue;
+                    const char* nm = netMgr.players[i].name[0] ? netMgr.players[i].name : "Player";
+                    float xOff = (float)strlen(nm) * 0.012f;
+                    drawText(nm, sx - xOff, sy, 1.1f, 0.85f, 0.9f, 0.7f, 0.85f);
+                }
+            }
             if(multiState==MULTI_IN_GAME){
                 char netBuf[96];
                 snprintf(netBuf,96,"RTT %.0fms TX %d RX %d",netMgr.rttMs,netMgr.packetsSent,netMgr.packetsRecv);

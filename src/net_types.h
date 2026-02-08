@@ -26,6 +26,7 @@ enum PacketType {
     PKT_ENTITY_REMOVE,   // Monster removed
     PKT_WORLD_SEED,
     PKT_CHAT,
+    PKT_PLAYER_NAME,     // Player id + display name
     PKT_SCARE,
     PKT_GAME_START,      // Host sends to start game for all
     PKT_TELEPORT,        // Request teleport to another player
