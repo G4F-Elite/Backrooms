@@ -43,6 +43,8 @@ inline void drawSettings(bool fp) {
                    &settings.mouseSens, nullptr, nullptr, &settings.fsrSharpness, nullptr, nullptr, nullptr};
     float mx[] = {1, 1, 1, 1, 1, 1, 0.006f, 1, 1, 1, 1, 1, 1};
     
+    const float rightColCenterX = 0.50f;
+
     for (int i = 0; i < 13; i++) {
         float s = (menuSel == i) ? 1.0f : 0.5f;
         float y = 0.43f - i*0.09f;
@@ -50,16 +52,16 @@ inline void drawSettings(bool fp) {
         drawText(lb[i], -0.48f, y, 1.8f, 0.9f*s, 0.85f*s, 0.4f*s);
         
         if (i == 7) {
-            drawText(upscalerModeLabel(settings.upscalerMode), 0.36f, y, 1.8f, 0.9f*s, 0.85f*s, 0.4f*s);
+            drawTextCentered(upscalerModeLabel(settings.upscalerMode), rightColCenterX, y, 1.8f, 0.9f*s, 0.85f*s, 0.4f*s);
         } else if (i == 8) {
             char rb[24];
             if (clampUpscalerMode(settings.upscalerMode) == UPSCALER_MODE_OFF) snprintf(rb, 24, "NATIVE");
             else snprintf(rb, 24, "%d%%", renderScalePercentFromPreset(settings.renderScalePreset));
-            drawText(rb, 0.48f, y, 1.8f, 0.9f*s, 0.85f*s, 0.4f*s);
+            drawTextCentered(rb, rightColCenterX, y, 1.8f, 0.9f*s, 0.85f*s, 0.4f*s);
         } else if (i == 10) {
-            drawText(aaModeLabel(settings.aaMode), 0.43f, y, 1.8f, 0.9f*s, 0.85f*s, 0.4f*s);
+            drawTextCentered(aaModeLabel(settings.aaMode), rightColCenterX, y, 1.8f, 0.9f*s, 0.85f*s, 0.4f*s);
         } else if (i == 11) {
-            drawText("OPEN", 0.48f, y, 1.8f, 0.9f*s, 0.85f*s, 0.4f*s);
+            drawTextCentered("OPEN", rightColCenterX, y, 1.8f, 0.9f*s, 0.85f*s, 0.4f*s);
         } else if (vl[i]) {
             float nv = *vl[i] / mx[i];
             if (nv > 1) nv = 1;
