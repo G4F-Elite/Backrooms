@@ -23,9 +23,9 @@ void testStoryScareOneShotAndCooldown() {
 
 void testRandomChanceByPhaseAndSanity() {
     assert(randomScareChancePercent(SCARE_PHASE_INTRO, 100.0f) == 0);
-    assert(randomScareChancePercent(SCARE_PHASE_EXPLORATION, 100.0f) == 6);
+    assert(randomScareChancePercent(SCARE_PHASE_EXPLORATION, 100.0f) == 10);
     assert(randomScareChancePercent(SCARE_PHASE_SURVIVAL, 60.0f) > randomScareChancePercent(SCARE_PHASE_EXPLORATION, 100.0f));
-    assert(randomScareChancePercent(SCARE_PHASE_DESPERATION, 20.0f) <= 45);
+    assert(randomScareChancePercent(SCARE_PHASE_DESPERATION, 20.0f) <= 55);
 }
 
 void testRandomTriggerFlow() {

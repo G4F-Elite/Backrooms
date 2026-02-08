@@ -9,6 +9,10 @@ inline constexpr int AA_MODE_FXAA = 1;
 inline constexpr int AA_MODE_TAA = 2;
 inline constexpr int AA_MODE_COUNT = 3;
 
+inline constexpr int FRAMEGEN_MODE_OFF = 0;
+inline constexpr int FRAMEGEN_MODE_INTERP = 1;
+inline constexpr int FRAMEGEN_MODE_COUNT = 2;
+
 inline constexpr int RENDER_SCALE_PRESET_COUNT = 6;
 inline constexpr int RENDER_SCALE_PRESET_DEFAULT = 3;
 inline constexpr float RENDER_SCALE_PRESETS[RENDER_SCALE_PRESET_COUNT] = {
@@ -71,4 +75,18 @@ inline const char* aaModeLabel(int mode) {
         case AA_MODE_TAA: return "TAA";
         default: return "OFF";
     }
+}
+
+inline int clampFramegenMode(int mode) {
+    if (mode < FRAMEGEN_MODE_OFF) return FRAMEGEN_MODE_OFF;
+    if (mode >= FRAMEGEN_MODE_COUNT) return FRAMEGEN_MODE_COUNT - 1;
+    return mode;
+}
+
+inline int stepFramegenMode(int mode, int delta) {
+    return clampFramegenMode(mode + delta);
+}
+
+inline const char* framegenModeLabel(int mode) {
+    return clampFramegenMode(mode) == FRAMEGEN_MODE_INTERP ? "INTERPOLATION" : "OFF";
 }
