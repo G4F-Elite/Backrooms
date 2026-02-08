@@ -425,11 +425,12 @@ void buildGeom(){
                     int wx=(pcx+dcx)*CHUNK_SIZE+lx,wz=(pcz+dcz)*CHUNK_SIZE+lz;
                     if(it->second.cells[lx][lz]!=0)continue;
                     float px=wx*CS,pz=wz*CS;
-                    float fl[]={px,0,pz,0,0,0,1,0,px,0,pz+CS,0,1,0,1,0,px+CS,0,pz+CS,1,1,0,1,0,
-                               px,0,pz,0,0,0,1,0,px+CS,0,pz+CS,1,1,0,1,0,px+CS,0,pz,1,0,0,1,0};
+                    const float uvTile = 2.2f;
+                    float fl[]={px,0,pz,0,0,0,1,0,px,0,pz+CS,0,uvTile,0,1,0,px+CS,0,pz+CS,uvTile,uvTile,0,1,0,
+                               px,0,pz,0,0,0,1,0,px+CS,0,pz+CS,uvTile,uvTile,0,1,0,px+CS,0,pz,uvTile,0,0,1,0};
                     for(int i=0;i<48;i++)fv.push_back(fl[i]);
-                    float cl[]={px,WH,pz,0,0,0,-1,0,px,WH,pz+CS,0,1,0,-1,0,px+CS,WH,pz+CS,1,1,0,-1,0,
-                               px,WH,pz,0,0,0,-1,0,px+CS,WH,pz+CS,1,1,0,-1,0,px+CS,WH,pz,1,0,0,-1,0};
+                    float cl[]={px,WH,pz,0,0,0,-1,0,px,WH,pz+CS,0,uvTile,0,-1,0,px+CS,WH,pz+CS,uvTile,uvTile,0,-1,0,
+                               px,WH,pz,0,0,0,-1,0,px+CS,WH,pz+CS,uvTile,uvTile,0,-1,0,px+CS,WH,pz,uvTile,0,0,-1,0};
                     for(int i=0;i<48;i++)cv.push_back(cl[i]);
                     if(getCellWorld(wx-1,wz)==1)mkWall(wv,px,pz,0,CS,WH,CS,WH);
                     if(getCellWorld(wx+1,wz)==1)mkWall(wv,px+CS,pz+CS,0,-CS,WH,CS,WH);

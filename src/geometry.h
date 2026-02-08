@@ -4,8 +4,8 @@
 
 inline void mkWall(std::vector<float>& v, float x, float z, float dx, float dz, float h, float CS, float WH) {
     Vec3 n = Vec3(dz, 0, -dx).norm();
-    float tx = sqrtf(dx * dx + dz * dz) / CS;
-    float ty = h / WH;
+    float tx = (sqrtf(dx * dx + dz * dz) / CS) * 1.8f;
+    float ty = (h / WH) * 1.6f;
     float vv[] = {
         x, 0, z, 0, 0, n.x, n.y, n.z,
         x, h, z, 0, ty, n.x, n.y, n.z,

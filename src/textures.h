@@ -22,7 +22,7 @@ inline float perlin(float x, float y, int oct) {
 }
 
 inline GLuint genTex(int type) {
-    const int sz=256;
+    const int sz=(type==3)?256:512;
     unsigned char* d=new unsigned char[sz*sz*3];
     for(int y=0;y<sz;y++) for(int x=0;x<sz;x++) {
         float r=128,g=128,b=128;
