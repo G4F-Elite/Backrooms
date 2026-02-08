@@ -159,7 +159,7 @@ void windowResize(GLFWwindow*, int w, int h) {
     if (h < 100) h = 100;
     winW = w;
     winH = h;
-    computeRenderTargetSize(winW, winH, renderScaleFromPreset(settings.renderScalePreset), renderW, renderH);
+    computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), renderW, renderH);
     if (fbo) glDeleteFramebuffers(1, &fbo);
     if (fboTex) glDeleteTextures(1, &fboTex);
     if (rbo) glDeleteRenderbuffers(1, &rbo);

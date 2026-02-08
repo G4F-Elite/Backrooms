@@ -35,6 +35,11 @@ inline int renderScalePercentFromPreset(int preset) {
     return (int)(scale * 100.0f + 0.5f);
 }
 
+inline float effectiveRenderScale(int upscalerMode, int preset) {
+    if (clampUpscalerMode(upscalerMode) == UPSCALER_MODE_OFF) return 1.0f;
+    return renderScaleFromPreset(preset);
+}
+
 inline float clampFsrSharpness(float sharpness) {
     if (sharpness < 0.0f) return 0.0f;
     if (sharpness > 1.0f) return 1.0f;

@@ -113,10 +113,6 @@ void main(){
  // Darker, warmer fog color
  vec3 fogColor = vec3(0.045, 0.04, 0.035);
  
- // Add subtle "dust particles" effect based on distance
- float dustDist = dist * 0.08;
- float dust = hash(fp * 0.5 + vec3(tm * 0.3, 0, 0)) * 0.015 * min(dustDist, 1.0);
- 
  // Distance-based color desaturation (far objects lose color)
  float desat = smoothstep(8.0, 20.0, dist);
  float gray = dot(res, vec3(0.3, 0.6, 0.1));
@@ -128,9 +124,6 @@ void main(){
  
  // Apply fog
  res = mix(fogColor, res, fog);
- 
- // Add dust on top
- res += vec3(dust);
  
  res *= vec3(1.0, 0.97, 0.9);
  
@@ -200,12 +193,29 @@ vec3 fsr1Sample(vec2 tc){
  vec3 lap = (n + s + e + w) - c * 4.0;
  float span = max(max(mx.r - mn.r, mx.g - mn.g), mx.b - mn.b);
  float adaptive = 1.0 / (1.0 + span * 16.0);
- vec3 rcas = c - lap * (0.22 + sharpness * 0.58) * adaptive;
+ vec3 rcas = c - lap * (0.28 + sharpness * 0.92) * adaptive;
  return clamp(rcas, 0.0, 1.0);
 }
 
+vec3 aaResolve(vec2 tc, vec3 base){
+ vec3 nw = texture(tex, tc + vec2(-texelX, texelY)).rgb;
+ vec3 ne = texture(tex, tc + vec2(texelX, texelY)).rgb;
+ vec3 sw = texture(tex, tc + vec2(-texelX, -texelY)).rgb;
+ vec3 se = texture(tex, tc + vec2(texelX, -texelY)).rgb;
+ float lumBase = dot(base, vec3(0.299, 0.587, 0.114));
+ float lumMin = min(lumBase, min(min(dot(nw,vec3(0.299,0.587,0.114)), dot(ne,vec3(0.299,0.587,0.114))), min(dot(sw,vec3(0.299,0.587,0.114)), dot(se,vec3(0.299,0.587,0.114)))));
+ float lumMax = max(lumBase, max(max(dot(nw,vec3(0.299,0.587,0.114)), dot(ne,vec3(0.299,0.587,0.114))), max(dot(sw,vec3(0.299,0.587,0.114)), dot(se,vec3(0.299,0.587,0.114)))));
+ float contrast = lumMax - lumMin;
+ vec3 avg = (nw + ne + sw + se + base) * 0.2;
+ float blend = smoothstep(0.04, 0.20, contrast) * 0.55;
+ return mix(base, avg, blend);
+}
+
 vec3 upscaledSample(vec2 tc){
- if(upscaler == 1) return fsr1Sample(tc);
+ if(upscaler == 1){
+  vec3 fsr = fsr1Sample(tc);
+  return aaResolve(tc, fsr);
+ }
  return texture(tex, tc).rgb;
 }
 
@@ -238,11 +248,6 @@ void main(){
  float vig = 1.0 - length(uv - 0.5) * 0.45;
  vig = smoothstep(0.3, 1.0, vig);
  c *= vig;
- 
- // Subtle dust particles overlay
- float dust = noise(uv * 200.0 + vec2(tm * 3.0, tm * 2.0));
- dust = smoothstep(0.75, 0.95, dust) * 0.08 * inten;
- c += dust;
  
  // Subtle light leak / haze at center
  float haze = 1.0 - length(uv - 0.5) * 1.5;

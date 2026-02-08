@@ -136,8 +136,12 @@ inline void drawSettings(bool fp) {
         if(i==7){
             drawText(upscalerModeLabel(settings.upscalerMode),0.36f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         }else if(i==8){
-            int scalePercent = renderScalePercentFromPreset(settings.renderScalePreset);
-            char rb[24]; snprintf(rb,24,"%d%%",scalePercent);
+            char rb[24];
+            if(clampUpscalerMode(settings.upscalerMode)==UPSCALER_MODE_OFF) snprintf(rb,24,"NATIVE");
+            else {
+                int scalePercent = renderScalePercentFromPreset(settings.renderScalePreset);
+                snprintf(rb,24,"%d%%",scalePercent);
+            }
             drawText(rb,0.48f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         }else if(i==10){
             drawText("OPEN",0.48f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
@@ -299,20 +303,22 @@ inline void drawIntro(int line, float timer, float lineTime, const char** introL
 inline void drawNote(int noteId, const char* title, const char* content) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     const char* backFill = "                                                  ";
-    for(float by = 0.96f; by >= -0.96f; by -= 0.08f) {
-        drawTextCentered(backFill, 0.0f, by, 3.4f, 0.07f, 0.05f, 0.03f, 0.90f);
+    for(float by = 0.98f; by >= -0.98f; by -= 0.07f) {
+        drawTextCentered(backFill, 0.0f, by, 3.8f, 0.01f, 0.01f, 0.01f, 0.97f);
     }
-    drawTextCentered(backFill, 0.0f, 0.88f, 3.4f, 0.22f, 0.18f, 0.12f, 0.22f);
+    for(float by = 0.90f; by >= -0.90f; by -= 0.09f) {
+        drawTextCentered(backFill, 0.0f, by, 3.2f, 0.08f, 0.06f, 0.04f, 0.74f);
+    }
 
     const char* panelShadow = "                                                  ";
     const char* panelBody = "                                              ";
     for(float yp = 0.76f; yp >= -0.74f; yp -= 0.09f) {
-        drawTextCentered(panelShadow, 0.0f, yp - 0.01f, 3.0f, 0.06f, 0.04f, 0.02f, 0.55f);
-        drawTextCentered(panelBody, 0.0f, yp, 3.0f, 0.84f, 0.79f, 0.64f, 0.97f);
+        drawTextCentered(panelShadow, 0.0f, yp - 0.012f, 3.05f, 0.0f, 0.0f, 0.0f, 0.82f);
+        drawTextCentered(panelBody, 0.0f, yp, 3.05f, 0.91f, 0.86f, 0.72f, 1.0f);
     }
 
-    drawTextCentered(title, 0.0f, 0.56f, 2.5f, 0.3f, 0.25f, 0.15f, 1.0f);
-    drawTextCentered("________________________________", 0.0f, 0.46f, 1.5f, 0.4f, 0.35f, 0.2f, 0.92f);
+    drawTextCentered(title, 0.0f, 0.56f, 2.6f, 0.10f, 0.08f, 0.05f, 1.0f);
+    drawTextCentered("________________________________", 0.0f, 0.46f, 1.5f, 0.16f, 0.12f, 0.08f, 1.0f);
 
     float ty = 0.30f;
     char line[64];
@@ -320,8 +326,8 @@ inline void drawNote(int noteId, const char* title, const char* content) {
     for(const char* p = content; *p; p++) {
         if(*p == '\n' || li >= 50) {
             line[li] = 0;
-            drawTextCentered(line, 0.0f, ty, 1.5f, 0.25f, 0.2f, 0.1f, 1.0f);
-            ty -= 0.08f;
+            drawTextCentered(line, 0.0f, ty, 1.62f, 0.08f, 0.07f, 0.05f, 1.0f);
+            ty -= 0.084f;
             li = 0;
         } else {
             line[li++] = *p;
@@ -329,8 +335,8 @@ inline void drawNote(int noteId, const char* title, const char* content) {
     }
     if(li > 0) {
         line[li] = 0;
-        drawTextCentered(line, 0.0f, ty, 1.5f, 0.25f, 0.2f, 0.1f, 1.0f);
+        drawTextCentered(line, 0.0f, ty, 1.62f, 0.08f, 0.07f, 0.05f, 1.0f);
     }
-    drawTextCentered("PRESS E OR ESC TO CLOSE", 0.0f, -0.75f, 1.5f, 0.45f, 0.4f, 0.24f, 0.96f);
+    drawTextCentered("PRESS E OR ESC TO CLOSE", 0.0f, -0.75f, 1.55f, 0.17f, 0.13f, 0.08f, 1.0f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }

@@ -416,7 +416,7 @@ int main(){
     wallTex=genTex(0);floorTex=genTex(1);ceilTex=genTex(2);lightTex=genTex(3);
     mainShader=mkShader(mainVS,mainFS);lightShader=mkShader(lightVS,lightFS);vhsShader=mkShader(vhsVS,vhsFS);
     buildGeom();
-    computeRenderTargetSize(winW, winH, renderScaleFromPreset(settings.renderScalePreset), renderW, renderH);
+    computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), renderW, renderH);
     initFBO(fbo,fboTex,rbo,renderW,renderH);
     initText();
     entityMgr.init();
@@ -426,7 +426,7 @@ int main(){
     while(!glfwWindowShouldClose(gWin)){
         float now=(float)glfwGetTime();dTime=now-lastFrame;lastFrame=now;vhsTime=now;
         int desiredRenderW = 0, desiredRenderH = 0;
-        computeRenderTargetSize(winW, winH, renderScaleFromPreset(settings.renderScalePreset), desiredRenderW, desiredRenderH);
+        computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), desiredRenderW, desiredRenderH);
         if(desiredRenderW != renderW || desiredRenderH != renderH){
             renderW = desiredRenderW;
             renderH = desiredRenderH;

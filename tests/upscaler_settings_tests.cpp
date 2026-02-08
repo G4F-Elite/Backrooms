@@ -23,6 +23,13 @@ void testRenderScalePresetStep() {
     assert(stepRenderScalePreset(RENDER_SCALE_PRESET_COUNT - 1, 1) == RENDER_SCALE_PRESET_COUNT - 1);
 }
 
+void testEffectiveRenderScaleDependsOnMode() {
+    float offScale = effectiveRenderScale(UPSCALER_MODE_OFF, 0);
+    float fsrScale = effectiveRenderScale(UPSCALER_MODE_FSR10, 0);
+    assert(offScale == 1.0f);
+    assert(fsrScale == 0.50f);
+}
+
 void testUpscalerModeClampAndLabel() {
     assert(clampUpscalerMode(-5) == UPSCALER_MODE_OFF);
     assert(clampUpscalerMode(UPSCALER_MODE_FSR10) == UPSCALER_MODE_FSR10);
@@ -41,6 +48,7 @@ int main() {
     testRenderScalePresetClamp();
     testRenderScalePresetValues();
     testRenderScalePresetStep();
+    testEffectiveRenderScaleDependsOnMode();
     testUpscalerModeClampAndLabel();
     testFsrSharpnessClamp();
     std::cout << "All upscaler settings tests passed.\n";
