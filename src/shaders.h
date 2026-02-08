@@ -106,9 +106,9 @@ void main(){
  float fog = exp(-dist * fogDensity);
  fog = clamp(fog, 0.0, 1.0);
  
- // Add noise to fog edge to break up hard transitions
- float fogNoise = hash(floor(fp * 2.0) + vec3(tm * 0.1));
- fog = fog * (0.92 + fogNoise * 0.08);
+ // Soft noise without block artifacts
+ float fogNoise = hash(fp * 0.17 + vec3(tm * 0.05));
+ fog = fog * (0.98 + fogNoise * 0.02);
  
  // Darker, warmer fog color
  vec3 fogColor = vec3(0.045, 0.04, 0.035);

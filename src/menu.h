@@ -21,6 +21,7 @@ const unsigned char FONT_DATA[96][7] = {
 };
 
 inline GLuint fontTex=0, textShader=0, textVAO=0, textVBO=0;
+inline GLuint overlayShader=0, overlayVAO=0, overlayVBO=0;
 struct Settings {
     float masterVol=0.7f;
     float musicVol=0.55f;
@@ -47,6 +48,14 @@ void main() { gl_Position = vec4(p, 0.0, 1.0); uv = t; })";
 inline const char* textFS = R"(#version 330 core
 in vec2 uv; out vec4 fc; uniform sampler2D tex; uniform vec3 col; uniform float alpha;
 void main() { float a = texture(tex, uv).r; fc = vec4(col, a * alpha); })";
+inline const char* overlayVS = R"(#version 330 core
+layout(location=0) in vec2 p;
+void main() { gl_Position = vec4(p, 0.0, 1.0); })";
+inline const char* overlayFS = R"(#version 330 core
+out vec4 fc;
+uniform vec3 col;
+uniform float alpha;
+void main() { fc = vec4(col, alpha); })";
 
 inline GLuint genFontTex() {
     unsigned char* data = new unsigned char[96*8*8*3]; memset(data,0,96*8*8*3);
@@ -66,6 +75,24 @@ inline void initText() {
     glBindVertexArray(textVAO); glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferData(GL_ARRAY_BUFFER,1024*24,NULL,GL_STATIC_DRAW);
     glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,16,(void*)0); glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,16,(void*)8);
     glEnableVertexAttribArray(0); glEnableVertexAttribArray(1);
+
+    GLuint ovs=glCreateShader(GL_VERTEX_SHADER); glShaderSource(ovs,1,&overlayVS,0); glCompileShader(ovs);
+    GLuint ofs=glCreateShader(GL_FRAGMENT_SHADER); glShaderSource(ofs,1,&overlayFS,0); glCompileShader(ofs);
+    overlayShader=glCreateProgram(); glAttachShader(overlayShader,ovs); glAttachShader(overlayShader,ofs); glLinkProgram(overlayShader);
+    glDeleteShader(ovs); glDeleteShader(ofs);
+    float quad[12] = {-1.0f,-1.0f,  1.0f,-1.0f,  1.0f,1.0f,  -1.0f,-1.0f,  1.0f,1.0f,  -1.0f,1.0f};
+    glGenVertexArrays(1,&overlayVAO); glGenBuffers(1,&overlayVBO);
+    glBindVertexArray(overlayVAO); glBindBuffer(GL_ARRAY_BUFFER,overlayVBO);
+    glBufferData(GL_ARRAY_BUFFER,sizeof(quad),quad,GL_STATIC_DRAW);
+    glVertexAttribPointer(0,2,GL_FLOAT,GL_FALSE,8,(void*)0); glEnableVertexAttribArray(0);
+}
+
+inline void drawFullscreenOverlay(float r, float g, float b, float a) {
+    glUseProgram(overlayShader);
+    glUniform3f(glGetUniformLocation(overlayShader,"col"),r,g,b);
+    glUniform1f(glGetUniformLocation(overlayShader,"alpha"),a);
+    glBindVertexArray(overlayVAO);
+    glDrawArrays(GL_TRIANGLES,0,6);
 }
 
 inline void drawText(const char* s, float x, float y, float sc, float r, float g, float b, float a=1.0f) {
@@ -108,6 +135,8 @@ inline void drawSlider(float x,float y,float w,float val,float r,float g,float b
 
 inline void drawMenu(float tm) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    drawFullscreenOverlay(0.035f,0.03f,0.028f,1.0f);
+    drawFullscreenOverlay(0.17f,0.13f,0.08f,0.18f + 0.04f*sinf(tm*0.9f));
     float p=0.8f+0.05f*sinf(tm*2.0f), gl=(rand()%100<3)?(rand()%10-5)*0.003f:0;
     drawTextCentered("THE BACKROOMS",0.0f+gl,0.5f,4.0f,0.9f,0.85f,0.4f,p);
     drawTextCentered("LEVEL 0",0.0f,0.35f,2.5f,0.7f,0.65f,0.3f,0.8f);
@@ -124,7 +153,7 @@ inline void drawMenu(float tm) {
 
 inline void drawSettings(bool fp) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    if(fp) drawText("                                        ",-1.0f,-1.0f,50.0f,0.03f,0.03f,0.04f,0.70f);
+    if(fp) drawFullscreenOverlay(0.02f,0.02f,0.03f,0.72f);
     drawTextCentered("SETTINGS",0.0f,0.55f,3.0f,0.9f,0.85f,0.4f);
     const char* lb[]={"MASTER VOL","MUSIC VOL","AMBIENCE VOL","SFX VOL","VOICE VOL","VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","KEY BINDS","BACK"};
     float*vl[]={&settings.masterVol,&settings.musicVol,&settings.ambienceVol,&settings.sfxVol,&settings.voiceVol,&settings.vhsIntensity,&settings.mouseSens,nullptr,nullptr,&settings.fsrSharpness,nullptr,nullptr};
@@ -157,7 +186,7 @@ inline void drawSettings(bool fp) {
 
 inline void drawPause() {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    drawText("                                        ",-1.0f,-1.0f,50.0f,0.03f,0.03f,0.04f,0.70f);
+    drawFullscreenOverlay(0.02f,0.02f,0.03f,0.72f);
     drawTextCentered("PAUSED",0.0f,0.25f,3.0f,0.9f,0.85f,0.4f);
     const char* it[]={"RESUME","SETTINGS","MAIN MENU","QUIT"};
     for(int i=0;i<4;i++){
@@ -192,7 +221,7 @@ inline void drawSurvivalTime(float t) {
 
 inline void drawKeybindsMenu(bool fromPause, int selected, int captureIndex) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    if(fromPause) drawText("                                        ",-1.0f,-1.0f,50.0f,0.03f,0.03f,0.04f,0.70f);
+    if(fromPause) drawFullscreenOverlay(0.02f,0.02f,0.03f,0.72f);
     drawTextCentered("KEY BINDS",0.0f,0.62f,2.6f,0.9f,0.85f,0.4f);
     for(int i=0;i<GAMEPLAY_BIND_COUNT;i++){
         float s=(selected==i)?1.0f:0.55f;
@@ -302,13 +331,8 @@ inline void drawIntro(int line, float timer, float lineTime, const char** introL
 
 inline void drawNote(int noteId, const char* title, const char* content) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    const char* backFill = "                                                  ";
-    for(float by = 0.98f; by >= -0.98f; by -= 0.07f) {
-        drawTextCentered(backFill, 0.0f, by, 3.8f, 0.01f, 0.01f, 0.01f, 0.97f);
-    }
-    for(float by = 0.90f; by >= -0.90f; by -= 0.09f) {
-        drawTextCentered(backFill, 0.0f, by, 3.2f, 0.08f, 0.06f, 0.04f, 0.74f);
-    }
+    drawFullscreenOverlay(0.0f,0.0f,0.0f,0.94f);
+    drawFullscreenOverlay(0.10f,0.08f,0.05f,0.38f);
 
     const char* panelShadow = "                                                  ";
     const char* panelBody = "                                              ";

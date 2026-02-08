@@ -106,14 +106,15 @@ inline void fillAudio(short* buf, int len) {
         }
         float uiMove = 0.0f;
         if(safe.uiMoveEnv > 0.0001f){
-            uiMove = sinf(globalPhase * 2400.0f) * safe.uiMoveEnv * 0.12f;
-            safe.uiMoveEnv *= 0.987f;
+            uiMove = sinf(globalPhase * 1900.0f) * safe.uiMoveEnv * 0.26f;
+            uiMove += sinf(globalPhase * 2300.0f) * safe.uiMoveEnv * 0.08f;
+            safe.uiMoveEnv *= 0.981f;
         }
         float uiConfirm = 0.0f;
         if(safe.uiConfirmEnv > 0.0001f){
-            uiConfirm = sinf(globalPhase * 1700.0f) * safe.uiConfirmEnv * 0.20f;
-            uiConfirm += sinf(globalPhase * 900.0f) * safe.uiConfirmEnv * 0.08f;
-            safe.uiConfirmEnv *= 0.984f;
+            uiConfirm = sinf(globalPhase * 1300.0f) * safe.uiConfirmEnv * 0.34f;
+            uiConfirm += sinf(globalPhase * 820.0f) * safe.uiConfirmEnv * 0.14f;
+            safe.uiConfirmEnv *= 0.978f;
         }
         
         // Danger sounds - progressive

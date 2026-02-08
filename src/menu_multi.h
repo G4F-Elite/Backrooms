@@ -188,7 +188,7 @@ inline void drawMultiPause(int playerCount) {
     glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    drawText("                                        ",-1.0f,-1.0f,50.0f,0.03f,0.03f,0.04f,0.70f);
+    drawFullscreenOverlay(0.02f,0.02f,0.03f,0.72f);
     
     drawTextCentered("PAUSED", 0.0f, 0.35f, 3.0f, 0.9f, 0.85f, 0.4f);
     
