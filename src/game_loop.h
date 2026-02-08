@@ -418,6 +418,7 @@ int main(){
     buildGeom();
     computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), renderW, renderH);
     initFBO(fbo,fboTex,rbo,renderW,renderH);
+    initTaaTargets();
     initText();
     entityMgr.init();
     initPlayerModels(); playerModelsInit = true;
@@ -631,32 +632,126 @@ int main(){
         glViewport(0,0,winW,winH);
         glClear(GL_COLOR_BUFFER_BIT);
         glDisable(GL_DEPTH_TEST);
-        
+
         glUseProgram(vhsShader);
-        glBindTexture(GL_TEXTURE_2D,fboTex);
         bool vhsMenu=(gameState==STATE_MENU);
         float vI=vhsMenu?(settings.vhsIntensity*0.15f):0.0f;
         static GLint vhsTmLoc = -1;
         static GLint vhsIntenLoc = -1;
         static GLint vhsUpscalerLoc = -1;
+        static GLint vhsAaModeLoc = -1;
         static GLint vhsSharpnessLoc = -1;
         static GLint vhsTexelXLoc = -1;
         static GLint vhsTexelYLoc = -1;
+        static GLint vhsTaaHistLoc = -1;
+        static GLint vhsTaaBlendLoc = -1;
+        static GLint vhsTaaJitterLoc = -1;
+        static GLint vhsTaaValidLoc = -1;
         if(vhsTmLoc<0){
+            glUniform1i(glGetUniformLocation(vhsShader,"tex"),0);
             vhsTmLoc = glGetUniformLocation(vhsShader,"tm");
             vhsIntenLoc = glGetUniformLocation(vhsShader,"inten");
             vhsUpscalerLoc = glGetUniformLocation(vhsShader,"upscaler");
+            vhsAaModeLoc = glGetUniformLocation(vhsShader,"aaMode");
             vhsSharpnessLoc = glGetUniformLocation(vhsShader,"sharpness");
             vhsTexelXLoc = glGetUniformLocation(vhsShader,"texelX");
             vhsTexelYLoc = glGetUniformLocation(vhsShader,"texelY");
+            vhsTaaHistLoc = glGetUniformLocation(vhsShader,"histTex");
+            vhsTaaBlendLoc = glGetUniformLocation(vhsShader,"taaBlend");
+            vhsTaaJitterLoc = glGetUniformLocation(vhsShader,"taaJitter");
+            vhsTaaValidLoc = glGetUniformLocation(vhsShader,"taaValid");
         }
-        glUniform1f(vhsTmLoc,vhsTime);
-        glUniform1f(vhsIntenLoc,vI);
-        glUniform1i(vhsUpscalerLoc,clampUpscalerMode(settings.upscalerMode));
-        glUniform1f(vhsSharpnessLoc,clampFsrSharpness(settings.fsrSharpness));
-        glUniform1f(vhsTexelXLoc,1.0f/(float)renderW);
-        glUniform1f(vhsTexelYLoc,1.0f/(float)renderH);
-        glBindVertexArray(quadVAO);glDrawArrays(GL_TRIANGLES,0,6);
+        static int prevAaMode = -1;
+        int aaMode = clampAaMode(settings.aaMode);
+        if(aaMode != prevAaMode){
+            prevAaMode = aaMode;
+            taaHistoryValid = false;
+            taaFrameIndex = 0;
+        }
+        float jitterX = 0.0f;
+        float jitterY = 0.0f;
+        if(aaMode == AA_MODE_TAA){
+            static const float jitterSeq[8][2] = {
+                {0.5f, 0.5f}, {0.75f, 0.25f}, {0.25f, 0.75f}, {0.875f, 0.625f},
+                {0.375f, 0.125f}, {0.625f, 0.875f}, {0.125f, 0.375f}, {0.9375f, 0.9375f}
+            };
+            jitterX = jitterSeq[taaFrameIndex & 7][0] - 0.5f;
+            jitterY = jitterSeq[taaFrameIndex & 7][1] - 0.5f;
+        }
+        if(aaMode==AA_MODE_TAA){
+            glBindFramebuffer(GL_FRAMEBUFFER,taaResolveFbo);
+            glViewport(0,0,winW,winH);
+            glClear(GL_COLOR_BUFFER_BIT);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D,fboTex);
+            glActiveTexture(GL_TEXTURE0 + 1);
+            glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
+            glUniform1i(vhsTaaHistLoc,1);
+            glActiveTexture(GL_TEXTURE0);
+            glUniform1f(vhsTmLoc,vhsTime);
+            glUniform1f(vhsIntenLoc,vI);
+            glUniform1i(vhsUpscalerLoc,clampUpscalerMode(settings.upscalerMode));
+            glUniform1i(vhsAaModeLoc,AA_MODE_TAA);
+            glUniform1f(vhsSharpnessLoc,clampFsrSharpness(settings.fsrSharpness));
+            glUniform1f(vhsTexelXLoc,1.0f/(float)renderW);
+            glUniform1f(vhsTexelYLoc,1.0f/(float)renderH);
+            glUniform1f(vhsTaaBlendLoc,0.88f);
+            glUniform3f(vhsTaaJitterLoc,jitterX,jitterY,0.0f);
+            glUniform1f(vhsTaaValidLoc,taaHistoryValid?1.0f:0.0f);
+            glBindVertexArray(quadVAO);
+            glDrawArrays(GL_TRIANGLES,0,6);
+
+            taaHistoryValid = true;
+            taaFrameIndex = (taaFrameIndex + 1) & 7;
+
+            GLuint taaTmp = taaHistoryTex;
+            taaHistoryTex = taaResolveTex;
+            taaResolveTex = taaTmp;
+            glBindFramebuffer(GL_FRAMEBUFFER,taaResolveFbo);
+            glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,taaResolveTex,0);
+
+            glBindFramebuffer(GL_FRAMEBUFFER,0);
+            glViewport(0,0,winW,winH);
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
+            glActiveTexture(GL_TEXTURE0 + 1);
+            glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
+            glUniform1i(vhsTaaHistLoc,1);
+            glActiveTexture(GL_TEXTURE0);
+            glUniform1f(vhsTmLoc,vhsTime);
+            glUniform1f(vhsIntenLoc,0.0f);
+            glUniform1i(vhsUpscalerLoc,UPSCALER_MODE_OFF);
+            glUniform1i(vhsAaModeLoc,AA_MODE_OFF);
+            glUniform1f(vhsSharpnessLoc,0.0f);
+            glUniform1f(vhsTexelXLoc,1.0f/(float)winW);
+            glUniform1f(vhsTexelYLoc,1.0f/(float)winH);
+            glUniform1f(vhsTaaBlendLoc,0.0f);
+            glUniform3f(vhsTaaJitterLoc,0.0f,0.0f,0.0f);
+            glUniform1f(vhsTaaValidLoc,0.0f);
+            glBindVertexArray(quadVAO);
+            glDrawArrays(GL_TRIANGLES,0,6);
+        }else{
+            taaHistoryValid = false;
+            taaFrameIndex = 0;
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D,fboTex);
+            glActiveTexture(GL_TEXTURE0 + 1);
+            glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
+            glUniform1i(vhsTaaHistLoc,1);
+            glActiveTexture(GL_TEXTURE0);
+            glUniform1f(vhsTmLoc,vhsTime);
+            glUniform1f(vhsIntenLoc,vI);
+            glUniform1i(vhsUpscalerLoc,clampUpscalerMode(settings.upscalerMode));
+            glUniform1i(vhsAaModeLoc,aaMode);
+            glUniform1f(vhsSharpnessLoc,clampFsrSharpness(settings.fsrSharpness));
+            glUniform1f(vhsTexelXLoc,1.0f/(float)renderW);
+            glUniform1f(vhsTexelYLoc,1.0f/(float)renderH);
+            glUniform1f(vhsTaaBlendLoc,0.0f);
+            glUniform3f(vhsTaaJitterLoc,0.0f,0.0f,0.0f);
+            glUniform1f(vhsTaaValidLoc,0.0f);
+            glBindVertexArray(quadVAO);
+            glDrawArrays(GL_TRIANGLES,0,6);
+        }
         glEnable(GL_DEPTH_TEST);
         
         drawUI();

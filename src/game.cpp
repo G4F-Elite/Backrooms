@@ -103,6 +103,11 @@ GLuint lightOffVAO, lightOffVBO;
 GLuint pillarVAO, pillarVBO;
 GLuint quadVAO, quadVBO;
 GLuint fbo, fboTex, rbo;
+GLuint taaHistoryTex = 0;
+GLuint taaResolveTex = 0;
+GLuint taaResolveFbo = 0;
+bool taaHistoryValid = false;
+int taaFrameIndex = 0;
 int wallVC, floorVC, ceilVC, lightVC, lightOffVC, pillarVC;
 
 // Audio
@@ -153,6 +158,36 @@ void audioThread() {
     CloseHandle(hEvent);
 }
 
+void initTaaTargets() {
+    if (taaResolveFbo) glDeleteFramebuffers(1, &taaResolveFbo);
+    if (taaHistoryTex) glDeleteTextures(1, &taaHistoryTex);
+    if (taaResolveTex) glDeleteTextures(1, &taaResolveTex);
+
+    glGenTextures(1, &taaHistoryTex);
+    glBindTexture(GL_TEXTURE_2D, taaHistoryTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, winW, winH, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glGenTextures(1, &taaResolveTex);
+    glBindTexture(GL_TEXTURE_2D, taaResolveTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, winW, winH, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glGenFramebuffers(1, &taaResolveFbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, taaResolveFbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, taaResolveTex, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    taaHistoryValid = false;
+    taaFrameIndex = 0;
+}
+
 // Window resize callback
 void windowResize(GLFWwindow*, int w, int h) {
     if (w < 100) w = 100;
@@ -164,6 +199,7 @@ void windowResize(GLFWwindow*, int w, int h) {
     if (fboTex) glDeleteTextures(1, &fboTex);
     if (rbo) glDeleteRenderbuffers(1, &rbo);
     initFBO(fbo, fboTex, rbo, renderW, renderH);
+    initTaaTargets();
 }
 
 // Shader compiler

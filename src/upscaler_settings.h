@@ -4,6 +4,11 @@ inline constexpr int UPSCALER_MODE_OFF = 0;
 inline constexpr int UPSCALER_MODE_FSR10 = 1;
 inline constexpr int UPSCALER_MODE_COUNT = 2;
 
+inline constexpr int AA_MODE_OFF = 0;
+inline constexpr int AA_MODE_FXAA = 1;
+inline constexpr int AA_MODE_TAA = 2;
+inline constexpr int AA_MODE_COUNT = 3;
+
 inline constexpr int RENDER_SCALE_PRESET_COUNT = 6;
 inline constexpr int RENDER_SCALE_PRESET_DEFAULT = 3;
 inline constexpr float RENDER_SCALE_PRESETS[RENDER_SCALE_PRESET_COUNT] = {
@@ -20,6 +25,16 @@ inline int clampRenderScalePreset(int preset) {
     if (preset < 0) return 0;
     if (preset >= RENDER_SCALE_PRESET_COUNT) return RENDER_SCALE_PRESET_COUNT - 1;
     return preset;
+}
+
+inline int clampAaMode(int mode) {
+    if (mode < AA_MODE_OFF) return AA_MODE_OFF;
+    if (mode >= AA_MODE_COUNT) return AA_MODE_COUNT - 1;
+    return mode;
+}
+
+inline int stepAaMode(int mode, int delta) {
+    return clampAaMode(mode + delta);
 }
 
 inline int stepRenderScalePreset(int preset, int delta) {
@@ -48,4 +63,12 @@ inline float clampFsrSharpness(float sharpness) {
 
 inline const char* upscalerModeLabel(int mode) {
     return clampUpscalerMode(mode) == UPSCALER_MODE_FSR10 ? "FSR 1.0" : "OFF";
+}
+
+inline const char* aaModeLabel(int mode) {
+    switch (clampAaMode(mode)) {
+        case AA_MODE_FXAA: return "FXAA";
+        case AA_MODE_TAA: return "TAA";
+        default: return "OFF";
+    }
 }

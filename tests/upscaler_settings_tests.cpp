@@ -44,6 +44,23 @@ void testFsrSharpnessClamp() {
     assert(clampFsrSharpness(1.2f) == 1.0f);
 }
 
+void testAaModeClampStepAndLabel() {
+    assert(clampAaMode(-3) == AA_MODE_OFF);
+    assert(clampAaMode(AA_MODE_OFF) == AA_MODE_OFF);
+    assert(clampAaMode(AA_MODE_FXAA) == AA_MODE_FXAA);
+    assert(clampAaMode(AA_MODE_TAA) == AA_MODE_TAA);
+    assert(clampAaMode(999) == AA_MODE_TAA);
+
+    assert(stepAaMode(AA_MODE_OFF, -1) == AA_MODE_OFF);
+    assert(stepAaMode(AA_MODE_OFF, 1) == AA_MODE_FXAA);
+    assert(stepAaMode(AA_MODE_FXAA, 1) == AA_MODE_TAA);
+    assert(stepAaMode(AA_MODE_TAA, 1) == AA_MODE_TAA);
+
+    assert(std::string(aaModeLabel(AA_MODE_OFF)) == "OFF");
+    assert(std::string(aaModeLabel(AA_MODE_FXAA)) == "FXAA");
+    assert(std::string(aaModeLabel(AA_MODE_TAA)) == "TAA");
+}
+
 int main() {
     testRenderScalePresetClamp();
     testRenderScalePresetValues();
@@ -51,6 +68,7 @@ int main() {
     testEffectiveRenderScaleDependsOnMode();
     testUpscalerModeClampAndLabel();
     testFsrSharpnessClamp();
+    testAaModeClampStepAndLabel();
     std::cout << "All upscaler settings tests passed.\n";
     return 0;
 }

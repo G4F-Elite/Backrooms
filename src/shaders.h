@@ -165,9 +165,14 @@ const char* vhsFS=R"(#version 330
 out vec4 F; in vec2 uv;
 uniform sampler2D tex; uniform float tm,inten;
 uniform int upscaler;
+uniform int aaMode;
 uniform float sharpness;
 uniform float texelX;
 uniform float texelY;
+uniform sampler2D histTex;
+uniform float taaBlend;
+uniform vec3 taaJitter;
+uniform float taaValid;
 
 float rnd(vec2 s){ return fract(sin(dot(s,vec2(12.9898,78.233)))*43758.5453); }
 
@@ -197,7 +202,7 @@ vec3 fsr1Sample(vec2 tc){
  return clamp(rcas, 0.0, 1.0);
 }
 
-vec3 aaResolve(vec2 tc, vec3 base){
+vec3 fxaaResolve(vec2 tc, vec3 base){
  vec3 nw = texture(tex, tc + vec2(-texelX, texelY)).rgb;
  vec3 ne = texture(tex, tc + vec2(texelX, texelY)).rgb;
  vec3 sw = texture(tex, tc + vec2(-texelX, -texelY)).rgb;
@@ -211,25 +216,50 @@ vec3 aaResolve(vec2 tc, vec3 base){
  return mix(base, avg, blend);
 }
 
-vec3 upscaledSample(vec2 tc){
+vec3 sourceSample(vec2 tc){
  if(upscaler == 1){
-  vec3 fsr = fsr1Sample(tc);
-  return aaResolve(tc, fsr);
+  return fsr1Sample(tc);
  }
  return texture(tex, tc).rgb;
 }
 
+vec3 taaResolve(vec2 tc){
+ vec2 off = taaJitter.xy * vec2(texelX, texelY);
+ vec3 cur = sourceSample(tc + off);
+ vec3 n = sourceSample(tc + vec2(0.0, texelY));
+ vec3 s = sourceSample(tc - vec2(0.0, texelY));
+ vec3 e = sourceSample(tc + vec2(texelX, 0.0));
+ vec3 w = sourceSample(tc - vec2(texelX, 0.0));
+ vec3 mn = min(cur, min(min(n, s), min(e, w)));
+ vec3 mx = max(cur, max(max(n, s), max(e, w)));
+ vec3 hist = texture(histTex, tc).rgb;
+ vec3 clampedHist = clamp(hist, mn, mx);
+ float useHist = clamp(taaValid, 0.0, 1.0);
+ return mix(cur, clampedHist, taaBlend * useHist);
+}
+
+vec3 resolveSample(vec2 tc){
+ vec3 base = sourceSample(tc);
+ if(aaMode == 1){
+  return fxaaResolve(tc, base);
+ }
+ if(aaMode == 2){
+  return taaResolve(tc);
+ }
+ return base;
+}
+
 void main(){
  if(inten < 0.2) {
-  F = vec4(upscaledSample(uv), 1.0);
+  F = vec4(resolveSample(uv), 1.0);
   return;
  }
  
  // Chromatic aberration
  float ab = 0.0015 * inten;
- float r = upscaledSample(uv + vec2(ab,0)).r;
- float g = upscaledSample(uv).g;
- float b = upscaledSample(uv - vec2(ab,0)).b;
+ float r = resolveSample(uv + vec2(ab,0)).r;
+ float g = resolveSample(uv).g;
+ float b = resolveSample(uv - vec2(ab,0)).b;
  vec3 c = vec3(r,g,b);
  
  // Scanlines
@@ -241,7 +271,7 @@ void main(){
  // Horizontal distortion glitch (rare)
  if(inten > 0.45 && rnd(vec2(tm * 0.08, floor(uv.y * 60))) > 0.985) {
   float of = (rnd(vec2(tm, floor(uv.y * 60))) - 0.5) * 0.018 * inten;
-  c = upscaledSample(uv + vec2(of, 0));
+  c = resolveSample(uv + vec2(of, 0));
  }
  
  // Vignette - stronger to hide screen edges
@@ -255,7 +285,7 @@ void main(){
  c += vec3(haze * 1.1, haze, haze * 0.9);
  
  // Ghost frame (very subtle double image)
- c = mix(c, upscaledSample(uv - vec2(0.003, 0.001)), 0.03 * inten);
+ c = mix(c, resolveSample(uv - vec2(0.003, 0.001)), 0.03 * inten);
  
  // Warm tint
  c.g += 0.01 * inten;

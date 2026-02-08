@@ -77,9 +77,10 @@ inline void handleNicknameInput(GLFWwindow* w) {
 }
 
 inline void settingsInput(GLFWwindow* w, bool fromPause) {
-    static constexpr int SETTINGS_ITEMS = 12;
-    static constexpr int SETTINGS_BINDS_INDEX = 10;
-    static constexpr int SETTINGS_BACK_INDEX = 11;
+    static constexpr int SETTINGS_ITEMS = 13;
+    static constexpr int SETTINGS_AA_INDEX = 10;
+    static constexpr int SETTINGS_BINDS_INDEX = 11;
+    static constexpr int SETTINGS_BACK_INDEX = 12;
     bool esc = glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS;
     bool up = glfwGetKey(w, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS;
     bool down = glfwGetKey(w, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS;
@@ -117,6 +118,9 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
     } else if (menuSel == 9) {
         if (left && !leftPressed) { settings.fsrSharpness = clampFsrSharpness(settings.fsrSharpness - 0.05f); triggerMenuNavigateSound(); }
         if (right && !rightPressed) { settings.fsrSharpness = clampFsrSharpness(settings.fsrSharpness + 0.05f); triggerMenuNavigateSound(); }
+    } else if (menuSel == SETTINGS_AA_INDEX) {
+        if (left && !leftPressed) { settings.aaMode = stepAaMode(settings.aaMode, -1); triggerMenuNavigateSound(); }
+        if (right && !rightPressed) { settings.aaMode = stepAaMode(settings.aaMode, 1); triggerMenuNavigateSound(); }
     } else if (menuSel == SETTINGS_BINDS_INDEX) {
         if (enter && !enterPressed) {
             triggerMenuConfirmSound();
@@ -173,13 +177,13 @@ inline void keybindsInput(GLFWwindow* w, bool fromPause) {
             } else if (menuSel == KEYBINDS_BACK_INDEX) {
                 triggerMenuConfirmSound();
                 gameState = fromPause ? STATE_SETTINGS_PAUSE : STATE_SETTINGS;
-                menuSel = 10;
+                menuSel = 11;
             }
         }
         if (esc && !escPressed) {
             triggerMenuConfirmSound();
             gameState = fromPause ? STATE_SETTINGS_PAUSE : STATE_SETTINGS;
-            menuSel = 10;
+            menuSel = 11;
         }
     }
 
