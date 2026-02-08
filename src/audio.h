@@ -37,6 +37,14 @@ struct SoundState {
     bool uiConfirmTrig=false;
     float uiMovePitch=1.0f;
     float uiAdjustPitch=1.0f;
+    // Entity proximity growl
+    float entityGrowlPhase=0;
+    float entityProximity=0;
+
+    // Sprint breathing
+    bool isSprinting=false;
+    float breathPhase=0;
+    float staminaRatio=1.0f;
 };
 
 extern SoundState sndState;
@@ -356,11 +364,41 @@ inline void fillAudio(short* buf, int len) {
         float roomEventsSfx = knock * (0.10f + envStress * 0.26f)
                             + buzzTick * 0.11f;
 
+        // Entity proximity growl sound
+        float growl = 0;
+
+        if(sndState.entityProximity > 0.05f) {
+            sndState.entityGrowlPhase += 0.0009f + sndState.entityProximity * 0.0006f;
+            if(sndState.entityGrowlPhase > 6.28318f) sndState.entityGrowlPhase -= 6.28318f;
+            float gBase = sinf(sndState.entityGrowlPhase * 22.0f) * 0.18f;
+            gBase += sinf(sndState.entityGrowlPhase * 35.0f) * 0.08f;
+            float gEnv = sndState.entityProximity * sndState.entityProximity;
+            growl = gBase * gEnv;
+        }
+
+        // Sprint breathing sound
+        float breath = 0;
+
+        if(sndState.isSprinting || sndState.staminaRatio < 0.5f) {
+            float intensity = sndState.isSprinting ? 1.0f : 0.0f;
+            intensity += (1.0f - sndState.staminaRatio) * 0.6f;
+            if(intensity > 1.0f) intensity = 1.0f;
+            float rate = 4.0f + intensity * 4.0f;
+            sndState.breathPhase += rate * dt;
+            if(sndState.breathPhase > 6.28318f) sndState.breathPhase -= 6.28318f;
+            float breathCycle = sinf(sndState.breathPhase);
+            if(breathCycle > 0.0f) {
+                float bEnv = breathCycle * expf(-breathCycle * 1.5f);
+                float bNoise = ((float)(rand()%100) / 100.0f - 0.5f) * 0.06f;
+                breath = (bEnv * 0.12f + bNoise) * intensity;
+            }
+        }
+
         float ambienceMix = hum*sndState.humVol + amb + distant + roomEventsAmb;
-        float sfxMix = step + scare + flashlightSwitch + roomEventsSfx;
+        float sfxMix = step + scare + flashlightSwitch + roomEventsSfx + breath;
         float uiMix = (uiMove + uiAdjust + uiConfirm) * (0.45f + 0.55f * sndState.sfxVol);
         float voiceMix = insane;
-        float musicMix = creepy;
+        float musicMix = creepy + growl;
         float v =
             (ambienceMix * sndState.ambienceVol +
              sfxMix * sndState.sfxVol +

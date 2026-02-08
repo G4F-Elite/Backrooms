@@ -177,3 +177,31 @@ inline void mkNoteGlow(std::vector<float>& v, Vec3 pos, float bob) {
         for (int i = 0; i < 48; i++) v.push_back(vv[i]);
     }
 }
+
+// Blood stain decal on a wall surface
+inline void mkBloodDecal(
+    std::vector<float>& v, float x, float z,
+    float nx, float nz, float scale
+) {
+    float hs = scale * 0.5f;
+    float yBase = 0.2f + (scale * 0.3f);
+    float yTop = yBase + scale * 0.8f;
+
+    // Offset slightly from wall to avoid z-fighting
+    float ox = x + nx * 0.02f;
+    float oz = z + nz * 0.02f;
+
+    // Tangent along wall
+    float tx = -nz * hs;
+    float tz = nx * hs;
+
+    float vv[] = {
+        ox - tx, yBase, oz - tz, 0, 0, nx, 0, nz,
+        ox + tx, yBase, oz + tz, 1, 0, nx, 0, nz,
+        ox + tx, yTop,  oz + tz, 1, 1, nx, 0, nz,
+        ox - tx, yBase, oz - tz, 0, 0, nx, 0, nz,
+        ox + tx, yTop,  oz + tz, 1, 1, nx, 0, nz,
+        ox - tx, yTop,  oz - tz, 0, 1, nx, 0, nz
+    };
+    for (int i = 0; i < 48; i++) v.push_back(vv[i]);
+}

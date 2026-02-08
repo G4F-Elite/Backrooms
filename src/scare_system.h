@@ -24,23 +24,23 @@ inline bool isStoryScareNote(int noteId) {
 }
 
 inline float randomScareInterval(int phase) {
-    if (phase == SCARE_PHASE_EXPLORATION) return 28.0f;
-    if (phase == SCARE_PHASE_SURVIVAL) return 22.0f;
-    if (phase == SCARE_PHASE_DESPERATION) return 16.0f;
+    if (phase == SCARE_PHASE_EXPLORATION) return 20.0f;
+    if (phase == SCARE_PHASE_SURVIVAL) return 15.0f;
+    if (phase == SCARE_PHASE_DESPERATION) return 10.0f;
     return 999.0f;
 }
 
 inline int randomScareChancePercent(int phase, float sanity) {
     if (phase == SCARE_PHASE_INTRO) return 0;
-    int baseChance = 6;
-    if (phase == SCARE_PHASE_SURVIVAL) baseChance = 11;
-    else if (phase == SCARE_PHASE_DESPERATION) baseChance = 16;
+    int baseChance = 10;
+    if (phase == SCARE_PHASE_SURVIVAL) baseChance = 18;
+    else if (phase == SCARE_PHASE_DESPERATION) baseChance = 25;
     int sanityBonus = 0;
-    if (sanity < 70.0f) sanityBonus += 5;
-    if (sanity < 45.0f) sanityBonus += 6;
-    if (sanity < 25.0f) sanityBonus += 8;
+    if (sanity < 70.0f) sanityBonus += 6;
+    if (sanity < 45.0f) sanityBonus += 8;
+    if (sanity < 25.0f) sanityBonus += 10;
     int chance = baseChance + sanityBonus;
-    if (chance > 45) chance = 45;
+    if (chance > 55) chance = 55;
     return chance;
 }
 

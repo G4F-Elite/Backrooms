@@ -104,3 +104,62 @@ inline GLuint genTex(int type) {
     glGenerateMipmap(GL_TEXTURE_2D);
     delete[] d; return tex;
 }
+
+// Blood stain texture for wall decals (type 5)
+inline GLuint genBloodTex() {
+    const int sz = 128;
+    unsigned char* d = new unsigned char[sz * sz * 4];
+
+    for (int y = 0; y < sz; y++) {
+        for (int x = 0; x < sz; x++) {
+            float cx = x - sz * 0.5f;
+            float cy = y - sz * 0.5f;
+            float dist = sqrtf(cx * cx + cy * cy) / (sz * 0.5f);
+
+            // Irregular splatter shape using noise
+            float splat = perlin(x * 0.08f + 5.0f, y * 0.08f + 7.0f, 4);
+            float edge = 1.0f - dist * (1.2f - splat * 0.4f);
+            if (edge < 0.0f) edge = 0.0f;
+            if (edge > 1.0f) edge = 1.0f;
+
+            // Dark red blood color with variation
+            float vary = perlin(x * 0.15f, y * 0.15f, 3) * 20.0f;
+            float r = 120.0f + vary;
+            float g = 15.0f + vary * 0.3f;
+            float b = 10.0f + vary * 0.2f;
+
+            // Drip streaks going downward
+            float drip = perlin(x * 0.12f + 3.0f, y * 0.04f, 3);
+            if (drip > 0.4f && y > sz / 3) {
+                float streak = (drip - 0.4f) * 2.5f;
+                r += streak * 30.0f;
+                edge += streak * 0.3f;
+                if (edge > 1.0f) edge = 1.0f;
+            }
+
+            float alpha = edge * 200.0f;
+            if (alpha > 255.0f) alpha = 255.0f;
+
+            int idx = (y * sz + x) * 4;
+            d[idx + 0] = (unsigned char)(r < 0 ? 0 : (r > 255 ? 255 : (int)r));
+            d[idx + 1] = (unsigned char)(g < 0 ? 0 : (g > 255 ? 255 : (int)g));
+            d[idx + 2] = (unsigned char)(b < 0 ? 0 : (b > 255 ? 255 : (int)b));
+            d[idx + 3] = (unsigned char)alpha;
+        }
+    }
+
+    GLuint tex;
+    glGenTextures(1, &tex);
+    glBindTexture(GL_TEXTURE_2D, tex);
+    glTexImage2D(
+        GL_TEXTURE_2D, 0, GL_RGBA, sz, sz, 0,
+        GL_RGBA, GL_UNSIGNED_BYTE, d
+    );
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    delete[] d;
+    return tex;
+}
