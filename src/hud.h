@@ -101,7 +101,9 @@ void drawUI(){
                     drawText(":)",sx-0.018f+jitter,sy,1.35f,0.95f,0.95f,0.95f,alpha);
                 }
             }
-            drawText(minimapEnabled?"MINIMAP ON [M]":"MINIMAP OFF [M]",0.56f,-0.96f,0.95f,0.55f,0.7f,0.8f,0.78f);
+            const char* mmState = minimapEnabled ? "MINIMAP ON [M]" : "MINIMAP OFF [M]";
+            drawText(mmState,-0.95f,0.95f,1.15f,0.0f,0.0f,0.0f,0.72f);
+            drawText(mmState,-0.95f,0.95f,1.15f,0.88f,0.93f,0.78f,0.98f);
         }
     }
 }
