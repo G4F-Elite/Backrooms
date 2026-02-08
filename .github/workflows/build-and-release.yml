@@ -1,0 +1,92 @@
+name: Build And Release
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup MinGW (w64devkit)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $url = "https://github.com/skeeto/w64devkit/releases/download/v2.1.0/w64devkit-x64-2.1.0.exe"
+          Invoke-WebRequest -Uri $url -OutFile "$env:RUNNER_TEMP\w64devkit.exe"
+          & "$env:RUNNER_TEMP\w64devkit.exe" x -o"$env:RUNNER_TEMP\w64devkit"
+          "$env:RUNNER_TEMP\w64devkit\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build backrooms.exe
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (!(Test-Path build)) { New-Item -ItemType Directory -Path build | Out-Null }
+          g++ -std=c++17 -O2 -Wall -Wno-unused-result -Wno-unknown-pragmas -mwindows -static -static-libgcc -static-libstdc++ `
+            -I"deps/include" `
+            -o "build/backrooms.exe" `
+            "src/game.cpp" `
+            "deps/src/glad.c" `
+            -L"deps/lib" `
+            -lglfw3 -lopengl32 -lgdi32 -luser32 -lkernel32 -lwinmm -lws2_32
+
+      - name: Package release files
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          if (!(Test-Path release)) { New-Item -ItemType Directory -Path release | Out-Null }
+          Copy-Item "build/backrooms.exe" "release/backrooms.exe" -Force
+          if (Test-Path "deps/lib/glfw3.dll") {
+            Copy-Item "deps/lib/glfw3.dll" "release/glfw3.dll" -Force
+          }
+          Copy-Item "README.md" "release/README.md" -Force
+          Compress-Archive -Path "release/*" -DestinationPath "build/backrooms-windows.zip" -Force
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backrooms-windows
+          path: |
+            build/backrooms.exe
+            build/backrooms-windows.zip
+
+      - name: Calculate version
+        id: ver
+        shell: pwsh
+        run: |
+          $date = Get-Date -Format "yyyy.MM.dd"
+          $sha = "${env:GITHUB_SHA}".Substring(0,7)
+          $version = "v${date}.${env:GITHUB_RUN_NUMBER}.${env:GITHUB_RUN_ATTEMPT}-${sha}"
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
+
+      - name: Create and push tag
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "${{ steps.ver.outputs.version }}" -m "Auto release ${{ steps.ver.outputs.version }}"
+          git push origin "${{ steps.ver.outputs.version }}"
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.version }}
+          name: Backrooms ${{ steps.ver.outputs.version }}
+          body: |
+            Auto-generated release from commit ${{ github.sha }}.
+            Build: Windows x64
+          files: |
+            build/backrooms.exe
+            build/backrooms-windows.zip
