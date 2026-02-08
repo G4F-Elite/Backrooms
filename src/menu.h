@@ -191,6 +191,7 @@ inline void drawSettings(bool fp) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     if(fp) drawFullscreenOverlay(0.02f,0.02f,0.03f,0.72f);
     drawTextCentered("SETTINGS",0.0f,0.55f,3.0f,0.9f,0.85f,0.4f);
+    const float rightColCenterX = 0.50f;
     const char* lb[]={"MASTER VOL","MUSIC VOL","AMBIENCE VOL","SFX VOL","VOICE VOL","VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","ANTI-ALIASING","KEY BINDS","BACK"};
     float*vl[]={&settings.masterVol,&settings.musicVol,&settings.ambienceVol,&settings.sfxVol,&settings.voiceVol,&settings.vhsIntensity,&settings.mouseSens,nullptr,nullptr,&settings.fsrSharpness,nullptr,nullptr,nullptr};
     float mx[]={1.0f,1.0f,1.0f,1.0f,1.0f,1.0f,0.006f,1.0f,1.0f,1.0f,1.0f,1.0f,1.0f};
@@ -199,7 +200,7 @@ inline void drawSettings(bool fp) {
         if(menuSel==i)drawText(">",-0.55f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         drawText(lb[i],-0.48f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         if(i==7){
-            drawText(upscalerModeLabel(settings.upscalerMode),0.36f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
+            drawTextCentered(upscalerModeLabel(settings.upscalerMode),rightColCenterX,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         }else if(i==8){
             char rb[24];
             if(clampUpscalerMode(settings.upscalerMode)==UPSCALER_MODE_OFF) snprintf(rb,24,"NATIVE");
@@ -207,11 +208,11 @@ inline void drawSettings(bool fp) {
                 int scalePercent = renderScalePercentFromPreset(settings.renderScalePreset);
                 snprintf(rb,24,"%d%%",scalePercent);
             }
-            drawText(rb,0.48f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
+            drawTextCentered(rb,rightColCenterX,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         }else if(i==10){
-            drawText(aaModeLabel(settings.aaMode),0.43f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
+            drawTextCentered(aaModeLabel(settings.aaMode),rightColCenterX,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         }else if(i==11){
-            drawText("OPEN",0.48f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
+            drawTextCentered("OPEN",rightColCenterX,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         }else if(vl[i]){
             float nv=*vl[i]/mx[i]; if(nv>1.0f)nv=1.0f;
             drawSlider(0.1f,y,0.45f,nv,0.9f*s,0.85f*s,0.4f*s);
