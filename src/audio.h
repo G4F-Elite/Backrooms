@@ -51,6 +51,16 @@ inline void fillAudio(short* buf, int len) {
     static AudioSafetyState safe;
     static float uiMoveTime = -1.0f;
     static float uiConfirmTime = -1.0f;
+    static float pipeTime = -1.0f, pipePitch = 92.0f, pipeDrift = 0.0f;
+    static float ventTime = -1.0f, ventPitch = 36.0f, ventNoise = 0.0f;
+    static float buzzTime = -1.0f, buzzPitch = 1220.0f;
+    static float knockTime = -1.0f;
+    static int knockStage = 0;
+    static float rustleTime = -1.0f, rustleNoise = 0.0f;
+    static float ringTime = -1.0f, ringPitch = 410.0f;
+    static float sceneClock = 0.0f;
+    static float nextSceneEvent = 2.8f;
+    static int lastSceneEvent = -1;
     const float dt = 1.0f / (float)SAMP_RATE;
     const float twoPi = 6.283185307f;
     for(int i=0;i<len;i++) {
@@ -78,6 +88,130 @@ inline void fillAudio(short* buf, int len) {
         if(sndState.distantPhase > 0) {
             distant = sinf(sndState.distantPhase * 80.0f) * expf(-sndState.distantPhase * 4.0f) * 0.3f;
             sndState.distantPhase -= 1.0f / SAMP_RATE;
+        }
+
+        // Soft procedural spot SFX (no hard peaks)
+        float envDanger = sndState.dangerLevel;
+        if(envDanger < 0.0f) envDanger = 0.0f;
+        if(envDanger > 1.0f) envDanger = 1.0f;
+        float envInsanity = 1.0f - sndState.sanityLevel;
+        if(envInsanity < 0.0f) envInsanity = 0.0f;
+        if(envInsanity > 1.0f) envInsanity = 1.0f;
+        float envStress = envDanger * 0.65f + envInsanity * 0.35f;
+        sceneClock += dt;
+        if(sceneClock >= nextSceneEvent){
+            float baseGap = 3.6f - envStress * 1.1f;
+            if(baseGap < 2.1f) baseGap = 2.1f;
+            float jitter = (float)(rand()%1000) / 1000.0f;
+            nextSceneEvent = sceneClock + baseGap + jitter * 3.4f;
+
+            int eventRoll = rand()%100;
+            int eventType = 0;
+            if(eventRoll < 24) eventType = 0;         // pipe
+            else if(eventRoll < 45) eventType = 1;    // vent
+            else if(eventRoll < 60) eventType = 2;    // rustle
+            else if(eventRoll < 75) eventType = 3;    // knock
+            else if(eventRoll < 89) eventType = 4;    // buzz
+            else eventType = 5;                       // ring
+            if(eventType == lastSceneEvent) eventType = (eventType + 1 + (rand()%2)) % 6;
+            lastSceneEvent = eventType;
+
+            if(eventType == 0 && pipeTime < 0.0f){
+                pipeTime = 0.0f;
+                pipePitch = 78.0f + (rand()%42);
+                pipeDrift = ((rand()%100) / 100.0f) * 1.6f + 0.3f;
+            }else if(eventType == 1 && ventTime < 0.0f){
+                ventTime = 0.0f;
+                ventPitch = 28.0f + (rand()%18);
+            }else if(eventType == 2 && rustleTime < 0.0f){
+                rustleTime = 0.0f;
+            }else if(eventType == 3 && knockTime < 0.0f){
+                knockTime = 0.0f;
+                knockStage = 0;
+            }else if(eventType == 4 && buzzTime < 0.0f){
+                buzzTime = 0.0f;
+                buzzPitch = 960.0f + (rand()%560);
+            }else if(eventType == 5 && ringTime < 0.0f){
+                ringTime = 0.0f;
+                ringPitch = 360.0f + (rand()%160);
+            }
+        }
+
+        float pipeTone = 0.0f;
+        if(pipeTime >= 0.0f){
+            float t = pipeTime;
+            float atk = (t < 0.08f) ? (t / 0.08f) : 1.0f;
+            float env = atk * expf(-t * 1.85f);
+            float freq = pipePitch + sinf(t * 1.9f) * pipeDrift;
+            pipeTone = (sinf(twoPi * freq * t) * 0.62f + sinf(twoPi * (freq * 1.97f) * t) * 0.21f) * env;
+            pipeTime += dt;
+            if(pipeTime > 1.9f) pipeTime = -1.0f;
+        }
+
+        float ventRumble = 0.0f;
+        if(ventTime >= 0.0f){
+            float t = ventTime;
+            float atk = (t < 0.10f) ? (t / 0.10f) : 1.0f;
+            float env = atk * expf(-t * 1.1f);
+            float targetNoise = ((rand()%100) / 100.0f) * 2.0f - 1.0f;
+            ventNoise = mixNoise(ventNoise, targetNoise, 0.02f);
+            float base = sinf(twoPi * ventPitch * t) * 0.55f + sinf(twoPi * (ventPitch * 0.52f) * t) * 0.25f;
+            ventRumble = (base + ventNoise * 0.28f) * env;
+            ventTime += dt;
+            if(ventTime > 2.2f) ventTime = -1.0f;
+        }
+
+        float buzzTick = 0.0f;
+        if(buzzTime >= 0.0f){
+            float t = buzzTime;
+            float atk = (t < 0.004f) ? (t / 0.004f) : 1.0f;
+            float env = atk * expf(-t * 9.5f);
+            float f = buzzPitch + sinf(t * 42.0f) * 120.0f;
+            buzzTick = (sinf(twoPi * f * t) * 0.55f + sinf(twoPi * (f * 1.5f) * t) * 0.16f) * env;
+            buzzTime += dt;
+            if(buzzTime > 0.35f) buzzTime = -1.0f;
+        }
+
+        float knock = 0.0f;
+        if(knockTime >= 0.0f){
+            float tapStart = 0.0f;
+            if(knockStage == 1) tapStart = 0.13f;
+            else if(knockStage == 2) tapStart = 0.29f;
+            float localT = knockTime - tapStart;
+            if(localT >= 0.0f && localT < 0.22f){
+                float atk = (localT < 0.01f) ? (localT / 0.01f) : 1.0f;
+                float env = atk * expf(-localT * 24.0f);
+                float kf = 145.0f + 18.0f * knockStage;
+                knock += (sinf(twoPi * kf * localT) * 0.85f + sinf(twoPi * (kf * 2.2f) * localT) * 0.2f) * env;
+            }
+            if(knockStage == 0 && knockTime > 0.13f) knockStage = 1;
+            if(knockStage == 1 && knockTime > 0.29f) knockStage = 2;
+            knockTime += dt;
+            if(knockTime > 0.62f) knockTime = -1.0f;
+        }
+
+        float rustle = 0.0f;
+        if(rustleTime >= 0.0f){
+            float t = rustleTime;
+            float atk = (t < 0.04f) ? (t / 0.04f) : 1.0f;
+            float env = atk * expf(-t * 4.3f);
+            float targetNoise = ((rand()%100) / 100.0f) * 2.0f - 1.0f;
+            rustleNoise = mixNoise(rustleNoise, targetNoise, 0.08f);
+            float flutter = sinf(twoPi * (540.0f + 40.0f * sinf(t * 5.0f)) * t) * 0.2f;
+            rustle = (rustleNoise * 0.5f + flutter) * env;
+            rustleTime += dt;
+            if(rustleTime > 1.05f) rustleTime = -1.0f;
+        }
+
+        float ring = 0.0f;
+        if(ringTime >= 0.0f){
+            float t = ringTime;
+            float atk = (t < 0.05f) ? (t / 0.05f) : 1.0f;
+            float env = atk * expf(-t * 2.6f);
+            float f = ringPitch + sinf(t * 2.2f) * 8.0f;
+            ring = (sinf(twoPi * f * t) * 0.55f + sinf(twoPi * (f * 1.01f) * t) * 0.45f) * env;
+            ringTime += dt;
+            if(ringTime > 1.35f) ringTime = -1.0f;
         }
         
         // Footsteps - louder
@@ -142,9 +276,9 @@ inline void fillAudio(short* buf, int len) {
             creepy += sinf(sndState.creepyPhase * 0.4f) * 0.2f * sndState.dangerLevel;
             // Dissonant tone
             creepy += sinf(sndState.creepyPhase * 2.1f) * 0.1f * sndState.dangerLevel;
-            // Static/noise
-            float staticTarget = (float)(rand()%100-50)/100.0f * 0.15f * sndState.dangerLevel;
-            safe.staticNoise = mixNoise(safe.staticNoise, staticTarget, 0.06f);
+            // Soft static texture (smoothed to avoid sharp clicks)
+            float staticTarget = (float)(rand()%100-50)/100.0f * 0.06f * sndState.dangerLevel;
+            safe.staticNoise = mixNoise(safe.staticNoise, staticTarget, 0.025f);
             creepy += safe.staticNoise;
             
             // Heartbeat at high danger
@@ -188,8 +322,15 @@ inline void fillAudio(short* buf, int len) {
             if(sndState.whisperPhase > 6.28318f) sndState.whisperPhase -= 6.28318f;
         }
         
-        float ambienceMix = hum*sndState.humVol + amb + distant;
-        float sfxMix = step + scare + flashClick;
+        float roomEventsAmb = pipeTone * (0.18f + envStress * 0.24f)
+                            + ventRumble * 0.22f
+                            + rustle * (0.12f + envInsanity * 0.12f)
+                            + ring * (0.10f + envStress * 0.10f);
+        float roomEventsSfx = knock * (0.10f + envStress * 0.26f)
+                            + buzzTick * 0.11f;
+
+        float ambienceMix = hum*sndState.humVol + amb + distant + roomEventsAmb;
+        float sfxMix = step + scare + flashClick + roomEventsSfx;
         float uiMix = (uiMove + uiConfirm) * (0.45f + 0.55f * sndState.sfxVol);
         float voiceMix = insane;
         float musicMix = creepy;

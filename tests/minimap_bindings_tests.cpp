@@ -5,43 +5,41 @@
 
 void testFirstPressToggles() {
     MinimapBindingState state = {};
-    bool toggled = shouldToggleMinimapFromBindings(true, false, false, false, state);
+    bool toggled = shouldToggleMinimapFromBindings(true, state);
     assert(toggled);
 }
 
 void testHoldDoesNotRetoggle() {
     MinimapBindingState state = {};
-    bool toggled = shouldToggleMinimapFromBindings(true, false, false, false, state);
+    bool toggled = shouldToggleMinimapFromBindings(true, state);
     assert(toggled);
-    toggled = shouldToggleMinimapFromBindings(true, false, false, false, state);
+    toggled = shouldToggleMinimapFromBindings(true, state);
     assert(!toggled);
 }
 
 void testReleaseAndPressTogglesAgain() {
     MinimapBindingState state = {};
-    bool toggled = shouldToggleMinimapFromBindings(false, false, false, false, state);
+    bool toggled = shouldToggleMinimapFromBindings(false, state);
     assert(!toggled);
-    toggled = shouldToggleMinimapFromBindings(true, false, false, false, state);
+    toggled = shouldToggleMinimapFromBindings(true, state);
     assert(toggled);
-    toggled = shouldToggleMinimapFromBindings(false, false, false, false, state);
+    toggled = shouldToggleMinimapFromBindings(false, state);
     assert(!toggled);
-    toggled = shouldToggleMinimapFromBindings(true, false, false, false, state);
+    toggled = shouldToggleMinimapFromBindings(true, state);
     assert(toggled);
 }
 
-void testEachBindingCanToggle() {
+void testOnlyMCanToggle() {
     MinimapBindingState state = {};
-    bool toggled = shouldToggleMinimapFromBindings(false, false, false, true, state);
+    bool toggled = shouldToggleMinimapFromBindings(false, state);
+    assert(!toggled);
+
+    toggled = shouldToggleMinimapFromBindings(true, state);
     assert(toggled);
 
-    toggled = shouldToggleMinimapFromBindings(false, false, false, false, state);
+    toggled = shouldToggleMinimapFromBindings(false, state);
     assert(!toggled);
-    toggled = shouldToggleMinimapFromBindings(false, true, false, false, state);
-    assert(toggled);
-
-    toggled = shouldToggleMinimapFromBindings(false, false, false, false, state);
-    assert(!toggled);
-    toggled = shouldToggleMinimapFromBindings(false, false, true, false, state);
+    toggled = shouldToggleMinimapFromBindings(true, state);
     assert(toggled);
 }
 
@@ -49,7 +47,7 @@ int main() {
     testFirstPressToggles();
     testHoldDoesNotRetoggle();
     testReleaseAndPressTogglesAgain();
-    testEachBindingCanToggle();
+    testOnlyMCanToggle();
     std::cout << "All minimap binding tests passed.\n";
     return 0;
 }
