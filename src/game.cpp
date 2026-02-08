@@ -37,6 +37,7 @@
 #include "cheats.h"
 #include "minimap.h"
 #include "content_events.h"
+#include "trap_events.h"
 #include "net_types.h"
 #include "net.h"
 #include "player_model.h"

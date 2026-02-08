@@ -11,6 +11,7 @@ bool playerModelsInit = false;
 #include "perf_tuning.h"
 #include "content_events.h"
 #include "entity_ai.h"
+#include "trap_events.h"
 void buildGeom();
 
 enum InteractRequestType {
@@ -52,6 +53,10 @@ EchoSignal echoSignal = {};
 float echoSpawnTimer = 14.0f;
 float echoStatusTimer = 0.0f;
 char echoStatusText[96] = {};
+TrapCorridorState trapCorridor = {};
+float anomalyBlur = 0.0f;
+float trapStatusTimer = 0.0f;
+char trapStatusText[96] = {};
 
 inline void triggerLocalScare(float flash, float shake, float sanityDamage){
     if(damageFlash < flash) damageFlash = flash;
@@ -186,6 +191,99 @@ inline void updateMinimapCheat(GLFWwindow* w){
 inline void setEchoStatus(const char* msg){
     snprintf(echoStatusText, sizeof(echoStatusText), "%s", msg);
     echoStatusTimer = 4.0f;
+}
+
+inline void setTrapStatus(const char* msg){
+    snprintf(trapStatusText, sizeof(trapStatusText), "%s", msg);
+    trapStatusTimer = 4.0f;
+}
+
+inline void carveCellSafe(int wx, int wz){
+    setCellWorld(wx, wz, 0);
+}
+
+inline void carveLineAxisAligned(int x0, int z0, int x1, int z1){
+    int x = x0, z = z0;
+    while(x != x1){ carveCellSafe(x,z); x += (x1 > x) ? 1 : -1; }
+    while(z != z1){ carveCellSafe(x,z); z += (z1 > z) ? 1 : -1; }
+    carveCellSafe(x,z);
+}
+
+inline void initTrapCorridor(const Vec3& spawnPos){
+    trapCorridor = {};
+    if(multiState==MULTI_IN_GAME) return;
+    int sx = (int)floorf(spawnPos.x / CS);
+    int sz = (int)floorf(spawnPos.z / CS);
+    int dir = (rng()%2)==0 ? 1 : -1;
+    trapCorridor.startX = sx + 4;
+    trapCorridor.startZ = sz + dir * (3 + (rng()%3));
+    trapCorridor.length = 8 + (rng()%3);
+    trapCorridor.gateX = trapCorridor.startX - 1;
+    trapCorridor.gateZ = trapCorridor.startZ;
+
+    carveLineAxisAligned(sx, sz, trapCorridor.gateX, trapCorridor.gateZ);
+    for(int i=0;i<=trapCorridor.length;i++){
+        int x = trapCorridor.startX + i;
+        int z = trapCorridor.startZ;
+        carveCellSafe(x,z);
+        setCellWorld(x, z - 1, 1);
+        setCellWorld(x, z + 1, 1);
+    }
+    setCellWorld(trapCorridor.startX + trapCorridor.length + 1, trapCorridor.startZ, 1);
+    setCellWorld(trapCorridor.gateX, trapCorridor.gateZ, 0);
+
+    trapCorridor.active = true;
+    trapCorridor.triggered = false;
+    trapCorridor.locked = false;
+    trapCorridor.resolved = false;
+    trapCorridor.lockTimer = 0.0f;
+    trapCorridor.stareProgress = 0.0f;
+    trapCorridor.anomalyPos = Vec3((trapCorridor.startX + trapCorridor.length + 0.5f) * CS, 1.35f, (trapCorridor.startZ + 0.5f) * CS);
+}
+
+inline void triggerTrapCorridor(){
+    if(!trapCorridor.active || trapCorridor.triggered) return;
+    trapCorridor.triggered = true;
+    trapCorridor.locked = true;
+    trapCorridor.lockTimer = 18.0f;
+    trapCorridor.stareProgress = 0.0f;
+    setCellWorld(trapCorridor.gateX, trapCorridor.gateZ, 1);
+    buildGeom();
+    setTrapStatus("PASSAGE SEALED. DARKNESS LISTENS.");
+}
+
+inline void unlockTrapCorridor(){
+    if(!trapCorridor.locked) return;
+    trapCorridor.locked = false;
+    trapCorridor.resolved = true;
+    setCellWorld(trapCorridor.gateX, trapCorridor.gateZ, 0);
+    buildGeom();
+    setTrapStatus("THE PASSAGE OPENS.");
+}
+
+inline void updateTrapCorridor(){
+    if(!trapCorridor.active || multiState==MULTI_IN_GAME) return;
+    if(trapStatusTimer > 0.0f) trapStatusTimer -= dTime;
+    int wx = (int)floorf(cam.pos.x / CS);
+    int wz = (int)floorf(cam.pos.z / CS);
+    if(!trapCorridor.triggered && isInsideTrapTrigger(wx, wz, trapCorridor.startX, trapCorridor.startZ, trapCorridor.length)){
+        triggerTrapCorridor();
+    }
+
+    bool lookingAtAnomaly = isLookingAtPoint(cam.pos, cam.yaw, cam.pitch, trapCorridor.anomalyPos, 0.94f, 12.0f);
+    anomalyBlur = updateAnomalyBlur(anomalyBlur, dTime, lookingAtAnomaly);
+
+    if(trapCorridor.locked){
+        trapCorridor.lockTimer -= dTime;
+        bool progressActive = lookingAtAnomaly && !flashlightOn;
+        trapCorridor.stareProgress = updateTrapStareProgress(trapCorridor.stareProgress, dTime, progressActive);
+        if(progressActive && (rng()%100)<4){
+            setTrapStatus("DO NOT BLINK.");
+        }
+        if(trapCorridor.stareProgress >= 2.6f || trapCorridor.lockTimer <= 0.0f){
+            unlockTrapCorridor();
+        }
+    }
 }
 
 inline void spawnEchoSignal(){
@@ -519,6 +617,7 @@ void genWorld(){
     updateVisibleChunks(cam.pos.x,cam.pos.z);
     updateLightsAndPillars(playerChunkX,playerChunkZ);
     entityMgr.reset();storyMgr.init();
+    initTrapCorridor(sp);
     resetPlayerInterpolation();
     initCoopObjectives(coopBase);
     worldItems.clear();
@@ -528,6 +627,9 @@ void genWorld(){
     echoSpawnTimer = 12.0f + (float)(rng()%8);
     echoStatusTimer = 0.0f;
     echoStatusText[0] = '\0';
+    trapStatusTimer = 0.0f;
+    trapStatusText[0] = '\0';
+    anomalyBlur = 0.0f;
     lightsOutTimer = falseDoorTimer = 0.0f;
     baitEffectTimer = 0.0f;
     itemSpawnTimer = 8.0f;
@@ -892,6 +994,17 @@ void drawUI(){
                 snprintf(netBuf,96,"RTT %.0fms TX %d RX %d",netMgr.rttMs,netMgr.packetsSent,netMgr.packetsRecv);
                 drawText(netBuf,0.45f,0.60f,1.0f,0.55f,0.65f,0.8f,0.7f);
             }
+            if(trapCorridor.active && trapStatusTimer > 0.0f){
+                drawText(trapStatusText,-0.33f,0.50f,1.2f,0.82f,0.78f,0.9f,0.85f);
+            }
+            if(trapCorridor.locked){
+                float sx=0, sy=0;
+                if(projectToScreen(trapCorridor.anomalyPos, sx, sy)){
+                    float jitter = ((rng()%100)-50) * 0.0007f;
+                    float alpha = flashlightOn ? 0.45f : 0.9f;
+                    drawText(":)",sx-0.018f+jitter,sy,1.35f,0.95f,0.95f,0.95f,alpha);
+                }
+            }
             drawText(minimapEnabled?"MINIMAP ON [F6/F7/HOME]":"MINIMAP OFF [F6/F7/HOME]",0.38f,-0.96f,0.95f,0.55f,0.7f,0.8f,0.68f);
         }
     }
@@ -1112,6 +1225,7 @@ int main(){
                 if(falseDoorTimer>0) falseDoorTimer-=dTime;
                 if(baitEffectTimer>0) baitEffectTimer-=dTime;
                 updateEchoSignal();
+                updateTrapCorridor();
                 gameInput(gWin);
                 int targetChunkX = (int)floorf(cam.pos.x / (CS * CHUNK_SIZE));
                 int targetChunkZ = (int)floorf(cam.pos.z / (CS * CHUNK_SIZE));
@@ -1225,7 +1339,7 @@ int main(){
         glUseProgram(vhsShader);
         glBindTexture(GL_TEXTURE_2D,fboTex);
         float sP=(100-playerSanity)/100*0.4f;
-        float vI=settings.vhsIntensity+entityMgr.dangerLevel*0.5f+sP;
+        float vI=settings.vhsIntensity+entityMgr.dangerLevel*0.5f+sP + anomalyBlur * 0.55f;
         static GLint vhsTmLoc = -1;
         static GLint vhsIntenLoc = -1;
         if(vhsTmLoc<0){

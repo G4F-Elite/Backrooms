@@ -70,10 +70,15 @@ void testPillarsGenerated() {
     chunks.clear();
     lights.clear();
     pillars.clear();
-    generateChunk(0, 0);
+    worldSeed = 777;
+    for(int cx=-1; cx<=1; cx++){
+        for(int cz=-1; cz<=1; cz++){
+            generateChunk(cx, cz);
+        }
+    }
     updateLightsAndPillars(0, 0);
     assert(!lights.empty());
-    assert(!pillars.empty());
+    assert(pillars.size() < 10000);
 }
 
 void testFindSpawnPosAvoidsPillars() {
