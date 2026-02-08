@@ -175,7 +175,7 @@ inline void drawDeath(float tm) {
 inline void drawSurvivalTime(float t) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     int m=(int)(t/60),s=(int)t%60; char b[16]; snprintf(b,16,"%d:%02d",m,s);
-    drawText(b,0.72f,0.9f,2.0f,0.6f,0.55f,0.35f,0.7f);
+    drawText(b,0.72f,0.9f,2.0f,0.78f,0.72f,0.48f,0.96f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 
@@ -283,7 +283,7 @@ inline void drawNote(int noteId, const char* title, const char* content) {
     }
 
     drawTextCentered(title, 0.0f, 0.56f, 2.5f, 0.3f, 0.25f, 0.15f, 1.0f);
-    drawTextCentered("________________________________", 0.0f, 0.46f, 1.5f, 0.4f, 0.35f, 0.2f, 0.6f);
+    drawTextCentered("________________________________", 0.0f, 0.46f, 1.5f, 0.4f, 0.35f, 0.2f, 0.92f);
 
     float ty = 0.30f;
     char line[64];
@@ -291,7 +291,7 @@ inline void drawNote(int noteId, const char* title, const char* content) {
     for(const char* p = content; *p; p++) {
         if(*p == '\n' || li >= 50) {
             line[li] = 0;
-            drawTextCentered(line, 0.0f, ty, 1.5f, 0.25f, 0.2f, 0.1f, 0.9f);
+            drawTextCentered(line, 0.0f, ty, 1.5f, 0.25f, 0.2f, 0.1f, 1.0f);
             ty -= 0.08f;
             li = 0;
         } else {
@@ -300,8 +300,8 @@ inline void drawNote(int noteId, const char* title, const char* content) {
     }
     if(li > 0) {
         line[li] = 0;
-        drawTextCentered(line, 0.0f, ty, 1.5f, 0.25f, 0.2f, 0.1f, 0.9f);
+        drawTextCentered(line, 0.0f, ty, 1.5f, 0.25f, 0.2f, 0.1f, 1.0f);
     }
-    drawTextCentered("PRESS E OR ESC TO CLOSE", 0.0f, -0.75f, 1.5f, 0.4f, 0.35f, 0.2f, 0.7f);
+    drawTextCentered("PRESS E OR ESC TO CLOSE", 0.0f, -0.75f, 1.5f, 0.45f, 0.4f, 0.24f, 0.96f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
