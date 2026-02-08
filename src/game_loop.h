@@ -284,11 +284,18 @@ void gameInput(GLFWwindow*w){
     static bool debugDownPressed = false;
     static bool debugEnterPressed = false;
     static bool debugEscPressed = false;
+    static bool perfTogglePressed = false;
     bool debugToggleNow = glfwGetKey(w,GLFW_KEY_F10)==GLFW_PRESS;
     if(debugToggleNow && !debugTogglePressed){
         debugTools.open = !debugTools.open;
     }
     debugTogglePressed = debugToggleNow;
+    bool perfToggleNow = glfwGetKey(w,GLFW_KEY_F3)==GLFW_PRESS;
+    if(perfToggleNow && !perfTogglePressed){
+        gPerfDebugOverlay = !gPerfDebugOverlay;
+        triggerMenuConfirmSound();
+    }
+    perfTogglePressed = perfToggleNow;
 
     if(debugTools.open){
         bool upNow = glfwGetKey(w,GLFW_KEY_UP)==GLFW_PRESS || glfwGetKey(w,GLFW_KEY_W)==GLFW_PRESS;
@@ -661,13 +668,27 @@ int main(){
     initPlayerModels(); playerModelsInit = true;
     std::thread aT(audioThread);
     int cachedRefreshRateHz = detectActiveRefreshRateHz(gWin);
+    gPerfRefreshHz = cachedRefreshRateHz;
     double nextRefreshProbeTime = 0.0;
+    initFrameTimeHistory(gPerfFrameTimeHistory, PERF_GRAPH_SAMPLES, 16.6f);
+    gPerfFrameTimeHead = PERF_GRAPH_SAMPLES - 1;
     
     while(!glfwWindowShouldClose(gWin)){
         double frameStartTime = glfwGetTime();
-        float now=(float)frameStartTime;dTime=now-lastFrame;lastFrame=now;vhsTime=now;
+        float now=(float)frameStartTime;
+        float rawDt = now - lastFrame;
+        if(lastFrame <= 0.0f || rawDt <= 0.0f || rawDt > 0.5f) rawDt = 0.016f;
+        dTime = rawDt;
+        lastFrame = now;
+        vhsTime = now;
+        gPerfFrameMs = dTime * 1000.0f;
+        pushFrameTimeSample(gPerfFrameTimeHistory, PERF_GRAPH_SAMPLES, gPerfFrameTimeHead, gPerfFrameMs);
+        float fpsNow = 1.0f / dTime;
+        if(gPerfFpsSmoothed < 1.0f) gPerfFpsSmoothed = fpsNow;
+        else gPerfFpsSmoothed = gPerfFpsSmoothed * 0.90f + fpsNow * 0.10f;
         if(now >= (float)nextRefreshProbeTime){
             cachedRefreshRateHz = detectActiveRefreshRateHz(gWin);
+            gPerfRefreshHz = cachedRefreshRateHz;
             nextRefreshProbeTime = (double)now + 1.0;
         }
         int desiredSwapInterval = settings.vsync ? 1 : 0;
@@ -1078,8 +1099,9 @@ int main(){
         
         drawUI();
         
-        glfwSwapBuffers(gWin);glfwPollEvents();
         int frameGenBaseCap = frameGenBaseFpsCap(cachedRefreshRateHz, settings.frameGenMode, settings.vsync);
+        gPerfFrameGenBaseCap = frameGenBaseCap;
+        glfwSwapBuffers(gWin);glfwPollEvents();
         applyFramePacing(frameStartTime, frameGenBaseCap);
     }
     audioRunning=false;SetEvent(hEvent);aT.join();glfwTerminate();return 0;

@@ -26,6 +26,7 @@
 #include "geometry.h"
 #include "render.h"
 #include "perf_tuning.h"
+#include "perf_overlay.h"
 #include "world.h"
 #include "map_content.h"
 #include "entity_types.h"
@@ -95,6 +96,13 @@ float noteSpawnTimer = 0;
 bool firstMouse = true;
 bool escPressed, enterPressed, isPlayerDead;
 bool upPressed, downPressed, leftPressed, rightPressed;
+float gPerfFrameMs = 16.6f;
+float gPerfFpsSmoothed = 60.0f;
+bool gPerfDebugOverlay = false;
+int gPerfRefreshHz = 60;
+int gPerfFrameGenBaseCap = 0;
+float gPerfFrameTimeHistory[PERF_GRAPH_SAMPLES] = {};
+int gPerfFrameTimeHead = PERF_GRAPH_SAMPLES - 1;
 
 // OpenGL resources
 GLuint wallTex, floorTex, ceilTex, lightTex, lampTex;

@@ -1,5 +1,6 @@
 #pragma once
 #include "coop.h"
+#include "perf_overlay.h"
 
 void drawUI(){
     if(gameState==STATE_MENU) drawMenu(vhsTime);
@@ -21,6 +22,31 @@ void drawUI(){
         else{
             drawDamageOverlay(damageFlash,playerHealth);
             drawSurvivalTime(survivalTime);
+            char fpsBuf[48];
+            snprintf(fpsBuf,48,"FPS: %.0f",gPerfFpsSmoothed);
+            drawText(fpsBuf,-0.10f,0.95f,1.20f,0.0f,0.0f,0.0f,0.72f);
+            drawText(fpsBuf,-0.10f,0.95f,1.20f,0.86f,0.91f,0.76f,0.98f);
+            char fgBuf[80];
+            formatFrameGenPipeline(
+                fgBuf,
+                80,
+                gPerfRefreshHz,
+                gPerfFrameGenBaseCap,
+                settings.frameGenMode,
+                settings.vsync
+            );
+            drawText(fgBuf,-0.10f,0.90f,1.08f,0.84f,0.89f,0.72f,0.95f);
+            char upBuf[96];
+            formatUpscalePipeline(
+                upBuf,
+                96,
+                settings.upscalerMode,
+                renderW,
+                renderH,
+                winW,
+                winH
+            );
+            drawText(upBuf,-0.10f,0.85f,1.03f,0.78f,0.84f,0.70f,0.92f);
             if(playerHealth<100)drawHealthBar(playerHealth);
             if(playerSanity<100)drawSanityBar(playerSanity);
             drawStaminaBar(playerStamina);
@@ -109,6 +135,25 @@ void drawUI(){
             const char* mmState = minimapEnabled ? "MINIMAP ON [M]" : "MINIMAP OFF [M]";
             drawText(mmState,-0.95f,0.95f,1.15f,0.0f,0.0f,0.0f,0.72f);
             drawText(mmState,-0.95f,0.95f,1.15f,0.88f,0.93f,0.78f,0.98f);
+            if(gPerfDebugOverlay){
+                char graph[40];
+                buildFrameTimeGraph(
+                    gPerfFrameTimeHistory,
+                    PERF_GRAPH_SAMPLES,
+                    gPerfFrameTimeHead,
+                    32,
+                    graph,
+                    40
+                );
+                float avgMs = averageFrameTimeMs(gPerfFrameTimeHistory, PERF_GRAPH_SAMPLES);
+                float p95Ms = percentileFrameTimeMs(gPerfFrameTimeHistory, PERF_GRAPH_SAMPLES, 0.95f);
+                char dbgA[96];
+                char dbgB[96];
+                snprintf(dbgA,96,"DEBUG PERF [F3] FT %.2fms AVG %.2f P95 %.2f",gPerfFrameMs,avgMs,p95Ms);
+                snprintf(dbgB,96,"GRAPH %s",graph);
+                drawText(dbgA,0.12f,-0.74f,1.00f,0.70f,0.85f,0.92f,0.90f);
+                drawText(dbgB,0.12f,-0.80f,1.00f,0.72f,0.82f,0.88f,0.90f);
+            }
             if(debugTools.flyMode){
                 drawText("DEBUG FLY: ON",0.52f,0.95f,1.10f,0.78f,0.95f,0.85f,0.96f);
             }
