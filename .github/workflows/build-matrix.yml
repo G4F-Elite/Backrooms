@@ -1,0 +1,58 @@
+name: Build Matrix
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+
+jobs:
+  windows-client:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MinGW (w64devkit)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $url = "https://github.com/skeeto/w64devkit/releases/download/v2.1.0/w64devkit-x64-2.1.0.exe"
+          Invoke-WebRequest -Uri $url -OutFile "$env:RUNNER_TEMP\w64devkit.exe"
+          & "$env:RUNNER_TEMP\w64devkit.exe" x -o"$env:RUNNER_TEMP\w64devkit"
+          "$env:RUNNER_TEMP\w64devkit\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build client
+        shell: pwsh
+        run: |
+          cmd /c build_client_windows.bat
+
+  linux-services:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y g++
+
+      - name: Build dedicated server
+        run: |
+          chmod +x build_server_linux.sh
+          ./build_server_linux.sh
+
+      - name: Build master service
+        run: |
+          chmod +x build_master_linux.sh
+          ./build_master_linux.sh
+
+      - name: Build server docker image
+        run: |
+          docker build -f server/Dockerfile -t backrooms-server-ci:latest .
+
+      - name: Build master docker image
+        run: |
+          docker build -f master/Dockerfile -t backrooms-master-ci:latest .

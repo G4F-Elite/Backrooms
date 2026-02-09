@@ -47,10 +47,10 @@ jobs:
           $ErrorActionPreference = "Stop"
           if (!(Test-Path release)) { New-Item -ItemType Directory -Path release | Out-Null }
           Copy-Item "build/backrooms.exe" "release/backrooms.exe" -Force
-          if (Test-Path "deps/lib/glfw3.dll") {
-            Copy-Item "deps/lib/glfw3.dll" "release/glfw3.dll" -Force
-          }
           Copy-Item "README.md" "release/README.md" -Force
+          if (Test-Path "release/glfw3.dll") {
+            throw "Single-EXE policy violated: unexpected glfw3.dll in release folder."
+          }
           Compress-Archive -Path "release/*" -DestinationPath "build/backrooms-windows.zip" -Force
 
       - name: Upload build artifact
