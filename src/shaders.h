@@ -2,12 +2,30 @@
 
 const char* mainVS=R"(#version 330
 layout(location=0) in vec3 p; layout(location=1) in vec2 t; layout(location=2) in vec3 n;
-out vec2 uv; out vec3 fp,nm;
+out vec2 uv; out vec3 fp,nm; out vec3 viewTS; out vec3 fragPosTS;
 uniform mat4 M,V,P;
-void main(){ fp=vec3(M*vec4(p,1)); nm=mat3(transpose(inverse(M)))*n; uv=t; gl_Position=P*V*M*vec4(p,1); })";
+uniform vec3 vp;
+
+void main(){
+ fp=vec3(M*vec4(p,1));
+ nm=mat3(transpose(inverse(M)))*n;
+ uv=t;
+ 
+ // Compute TBN matrix for parallax
+ vec3 N = normalize(nm);
+ vec3 T = normalize(cross(N, vec3(0.0, 1.0, 0.1)));
+ vec3 B = cross(N, T);
+ mat3 TBN = transpose(mat3(T, B, N));
+ 
+ viewTS = TBN * normalize(vp - fp);
+ fragPosTS = TBN * fp;
+ 
+ gl_Position=P*V*M*vec4(p,1);
+})";
 
 const char* mainFS=R"(#version 330
 out vec4 F; in vec2 uv; in vec3 fp,nm;
+in vec3 viewTS; in vec3 fragPosTS;
 uniform sampler2D tex; uniform vec3 vp; uniform float tm;
 uniform int nl; uniform vec3 lp[16]; uniform float danger;
 uniform int flashOn; uniform vec3 flashDir;
@@ -17,8 +35,29 @@ float hash(vec3 p) {
  return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
 }
 
+// Optimized single-step parallax for performance
+vec2 parallaxOffset(vec2 texCoords, vec3 viewDir) {
+ float height = texture(tex, texCoords).a;
+ float heightScale = 0.025; // Subtle effect to avoid artifacts
+ 
+ // Distance-based LOD - disable parallax at distance
+ float dist = length(vp - fp);
+ float lodFade = 1.0 - smoothstep(8.0, 15.0, dist);
+ if(lodFade < 0.01) return texCoords;
+ 
+ // Simple offset parallax (fastest method)
+ float h = (height - 0.5) * heightScale * lodFade;
+ vec2 offset = viewDir.xy * h;
+ 
+ return texCoords + offset;
+}
+
 void main(){
- vec3 tc = texture(tex,uv).rgb;
+ // Apply parallax offset to UV
+ vec3 V = normalize(viewTS);
+ vec2 texCoord = parallaxOffset(uv, V);
+ 
+ vec3 tc = texture(tex, texCoord).rgb;
  vec3 N = normalize(nm);
  bool isCeil = N.y < -0.5;
  bool isFloor = N.y > 0.5;
@@ -298,4 +337,3 @@ vec3 c = vec3(r,g,b);
  
  F = vec4(c, 1);
 })";
-
