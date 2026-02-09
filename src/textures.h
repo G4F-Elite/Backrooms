@@ -30,57 +30,81 @@ inline GLuint genTex(int type) {
     unsigned char* d=new unsigned char[sz*sz*4]; // RGBA for height map
     for(int y=0;y<sz;y++) for(int x=0;x<sz;x++) {
         float r=128,g=128,b=128,h=128; // h = height for parallax
-        if(type==0) { // wall - detailed yellow wallpaper with fabric texture
-            // Base wallpaper color - aged yellow
-            float baseR = 198, baseG = 178, baseB = 88;
+        if(type==0) { // wall - vintage yellow wallpaper with damask pattern
+            // Normalized UV for resolution-independent pattern scaling
+            float u = (float)x / (float)sz;
+            float v = (float)y / (float)sz;
             
-            // Large scale pattern - vintage wallpaper vertical stripes
-            float stripePhase = sinf(x * 0.08f) * 0.5f + 0.5f;
-            float stripePattern = stripePhase * 12.0f;
+            // Base wallpaper color - warm aged yellow
+            float baseR = 195, baseG = 175, baseB = 85;
             
-            // Diamond/damask pattern overlay
-            float damaskX = sinf(x * 0.12f + y * 0.06f);
-            float damaskY = sinf(y * 0.12f + x * 0.06f);
-            float damask = (damaskX * damaskY + 1.0f) * 0.5f * 8.0f;
+            // --- Vertical stripes: 16 stripes across texture, two-tone ---
+            float stripePhase = u * 16.0f;
+            float stripeFrac = stripePhase - floorf(stripePhase);
+            // Smoothstep-style transition between light and dark bands
+            float stripeT = 0.5f + 0.5f * sinf(stripeFrac * 6.28318f);
+            float stripeShade = stripeT * 8.0f;
             
-            // Fabric weave texture - horizontal and vertical threads
-            float warpThread = sinf(x * 0.6f) * 3.0f;
-            float weftThread = sinf(y * 0.6f) * 3.0f;
-            float weave = (warpThread + weftThread) * 0.5f;
+            // --- Damask diamond motif: tiled 8x12, offset rows ---
+            float motifU = u * 8.0f;
+            float motifV = v * 12.0f;
+            float colIdx = floorf(motifU);
+            // Offset every other column by half a cell for brick-like layout
+            float adjV = motifV + (fmodf(colIdx, 2.0f) < 1.0f ? 0.0f : 0.5f);
+            float mu = motifU - floorf(motifU); // 0-1 within cell
+            float mv = adjV - floorf(adjV);     // 0-1 within cell
+            // Diamond distance from cell center
+            float dcx = fabsf(mu - 0.5f) * 2.0f;
+            float dcy = fabsf(mv - 0.5f) * 2.0f;
+            float diamond = 1.0f - (dcx + dcy);
+            if(diamond < 0.0f) diamond = 0.0f;
+            // Inner detail ring
+            float innerD = 1.0f - (dcx * 1.6f + dcy * 1.6f);
+            if(innerD < 0.0f) innerD = 0.0f;
+            // Floral accent at diamond center
+            float centerDist = sqrtf((mu-0.5f)*(mu-0.5f) + (mv-0.5f)*(mv-0.5f));
+            float floral = (centerDist < 0.12f) ? (0.12f - centerDist) * 50.0f : 0.0f;
+            float motifValue = diamond * 10.0f + innerD * 5.0f + floral;
             
-            // Fine grain noise - paper/fabric texture
-            float fineGrain = perlin(x * 0.25f, y * 0.25f, 3) * 12.0f;
-            float microDetail = perlin(x * 0.8f, y * 0.8f, 2) * 5.0f;
+            // --- Thin horizontal decorative lines ---
+            float hLineV = v * 24.0f;
+            float hLineFrac = hLineV - floorf(hLineV);
+            float hLine = (fabsf(hLineFrac - 0.5f) < 0.035f) ? 5.0f : 0.0f;
             
-            // Larger noise for color variation
-            float colorVar = perlin(x * 0.04f, y * 0.04f, 4) * 20.0f;
+            // --- Fine paper/fabric grain ---
+            float grain = perlin(x * 0.5f, y * 0.5f, 3) * 5.0f
+                        + perlin(x * 1.2f, y * 1.2f, 2) * 2.5f;
             
-            // Age/dirt stains
-            float stain = perlin(x * 0.02f, y * 0.025f, 5);
-            float dirtMask = (stain > 0.5f) ? (stain - 0.5f) * 40.0f : 0.0f;
+            // --- Large-scale aging color variation ---
+            float colorVar = perlin(x * 0.008f, y * 0.008f, 4) * 14.0f;
             
-            // Water damage near bottom
+            // --- Dirt/age stains ---
+            float stain = perlin(x * 0.005f, y * 0.006f, 5);
+            float dirtMask = (stain > 0.4f) ? (stain - 0.4f) * 28.0f : 0.0f;
+            
+            // --- Water damage near bottom edge ---
             float waterDamage = 0.0f;
-            if(y > sz * 0.7f) {
-                float wetness = perlin(x * 0.08f, y * 0.04f, 4);
-                waterDamage = wetness * (y - sz * 0.7f) * 0.5f;
+            if(v > 0.75f) {
+                float wetness = perlin(x * 0.015f, y * 0.01f, 4);
+                waterDamage = wetness * (v - 0.75f) * 80.0f;
             }
             
-            // Combine all effects
-            r = baseR + stripePattern + damask + weave + fineGrain + microDetail + colorVar - dirtMask - waterDamage * 0.7f;
-            g = baseG + stripePattern * 0.9f + damask * 0.9f + weave + fineGrain + microDetail * 0.9f + colorVar * 0.9f - dirtMask * 1.2f - waterDamage;
-            b = baseB + stripePattern * 0.4f + damask * 0.4f + weave * 0.5f + fineGrain * 0.5f + microDetail * 0.4f + colorVar * 0.4f - dirtMask * 0.8f - waterDamage * 0.6f;
+            // Combine all layers
+            r = baseR + stripeShade + motifValue + hLine + grain + colorVar - dirtMask - waterDamage * 0.7f;
+            g = baseG + stripeShade * 0.9f + motifValue * 0.9f + hLine * 0.9f + grain + colorVar * 0.85f - dirtMask * 1.2f - waterDamage;
+            b = baseB + stripeShade * 0.4f + motifValue * 0.4f + hLine * 0.4f + grain * 0.5f + colorVar * 0.4f - dirtMask * 0.8f - waterDamage * 0.6f;
             
-            // Height map for parallax - based on pattern depth
-            h = 128.0f + damask * 2.0f + stripePattern * 1.5f + fineGrain - dirtMask * 0.5f;
+            // Height map for parallax - raised pattern
+            h = 128.0f + motifValue * 2.0f + stripeShade * 0.5f + grain * 0.3f - dirtMask * 0.5f;
             
-            // Peeling edges effect (rare)
-            if(perlin(x * 0.015f + 7.0f, y * 0.015f + 3.0f, 3) > 0.75f) {
-                float peelAmount = (perlin(x * 0.015f + 7.0f, y * 0.015f + 3.0f, 3) - 0.75f) * 80.0f;
+            // Rare peeling effect
+            float peelNoise = perlin(x * 0.003f + 7.0f, y * 0.003f + 3.0f, 3);
+            if(peelNoise > 0.75f) {
+                float peelAmount = (peelNoise - 0.75f) * 80.0f;
                 r -= peelAmount * 0.3f;
                 g -= peelAmount * 0.4f;
                 b -= peelAmount * 0.2f;
-                h -= peelAmount * 0.8f; // Peeling creates depth
+                h -= peelAmount * 0.8f;
             }
             
         } else if(type==1) { // floor - detailed industrial carpet
