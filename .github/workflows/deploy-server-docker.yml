@@ -45,21 +45,41 @@ jobs:
             echo "VPS_SSH or VPS_HOST secret is missing"
             exit 1
           fi
+
+          clean_host="$(printf '%s' "$VPS_HOST" | tr -d '\r\n' | xargs)"
+          clean_host="${clean_host#ssh://}"
+          clean_host="${clean_host#*@}"
+          clean_host="${clean_host%%/*}"
+          clean_host="${clean_host%%:*}"
+          if [ -z "$clean_host" ]; then
+            echo "VPS_HOST is invalid after normalization"
+            exit 1
+          fi
+
           install -m 700 -d ~/.ssh
           printf '%s\n' "$VPS_SSH" > ~/.ssh/id_deploy
           chmod 600 ~/.ssh/id_deploy
 
-          host_to_scan="$VPS_HOST"
-          host_to_scan="${host_to_scan#*@}"
-          host_to_scan="${host_to_scan%%:*}"
-          ssh-keyscan -H "$host_to_scan" >> ~/.ssh/known_hosts
+          for i in 1 2 3 4 5; do
+            if ssh-keyscan -T 5 -H "$clean_host" >> ~/.ssh/known_hosts 2>/dev/null; then
+              echo "SSH host key fetched for $clean_host"
+              break
+            fi
+            if [ "$i" -eq 5 ]; then
+              echo "Failed to resolve/scan VPS host: $clean_host"
+              exit 1
+            fi
+            sleep $((i * 2))
+          done
 
       - name: Copy image to VPS
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
         run: |
           set -euo pipefail
-          target="$VPS_HOST"
+          target="$(printf '%s' "$VPS_HOST" | tr -d '\r\n' | xargs)"
+          target="${target#ssh://}"
+          target="${target%%/*}"
           if [[ "$target" != *"@"* ]]; then
             target="root@$target"
           fi
@@ -70,7 +90,9 @@ jobs:
           VPS_HOST: ${{ secrets.VPS_HOST }}
         run: |
           set -euo pipefail
-          target="$VPS_HOST"
+          target="$(printf '%s' "$VPS_HOST" | tr -d '\r\n' | xargs)"
+          target="${target#ssh://}"
+          target="${target%%/*}"
           if [[ "$target" != *"@"* ]]; then
             target="root@$target"
           fi
