@@ -106,44 +106,48 @@ float fbm(vec2 p){ float a=0.0, w=0.55; for(int i=0;i<5;i++){ a+=w*noise(p); p*=
 float boxSDF(vec3 p, vec3 b){ vec3 d=abs(p)-b; return min(max(d.x,max(d.y,d.z)),0.0)+length(max(d,0.0)); }
 
 void main(){
-    vec2 p = uv*2.0-1.0; p.x*=1.3;
-    float time = tm*0.55;
+    vec2 p = uv*2.0-1.0; p.x*=1.32;
+    float time = tm*0.52;
 
-    vec3 ro = vec3(0.0, 0.0, -2.0 + sin(time*0.6)*0.4);
-    float ang = sin(time*0.4)*0.35;
-    vec3 rd = normalize(vec3(p,1.2));
+    vec3 ro = vec3(0.0, 0.1, -2.2 + sin(time*0.6)*0.35);
+    float ang = sin(time*0.33)*0.28;
+    vec3 rd = normalize(vec3(p,1.25));
     rd.xz = mat2(cos(ang),-sin(ang),sin(ang),cos(ang)) * rd.xz;
 
-    float t=0.0; float dAcc=0.0; vec3 col=vec3(0.0);
-    for(int i=0;i<42;i++){
+    float t=0.0; float dAcc=0.0; float fog=1.0;
+    for(int i=0;i<48;i++){
         vec3 pos = ro + rd*t;
-        // repeat backrooms hallways
         vec3 rp = pos; rp.xz = mod(rp.xz+6.0, 12.0)-6.0;
-        float d = boxSDF(rp, vec3(4.0,1.8,2.5));
-        float cell = boxSDF(rp, vec3(3.8,1.55,2.3));
-        float wall = max(-cell, d);
-        dAcc = mix(dAcc, 1.0-wall*0.18, 0.08);
-        t += clamp(wall*0.65, 0.02, 0.35);
+        float corridor = boxSDF(rp, vec3(4.0,1.9,2.6));
+        float inner = boxSDF(rp, vec3(3.75,1.6,2.3));
+        float d = max(corridor, -inner);
+        dAcc = mix(dAcc, 1.0 - d*0.2, 0.08);
+        t += clamp(d*0.7, 0.02, 0.35);
+        fog = min(fog, exp(-t*0.42));
     }
 
-    float light = fbm(uv*6.0 + vec2(time*0.38, time*0.27))*0.5 + 0.5;
-    float grime = fbm(uv*12.0 + vec2(time*0.2, -time*0.15));
-    float scan = 0.40 + 0.60*sin((uv.y*660.0) + time*42.0 + sin(uv.x*16.0+time*1.2));
-    float vign = smoothstep(1.25,0.25,length(p));
-    float dust = (hash21(uv*vec2(420.0,220.0)+time*3.2)-0.5)*0.08;
-    float lamp = smoothstep(0.0,0.12,cos(uv.x*18.0 + time*0.6))*smoothstep(0.75,1.05,uv.y);
+    float lightNoise = fbm(uv*8.0 + vec2(time*0.35, time*0.22))*0.5+0.5;
+    float grime = fbm(uv*14.0 + vec2(time*0.18, -time*0.14));
+    float scan = 0.45 + 0.55*sin((uv.y*880.0) + time*48.0 + sin(uv.x*18.0+time*1.4));
+    float vign = smoothstep(1.35,0.25,length(p));
+    float dust = (hash21(uv*vec2(520.0,260.0)+time*3.6)-0.5)*0.10;
+    float lamp = smoothstep(0.0,0.10,cos(uv.x*20.0 + time*0.25))*smoothstep(0.70,1.05,uv.y);
+    float floorMask = smoothstep(-0.05,0.25, -p.y);
 
-    vec3 baseA = vec3(0.20,0.17,0.09);
-    vec3 baseB = vec3(0.40,0.33,0.16);
-    vec3 leak = vec3(0.55,0.50,0.24);
+    vec3 wallA = vec3(0.26,0.22,0.12);
+    vec3 wallB = vec3(0.48,0.40,0.20);
+    vec3 floorCol = vec3(0.18,0.15,0.10);
+    vec3 lampCol = vec3(0.80,0.74,0.38);
 
-    col = mix(baseA, baseB, dAcc*vign);
-    col += vec3(0.30,0.27,0.12)*light*0.65;
-    col += leak * lamp * 0.45;
-    col *= 0.65 + 0.35*vign;
-    col -= grime*0.12;
-    col += vec3(0.22,0.20,0.11)*(scan*0.09);
+    vec3 col = mix(wallA, wallB, dAcc*vign);
+    col = mix(col, floorCol, floorMask*0.6);
+    col += vec3(0.32,0.29,0.14) * lightNoise * 0.7;
+    col += lampCol * lamp * 0.55;
+    col *= (0.55 + 0.45*vign);
+    col -= grime*0.16;
+    col += vec3(0.24,0.21,0.12)*(scan*0.08);
     col += dust;
+    col *= fog;
     col = clamp(col,0.0,1.0);
     fc = vec4(col,1.0);
 })";
