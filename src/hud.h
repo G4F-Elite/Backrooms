@@ -39,8 +39,11 @@ void drawUI(){
             char upBuf[96];
             formatUpscalePipeline(upBuf,96,settings.upscalerMode,renderW,renderH,winW,winH);
             if(gHudTelemetryVisible){
-                char perfRow[240];
-                snprintf(perfRow,240,"%s | %s | %s",fpsBuf,fgBuf,upBuf);
+                char pingBuf[48];
+                if(multiState==MULTI_IN_GAME) snprintf(pingBuf,48,"PING %.0fms",netMgr.rttMs);
+                else snprintf(pingBuf,48,"PING --");
+                char perfRow[300];
+                snprintf(perfRow,300,"%s | %s | %s | %s",fpsBuf,fgBuf,upBuf,pingBuf);
                 drawHudText(perfRow,-0.95f,0.95f,1.20f,0.88f,0.93f,0.78f,0.98f);
                 drawHudText("[F6] HUD  [F8] MINIMAP  [F3] DEBUG",-0.95f,0.90f,0.95f,0.70f,0.76f,0.66f,0.90f);
             }else{
@@ -123,11 +126,6 @@ void drawUI(){
                     float xOff = (float)strlen(nm) * 0.012f;
                     drawHudText(nm, sx - xOff, sy, 1.1f, 0.85f, 0.9f, 0.7f, 0.90f);
                 }
-            }
-            if(multiState==MULTI_IN_GAME){
-                char netBuf[96];
-                snprintf(netBuf,96,"RTT %.0fms TX %d RX %d",netMgr.rttMs,netMgr.packetsSent,netMgr.packetsRecv);
-                drawHudText(netBuf,0.45f,0.60f,1.0f,0.55f,0.65f,0.8f,0.78f);
             }
             if(trapCorridor.active && trapStatusTimer > 0.0f){
                 drawHudTextCentered(trapStatusText,0.0f,0.55f,1.2f,0.82f,0.78f,0.9f,0.90f);
