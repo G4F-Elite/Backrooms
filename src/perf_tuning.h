@@ -39,6 +39,13 @@ struct LightTemporalState {
 inline std::unordered_map<int, LightTemporalState> g_lightStates;
 inline float g_lastLightUpdateTime = 0.0f;
 
+inline int sceneLightKey(const Light& l) {
+    int qx = (int)floorf(l.pos.x * 4.0f);
+    int qy = (int)floorf(l.pos.y * 4.0f);
+    int qz = (int)floorf(l.pos.z * 4.0f);
+    return (qx * 73856093) ^ (qy * 19349663) ^ (qz * 83492791);
+}
+
 inline void updateLightTemporalStates(float currentTime) {
     float dt = currentTime - g_lastLightUpdateTime;
     if (dt <= 0.0f || dt > 0.5f) dt = 0.016f; // Cap at reasonable value
@@ -97,8 +104,8 @@ inline int gatherNearestSceneLights(const std::vector<Light>& lights, const Vec3
             if (distFade < 0.0f) distFade = 0.0f;
         }
         
-        // Update temporal state
-        auto& state = g_lightStates[i];
+        int lightId = sceneLightKey(l);
+        auto& state = g_lightStates[lightId];
         state.targetFade = distFade;
         state.wasVisible = true;
         
@@ -108,7 +115,7 @@ inline int gatherNearestSceneLights(const std::vector<Light>& lights, const Vec3
         // Combine distance fade with temporal fade
         float finalFade = state.currentFade;
         
-        SceneLightData ld = {l.pos.x, l.pos.y, l.pos.z, finalFade, i};
+        SceneLightData ld = {l.pos.x, l.pos.y, l.pos.z, finalFade, lightId};
 
         if (count < SCENE_LIGHT_LIMIT) {
             int idx = count++;

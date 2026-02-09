@@ -132,6 +132,7 @@ inline void applyRoamEvent(int type, int a, int b, float duration){
     if(type==ROAM_LIGHTS_OUT){
         lightsOutTimer = duration;
         for(auto& l:lights) l.on = false;
+        buildGeom();
     }else if(type==ROAM_GEOM_SHIFT){
         (void)a; (void)b;
         reshuffleBehind(cam.pos.x, cam.pos.z, cam.yaw);
@@ -155,16 +156,16 @@ inline void applyRoamEvent(int type, int a, int b, float duration){
 }
 
 inline void updateRoamEventsHost(){
-    static float roamTimer = 11.0f;
+    static float roamTimer = 18.0f;
     roamTimer -= dTime;
     if(roamTimer > 0) return;
-    roamTimer = 11.0f + (rng()%11);
+    roamTimer = 18.0f + (rng()%15);
     int typeRoll = (int)(rng()%100);
     int type = ROAM_FALSE_DOOR;
-    if(typeRoll < 24) type = ROAM_LIGHTS_OUT;
-    else if(typeRoll < 42) type = ROAM_GEOM_SHIFT;
-    else if(typeRoll < 64) type = ROAM_FALSE_DOOR;
-    else if(typeRoll < 84) type = ROAM_FLOOR_HOLES;
+    if(typeRoll < 12) type = ROAM_LIGHTS_OUT;
+    else if(typeRoll < 32) type = ROAM_GEOM_SHIFT;
+    else if(typeRoll < 58) type = ROAM_FALSE_DOOR;
+    else if(typeRoll < 82) type = ROAM_FLOOR_HOLES;
     else type = ROAM_SUPPLY_CACHE;
     float duration = (type==ROAM_GEOM_SHIFT) ? 0.1f : 8.0f + (float)(rng()%5);
     applyRoamEvent(type, playerChunkX, playerChunkZ, duration);

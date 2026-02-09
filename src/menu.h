@@ -41,6 +41,32 @@ struct Settings {
     GameplayBinds binds = {};
 };
 inline Settings settings;
+enum SettingsTab {
+    SETTINGS_TAB_AUDIO = 0,
+    SETTINGS_TAB_VIDEO = 1
+};
+inline int settingsTab = SETTINGS_TAB_AUDIO;
+
+inline int settingsItemsForTab(int tab) {
+    return (tab == SETTINGS_TAB_AUDIO) ? 7 : 12;
+}
+
+inline int settingsBindsIndexForTab(int tab) {
+    return (tab == SETTINGS_TAB_VIDEO) ? 10 : -1;
+}
+
+inline int settingsBackIndexForTab(int tab) {
+    return (tab == SETTINGS_TAB_AUDIO) ? 6 : 11;
+}
+
+inline int clampSettingsSelection(int tab, int idx) {
+    int cnt = settingsItemsForTab(tab);
+    if (cnt <= 0) return 0;
+    if (idx < 0) return cnt - 1;
+    if (idx >= cnt) return 0;
+    return idx;
+}
+
 enum GameState { STATE_MENU, STATE_GAME, STATE_PAUSE, STATE_SETTINGS, STATE_SETTINGS_PAUSE, STATE_KEYBINDS, STATE_KEYBINDS_PAUSE, STATE_INTRO, STATE_NOTE, STATE_MULTI, STATE_MULTI_HOST, STATE_MULTI_JOIN, STATE_MULTI_WAIT };
 inline GameState gameState = STATE_MENU;
 inline int menuSel=0, currentWinW=1280, currentWinH=720;
@@ -134,16 +160,22 @@ inline void drawMainMenuBackdrop(float tm) {
 }
 
 inline void drawText(const char* s, float x, float y, float sc, float r, float g, float b, float a=1.0f) {
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     float v[512*24]; int vc=0; float cx=x,cy=y,cw=sc*8.0f/(float)currentWinW*2.0f,ch=sc*8.0f/(float)currentWinH*2.0f;
     for(const char*p=s;*p && vc<512*24-24;p++) { if(*p=='\n'){cx=x;cy-=ch*1.2f;continue;} int c=*p-32; if(c<0||c>95)c=0;
         float u0=c*8.0f/(96.0f*8.0f),u1=(c+1)*8.0f/(96.0f*8.0f);
         float t[24]={cx,cy,u0,1,cx+cw,cy,u1,1,cx+cw,cy+ch,u1,0,cx,cy,u0,1,cx+cw,cy+ch,u1,0,cx,cy+ch,u0,0};
-        for(int i=0;i<24;i++) v[vc++]=t[i]; cx+=cw*0.75f;
+        for(int i=0;i<24;i++) v[vc++]=t[i];
+        cx+=cw*0.75f;
     }
-    glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferData(GL_ARRAY_BUFFER,vc*4,v,GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferData(GL_ARRAY_BUFFER,vc*sizeof(float),v,GL_STATIC_DRAW);
     glUseProgram(textShader); glUniform3f(glGetUniformLocation(textShader,"col"),r,g,b);
     glUniform1f(glGetUniformLocation(textShader,"alpha"),a);
     glBindTexture(GL_TEXTURE_2D,fontTex); glBindVertexArray(textVAO); glDrawArrays(GL_TRIANGLES,0,vc/4);
+    glEnable(GL_CULL_FACE);
 }
 
 inline float textAdvanceNdc(float sc) {
@@ -214,40 +246,71 @@ inline void drawSettings(bool fp) {
     if(fp) drawFullscreenOverlay(0.02f,0.02f,0.03f,0.72f);
     drawTextCentered("SETTINGS",0.0f,0.55f,3.0f,0.9f,0.85f,0.4f);
     const float rightColCenterX = 0.50f;
-    const char* lb[]={"MASTER VOL","MUSIC VOL","AMBIENCE VOL","SFX VOL","VOICE VOL","VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","ANTI-ALIASING","FAST MATH","FRAME GEN","V-SYNC","KEY BINDS","BACK"};
-    float*vl[]={&settings.masterVol,&settings.musicVol,&settings.ambienceVol,&settings.sfxVol,&settings.voiceVol,&settings.vhsIntensity,&settings.mouseSens,nullptr,nullptr,&settings.fsrSharpness,nullptr,nullptr,nullptr,nullptr,nullptr,nullptr};
-    float mx[]={1.0f,1.0f,1.0f,1.0f,1.0f,1.0f,0.006f,1.0f,1.0f,1.0f,1.0f,1.0f,1.0f,1.0f,1.0f,1.0f};
-    for(int i=0;i<16;i++){
-        float s=(menuSel==i)?1.0f:0.5f,y=0.43f-i*0.09f;
-        if(menuSel==i)drawText(">",-0.55f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
-        drawText(lb[i],-0.48f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
-        if(i==7){
-            drawTextCentered(upscalerModeLabel(settings.upscalerMode),rightColCenterX,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
-        }else if(i==8){
-            char rb[24];
-            if(clampUpscalerMode(settings.upscalerMode)==UPSCALER_MODE_OFF) snprintf(rb,24,"NATIVE");
-            else {
-                int scalePercent = renderScalePercentFromPreset(settings.renderScalePreset);
-                snprintf(rb,24,"%d%%",scalePercent);
+    const bool audioTab = settingsTab == SETTINGS_TAB_AUDIO;
+    const int itemCount = settingsItemsForTab(settingsTab);
+    const float tabAlphaAudio = audioTab ? 1.0f : 0.52f;
+    const float tabAlphaVideo = audioTab ? 0.52f : 1.0f;
+    drawTextCentered(audioTab ? "[AUDIO]" : " AUDIO ", -0.18f, 0.44f, 1.55f, 0.86f * tabAlphaAudio, 0.84f * tabAlphaAudio, 0.58f * tabAlphaAudio, 0.96f);
+    drawTextCentered(audioTab ? " VIDEO " : "[VIDEO]", 0.18f, 0.44f, 1.55f, 0.86f * tabAlphaVideo, 0.84f * tabAlphaVideo, 0.58f * tabAlphaVideo, 0.96f);
+    for(int i=0;i<itemCount;i++){
+        float s=(menuSel==i)?1.0f:0.5f;
+        float y=0.33f-i*0.09f;
+        if(menuSel==i)drawText(">",-0.55f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+        if(i==0){
+            drawText("CATEGORY",-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            drawTextCentered(audioTab?"AUDIO":"VIDEO",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            continue;
+        }
+        if(audioTab){
+            const char* lb[]={"MASTER VOL","MUSIC VOL","AMBIENCE VOL","SFX VOL","VOICE VOL","BACK"};
+            float* vl[] = {&settings.masterVol,&settings.musicVol,&settings.ambienceVol,&settings.sfxVol,&settings.voiceVol,nullptr};
+            float mx[] = {1.0f,1.0f,1.0f,1.0f,1.0f,1.0f};
+            int ai = i - 1;
+            drawText(lb[ai],-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            if(vl[ai]){
+                float nv=*vl[ai]/mx[ai]; if(nv>1.0f)nv=1.0f;
+                drawSlider(0.1f,y,0.45f,nv,0.9f*s,0.85f*s,0.4f*s);
+                char b[16]; snprintf(b,16,"%d%%",(int)(nv*100));
+                drawText(b,0.58f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }
-            drawTextCentered(rb,rightColCenterX,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
-        }else if(i==10){
-            drawTextCentered(aaModeLabel(settings.aaMode),rightColCenterX,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
-        }else if(i==11){
-            drawTextCentered(settings.fastMath?"ON":"OFF",rightColCenterX,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
-        }else if(i==12){
-            drawTextCentered(frameGenModeLabel(settings.frameGenMode),rightColCenterX,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
-        }else if(i==13){
-            drawTextCentered(settings.vsync?"ON":"OFF",rightColCenterX,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
-        }else if(i==14){
-            drawTextCentered("OPEN",rightColCenterX,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
-        }else if(vl[i]){
-            float nv=*vl[i]/mx[i]; if(nv>1.0f)nv=1.0f;
-            drawSlider(0.1f,y,0.45f,nv,0.9f*s,0.85f*s,0.4f*s);
-            char b[16]; snprintf(b,16,"%d%%",(int)(nv*100)); drawText(b,0.58f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
+        }else{
+            const char* lb[]={"VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","ANTI-ALIASING","FAST MATH","FRAME GEN","V-SYNC","KEY BINDS","BACK"};
+            int vi = i - 1;
+            drawText(lb[vi],-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            if(vi==0 || vi==1 || vi==4){
+                float val = 0.0f;
+                float maxV = 1.0f;
+                if(vi==0) val = settings.vhsIntensity;
+                else if(vi==1){ val = settings.mouseSens; maxV = 0.006f; }
+                else val = settings.fsrSharpness;
+                float nv=val/maxV; if(nv>1.0f)nv=1.0f;
+                drawSlider(0.1f,y,0.45f,nv,0.9f*s,0.85f*s,0.4f*s);
+                char b[16]; snprintf(b,16,"%d%%",(int)(nv*100));
+                drawText(b,0.58f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            }else if(vi==2){
+                drawTextCentered(upscalerModeLabel(settings.upscalerMode),rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            }else if(vi==3){
+                char rb[24];
+                if(clampUpscalerMode(settings.upscalerMode)==UPSCALER_MODE_OFF) snprintf(rb,24,"NATIVE");
+                else {
+                    int scalePercent = renderScalePercentFromPreset(settings.renderScalePreset);
+                    snprintf(rb,24,"%d%%",scalePercent);
+                }
+                drawTextCentered(rb,rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            }else if(vi==5){
+                drawTextCentered(aaModeLabel(settings.aaMode),rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            }else if(vi==6){
+                drawTextCentered(settings.fastMath?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            }else if(vi==7){
+                drawTextCentered(frameGenModeLabel(settings.frameGenMode),rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            }else if(vi==8){
+                drawTextCentered(settings.vsync?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            }else if(vi==9){
+                drawTextCentered("OPEN",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            }
         }
     }
-    drawTextCentered("LEFT/RIGHT - ADJUST    ENTER - BACK",0.0f,-0.55f,1.5f,0.5f,0.5f,0.4f,0.6f);
+    drawTextCentered("LEFT/RIGHT TAB/ADJUST   ENTER TO TOGGLE",0.0f,-0.58f,1.35f,0.5f,0.5f,0.4f,0.6f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 

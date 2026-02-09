@@ -105,7 +105,7 @@ float gPerfFrameTimeHistory[PERF_GRAPH_SAMPLES] = {};
 int gPerfFrameTimeHead = PERF_GRAPH_SAMPLES - 1;
 
 // OpenGL resources
-GLuint wallTex, floorTex, ceilTex, lightTex, lampTex;
+GLuint wallTex, floorTex, ceilTex, lightTex, lampTex, propTex;
 GLuint mainShader, vhsShader, lightShader;
 GLuint wallVAO, wallVBO, floorVAO, floorVBO;
 GLuint ceilVAO, ceilVBO, lightVAO, lightVBO;

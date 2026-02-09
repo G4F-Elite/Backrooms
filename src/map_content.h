@@ -52,29 +52,37 @@ inline bool isMapPropPushableType(int type) {
            type == MAP_PROP_BOX_PALLET;
 }
 
+inline void mapPropHalfExtents(const MapProp& p, float& hx, float& hz) {
+    float s = p.scale;
+    if (p.type == MAP_PROP_CONE_CLUSTER) { hx = 0.62f * s; hz = 0.62f * s; return; }
+    if (p.type == MAP_PROP_BARRIER) { hx = 0.82f * s; hz = 0.28f * s; return; }
+    if (p.type == MAP_PROP_CABLE_REEL) { hx = 0.54f * s; hz = 0.54f * s; return; }
+    if (p.type == MAP_PROP_PUDDLE) { hx = 0.0f; hz = 0.0f; return; }
+    if (p.type == MAP_PROP_DEBRIS) { hx = 0.76f * s; hz = 0.72f * s; return; }
+    if (p.type == MAP_PROP_DESK) { hx = 0.62f * s; hz = 0.46f * s; return; }
+    if (p.type == MAP_PROP_CHAIR) { hx = 0.32f * s; hz = 0.32f * s; return; }
+    if (p.type == MAP_PROP_CABINET) { hx = 0.40f * s; hz = 0.34f * s; return; }
+    if (p.type == MAP_PROP_PARTITION) { hx = 0.72f * s; hz = 0.18f * s; return; }
+    if (p.type == MAP_PROP_BOX_PALLET) { hx = 0.68f * s; hz = 0.60f * s; return; }
+    if (p.type == MAP_PROP_DRUM_STACK) { hx = 0.52f * s; hz = 0.52f * s; return; }
+    if (p.type == MAP_PROP_LOCKER_BANK) { hx = 0.66f * s; hz = 0.30f * s; return; }
+    hx = 0.80f * s; hz = 0.74f * s;
+}
+
 inline float mapPropCollisionRadius(const MapProp& p) {
-    if (p.type == MAP_PROP_PUDDLE) return 0.0f;
-    if (p.type == MAP_PROP_CONE_CLUSTER) return 0.72f;
-    if (p.type == MAP_PROP_BARRIER) return 0.96f;
-    if (p.type == MAP_PROP_CABLE_REEL) return 0.66f;
-    if (p.type == MAP_PROP_DEBRIS) return 0.58f;
-    if (p.type == MAP_PROP_CHAIR) return 0.46f;
-    if (p.type == MAP_PROP_DESK) return 0.92f;
-    if (p.type == MAP_PROP_CABINET) return 0.80f;
-    if (p.type == MAP_PROP_PARTITION) return 0.95f;
-    if (p.type == MAP_PROP_BOX_PALLET) return 0.86f;
-    if (p.type == MAP_PROP_DRUM_STACK) return 0.68f;
-    if (p.type == MAP_PROP_LOCKER_BANK) return 0.84f;
-    return 0.78f;
+    float hx = 0.0f, hz = 0.0f;
+    mapPropHalfExtents(p, hx, hz);
+    return hx > hz ? hx : hz;
 }
 
 inline bool collideMapPropsEx(float x, float z, float pr, int ignoreIndex) {
     for (const auto& p : mapProps) {
         int idx = (int)(&p - &mapProps[0]);
         if (idx == ignoreIndex) continue;
-        float r = mapPropCollisionRadius(p);
-        if (r <= 0.001f) continue;
-        if (fabsf(x - p.pos.x) < (r + pr) && fabsf(z - p.pos.z) < (r + pr)) return true;
+        float hx = 0.0f, hz = 0.0f;
+        mapPropHalfExtents(p, hx, hz);
+        if (hx <= 0.001f || hz <= 0.001f) continue;
+        if (fabsf(x - p.pos.x) < (hx + pr) && fabsf(z - p.pos.z) < (hz + pr)) return true;
     }
     return false;
 }
@@ -95,10 +103,11 @@ inline bool tryPushMapProps(float playerX, float playerZ, float pr, float moveX,
     for (int i = 0; i < (int)mapProps.size(); i++) {
         const MapProp& p = mapProps[i];
         if (!isMapPropPushableType(p.type)) continue;
-        float r = mapPropCollisionRadius(p);
-        if (r <= 0.001f) continue;
-        if (fabsf(playerX - p.pos.x) >= (r + pr)) continue;
-        if (fabsf(playerZ - p.pos.z) >= (r + pr)) continue;
+        float hx = 0.0f, hz = 0.0f;
+        mapPropHalfExtents(p, hx, hz);
+        if (hx <= 0.001f || hz <= 0.001f) continue;
+        if (fabsf(playerX - p.pos.x) >= (hx + pr)) continue;
+        if (fabsf(playerZ - p.pos.z) >= (hz + pr)) continue;
         float dx = p.pos.x - playerX;
         float dz = p.pos.z - playerZ;
         float ds = dx * dx + dz * dz;
@@ -117,7 +126,9 @@ inline bool tryPushMapProps(float playerX, float playerZ, float pr, float moveX,
 
     float tryX = p.pos.x + dirX * pushStrength;
     float tryZ = p.pos.z + dirZ * pushStrength;
-    float propRadius = mapPropCollisionRadius(p) * 0.82f;
+    float hx = 0.0f, hz = 0.0f;
+    mapPropHalfExtents(p, hx, hz);
+    float propRadius = (hx > hz ? hx : hz) * 0.82f;
     if (collideWorld(tryX, tryZ, propRadius)) return false;
     if (collideMapPropsEx(tryX, tryZ, propRadius, targetIndex)) return false;
 
@@ -154,12 +165,25 @@ inline bool isMapPropCellValid(const Chunk& c, int lx, int lz) {
 }
 
 inline void pushMapPropUnique(int cx, int cz, int lx, int lz, int type, float scale, float yaw) {
-    Vec3 wp(
+    Vec3 base(
         ((float)(cx * CHUNK_SIZE + lx) + 0.5f) * CS,
         0.0f,
         ((float)(cz * CHUNK_SIZE + lz) + 0.5f) * CS
     );
-    if (hasMapPropNear(wp, CS * 0.55f)) return;
+    Vec3 wp = base;
+    const float jitter = CS * 0.22f;
+    for (int attempt = 0; attempt < 3; attempt++) {
+        float mul = (attempt == 0) ? 1.0f : (attempt == 1 ? 0.6f : 0.3f);
+        float ox = sinf(yaw * 1.37f + (float)attempt * 0.91f) * jitter * mul;
+        float oz = cosf(yaw * 1.61f + (float)attempt * 1.23f) * jitter * mul;
+        Vec3 cand(base.x + ox, 0.0f, base.z + oz);
+        int wx = (int)floorf(cand.x / CS);
+        int wz = (int)floorf(cand.z / CS);
+        if (getCellWorld(wx, wz) != 0) continue;
+        wp = cand;
+        break;
+    }
+    if (hasMapPropNear(wp, CS * (0.40f + scale * 0.22f))) return;
     MapProp pr{};
     pr.pos = wp;
     pr.type = type;
@@ -170,8 +194,8 @@ inline void pushMapPropUnique(int cx, int cz, int lx, int lz, int type, float sc
 
 inline void spawnChunkProps(const Chunk& c) {
     std::mt19937 cr(chunkMapContentSeed(c.cx, c.cz, 0xA18F331u));
-    int baseCount = 2 + (int)(cr() % 3);
-    int maxAttempts = 52;
+    int baseCount = 1 + (int)(cr() % 2);
+    int maxAttempts = 44;
 
     for (int i = 0; i < baseCount && maxAttempts > 0; i++) {
         int lx = 2 + (int)(cr() % (CHUNK_SIZE - 4));
@@ -180,16 +204,21 @@ inline void spawnChunkProps(const Chunk& c) {
             maxAttempts--;
             continue;
         }
+        int wallsNear = countWallNeighbors(c, lx, lz);
+        if (wallsNear < 2 && (cr() % 100) < 90) {
+            maxAttempts--;
+            continue;
+        }
         int weighted = (int)(cr() % 100);
         int type = MAP_PROP_CRATE_STACK;
-        if (weighted < 34) type = MAP_PROP_CRATE_STACK;
-        else if (weighted < 56) type = MAP_PROP_BOX_PALLET;
-        else if (weighted < 68) type = MAP_PROP_BARRIER;
-        else if (weighted < 77) type = MAP_PROP_CABLE_REEL;
-        else if (weighted < 84) type = MAP_PROP_DRUM_STACK;
-        else if (weighted < 90) type = MAP_PROP_DEBRIS;
-        else if (weighted < 94) type = MAP_PROP_LOCKER_BANK;
-        else if (weighted < 97) type = MAP_PROP_CABINET;
+        if (weighted < 36) type = MAP_PROP_CRATE_STACK;
+        else if (weighted < 60) type = MAP_PROP_BOX_PALLET;
+        else if (weighted < 70) type = MAP_PROP_BARRIER;
+        else if (weighted < 80) type = MAP_PROP_CABLE_REEL;
+        else if (weighted < 87) type = MAP_PROP_DRUM_STACK;
+        else if (weighted < 93) type = MAP_PROP_DEBRIS;
+        else if (weighted < 97) type = MAP_PROP_LOCKER_BANK;
+        else if (weighted < 99) type = MAP_PROP_CABINET;
         else type = MAP_PROP_PUDDLE;
         float scale = 0.78f + ((float)(cr() % 45) / 100.0f);
         float yaw = ((float)(cr() % 628) / 100.0f);

@@ -32,26 +32,71 @@ public:
     int roomCount = 0;
     int selectedRoom = 0;
     
-    void ensureLocalIP() {
-        if (strcmp(localIP, "0.0.0.0") != 0) return;
-        char host[256];
-        if (gethostname(host, sizeof(host)) != 0) return;
-        addrinfo hints;
-        memset(&hints, 0, sizeof(hints));
-        hints.ai_family = AF_INET;
-        hints.ai_socktype = SOCK_DGRAM;
-        addrinfo* result = nullptr;
-        if (getaddrinfo(host, nullptr, &hints, &result) != 0) return;
-        for (addrinfo* it = result; it; it = it->ai_next) {
-            sockaddr_in* addr = (sockaddr_in*)it->ai_addr;
-            const char* ip = inet_ntoa(addr->sin_addr);
-            if (!ip) continue;
-            if (strcmp(ip, "127.0.0.1") == 0) continue;
-            strncpy(localIP, ip, sizeof(localIP) - 1);
-            localIP[sizeof(localIP) - 1] = 0;
-            break;
+    bool isUsableLanIP(const char* ip) const {
+        if (!ip || ip[0] == '\0') return false;
+        if (strcmp(ip, "0.0.0.0") == 0) return false;
+        if (strcmp(ip, "127.0.0.1") == 0) return false;
+        return true;
+    }
+
+    bool resolveLocalIPFromSocket() {
+        SOCKET tmp = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+        if (tmp == INVALID_SOCKET) return false;
+        sockaddr_in dst;
+        memset(&dst, 0, sizeof(dst));
+        dst.sin_family = AF_INET;
+        dst.sin_port = htons(53);
+        inet_pton(AF_INET, "8.8.8.8", &dst.sin_addr);
+        connect(tmp, (sockaddr*)&dst, sizeof(dst));
+        sockaddr_in local;
+        int len = sizeof(local);
+        memset(&local, 0, sizeof(local));
+        bool ok = false;
+        if (getsockname(tmp, (sockaddr*)&local, &len) == 0) {
+            char ip[64] = {};
+            if (inet_ntop(AF_INET, (void*)&local.sin_addr, ip, sizeof(ip))) {
+                if (isUsableLanIP(ip)) {
+                    strncpy(localIP, ip, sizeof(localIP) - 1);
+                    localIP[sizeof(localIP) - 1] = 0;
+                    ok = true;
+                }
+            }
         }
-        freeaddrinfo(result);
+        closesocket(tmp);
+        return ok;
+    }
+
+    void ensureLocalIP() {
+        if (isUsableLanIP(localIP)) return;
+        bool tempWsa = false;
+        if (!initialized) {
+            WSADATA wsa;
+            if (WSAStartup(MAKEWORD(2, 2), &wsa) == 0) tempWsa = true;
+        }
+        char host[256];
+        if (gethostname(host, sizeof(host)) == 0) {
+            addrinfo hints;
+            memset(&hints, 0, sizeof(hints));
+            hints.ai_family = AF_INET;
+            hints.ai_socktype = SOCK_DGRAM;
+            addrinfo* result = nullptr;
+            if (getaddrinfo(host, nullptr, &hints, &result) == 0) {
+                for (addrinfo* it = result; it; it = it->ai_next) {
+                    sockaddr_in* addr = (sockaddr_in*)it->ai_addr;
+                    const char* ip = inet_ntoa(addr->sin_addr);
+                    if (!isUsableLanIP(ip)) continue;
+                    strncpy(localIP, ip, sizeof(localIP) - 1);
+                    localIP[sizeof(localIP) - 1] = 0;
+                    break;
+                }
+                freeaddrinfo(result);
+            }
+        }
+        if (!isUsableLanIP(localIP)) resolveLocalIPFromSocket();
+        if (!isUsableLanIP(localIP)) {
+            snprintf(localIP, sizeof(localIP), "127.0.0.1");
+        }
+        if (tempWsa) WSACleanup();
     }
     
     bool startClient() {

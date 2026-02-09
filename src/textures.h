@@ -90,6 +90,16 @@ inline GLuint genTex(int type) {
                 g = border - 4.0f;
                 b = border - 10.0f;
             }
+        } else if(type==5) { // generic prop texture (metal/cardboard mix)
+            float grains = perlin(x * 0.14f, y * 0.14f, 4) * 14.0f;
+            float ridges = sinf(x * 0.22f + perlin(y * 0.07f, x * 0.05f, 2) * 2.5f) * 9.0f;
+            float rust = perlin(x * 0.035f + 4.0f, y * 0.035f + 7.0f, 4);
+            float rustMask = rust > 0.45f ? (rust - 0.45f) * 90.0f : 0.0f;
+            float tapeLine = fmodf((float)x, 96.0f);
+            float tape = (tapeLine > 42.0f && tapeLine < 54.0f) ? 18.0f : 0.0f;
+            r = 128.0f + grains + ridges * 0.3f + tape - rustMask * 0.25f;
+            g = 119.0f + grains * 0.9f + ridges * 0.2f + tape * 0.9f - rustMask * 0.55f;
+            b = 104.0f + grains * 0.7f + ridges * 0.12f + tape * 0.4f - rustMask * 0.75f;
         }
         d[(y*sz+x)*3+0]=(unsigned char)(r<0?0:(r>255?255:(int)r));
         d[(y*sz+x)*3+1]=(unsigned char)(g<0?0:(g>255?255:(int)g));

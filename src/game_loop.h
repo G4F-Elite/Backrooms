@@ -586,6 +586,7 @@ void renderScene(){
     glBindVertexArray(pillarVAO);glDrawArrays(GL_TRIANGLES,0,pillarVC);
     if(decorVC>0){
         glDisable(GL_CULL_FACE);
+        glBindTexture(GL_TEXTURE_2D,propTex);
         glBindVertexArray(decorVAO);glDrawArrays(GL_TRIANGLES,0,decorVC);
         glEnable(GL_CULL_FACE);
     }
@@ -619,6 +620,34 @@ void renderScene(){
 
 inline int detectActiveRefreshRateHz(GLFWwindow* w){
     GLFWmonitor* mon = glfwGetWindowMonitor(w);
+    if(!mon){
+        int wx = 0, wy = 0, ww = 0, wh = 0;
+        glfwGetWindowPos(w, &wx, &wy);
+        glfwGetWindowSize(w, &ww, &wh);
+        int count = 0;
+        GLFWmonitor** mons = glfwGetMonitors(&count);
+        int bestArea = -1;
+        for(int i=0;i<count;i++){
+            int mx = 0, my = 0;
+            glfwGetMonitorPos(mons[i], &mx, &my);
+            const GLFWvidmode* vm = glfwGetVideoMode(mons[i]);
+            if(!vm) continue;
+            int mw = vm->width;
+            int mh = vm->height;
+            int ix0 = wx > mx ? wx : mx;
+            int iy0 = wy > my ? wy : my;
+            int ix1 = (wx + ww) < (mx + mw) ? (wx + ww) : (mx + mw);
+            int iy1 = (wy + wh) < (my + mh) ? (wy + wh) : (my + mh);
+            int iw = ix1 - ix0;
+            int ih = iy1 - iy0;
+            if(iw <= 0 || ih <= 0) continue;
+            int area = iw * ih;
+            if(area > bestArea){
+                bestArea = area;
+                mon = mons[i];
+            }
+        }
+    }
     if(!mon) mon = glfwGetPrimaryMonitor();
     if(!mon) return 60;
     const GLFWvidmode* vm = glfwGetVideoMode(mon);
@@ -657,7 +686,7 @@ int main(){
     
     glEnable(GL_DEPTH_TEST);glEnable(GL_CULL_FACE);
     genWorld();
-    wallTex=genTex(0);floorTex=genTex(1);ceilTex=genTex(2);lightTex=genTex(3);lampTex=genTex(4);
+    wallTex=genTex(0);floorTex=genTex(1);ceilTex=genTex(2);lightTex=genTex(3);lampTex=genTex(4);propTex=genTex(5);
     mainShader=mkShader(mainVS,mainFS);lightShader=mkShader(lightVS,lightFS);vhsShader=mkShader(vhsVS,vhsFS);
     buildGeom();
     computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), renderW, renderH);
@@ -1102,7 +1131,7 @@ int main(){
         int frameGenBaseCap = frameGenBaseFpsCap(cachedRefreshRateHz, settings.frameGenMode, settings.vsync);
         gPerfFrameGenBaseCap = frameGenBaseCap;
         glfwSwapBuffers(gWin);glfwPollEvents();
-        applyFramePacing(frameStartTime, frameGenBaseCap);
+        if(!settings.vsync) applyFramePacing(frameStartTime, frameGenBaseCap);
     }
     audioRunning=false;SetEvent(hEvent);aT.join();glfwTerminate();return 0;
 }

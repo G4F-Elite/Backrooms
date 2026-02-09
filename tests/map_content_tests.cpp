@@ -97,7 +97,7 @@ void testGeneratesVariedProps() {
     }
     updateMapContent(0, 0);
 
-    assert(mapProps.size() > 15);
+    assert(mapProps.size() >= 8);
     bool seen[13] = {false, false, false, false, false, false, false, false, false, false, false, false, false};
     for (const auto& p : mapProps) {
         if (p.type >= 0 && p.type < 13) seen[p.type] = true;

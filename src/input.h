@@ -38,7 +38,6 @@ inline void popNicknameChar() {
     int len = (int)strlen(multiNickname);
     if (len <= 0) return;
     multiNickname[len - 1] = '\0';
-    sanitizePlayerName(multiNickname, multiNickname);
 }
 
 inline void handleNicknameInput(GLFWwindow* w) {
@@ -77,13 +76,6 @@ inline void handleNicknameInput(GLFWwindow* w) {
 }
 
 inline void settingsInput(GLFWwindow* w, bool fromPause) {
-    static constexpr int SETTINGS_ITEMS = 16;
-    static constexpr int SETTINGS_AA_INDEX = 10;
-    static constexpr int SETTINGS_FAST_MATH_INDEX = 11;
-    static constexpr int SETTINGS_FRAME_GEN_INDEX = 12;
-    static constexpr int SETTINGS_VSYNC_INDEX = 13;
-    static constexpr int SETTINGS_BINDS_INDEX = 14;
-    static constexpr int SETTINGS_BACK_INDEX = 15;
     bool esc = glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS;
     bool up = glfwGetKey(w, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS;
     bool down = glfwGetKey(w, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS;
@@ -95,50 +87,103 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
     static double nextAdjustTime = 0.0;
     const double adjustFirstDelay = 0.28;
     const double adjustRepeatInterval = 0.055;
+    auto switchTab = [&]() {
+        settingsTab = (settingsTab == SETTINGS_TAB_AUDIO) ? SETTINGS_TAB_VIDEO : SETTINGS_TAB_AUDIO;
+        menuSel = clampSettingsSelection(settingsTab, menuSel);
+    };
+
+    auto audioAdjust = [&](int idx, int dir) {
+        float* vals[] = {
+            &settings.masterVol,
+            &settings.musicVol,
+            &settings.ambienceVol,
+            &settings.sfxVol,
+            &settings.voiceVol
+        };
+        float maxV[] = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
+        float minV[] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+        float step[] = {0.05f, 0.05f, 0.05f, 0.05f, 0.05f};
+        int ai = idx - 1;
+        if (ai < 0 || ai >= 5) return false;
+        *vals[ai] += step[ai] * (float)dir;
+        if (*vals[ai] < minV[ai]) *vals[ai] = minV[ai];
+        if (*vals[ai] > maxV[ai]) *vals[ai] = maxV[ai];
+        return true;
+    };
+
+    auto videoAdjust = [&](int idx, int dir) {
+        int vi = idx - 1;
+        if (vi == 0) {
+            settings.vhsIntensity += 0.05f * (float)dir;
+            if (settings.vhsIntensity < 0.0f) settings.vhsIntensity = 0.0f;
+            if (settings.vhsIntensity > 1.0f) settings.vhsIntensity = 1.0f;
+            return true;
+        }
+        if (vi == 1) {
+            settings.mouseSens += 0.0003f * (float)dir;
+            if (settings.mouseSens < 0.0005f) settings.mouseSens = 0.0005f;
+            if (settings.mouseSens > 0.006f) settings.mouseSens = 0.006f;
+            return true;
+        }
+        if (vi == 2) {
+            settings.upscalerMode = clampUpscalerMode(settings.upscalerMode + dir);
+            return true;
+        }
+        if (vi == 3) {
+            settings.renderScalePreset = stepRenderScalePreset(settings.renderScalePreset, dir);
+            return true;
+        }
+        if (vi == 4) {
+            settings.fsrSharpness = clampFsrSharpness(settings.fsrSharpness + 0.05f * (float)dir);
+            return true;
+        }
+        if (vi == 5) {
+            settings.aaMode = stepAaMode(settings.aaMode, dir);
+            return true;
+        }
+        if (vi == 6) {
+            settings.fastMath = !settings.fastMath;
+            return true;
+        }
+        if (vi == 7) {
+            settings.frameGenMode = stepFrameGenMode(settings.frameGenMode, dir);
+            return true;
+        }
+        if (vi == 8) {
+            settings.vsync = !settings.vsync;
+            return true;
+        }
+        return false;
+    };
 
     auto applyAdjust = [&](int dir) {
         if (dir == 0) return;
-        if (menuSel <= 6) {
-            float* vals[] = {
-                &settings.masterVol, &settings.musicVol, &settings.ambienceVol, &settings.sfxVol,
-                &settings.voiceVol, &settings.vhsIntensity, &settings.mouseSens
-            };
-            float maxV[] = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 1.0f, 0.006f};
-            float minV[] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0005f};
-            float step[] = {0.05f, 0.05f, 0.05f, 0.05f, 0.05f, 0.05f, 0.0003f};
-            *vals[menuSel] += step[menuSel] * (float)dir;
-            if (*vals[menuSel] < minV[menuSel]) *vals[menuSel] = minV[menuSel];
-            if (*vals[menuSel] > maxV[menuSel]) *vals[menuSel] = maxV[menuSel];
-            triggerMenuAdjustSound();
-        } else if (menuSel == 7) {
-            settings.upscalerMode = clampUpscalerMode(settings.upscalerMode + dir);
-            triggerMenuAdjustSound();
-        } else if (menuSel == 8) {
-            settings.renderScalePreset = stepRenderScalePreset(settings.renderScalePreset, dir);
-            triggerMenuAdjustSound();
-        } else if (menuSel == 9) {
-            settings.fsrSharpness = clampFsrSharpness(settings.fsrSharpness + 0.05f * (float)dir);
-            triggerMenuAdjustSound();
-        } else if (menuSel == SETTINGS_AA_INDEX) {
-            settings.aaMode = stepAaMode(settings.aaMode, dir);
-            triggerMenuAdjustSound();
-        } else if (menuSel == SETTINGS_FAST_MATH_INDEX) {
-            settings.fastMath = !settings.fastMath;
-            triggerMenuAdjustSound();
-        } else if (menuSel == SETTINGS_FRAME_GEN_INDEX) {
-            settings.frameGenMode = stepFrameGenMode(settings.frameGenMode, dir);
-            triggerMenuAdjustSound();
-        } else if (menuSel == SETTINGS_VSYNC_INDEX) {
-            settings.vsync = !settings.vsync;
-            triggerMenuAdjustSound();
+        bool changed = false;
+        if (menuSel == 0) {
+            switchTab();
+            changed = true;
+        } else if (settingsTab == SETTINGS_TAB_AUDIO) {
+            changed = audioAdjust(menuSel, dir);
+        } else {
+            changed = videoAdjust(menuSel, dir);
         }
+        if (changed) triggerMenuAdjustSound();
     };
     
-    if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = SETTINGS_ITEMS - 1; triggerMenuNavigateSound(); }
-    if (down && !downPressed) { menuSel++; if (menuSel >= SETTINGS_ITEMS) menuSel = 0; triggerMenuNavigateSound(); }
+    if (up && !upPressed) {
+        menuSel = clampSettingsSelection(settingsTab, menuSel - 1);
+        triggerMenuNavigateSound();
+    }
+    if (down && !downPressed) {
+        menuSel = clampSettingsSelection(settingsTab, menuSel + 1);
+        triggerMenuNavigateSound();
+    }
     
     int adjustDir = right ? 1 : (left ? -1 : 0);
-    if (menuSel <= SETTINGS_VSYNC_INDEX) {
+    int bindsIndex = settingsBindsIndexForTab(settingsTab);
+    int backIndex = settingsBackIndexForTab(settingsTab);
+    bool canAdjust = menuSel == 0 || (menuSel != bindsIndex && menuSel != backIndex);
+    if (canAdjust) {
         if (adjustDir == 0) {
             adjustHoldDir = 0;
             nextAdjustTime = 0.0;
@@ -150,19 +195,32 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
             applyAdjust(adjustDir);
             nextAdjustTime = now + adjustRepeatInterval;
         }
-    } else if (menuSel == SETTINGS_BINDS_INDEX) {
+    } else if (menuSel == bindsIndex) {
         if (enter && !enterPressed) {
             triggerMenuConfirmSound();
+            settingsTab = SETTINGS_TAB_VIDEO;
             gameState = fromPause ? STATE_KEYBINDS_PAUSE : STATE_KEYBINDS;
             menuSel = 0;
             keybindCaptureIndex = -1;
         }
     }
+
+    if (enter && !enterPressed) {
+        if (menuSel == backIndex) {
+            triggerMenuConfirmSound();
+            gameState = fromPause ? STATE_PAUSE : STATE_MENU;
+            menuSel = fromPause ? 1 : 2;
+        } else if (menuSel != bindsIndex) {
+            if (menuSel == 0 || settingsTab == SETTINGS_TAB_VIDEO) {
+                applyAdjust(1);
+            }
+        }
+    }
     
-    if ((enter && !enterPressed && menuSel == SETTINGS_BACK_INDEX) || (esc && !escPressed)) { 
+    if (esc && !escPressed) { 
         triggerMenuConfirmSound();
         gameState = fromPause ? STATE_PAUSE : STATE_MENU; 
-        menuSel = fromPause ? 1 : 2;  // Settings position in respective menu
+        menuSel = fromPause ? 1 : 2;
     }
     
     escPressed = esc; 
@@ -206,13 +264,15 @@ inline void keybindsInput(GLFWwindow* w, bool fromPause) {
             } else if (menuSel == KEYBINDS_BACK_INDEX) {
                 triggerMenuConfirmSound();
                 gameState = fromPause ? STATE_SETTINGS_PAUSE : STATE_SETTINGS;
-                menuSel = 14;
+                settingsTab = SETTINGS_TAB_VIDEO;
+                menuSel = 10;
             }
         }
         if (esc && !escPressed) {
             triggerMenuConfirmSound();
             gameState = fromPause ? STATE_SETTINGS_PAUSE : STATE_SETTINGS;
-            menuSel = 14;
+            settingsTab = SETTINGS_TAB_VIDEO;
+            menuSel = 10;
         }
     }
 
@@ -245,6 +305,7 @@ inline void menuInput(GLFWwindow* w) {
             }
             else if (menuSel == 2) { 
                 // Settings
+                settingsTab = SETTINGS_TAB_AUDIO;
                 gameState = STATE_SETTINGS; 
                 menuSel = 0; 
             }
@@ -281,6 +342,7 @@ inline void menuInput(GLFWwindow* w) {
                     firstMouse = true;
                 }
                 else if (menuSel == 2) { 
+                    settingsTab = SETTINGS_TAB_AUDIO;
                     gameState = STATE_SETTINGS_PAUSE; 
                     menuSel = 0; 
                 }
@@ -314,6 +376,7 @@ inline void menuInput(GLFWwindow* w) {
                     firstMouse = true; 
                 }
                 else if (menuSel == 1) { 
+                    settingsTab = SETTINGS_TAB_AUDIO;
                     gameState = STATE_SETTINGS_PAUSE; 
                     menuSel = 0; 
                 }
