@@ -163,12 +163,15 @@ inline void menuInput(GLFWwindow* w) {
                 gameState = STATE_MULTI_JOIN; 
                 menuSel = 0; 
                 multiIPManualEdit = false;
+                multiMasterManualEdit = false;
                 if (multiNetworkMode == 0) {
                     lanDiscovery.startClient();
                     lanDiscovery.requestScan();
                     dedicatedDirectory.stop();
                 } else {
-                    dedicatedDirectory.start("127.0.0.1", backrooms::protocol::kDefaultMasterPort);
+                    int mPort = backrooms::protocol::kDefaultMasterPort;
+                    if (std::sscanf(multiMasterPort, "%d", &mPort) != 1 || mPort < 1 || mPort > 65535) mPort = backrooms::protocol::kDefaultMasterPort;
+                    dedicatedDirectory.start(multiMasterIP, (unsigned short)mPort);
                     dedicatedDirectory.requestScan();
                     lanDiscovery.stop();
                 }
@@ -252,21 +255,26 @@ inline void menuInput(GLFWwindow* w) {
             if (pressed && !numPressed[i]) {
                 if (multiInputField == 0) {
                     // IP field - allow numbers and dots
-                    int len = (int)strlen(multiJoinIP);
+                    char* targetIP = (multiNetworkMode == 0) ? multiJoinIP : multiMasterIP;
+                    int len = (int)strlen(targetIP);
                     if (len < 15) {
-                        if (i < 10 || (i == 10 && len > 0 && multiJoinIP[len-1] != '.')) {
-                            multiJoinIP[len] = chars[i];
-                            multiJoinIP[len + 1] = 0;
-                            multiIPManualEdit = true;
+                        if (i < 10 || (i == 10 && len > 0 && targetIP[len-1] != '.')) {
+                            targetIP[len] = chars[i];
+                            targetIP[len + 1] = 0;
+                            if (multiNetworkMode == 0) multiIPManualEdit = true;
+                            else multiMasterManualEdit = true;
                         }
                     }
                 } else {
                     // Port field - numbers only
                     if (i < 10) {
-                        int len = (int)strlen(multiJoinPort);
+                        char* targetPort = (multiNetworkMode == 0) ? multiJoinPort : multiMasterPort;
+                        int len = (int)strlen(targetPort);
                         if (len < 5) {
-                            multiJoinPort[len] = chars[i];
-                            multiJoinPort[len + 1] = 0;
+                            targetPort[len] = chars[i];
+                            targetPort[len + 1] = 0;
+                            if (multiNetworkMode == 0) multiIPManualEdit = true;
+                            else multiMasterManualEdit = true;
                         }
                     }
                 }
@@ -279,14 +287,21 @@ inline void menuInput(GLFWwindow* w) {
         bool bsNow = glfwGetKey(w, GLFW_KEY_BACKSPACE) == GLFW_PRESS;
         if (bsNow && !bsPressed) {
             if (multiInputField == 0) {
-                int len = (int)strlen(multiJoinIP);
+                char* targetIP = (multiNetworkMode == 0) ? multiJoinIP : multiMasterIP;
+                int len = (int)strlen(targetIP);
                 if (len > 0) {
-                    multiJoinIP[len - 1] = 0;
-                    multiIPManualEdit = true;
+                    targetIP[len - 1] = 0;
+                    if (multiNetworkMode == 0) multiIPManualEdit = true;
+                    else multiMasterManualEdit = true;
                 }
             } else {
-                int len = (int)strlen(multiJoinPort);
-                if (len > 0) multiJoinPort[len - 1] = 0;
+                char* targetPort = (multiNetworkMode == 0) ? multiJoinPort : multiMasterPort;
+                int len = (int)strlen(targetPort);
+                if (len > 0) {
+                    targetPort[len - 1] = 0;
+                    if (multiNetworkMode == 0) multiIPManualEdit = true;
+                    else multiMasterManualEdit = true;
+                }
             }
         }
         bsPressed = bsNow;
@@ -295,7 +310,13 @@ inline void menuInput(GLFWwindow* w) {
         bool refreshNow = glfwGetKey(w, GLFW_KEY_R) == GLFW_PRESS;
         if (refreshNow && !refreshPressed) {
             if (multiNetworkMode == 0) lanDiscovery.requestScan();
-            else dedicatedDirectory.requestScan();
+            else {
+                int mPort = backrooms::protocol::kDefaultMasterPort;
+                if (std::sscanf(multiMasterPort, "%d", &mPort) != 1 || mPort < 1 || mPort > 65535) mPort = backrooms::protocol::kDefaultMasterPort;
+                dedicatedDirectory.stop();
+                dedicatedDirectory.start(multiMasterIP, (unsigned short)mPort);
+                dedicatedDirectory.requestScan();
+            }
         }
         refreshPressed = refreshNow;
         
@@ -321,6 +342,27 @@ inline void menuInput(GLFWwindow* w) {
             }
         }
         pickRoomPressed = pickRoomNow;
+
+        static bool quickConnectPressed = false;
+        bool quickConnectNow = glfwGetKey(w, GLFW_KEY_G) == GLFW_PRESS;
+        if (quickConnectNow && !quickConnectPressed && multiNetworkMode == 1) {
+            const DedicatedRoomInfo* room = dedicatedDirectory.getSelectedRoom();
+            if (room) {
+                std::snprintf(multiJoinIP, sizeof(multiJoinIP), "%s", room->ip);
+                std::snprintf(multiJoinPort, sizeof(multiJoinPort), "%hu", room->gamePort);
+                char fullAddr[64];
+                std::snprintf(fullAddr, 64, "%s", multiJoinIP);
+                netMgr.init();
+                if (netMgr.joinGame(fullAddr, multiNickname)) {
+                    lanDiscovery.stop();
+                    dedicatedDirectory.stop();
+                    multiState = MULTI_CONNECTING;
+                    gameState = STATE_MULTI_WAIT;
+                    menuSel = 0;
+                }
+            }
+        }
+        quickConnectPressed = quickConnectNow;
         
         if (multiNetworkMode == 0) {
             lanDiscovery.updateClient((float)glfwGetTime());

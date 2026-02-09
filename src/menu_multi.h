@@ -20,9 +20,12 @@ inline char multiJoinIP[64] = "192.168.0.1";
 inline char multiJoinPort[8] = "27015";
 inline int multiInputField = 0;  // 0 = IP, 1 = Port
 inline bool multiIPManualEdit = false;
+inline bool multiMasterManualEdit = false;
 inline bool multiEditingNickname = false;
 inline char multiNickname[PLAYER_NAME_BUF_LEN] = "Player";
 inline int multiNetworkMode = 0; // 0 LAN, 1 DEDICATED
+inline char multiMasterIP[64] = "127.0.0.1";
+inline char multiMasterPort[8] = "27017";
 
 // Draw multiplayer main menu
 inline void drawMultiMenuScreen(float tm) {
@@ -65,25 +68,29 @@ inline void drawJoinMenuScreen(float tm) {
     
     drawTextCentered("JOIN GAME", 0.0f, 0.55f, 3.0f, 0.9f, 0.85f, 0.4f, 0.9f);
     
-    // IP Field
+    bool dedicated = (multiNetworkMode == 1);
+
+    // IP Field (LAN target IP or Dedicated master IP)
     float ipSel = (multiInputField == 0) ? 1.0f : 0.5f;
-    drawText("IP ADDRESS:", -0.45f, 0.25f, 1.8f, 0.6f*ipSel, 0.6f*ipSel, 0.5f*ipSel, 0.8f);
+    drawText(dedicated ? "MASTER IP:" : "IP ADDRESS:", -0.45f, 0.25f, 1.8f, 0.6f*ipSel, 0.6f*ipSel, 0.5f*ipSel, 0.8f);
     char ipBuf[48];
+    const char* shownIP = dedicated ? multiMasterIP : multiJoinIP;
     if (multiInputField == 0) {
-        snprintf(ipBuf, 48, "[%s_]", multiJoinIP);
+        snprintf(ipBuf, 48, "[%s_]", shownIP);
     } else {
-        snprintf(ipBuf, 48, "[%s]", multiJoinIP);
+        snprintf(ipBuf, 48, "[%s]", shownIP);
     }
     drawText(ipBuf, -0.45f, 0.12f, 2.0f, 0.9f*ipSel, 0.9f*ipSel, 0.6f*ipSel, 1.0f);
     
-    // Port Field
+    // Port Field (LAN target port or Dedicated master port)
     float portSel = (multiInputField == 1) ? 1.0f : 0.5f;
-    drawText("PORT:", 0.15f, 0.25f, 1.8f, 0.6f*portSel, 0.6f*portSel, 0.5f*portSel, 0.8f);
+    drawText(dedicated ? "MASTER PORT:" : "PORT:", 0.15f, 0.25f, 1.8f, 0.6f*portSel, 0.6f*portSel, 0.5f*portSel, 0.8f);
     char portBuf[24];
+    const char* shownPort = dedicated ? multiMasterPort : multiJoinPort;
     if (multiInputField == 1) {
-        snprintf(portBuf, 24, "[%s_]", multiJoinPort);
+        snprintf(portBuf, 24, "[%s_]", shownPort);
     } else {
-        snprintf(portBuf, 24, "[%s]", multiJoinPort);
+        snprintf(portBuf, 24, "[%s]", shownPort);
     }
     drawText(portBuf, 0.15f, 0.12f, 2.0f, 0.9f*portSel, 0.9f*portSel, 0.6f*portSel, 1.0f);
     
@@ -97,14 +104,14 @@ inline void drawJoinMenuScreen(float tm) {
     }
     
     drawText("TAB TO SWITCH FIELDS    0-9 AND . FOR INPUT", -0.58f, -0.4f, 1.3f, 0.5f, 0.5f, 0.4f, 0.6f);
-    drawText("BACKSPACE TO DELETE     ENTER TO CONNECT", -0.52f, -0.5f, 1.3f, 0.5f, 0.5f, 0.4f, 0.6f);
+    drawText(dedicated ? "BACKSPACE TO DELETE     ENTER/G CONNECT" : "BACKSPACE TO DELETE     ENTER TO CONNECT", -0.58f, -0.5f, 1.3f, 0.5f, 0.5f, 0.4f, 0.6f);
     if (multiNetworkMode == 0) drawText("AUTO LAN SCAN: R REFRESH, F NEXT ROOM", -0.58f, -0.6f, 1.2f, 0.55f, 0.65f, 0.45f, 0.7f);
     else drawText("MASTER SCAN: R REFRESH, F NEXT SERVER", -0.58f, -0.6f, 1.2f, 0.55f, 0.65f, 0.45f, 0.7f);
     
     char roomHead[64];
     snprintf(roomHead, 64, multiNetworkMode == 0 ? "ROOMS FOUND: %d" : "SERVERS FOUND: %d", multiNetworkMode == 0 ? lanDiscovery.roomCount : dedicatedDirectory.roomCount);
     drawText(roomHead, -0.58f, -0.72f, 1.2f, 0.7f, 0.8f, 0.55f, 0.75f);
-    if (multiNetworkMode == 0) {
+    if (!dedicated) {
         for (int i = 0; i < lanDiscovery.roomCount && i < 3; i++) {
             const LanRoomInfo& room = lanDiscovery.rooms[i];
             char roomLine[128];
@@ -119,6 +126,12 @@ inline void drawJoinMenuScreen(float tm) {
             snprintf(roomLine, 128, "%s:%hu %d/%d %s", room.ip, room.gamePort, (int)room.playerCount, (int)room.maxPlayers, room.inGame ? "IN GAME" : "LOBBY");
             float alpha = (i == dedicatedDirectory.selectedRoom) ? 0.95f : 0.65f;
             drawText(roomLine, -0.58f, -0.8f - i * 0.07f, 1.1f, 0.75f, 0.85f, 0.6f, alpha);
+        }
+        const DedicatedRoomInfo* room = dedicatedDirectory.getSelectedRoom();
+        if (room) {
+            char targetLine[128];
+            snprintf(targetLine, 128, "TARGET: %s:%hu", room->ip, room->gamePort);
+            drawText(targetLine, -0.58f, -1.02f, 1.1f, 0.72f, 0.85f, 0.62f, 0.82f);
         }
     }
     
