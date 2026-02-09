@@ -29,7 +29,22 @@ struct MapProp {
     float yaw;
 };
 
+enum MapPoiType {
+    MAP_POI_OFFICE = 0,
+    MAP_POI_SERVER = 1,
+    MAP_POI_STORAGE = 2,
+    MAP_POI_RESTROOM = 3
+};
+
+struct MapPoi {
+    Vec3 pos;
+    int type;
+    float radius;
+    int id;
+};
+
 extern std::vector<MapProp> mapProps;
+extern std::vector<MapPoi> mapPois;
 
 inline unsigned int chunkMapContentSeed(int cx, int cz, unsigned int salt) {
     unsigned int s = worldSeed ^ (unsigned int)(cx * 92837111) ^ (unsigned int)(cz * 689287499);
@@ -39,6 +54,16 @@ inline unsigned int chunkMapContentSeed(int cx, int cz, unsigned int salt) {
 inline bool hasMapPropNear(const Vec3& p, float radius) {
     float r2 = radius * radius;
     for (const auto& it : mapProps) {
+        float dx = it.pos.x - p.x;
+        float dz = it.pos.z - p.z;
+        if (dx * dx + dz * dz < r2) return true;
+    }
+    return false;
+}
+
+inline bool hasMapPoiNear(const Vec3& p, float radius) {
+    float r2 = radius * radius;
+    for (const auto& it : mapPois) {
         float dx = it.pos.x - p.x;
         float dz = it.pos.z - p.z;
         if (dx * dx + dz * dz < r2) return true;
@@ -298,10 +323,51 @@ inline void spawnOfficeFurniture(const Chunk& c) {
     }
 }
 
+inline void pushMapPoiUnique(int cx, int cz, int lx, int lz, int type, float radius) {
+    Vec3 p(
+        ((float)(cx * CHUNK_SIZE + lx) + 0.5f) * CS,
+        0.0f,
+        ((float)(cz * CHUNK_SIZE + lz) + 0.5f) * CS
+    );
+    int wx = (int)floorf(p.x / CS);
+    int wz = (int)floorf(p.z / CS);
+    if (getCellWorld(wx, wz) != 0) return;
+    if (hasMapPoiNear(p, CS * 4.0f)) return;
+    MapPoi poi{};
+    poi.pos = p;
+    poi.type = type;
+    poi.radius = radius;
+    poi.id = (cx * 73856093) ^ (cz * 19349663) ^ (lx * 83492791) ^ (lz * 297121507);
+    mapPois.push_back(poi);
+}
+
+inline void spawnChunkPoiRooms(const Chunk& c) {
+    std::mt19937 cr(chunkMapContentSeed(c.cx, c.cz, 0x71D9A3u));
+    int spawnRoll = (int)(cr() % 100);
+    if (spawnRoll > 27) return;
+    int tries = 10;
+    while (tries-- > 0) {
+        int lx = 3 + (int)(cr() % (CHUNK_SIZE - 6));
+        int lz = 3 + (int)(cr() % (CHUNK_SIZE - 6));
+        if (!isMapPropCellValid(c, lx, lz)) continue;
+        int open = countOpenNeighbors(c, lx, lz);
+        if (open < 3) continue;
+        int typeRoll = (int)(cr() % 100);
+        int type = MAP_POI_OFFICE;
+        if (typeRoll < 30) type = MAP_POI_OFFICE;
+        else if (typeRoll < 55) type = MAP_POI_SERVER;
+        else if (typeRoll < 80) type = MAP_POI_STORAGE;
+        else type = MAP_POI_RESTROOM;
+        pushMapPoiUnique(c.cx, c.cz, lx, lz, type, CS * 1.8f);
+        break;
+    }
+}
+
 inline void rebuildChunkMapContent(const Chunk& c) {
     spawnChunkProps(c);
     spawnChunkPoiClusters(c);
     spawnOfficeFurniture(c);
+    spawnChunkPoiRooms(c);
 }
 
 inline bool isMapPropTooFar(const MapProp& p, float cx, float cz, float md) {
@@ -333,6 +399,19 @@ inline void updateMapContent(int pcx, int pcz) {
         ),
         mapProps.end()
     );
+    mapPois.erase(
+        std::remove_if(
+            mapPois.begin(),
+            mapPois.end(),
+            [&](const MapPoi& p) {
+                if (fabsf(p.pos.x - cx) > md || fabsf(p.pos.z - cz) > md) return true;
+                int wx = (int)floorf(p.pos.x / CS);
+                int wz = (int)floorf(p.pos.z / CS);
+                return getCellWorld(wx, wz) == 1;
+            }
+        ),
+        mapPois.end()
+    );
 
     for (int dcx = -VIEW_CHUNKS; dcx <= VIEW_CHUNKS; dcx++) {
         for (int dcz = -VIEW_CHUNKS; dcz <= VIEW_CHUNKS; dcz++) {
@@ -341,4 +420,19 @@ inline void updateMapContent(int pcx, int pcz) {
             rebuildChunkMapContent(it->second);
         }
     }
+}
+
+inline int nearestMapPoiIndex(const Vec3& pos, float maxDist) {
+    float best = maxDist * maxDist;
+    int idx = -1;
+    for (int i = 0; i < (int)mapPois.size(); i++) {
+        float dx = mapPois[i].pos.x - pos.x;
+        float dz = mapPois[i].pos.z - pos.z;
+        float d2 = dx * dx + dz * dz;
+        if (d2 < best) {
+            best = d2;
+            idx = i;
+        }
+    }
+    return idx;
 }

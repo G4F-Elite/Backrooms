@@ -63,6 +63,7 @@ std::unordered_map<long long, Chunk> chunks;
 std::vector<Light> lights;
 std::vector<Vec3> pillars;
 std::vector<MapProp> mapProps;
+std::vector<MapPoi> mapPois;
 std::mt19937 rng;
 int playerChunkX = 0, playerChunkZ = 0;
 int lastBuildChunkX = -999, lastBuildChunkZ = -999;

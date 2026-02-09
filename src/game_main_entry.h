@@ -184,6 +184,7 @@ int main(){
                 if(baitEffectTimer>0) baitEffectTimer-=dTime;
                 updateEchoSignal();
                 updateTrapCorridor();
+                updatePoiRuntime();
                 if(multiState!=MULTI_IN_GAME) updateRoamEventsHost();
                 updateFloorHoles();
                 gameInput(gWin);

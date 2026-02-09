@@ -16,6 +16,7 @@ std::unordered_map<long long, Chunk> chunks;
 std::vector<Light> lights;
 std::vector<Vec3> pillars;
 std::vector<MapProp> mapProps;
+std::vector<MapPoi> mapPois;
 int playerChunkX = 0;
 int playerChunkZ = 0;
 
@@ -66,6 +67,7 @@ void testDeterministicPlacementBySeed() {
     lights.clear();
     pillars.clear();
     mapProps.clear();
+    mapPois.clear();
     worldSeed = 424242;
     generateArea(0, 0);
     auto a = makeSnapshot();
@@ -74,6 +76,7 @@ void testDeterministicPlacementBySeed() {
     lights.clear();
     pillars.clear();
     mapProps.clear();
+    mapPois.clear();
     worldSeed = 424242;
     generateArea(0, 0);
     auto b = makeSnapshot();
@@ -88,6 +91,7 @@ void testGeneratesVariedProps() {
     lights.clear();
     pillars.clear();
     mapProps.clear();
+    mapPois.clear();
     worldSeed = 1701;
 
     for (int cx = -1; cx <= 1; cx++) {
@@ -112,6 +116,7 @@ void testNoPropsInsideWalls() {
     lights.clear();
     pillars.clear();
     mapProps.clear();
+    mapPois.clear();
     worldSeed = 8088;
     generateArea(0, 0);
     assert(!mapProps.empty());
@@ -139,6 +144,54 @@ void testPropCollisionBlocksSolidPropsOnly() {
     puddle.scale = 1.0f;
     mapProps.push_back(puddle);
     assert(!collideMapProps(10.0f, 10.0f, 0.2f));
+}
+
+void testPoisDeterministicBySeed() {
+    chunks.clear();
+    lights.clear();
+    pillars.clear();
+    mapProps.clear();
+    mapPois.clear();
+    worldSeed = 777001;
+    generateArea(0, 0);
+    std::vector<int> first;
+    for (const auto& poi : mapPois) {
+        first.push_back((int)floorf(poi.pos.x * 10.0f));
+        first.push_back((int)floorf(poi.pos.z * 10.0f));
+        first.push_back(poi.type);
+    }
+
+    chunks.clear();
+    lights.clear();
+    pillars.clear();
+    mapProps.clear();
+    mapPois.clear();
+    worldSeed = 777001;
+    generateArea(0, 0);
+    std::vector<int> second;
+    for (const auto& poi : mapPois) {
+        second.push_back((int)floorf(poi.pos.x * 10.0f));
+        second.push_back((int)floorf(poi.pos.z * 10.0f));
+        second.push_back(poi.type);
+    }
+
+    assert(first == second);
+}
+
+void testPoisNeverInsideWalls() {
+    chunks.clear();
+    lights.clear();
+    pillars.clear();
+    mapProps.clear();
+    mapPois.clear();
+    worldSeed = 129001;
+    generateArea(0, 0);
+
+    for (const auto& poi : mapPois) {
+        int wx = (int)floorf(poi.pos.x / CS);
+        int wz = (int)floorf(poi.pos.z / CS);
+        assert(getCellWorld(wx, wz) == 0);
+    }
 }
 
 void testPushablePropCanMove() {
@@ -174,6 +227,8 @@ int main() {
     testGeneratesVariedProps();
     testNoPropsInsideWalls();
     testPropCollisionBlocksSolidPropsOnly();
+    testPoisDeterministicBySeed();
+    testPoisNeverInsideWalls();
     testPushablePropCanMove();
     testNonPushablePropDoesNotMove();
     std::cout << "All map content tests passed.\n";

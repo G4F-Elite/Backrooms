@@ -97,6 +97,22 @@ void buildGeom(){
             mkBox(dv, pr.pos.x + 0.28f, 0.0f, pr.pos.z - 0.22f, 0.56f * pr.scale, 0.28f * pr.scale, 0.56f * pr.scale);
         }
     }
+    for(const auto& poi:mapPois){
+        if(poi.type==MAP_POI_OFFICE){
+            mkBox(dv, poi.pos.x, 0.0f, poi.pos.z, 1.00f, 0.22f, 1.00f);
+            mkBox(dv, poi.pos.x, 0.22f, poi.pos.z - 0.32f, 0.92f, 0.62f, 0.10f);
+        }else if(poi.type==MAP_POI_SERVER){
+            mkBox(dv, poi.pos.x - 0.32f, 0.0f, poi.pos.z, 0.26f, 1.45f, 0.26f);
+            mkBox(dv, poi.pos.x + 0.32f, 0.0f, poi.pos.z, 0.26f, 1.45f, 0.26f);
+            mkBox(dv, poi.pos.x, 1.42f, poi.pos.z, 0.74f, 0.08f, 0.32f);
+        }else if(poi.type==MAP_POI_STORAGE){
+            mkBox(dv, poi.pos.x, 0.0f, poi.pos.z, 1.18f, 0.42f, 1.02f);
+            mkBox(dv, poi.pos.x, 0.42f, poi.pos.z, 1.04f, 0.52f, 0.88f);
+        }else{
+            mkBox(dv, poi.pos.x, 0.0f, poi.pos.z, 0.82f, 0.20f, 0.82f);
+            mkBox(dv, poi.pos.x, 0.20f, poi.pos.z, 0.54f, 0.12f, 0.54f);
+        }
+    }
     if(coop.initialized){
         for(int s=0;s<2;s++){
             const Vec3 sp = coop.switches[s];
@@ -173,7 +189,7 @@ void genWorld(){
         if(multiState==MULTI_IN_GAME) netMgr.worldSeed = worldSeed;
     }
     
-    chunks.clear();lights.clear();pillars.clear();mapProps.clear();
+    chunks.clear();lights.clear();pillars.clear();mapProps.clear();mapPois.clear();
     g_lightStates.clear(); // Reset light temporal states on world gen
     updateVisibleChunks(0,0);
     updateLightsAndPillars(0,0);
@@ -255,6 +271,7 @@ void genWorld(){
     flashlightShutdownBlinkTimer = 0.0f;
     resetScareSystemState(scareState);
     entitySpawnTimer=30;survivalTime=0;reshuffleTimer=15;
+    resetPoiRuntime();
     floorHoles.clear();
     playerFalling = false;
     fallVelocity = 0.0f;
