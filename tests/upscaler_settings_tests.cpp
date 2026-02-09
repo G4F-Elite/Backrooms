@@ -12,7 +12,7 @@ void testRenderScalePresetClamp() {
 }
 
 void testRenderScalePresetValues() {
-    assert(renderScaleFromPreset(0) == 0.50f);
+    assert(renderScaleFromPreset(0) == 0.25f);
     assert(renderScaleFromPreset(RENDER_SCALE_PRESET_DEFAULT) == 0.75f);
     assert(renderScaleFromPreset(RENDER_SCALE_PRESET_COUNT - 1) == 1.00f);
 }
@@ -27,7 +27,7 @@ void testEffectiveRenderScaleDependsOnMode() {
     float offScale = effectiveRenderScale(UPSCALER_MODE_OFF, 0);
     float fsrScale = effectiveRenderScale(UPSCALER_MODE_FSR10, 0);
     assert(offScale == 1.0f);
-    assert(fsrScale == 0.50f);
+    assert(fsrScale == 0.25f);
 }
 
 void testUpscalerModeClampAndLabel() {

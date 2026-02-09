@@ -14,10 +14,10 @@ inline constexpr int FRAME_GEN_MODE_150 = 1;
 inline constexpr int FRAME_GEN_MODE_200 = 2;
 inline constexpr int FRAME_GEN_MODE_COUNT = 3;
 
-inline constexpr int RENDER_SCALE_PRESET_COUNT = 6;
-inline constexpr int RENDER_SCALE_PRESET_DEFAULT = 3;
+inline constexpr int RENDER_SCALE_PRESET_COUNT = 9;
+inline constexpr int RENDER_SCALE_PRESET_DEFAULT = 6;
 inline constexpr float RENDER_SCALE_PRESETS[RENDER_SCALE_PRESET_COUNT] = {
-    0.50f, 0.59f, 0.67f, 0.75f, 0.83f, 1.00f
+    0.25f, 0.33f, 0.42f, 0.50f, 0.59f, 0.67f, 0.75f, 0.83f, 1.00f
 };
 
 inline int clampUpscalerMode(int mode) {

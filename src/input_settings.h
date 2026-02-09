@@ -1,4 +1,43 @@
 #pragma once
+
+// Check if current settings item is a slider that supports numeric input
+inline bool isSliderItem(int tab, int sel) {
+    if(sel <= 0) return false;
+    if(tab == SETTINGS_TAB_AUDIO) {
+        int ai = sel - 1;
+        return ai >= 0 && ai < 5; // all 5 volume sliders
+    }
+    if(tab == SETTINGS_TAB_VIDEO) {
+        int vi = sel - 1;
+        return vi == 0 || vi == 1 || vi == 4; // VHS, mouse sens, FSR sharp
+    }
+    return false;
+}
+
+// Apply typed numeric value to the correct slider
+inline void applySliderInputValue() {
+    sliderInputBuf[sliderInputLen] = 0;
+    int val = 0;
+    for(int i = 0; i < sliderInputLen; i++) {
+        val = val * 10 + (sliderInputBuf[i] - '0');
+    }
+    if(val < 0) val = 0;
+    if(val > 100) val = 100;
+    float nv = (float)val / 100.0f;
+    if(sliderInputTab == SETTINGS_TAB_AUDIO) {
+        float* vols[] = {&settings.masterVol, &settings.musicVol, &settings.ambienceVol, &settings.sfxVol, &settings.voiceVol};
+        int ai = sliderInputItem - 1;
+        if(ai >= 0 && ai < 5) *vols[ai] = nv;
+    } else if(sliderInputTab == SETTINGS_TAB_VIDEO) {
+        int vi = sliderInputItem - 1;
+        if(vi == 0) settings.vhsIntensity = nv;
+        else if(vi == 1) settings.mouseSens = nv * 0.006f;
+        else if(vi == 4) settings.fsrSharpness = nv;
+    }
+    sliderInputActive = false;
+    sliderInputLen = 0;
+}
+
 inline void settingsInput(GLFWwindow* w, bool fromPause) {
     bool esc = glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS;
     bool up = glfwGetKey(w, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS;
@@ -11,6 +50,51 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
     static double nextAdjustTime = 0.0;
     const double adjustFirstDelay = 0.28;
     const double adjustRepeatInterval = 0.055;
+
+    // Handle numeric input mode for sliders
+    if(sliderInputActive) {
+        // Check digit keys 0-9
+        for(int k = GLFW_KEY_0; k <= GLFW_KEY_9; k++) {
+            static bool numPressed[10] = {};
+            int digit = k - GLFW_KEY_0;
+            bool pressed = glfwGetKey(w, k) == GLFW_PRESS;
+            if(pressed && !numPressed[digit] && sliderInputLen < 3) {
+                sliderInputBuf[sliderInputLen++] = '0' + digit;
+            }
+            numPressed[digit] = pressed;
+        }
+        // Numpad digits
+        for(int k = GLFW_KEY_KP_0; k <= GLFW_KEY_KP_9; k++) {
+            static bool kpPressed[10] = {};
+            int digit = k - GLFW_KEY_KP_0;
+            bool pressed = glfwGetKey(w, k) == GLFW_PRESS;
+            if(pressed && !kpPressed[digit] && sliderInputLen < 3) {
+                sliderInputBuf[sliderInputLen++] = '0' + digit;
+            }
+            kpPressed[digit] = pressed;
+        }
+        // Backspace
+        bool bksp = glfwGetKey(w, GLFW_KEY_BACKSPACE) == GLFW_PRESS;
+        static bool bkspPressed = false;
+        if(bksp && !bkspPressed && sliderInputLen > 0) sliderInputLen--;
+        bkspPressed = bksp;
+        // Enter confirms
+        if(enter && !enterPressed) {
+            if(sliderInputLen > 0) applySliderInputValue();
+            else sliderInputActive = false;
+            triggerMenuConfirmSound();
+        }
+        // Esc cancels
+        if(esc && !escPressed) {
+            sliderInputActive = false;
+            sliderInputLen = 0;
+        }
+        escPressed = esc; enterPressed = enter;
+        upPressed = up; downPressed = down;
+        leftPressed = left; rightPressed = right;
+        return;
+    }
+
     auto switchTab = [&](int dir) {
         settingsTab = (settingsTab + (dir > 0 ? 1 : 2)) % 3;
         menuSel = clampSettingsSelection(settingsTab, menuSel);
@@ -108,7 +192,14 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
             gameState = fromPause ? STATE_PAUSE : STATE_MENU;
             menuSel = fromPause ? 1 : 2;
         } else if (menuSel != bindsIndex) {
-            if (menuSel == 0 || settingsTab == SETTINGS_TAB_VIDEO) {
+            // Check if this is a slider - open numeric input
+            if (isSliderItem(settingsTab, menuSel)) {
+                sliderInputActive = true;
+                sliderInputTab = settingsTab;
+                sliderInputItem = menuSel;
+                sliderInputLen = 0;
+                triggerMenuConfirmSound();
+            } else if (menuSel == 0 || settingsTab == SETTINGS_TAB_VIDEO) {
                 applyAdjust(1);
             }
         }

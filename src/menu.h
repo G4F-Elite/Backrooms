@@ -220,23 +220,29 @@ inline void drawTextCentered(const char* s, float centerX, float y, float sc, fl
     drawText(s, centerX - measureTextWidthNdc(s, sc) * 0.5f, y, sc, r, g, b, a);
 }
 
+inline bool sliderInputActive = false;
+inline int sliderInputTab = -1;
+inline int sliderInputItem = -1;
+inline char sliderInputBuf[8] = {};
+inline int sliderInputLen = 0;
+
 inline void drawSlider(float x,float y,float w,float val,float r,float g,float b) {
     (void)w;
-    const int slots = 18;
+    const int slots = 30;
     int filled = (int)(val * (float)slots + 0.5f);
     if(filled < 0) filled = 0;
     if(filled > slots) filled = slots;
 
     char base[slots + 1];
-    for(int i=0;i<slots;i++) base[i]='.';
+    for(int i=0;i<slots;i++) base[i]='-';
     base[slots]=0;
-    drawText(base,x,y,1.55f,r*0.33f,g*0.33f,b*0.33f,0.92f);
+    drawText(base,x,y,1.55f,r*0.25f,g*0.25f,b*0.25f,0.85f);
 
     if(filled > 0){
         char fill[slots + 1];
-        for(int i=0;i<filled;i++) fill[i]='#';
+        for(int i=0;i<filled;i++) fill[i]='=';
         fill[filled]=0;
-        drawText(fill,x,y,1.55f,r,g,b,0.98f);
+        drawText(fill,x,y,1.55f,r,g,b,0.95f);
     }
 
     int knobIndex = filled > 0 ? (filled - 1) : 0;
@@ -357,7 +363,18 @@ inline void drawSettings(bool fp) {
             }
         }
     }
-    drawTextCentered("LEFT/RIGHT TAB/ADJUST   ENTER TO TOGGLE",0.0f,-0.58f,1.35f,0.5f,0.5f,0.4f,0.6f);
+    // Show numeric input overlay if active
+    if(sliderInputActive) {
+        float iy = 0.33f - sliderInputItem * 0.09f;
+        drawOverlayRectNdc(0.42f, iy - 0.02f, 0.72f, iy + 0.04f, 0.05f, 0.05f, 0.08f, 0.9f);
+        char inputDisp[16];
+        sliderInputBuf[sliderInputLen] = 0;
+        snprintf(inputDisp, 16, "%s_%%", sliderInputBuf);
+        drawText(inputDisp, 0.44f, iy, 1.9f, 0.95f, 0.9f, 0.5f, 1.0f);
+        drawTextCentered("TYPE 0-100  ENTER CONFIRM  ESC CANCEL", 0.0f, -0.58f, 1.35f, 0.7f, 0.65f, 0.35f, 0.8f);
+    } else {
+        drawTextCentered("L/R ADJUST  ENTER TYPE VALUE  ESC BACK", 0.0f, -0.58f, 1.35f, 0.5f, 0.5f, 0.4f, 0.6f);
+    }
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 

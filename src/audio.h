@@ -110,11 +110,14 @@ inline void fillAudio(short* buf, int len) {
         sndState.ambPhase += 0.00025f;
         if(sndState.ambPhase>6.28318f) sndState.ambPhase-=6.28318f;
         
-        // Distant sounds - random creaks and groans
+        // Distant sounds - deep groans and creaks (slow, low-frequency)
         float distant = 0;
-        if(rand()%50000 < 3) sndState.distantPhase = 0.5f;
+        if(rand()%80000 < 2) sndState.distantPhase = 0.8f;
         if(sndState.distantPhase > 0) {
-            distant = sinf(sndState.distantPhase * 80.0f) * expf(-sndState.distantPhase * 4.0f) * 0.3f;
+            // Low creaking groan that fades slowly
+            float dFreq = 35.0f + sinf(sndState.distantPhase * 2.0f) * 8.0f;
+            distant = sinf(sndState.distantPhase * dFreq) * expf(-sndState.distantPhase * 2.5f) * 0.18f;
+            distant += sinf(sndState.distantPhase * dFreq * 0.5f) * expf(-sndState.distantPhase * 1.8f) * 0.08f;
             sndState.distantPhase -= 1.0f / SAMP_RATE;
         }
 
@@ -128,10 +131,10 @@ inline void fillAudio(short* buf, int len) {
         float envStress = envDanger * 0.65f + envInsanity * 0.35f;
         sceneClock += dt;
         if(sceneClock >= nextSceneEvent){
-            float baseGap = 3.6f - envStress * 1.1f;
-            if(baseGap < 2.1f) baseGap = 2.1f;
+            float baseGap = 5.5f - envStress * 1.5f;
+            if(baseGap < 3.5f) baseGap = 3.5f;
             float jitter = (float)(rand()%1000) / 1000.0f;
-            nextSceneEvent = sceneClock + baseGap + jitter * 3.4f;
+            nextSceneEvent = sceneClock + baseGap + jitter * 5.0f;
 
             int eventRoll = rand()%100;
             int eventType = 0;
@@ -158,10 +161,10 @@ inline void fillAudio(short* buf, int len) {
                 knockStage = 0;
             }else if(eventType == 4 && buzzTime < 0.0f){
                 buzzTime = 0.0f;
-                buzzPitch = 960.0f + (rand()%560);
+                buzzPitch = 180.0f + (rand()%120);
             }else if(eventType == 5 && ringTime < 0.0f){
                 ringTime = 0.0f;
-                ringPitch = 360.0f + (rand()%160);
+                ringPitch = 140.0f + (rand()%80);
             }
         }
 
@@ -189,57 +192,74 @@ inline void fillAudio(short* buf, int len) {
             if(ventTime > 2.2f) ventTime = -1.0f;
         }
 
+        // Buzz - low electrical hum/crackle, not a high-pitched screech
         float buzzTick = 0.0f;
         if(buzzTime >= 0.0f){
             float t = buzzTime;
-            float atk = (t < 0.004f) ? (t / 0.004f) : 1.0f;
-            float env = atk * expf(-t * 9.5f);
-            float f = buzzPitch + sinf(t * 42.0f) * 120.0f;
-            buzzTick = (sinf(twoPi * f * t) * 0.55f + sinf(twoPi * (f * 1.5f) * t) * 0.16f) * env;
+            float atk = (t < 0.02f) ? (t / 0.02f) : 1.0f;
+            float env = atk * expf(-t * 4.5f);
+            float f = buzzPitch + sinf(t * 8.0f) * 15.0f;
+            // Low rumbling buzz with subtle overtone
+            buzzTick = (sinf(twoPi * f * t) * 0.35f + sinf(twoPi * (f * 2.0f) * t) * 0.08f) * env;
+            // Add filtered noise texture for electrical feel
+            float nTarget = ((rand()%100) / 100.0f) * 2.0f - 1.0f;
+            static float buzzNoise = 0.0f;
+            buzzNoise = mixNoise(buzzNoise, nTarget, 0.015f);
+            buzzTick += buzzNoise * 0.06f * env;
             buzzTime += dt;
-            if(buzzTime > 0.35f) buzzTime = -1.0f;
+            if(buzzTime > 0.8f) buzzTime = -1.0f;
         }
 
+        // Knock - distant muffled thuds, like something heavy behind walls
         float knock = 0.0f;
         if(knockTime >= 0.0f){
             float tapStart = 0.0f;
-            if(knockStage == 1) tapStart = 0.13f;
-            else if(knockStage == 2) tapStart = 0.29f;
+            if(knockStage == 1) tapStart = 0.18f;
+            else if(knockStage == 2) tapStart = 0.40f;
             float localT = knockTime - tapStart;
-            if(localT >= 0.0f && localT < 0.22f){
-                float atk = (localT < 0.01f) ? (localT / 0.01f) : 1.0f;
-                float env = atk * expf(-localT * 24.0f);
-                float kf = 145.0f + 18.0f * knockStage;
-                knock += (sinf(twoPi * kf * localT) * 0.85f + sinf(twoPi * (kf * 2.2f) * localT) * 0.2f) * env;
+            if(localT >= 0.0f && localT < 0.25f){
+                float atk = (localT < 0.003f) ? (localT / 0.003f) : 1.0f;
+                float env = atk * expf(-localT * 18.0f);
+                // Low frequency thud - like distant door slam
+                float kf = 55.0f + 8.0f * knockStage;
+                knock += sinf(twoPi * kf * localT) * 0.5f * env;
+                // Body resonance
+                knock += sinf(twoPi * (kf * 1.7f) * localT) * 0.15f * expf(-localT * 25.0f);
             }
-            if(knockStage == 0 && knockTime > 0.13f) knockStage = 1;
-            if(knockStage == 1 && knockTime > 0.29f) knockStage = 2;
+            if(knockStage == 0 && knockTime > 0.18f) knockStage = 1;
+            if(knockStage == 1 && knockTime > 0.40f) knockStage = 2;
             knockTime += dt;
-            if(knockTime > 0.62f) knockTime = -1.0f;
+            if(knockTime > 0.75f) knockTime = -1.0f;
         }
 
+        // Rustle - low scratching/shuffling, not high-pitched flutter
         float rustle = 0.0f;
         if(rustleTime >= 0.0f){
             float t = rustleTime;
-            float atk = (t < 0.04f) ? (t / 0.04f) : 1.0f;
-            float env = atk * expf(-t * 4.3f);
+            float atk = (t < 0.06f) ? (t / 0.06f) : 1.0f;
+            float env = atk * expf(-t * 3.0f);
             float targetNoise = ((rand()%100) / 100.0f) * 2.0f - 1.0f;
-            rustleNoise = mixNoise(rustleNoise, targetNoise, 0.08f);
-            float flutter = sinf(twoPi * (540.0f + 40.0f * sinf(t * 5.0f)) * t) * 0.2f;
-            rustle = (rustleNoise * 0.5f + flutter) * env;
+            rustleNoise = mixNoise(rustleNoise, targetNoise, 0.04f);
+            // Low scratchy sound instead of high-pitched flutter
+            float scrape = sinf(twoPi * (80.0f + 20.0f * sinf(t * 3.0f)) * t) * 0.15f;
+            rustle = (rustleNoise * 0.25f + scrape) * env;
             rustleTime += dt;
-            if(rustleTime > 1.05f) rustleTime = -1.0f;
+            if(rustleTime > 1.5f) rustleTime = -1.0f;
         }
 
+        // Ring - deep metallic resonance, not a piercing tone
         float ring = 0.0f;
         if(ringTime >= 0.0f){
             float t = ringTime;
-            float atk = (t < 0.05f) ? (t / 0.05f) : 1.0f;
-            float env = atk * expf(-t * 2.6f);
-            float f = ringPitch + sinf(t * 2.2f) * 8.0f;
-            ring = (sinf(twoPi * f * t) * 0.55f + sinf(twoPi * (f * 1.01f) * t) * 0.45f) * env;
+            float atk = (t < 0.08f) ? (t / 0.08f) : 1.0f;
+            float env = atk * expf(-t * 1.8f);
+            float f = ringPitch + sinf(t * 1.5f) * 5.0f;
+            // Deep metallic drone with beating
+            ring = (sinf(twoPi * f * t) * 0.3f + sinf(twoPi * (f * 1.005f) * t) * 0.25f) * env;
+            // Sub harmonic for depth
+            ring += sinf(twoPi * (f * 0.5f) * t) * 0.1f * env;
             ringTime += dt;
-            if(ringTime > 1.35f) ringTime = -1.0f;
+            if(ringTime > 2.0f) ringTime = -1.0f;
         }
         
         // Footsteps - louder
@@ -254,7 +274,7 @@ inline void fillAudio(short* buf, int len) {
             if(sndState.footPhase > 0.2f) { sndState.stepTrig=false; sndState.footPhase=0; }
         }
         
-        // Flashlight switch tone (soft, no hard click peaks)
+        // Flashlight switch - mechanical click sound (low, tactile)
         float flashlightSwitch = 0;
         static float lastFlash = 0;
         if(sndState.flashlightOn != lastFlash) {
@@ -262,10 +282,13 @@ inline void fillAudio(short* buf, int len) {
             lastFlash = sndState.flashlightOn;
         }
         if(safe.flashlightEnv > 0.0001f) {
-            float swf = 420.0f + (1.0f - safe.flashlightEnv) * 180.0f;
-            flashlightSwitch = (sinf(twoPi * swf * globalPhase) * 0.26f +
-                                sinf(twoPi * swf * 1.7f * globalPhase) * 0.10f) * safe.flashlightEnv;
-            safe.flashlightEnv *= 0.965f;
+            // Low mechanical click - not a tone
+            float clickPhase = (1.0f - safe.flashlightEnv);
+            float swf = 160.0f + clickPhase * 60.0f;
+            flashlightSwitch = sinf(twoPi * swf * globalPhase) * 0.18f * safe.flashlightEnv;
+            // Add a sharp transient for the "click" feel
+            flashlightSwitch += sinf(twoPi * 90.0f * globalPhase) * 0.08f * safe.flashlightEnv * safe.flashlightEnv;
+            safe.flashlightEnv *= 0.94f;
         }
         float flashlightLoop = 0.0f;
         if(sndState.flashlightOn > 0.5f){
@@ -287,47 +310,56 @@ inline void fillAudio(short* buf, int len) {
             uiConfirmTime = 0.0f;
             sndState.uiConfirmTrig = false;
         }
+        // UI Move - soft muted thud with low tone (not a high-pitched beep)
         float uiMove = 0.0f;
         if(uiMoveTime >= 0.0f){
             float t = uiMoveTime;
-            float attack = (t < 0.012f) ? (t / 0.012f) : 1.0f;
-            float env = attack * expf(-t * 12.0f);
-            float wob = 1.0f + 0.015f * sinf(t * 30.0f);
+            float attack = (t < 0.006f) ? (t / 0.006f) : 1.0f;
+            float env = attack * expf(-t * 18.0f);
             float pitch = sndState.uiMovePitch;
-            if(pitch < 0.65f) pitch = 0.65f;
-            if(pitch > 1.55f) pitch = 1.55f;
-            float f1 = 590.0f * wob * pitch;
-            float f2 = 880.0f * pitch;
-            uiMove = (sinf(twoPi * f1 * t) * 0.55f + sinf(twoPi * f2 * t) * 0.25f) * env;
+            if(pitch < 0.8f) pitch = 0.8f;
+            if(pitch > 1.2f) pitch = 1.2f;
+            // Low, soft tone - like a muffled click/tap
+            float f1 = 220.0f * pitch;
+            float f2 = 330.0f * pitch;
+            uiMove = (sinf(twoPi * f1 * t) * 0.35f + sinf(twoPi * f2 * t) * 0.12f) * env;
+            // Add a soft thud texture
+            uiMove += sinf(twoPi * 85.0f * pitch * t) * expf(-t * 30.0f) * 0.15f;
             uiMoveTime += dt;
-            if(uiMoveTime > 0.22f) uiMoveTime = -1.0f;
+            if(uiMoveTime > 0.12f) uiMoveTime = -1.0f;
         }
         float uiConfirm = 0.0f;
+        // UI Adjust - very subtle low tick
         float uiAdjust = 0.0f;
         if(uiAdjustTime >= 0.0f){
             float t = uiAdjustTime;
-            float attack = (t < 0.008f) ? (t / 0.008f) : 1.0f;
-            float env = attack * expf(-t * 13.5f);
+            float attack = (t < 0.004f) ? (t / 0.004f) : 1.0f;
+            float env = attack * expf(-t * 22.0f);
             float pitch = sndState.uiAdjustPitch;
-            if(pitch < 0.65f) pitch = 0.65f;
-            if(pitch > 1.55f) pitch = 1.55f;
-            float f1 = (690.0f + sinf(t * 34.0f) * 14.0f) * pitch;
-            float f2 = 1030.0f * pitch;
-            uiAdjust = (sinf(twoPi * f1 * t) * 0.62f + sinf(twoPi * f2 * t) * 0.16f) * env;
+            if(pitch < 0.85f) pitch = 0.85f;
+            if(pitch > 1.15f) pitch = 1.15f;
+            // Soft, muted tick - like a physical switch
+            float f1 = 260.0f * pitch;
+            uiAdjust = sinf(twoPi * f1 * t) * 0.28f * env;
+            uiAdjust += sinf(twoPi * 120.0f * pitch * t) * expf(-t * 35.0f) * 0.12f;
             uiAdjustTime += dt;
-            if(uiAdjustTime > 0.15f) uiAdjustTime = -1.0f;
+            if(uiAdjustTime > 0.08f) uiAdjustTime = -1.0f;
         }
+        // UI Confirm - gentle low descending tone (not a harsh beep)
         if(uiConfirmTime >= 0.0f){
             float t = uiConfirmTime;
-            float attack = (t < 0.010f) ? (t / 0.010f) : 1.0f;
-            float env = attack * expf(-t * 8.2f);
-            float lerpT = t / 0.32f;
+            float attack = (t < 0.008f) ? (t / 0.008f) : 1.0f;
+            float env = attack * expf(-t * 10.0f);
+            float lerpT = t / 0.25f;
             if(lerpT > 1.0f) lerpT = 1.0f;
-            float f1 = 760.0f + (520.0f - 760.0f) * lerpT;
+            // Descending warm tone
+            float f1 = 340.0f + (240.0f - 340.0f) * lerpT;
             float f2 = f1 * 1.5f;
-            uiConfirm = (sinf(twoPi * f1 * t) * 0.75f + sinf(twoPi * f2 * t) * 0.22f) * env;
+            uiConfirm = (sinf(twoPi * f1 * t) * 0.30f + sinf(twoPi * f2 * t) * 0.08f) * env;
+            // Add sub bass thud
+            uiConfirm += sinf(twoPi * 65.0f * t) * expf(-t * 15.0f) * 0.18f;
             uiConfirmTime += dt;
-            if(uiConfirmTime > 0.32f) uiConfirmTime = -1.0f;
+            if(uiConfirmTime > 0.25f) uiConfirmTime = -1.0f;
         }
         
         // Danger sounds - progressive
@@ -383,12 +415,12 @@ inline void fillAudio(short* buf, int len) {
             if(sndState.whisperPhase > 6.28318f) sndState.whisperPhase -= 6.28318f;
         }
         
-        float roomEventsAmb = pipeTone * (0.18f + envStress * 0.24f)
-                            + ventRumble * 0.22f
-                            + rustle * (0.12f + envInsanity * 0.12f)
-                            + ring * (0.10f + envStress * 0.10f);
-        float roomEventsSfx = knock * (0.10f + envStress * 0.26f)
-                            + buzzTick * 0.11f;
+        float roomEventsAmb = pipeTone * (0.10f + envStress * 0.12f)
+                            + ventRumble * 0.14f
+                            + rustle * (0.08f + envInsanity * 0.08f)
+                            + ring * (0.07f + envStress * 0.06f);
+        float roomEventsSfx = knock * (0.08f + envStress * 0.14f)
+                            + buzzTick * 0.07f;
 
         float move = clamp01Audio(sndState.moveIntensity);
         float sprint = clamp01Audio(sndState.sprintIntensity);

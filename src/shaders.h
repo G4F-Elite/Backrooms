@@ -138,34 +138,61 @@ void main(){
   if(maxB > 0.1) res = max(res, tc * 0.15);
  }
  
- // THICK FOG - exponential falloff to hide distant LOD transitions
+ // VOLUMETRIC FOG - layered with height variation for depth
  float dist = length(vp - fp);
  
- // Exponential fog - much thicker, starts closer
- float fogDensity = 0.065;
- float fog = exp(-dist * fogDensity);
+ // Multi-layered fog for volumetric feel
+ float fogDensityBase = 0.055;
+ float fogDensityHigh = 0.075;
+ // Height-based fog density - thicker near floor
+ float heightFog = mix(fogDensityHigh, fogDensityBase, smoothstep(0.0, 2.5, fp.y));
+ float fog = exp(-dist * heightFog);
  fog = clamp(fog, 0.0, 1.0);
  
- // Soft noise without block artifacts
- float fogNoise = hash(fp * 0.17 + vec3(tm * 0.05));
- fog = fog * (0.98 + fogNoise * 0.02);
+ // Animated volumetric noise - swirling fog
+ float fogNoise1 = hash(fp * 0.13 + vec3(tm * 0.03, tm * 0.02, tm * 0.01));
+ float fogNoise2 = hash(fp * 0.07 + vec3(-tm * 0.015, tm * 0.025, tm * 0.008));
+ float fogNoise = mix(fogNoise1, fogNoise2, 0.5);
+ fog = fog * (0.94 + fogNoise * 0.06);
  
- // Darker, warmer fog color
- vec3 fogColor = vec3(0.045, 0.04, 0.035);
+ // Warm atmospheric fog color - tinted by nearby lights
+ vec3 baseFogColor = vec3(0.055, 0.048, 0.038);
+ // Warm light scatter in fog from nearby lights
+ float lightScatter = 0.0;
+ for(int i = 0; i < nl && i < 16; i++) {
+  float ld = length(lp[i] - fp);
+  lightScatter += 1.0 / (1.0 + ld * ld * 0.08) * 0.15;
+ }
+ lightScatter = min(lightScatter, 0.5);
+ vec3 fogColor = baseFogColor + vec3(0.06, 0.045, 0.02) * lightScatter;
  
- // Distance-based color desaturation (far objects lose color)
- float desat = smoothstep(8.0, 20.0, dist);
+ // Distance-based color desaturation with warm shift
+ float desat = smoothstep(6.0, 18.0, dist);
  float gray = dot(res, vec3(0.3, 0.6, 0.1));
- res = mix(res, vec3(gray), desat * 0.4);
+ vec3 desatColor = vec3(gray * 1.05, gray * 0.98, gray * 0.88); // warm desaturation
+ res = mix(res, desatColor, desat * 0.45);
  
  // Distance-based darkening before fog (smooth LOD transition)
- float distDarken = smoothstep(15.0, 25.0, dist);
- res *= (1.0 - distDarken * 0.5);
+ float distDarken = smoothstep(12.0, 22.0, dist);
+ res *= (1.0 - distDarken * 0.55);
+ 
+ // Dust particles in light beams (subtle sparkle)
+ float dustParticle = hash(fp * 1.7 + vec3(tm * 0.3));
+ float dustVisible = smoothstep(0.97, 1.0, dustParticle) * lightScatter * 2.0;
+ float dustDist = smoothstep(12.0, 2.0, dist);
+ res += vec3(0.8, 0.75, 0.5) * dustVisible * dustDist * 0.12;
  
  // Apply fog
  res = mix(fogColor, res, fog);
  
- res *= vec3(1.0, 0.97, 0.9);
+ // Atmospheric warm tint
+ res *= vec3(1.02, 0.97, 0.88);
+ 
+ // Subtle color grading - lift shadows warm, cool highlights
+ float lum = dot(res, vec3(0.3, 0.6, 0.1));
+ vec3 shadowTint = vec3(0.02, 0.015, 0.005) * (1.0 - smoothstep(0.0, 0.15, lum));
+ vec3 highlightTint = vec3(-0.005, 0.0, 0.01) * smoothstep(0.3, 0.8, lum);
+ res += shadowTint + highlightTint;
  
  // Danger red tint in environment
  if(danger > 0.3) {
@@ -369,44 +396,70 @@ void main(){
  return;
 }
 
-// Chromatic aberration
-float ab = 0.0015 * inten;
-float r = resolveSample(uv + vec2(ab,0)).r;
+// Chromatic aberration - asymmetric for realistic lens feel
+float ab = 0.0018 * inten;
+float abV = 0.0008 * inten; // slight vertical component
+float r = resolveSample(uv + vec2(ab, abV * 0.5)).r;
 float g = resolveSample(uv).g;
-float b = resolveSample(uv - vec2(ab,0)).b;
+float b = resolveSample(uv - vec2(ab, abV * 0.3)).b;
 vec3 c = vec3(r,g,b);
  if(frameGen == 1 && taaValid > 0.5){
   vec3 prev = texture(histTex, uv).rgb;
   c = mix(c, prev, clamp(frameGenBlend, 0.0, 0.6));
  }
  
- // Scanlines
- c -= sin(uv.y * 600.0 + tm * 6.0) * 0.016 * inten;
+ // Film grain - organic noise instead of sharp static
+ float grainTime = tm * 0.7;
+ float grain1 = rnd(uv * 0.8 + vec2(grainTime, grainTime * 0.73));
+ float grain2 = rnd(uv * 1.3 + vec2(grainTime * 1.1, grainTime * 0.5));
+ float filmGrain = (grain1 * 0.6 + grain2 * 0.4 - 0.5) * 0.028 * inten;
+ // Film grain is stronger in darker areas (like real film)
+ float pixelLum = dot(c, vec3(0.3, 0.6, 0.1));
+ float grainStrength = mix(1.5, 0.5, smoothstep(0.0, 0.4, pixelLum));
+ c += vec3(filmGrain) * grainStrength;
  
- // Light static noise
- c += (rnd(uv + vec2(tm,0)) - 0.5) * 0.035 * inten;
+ // Subtle scanlines - less aggressive, more like CRT phosphor
+ float scanline = sin(uv.y * 400.0 + tm * 3.0) * 0.5 + 0.5;
+ scanline = pow(scanline, 3.0) * 0.012 * inten;
+ c -= vec3(scanline);
  
- // Horizontal distortion glitch (rare)
- if(inten > 0.45 && rnd(vec2(tm * 0.08, floor(uv.y * 60))) > 0.985) {
-  float of = (rnd(vec2(tm, floor(uv.y * 60))) - 0.5) * 0.018 * inten;
+ // Horizontal distortion glitch (very rare, subtle)
+ if(inten > 0.45 && rnd(vec2(tm * 0.06, floor(uv.y * 40))) > 0.992) {
+  float of = (rnd(vec2(tm, floor(uv.y * 40))) - 0.5) * 0.012 * inten;
   c = resolveSample(uv + vec2(of, 0));
  }
  
- // Vignette - stronger to hide screen edges
- float vig = 1.0 - length(uv - 0.5) * 0.45;
- vig = smoothstep(0.3, 1.0, vig);
- c *= vig;
+ // Vignette - natural camera lens falloff
+ vec2 vigUV = uv - 0.5;
+ float vigDist = dot(vigUV, vigUV); // squared distance for natural falloff
+ float vig = 1.0 - vigDist * 0.8;
+ vig = smoothstep(0.15, 1.0, vig);
+ // Slightly warm the vignette edges
+ c.r *= mix(vig, 1.0, 0.05);
+ c.g *= vig;
+ c.b *= mix(vig, 1.0, -0.03);
  
- // Subtle light leak / haze at center
- float haze = 1.0 - length(uv - 0.5) * 1.5;
- haze = max(haze, 0.0) * 0.03 * inten;
- c += vec3(haze * 1.1, haze, haze * 0.9);
+ // Subtle warm light leak from edge (like old camera)
+ float leakAngle = atan(vigUV.y, vigUV.x);
+ float leak = sin(leakAngle * 1.5 + tm * 0.05) * 0.5 + 0.5;
+ float leakMask = smoothstep(0.35, 0.55, length(vigUV)) * leak * 0.015 * inten;
+ c += vec3(leakMask * 1.2, leakMask * 0.9, leakMask * 0.4);
  
- // Ghost frame (very subtle double image)
- c = mix(c, resolveSample(uv - vec2(0.003, 0.001)), 0.03 * inten);
+ // Ghost frame (very subtle double image with slight color shift)
+ vec3 ghost = resolveSample(uv - vec2(0.003, 0.0015));
+ c = mix(c, ghost * vec3(1.02, 0.98, 0.96), 0.025 * inten);
  
- // Warm tint
- c.g += 0.01 * inten;
+ // Cinematic color grading - warm midtones, cool shadows
+ float lumC = dot(c, vec3(0.3, 0.6, 0.1));
+ // Lift shadows slightly warm
+ c += vec3(0.012, 0.008, 0.002) * (1.0 - smoothstep(0.0, 0.2, lumC)) * inten;
+ // Warm midtones
+ c.r += 0.008 * smoothstep(0.1, 0.3, lumC) * (1.0 - smoothstep(0.3, 0.6, lumC)) * inten;
+ // Slight green in highlights (fluorescent light feel)
+ c.g += 0.005 * smoothstep(0.4, 0.8, lumC) * inten;
+ 
+ // Subtle contrast enhancement
+ c = mix(vec3(lumC), c, 1.05);
 
  if(rtxA>0){ int n=rtxA<=1?6:(rtxA<=2?10:(rtxA<=3?14:20)); c*=rtxSSAO(uv,n); }
  if(rtxG>0){ int n=rtxG<=1?6:(rtxG<=2?10:16); c+=rtxGI(uv,n)*0.18; }
