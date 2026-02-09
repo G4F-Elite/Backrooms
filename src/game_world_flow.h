@@ -16,11 +16,12 @@ void buildGeom(){
                     int wx=(pcx+dcx)*CHUNK_SIZE+lx,wz=(pcz+dcz)*CHUNK_SIZE+lz;
                     if(it->second.cells[lx][lz]!=0)continue;
                     float px=wx*CS,pz=wz*CS;
-                    const float uvTile = 2.2f;
+                    const float uvFloor = 2.2f;
+                    const float uvCeil = 0.78f;
                     bool hasHole = isFloorHoleCell(wx,wz) || isAbyssCell(wx,wz);
                     if(!hasHole){
-                        float fl[]={px,0,pz,0,0,0,1,0,px,0,pz+CS,0,uvTile,0,1,0,px+CS,0,pz+CS,uvTile,uvTile,0,1,0,
-                                   px,0,pz,0,0,0,1,0,px+CS,0,pz+CS,uvTile,uvTile,0,1,0,px+CS,0,pz,uvTile,0,0,1,0};
+                        float fl[]={px,0,pz,0,0,0,1,0,px,0,pz+CS,0,uvFloor,0,1,0,px+CS,0,pz+CS,uvFloor,uvFloor,0,1,0,
+                                   px,0,pz,0,0,0,1,0,px+CS,0,pz+CS,uvFloor,uvFloor,0,1,0,px+CS,0,pz,uvFloor,0,0,1,0};
                         for(int i=0;i<48;i++)fv.push_back(fl[i]);
                     }else{
                         const float shaftDepth = 30.0f;
@@ -33,13 +34,41 @@ void buildGeom(){
                         if(backSolid) mkShaftWall(wv,px+CS,pz,-CS,0,0,shaftDepth,CS);
                         if(frontSolid) mkShaftWall(wv,px,pz+CS,CS,0,0,shaftDepth,CS);
                     }
-                    float cl[]={px,WH,pz,0,0,0,-1,0,px,WH,pz+CS,0,uvTile,0,-1,0,px+CS,WH,pz+CS,uvTile,uvTile,0,-1,0,
-                               px,WH,pz,0,0,0,-1,0,px+CS,WH,pz+CS,uvTile,uvTile,0,-1,0,px+CS,WH,pz,uvTile,0,0,-1,0};
+                    float cl[]={px,WH,pz,0,0,0,-1,0,px,WH,pz+CS,0,uvCeil,0,-1,0,px+CS,WH,pz+CS,uvCeil,uvCeil,0,-1,0,
+                               px,WH,pz,0,0,0,-1,0,px+CS,WH,pz+CS,uvCeil,uvCeil,0,-1,0,px+CS,WH,pz,uvCeil,0,0,-1,0};
                     for(int i=0;i<48;i++)cv.push_back(cl[i]);
-                    if(getCellWorld(wx-1,wz)==1)mkWall(wv,px,pz,0,CS,WH,CS,WH);
-                    if(getCellWorld(wx+1,wz)==1)mkWall(wv,px+CS,pz+CS,0,-CS,WH,CS,WH);
-                    if(getCellWorld(wx,wz-1)==1)mkWall(wv,px+CS,pz,-CS,0,WH,CS,WH);
-                    if(getCellWorld(wx,wz+1)==1)mkWall(wv,px,pz+CS,CS,0,WH,CS,WH);
+                    bool wallL = getCellWorld(wx-1,wz)==1;
+                    bool wallR = getCellWorld(wx+1,wz)==1;
+                    bool wallB = getCellWorld(wx,wz-1)==1;
+                    bool wallF = getCellWorld(wx,wz+1)==1;
+                    if(wallL)mkWall(wv,px,pz,0,CS,WH,CS,WH);
+                    if(wallR)mkWall(wv,px+CS,pz+CS,0,-CS,WH,CS,WH);
+                    if(wallB)mkWall(wv,px+CS,pz,-CS,0,WH,CS,WH);
+                    if(wallF)mkWall(wv,px,pz+CS,CS,0,WH,CS,WH);
+
+                    if(!hasHole){
+                        bool corridorZ = wallL && wallR && !wallB && !wallF;
+                        bool corridorX = wallB && wallF && !wallL && !wallR;
+                        unsigned int doorHash = (unsigned int)(wx * 73856093u) ^ (unsigned int)(wz * 19349663u) ^ (worldSeed * 83492791u);
+                        bool spawnDoorway = (doorHash % 100u) < 7u;
+                        if(spawnDoorway && (corridorZ || corridorX)){
+                            float cxCell = px + CS * 0.5f;
+                            float czCell = pz + CS * 0.5f;
+                            float postH = WH * 0.80f;
+                            float postW = CS * 0.07f;
+                            float frameT = CS * 0.10f;
+                            float side = CS * 0.43f;
+                            if(corridorZ){
+                                mkBox(dv, cxCell - side, 0.0f, czCell, postW, postH, frameT);
+                                mkBox(dv, cxCell + side, 0.0f, czCell, postW, postH, frameT);
+                                mkBox(dv, cxCell, postH, czCell, CS * 0.98f, CS * 0.09f, frameT);
+                            }else{
+                                mkBox(dv, cxCell, 0.0f, czCell - side, frameT, postH, postW);
+                                mkBox(dv, cxCell, 0.0f, czCell + side, frameT, postH, postW);
+                                mkBox(dv, cxCell, postH, czCell, frameT, CS * 0.09f, CS * 0.98f);
+                            }
+                        }
+                    }
                 }
             }
         }

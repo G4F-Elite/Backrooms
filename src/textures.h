@@ -145,7 +145,7 @@ inline GLuint genTex(int type) {
             h = 128.0f + loopPattern * 1.5f + fiberHighlight * 0.5f - dirtAmount * 0.3f;
             
         } else if(type==2) { // ceiling - acoustic drop ceiling tiles with detailed texture
-            int tileSize = 64;
+            int tileSize = 128;
             float lx = (float)(x % tileSize);
             float ly = (float)(y % tileSize);
             
@@ -155,7 +155,7 @@ inline GLuint genTex(int type) {
             float edgeDist = fminf(dx, dy);
             
             // Metal grid frame between tiles
-            bool isFrame = (dx < 2.0f || dy < 2.0f);
+            bool isFrame = (dx < 3.0f || dy < 3.0f);
             
             if(isFrame) {
                 // Aluminum T-bar grid
@@ -171,8 +171,8 @@ inline GLuint genTex(int type) {
                 float baseColor = 225.0f;
                 
                 // Porous acoustic texture - small holes
-                float poreX = fmodf(lx * 1.7f, 6.0f);
-                float poreY = fmodf(ly * 1.7f, 6.0f);
+                float poreX = fmodf(lx * 1.15f, 9.0f);
+                float poreY = fmodf(ly * 1.15f, 9.0f);
                 float poreDist = sqrtf((poreX - 3.0f) * (poreX - 3.0f) + (poreY - 3.0f) * (poreY - 3.0f));
                 float poreDepth = (poreDist < 1.5f) ? (1.5f - poreDist) * 10.0f : 0.0f;
                 
@@ -287,7 +287,7 @@ inline GLuint genTex(int type) {
                 h = 140.0f;
             }
             
-        } else if(type==5) { // generic prop texture (metal/cardboard mix)
+        } else if(type==5) { // generic prop texture (wood/metal utility mix)
             float grains = perlin(x * 0.14f, y * 0.14f, 4) * 14.0f;
             float ridges = sinf(x * 0.22f + perlin(y * 0.07f, x * 0.05f, 2) * 2.5f) * 9.0f;
             float rust = perlin(x * 0.035f + 4.0f, y * 0.035f + 7.0f, 4);
@@ -296,10 +296,13 @@ inline GLuint genTex(int type) {
             float tape = (tapeLine > 42.0f && tapeLine < 54.0f) ? 18.0f : 0.0f;
             float panel = (fmodf((float)x, 128.0f) < 4.0f || fmodf((float)y, 128.0f) < 4.0f) ? 24.0f : 0.0f;
             float card = perlin(x * 0.09f + 6.0f, y * 0.09f + 2.0f, 3) * 10.0f;
-            r = 116.0f + grains * 0.7f + ridges * 0.2f + tape + panel * 0.2f + card - rustMask * 0.20f;
-            g = 104.0f + grains * 0.6f + ridges * 0.15f + tape * 0.8f + panel * 0.35f + card * 0.9f - rustMask * 0.42f;
-            b = 86.0f + grains * 0.5f + ridges * 0.1f + tape * 0.35f + panel * 0.50f + card * 0.5f - rustMask * 0.62f;
-            h = 122.0f + ridges * 0.55f + grains * 0.24f + panel * 0.7f;
+            float woodBands = sinf((x + perlin(y * 0.03f, x * 0.02f, 2) * 22.0f) * 0.08f) * 16.0f;
+            float knot = perlin(x * 0.045f + 2.0f, y * 0.045f + 11.0f, 4);
+            float knotMask = knot > 0.55f ? (knot - 0.55f) * 52.0f : 0.0f;
+            r = 122.0f + grains * 0.55f + ridges * 0.15f + woodBands + tape * 0.35f + panel * 0.08f + card - rustMask * 0.10f - knotMask * 0.4f;
+            g = 90.0f + grains * 0.42f + ridges * 0.10f + woodBands * 0.7f + tape * 0.22f + panel * 0.06f + card * 0.75f - rustMask * 0.18f - knotMask * 0.35f;
+            b = 58.0f + grains * 0.30f + ridges * 0.08f + woodBands * 0.35f + tape * 0.12f + panel * 0.04f + card * 0.45f - rustMask * 0.24f - knotMask * 0.28f;
+            h = 124.0f + ridges * 0.45f + grains * 0.18f + woodBands * 0.24f + knotMask * 0.32f;
         }
         
         // Clamp and store RGBA
