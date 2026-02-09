@@ -71,6 +71,8 @@ int main(){
         sndState.ambienceVol=settings.ambienceVol;
         sndState.sfxVol=settings.sfxVol;
         sndState.voiceVol=settings.voiceVol;
+        sndState.deathMode = isPlayerDead;
+        if(isSmileSilenceActive()){ sndState.musicVol*=0.08f; sndState.ambienceVol*=0.02f; sndState.voiceVol*=0.12f; }
         sndState.sanityLevel=playerSanity/100.0f;currentWinW=winW;currentWinH=winH;
         g_fastMathEnabled = settings.fastMath;
         if(gameState!=STATE_GAME){
@@ -181,6 +183,7 @@ int main(){
                 if(baitEffectTimer>0) baitEffectTimer-=dTime;
                 updateEchoSignal();
                 updateTrapCorridor();
+                if(multiState!=MULTI_IN_GAME) updateSmileEvent();
                 updatePoiRuntime();
                 if(multiState!=MULTI_IN_GAME) updateRoamEventsHost();
                 updateFloorHoles();
@@ -361,7 +364,7 @@ int main(){
         static GLint vhsSharpnessLoc=-1,vhsTexelXLoc=-1,vhsTexelYLoc=-1;
         static GLint vhsTaaHistLoc=-1,vhsTaaBlendLoc=-1,vhsTaaJitterLoc=-1,vhsTaaValidLoc=-1;
         static GLint vhsFrameGenLoc=-1,vhsFrameGenBlendLoc=-1;
-        static GLint vhsRtxALoc=-1,vhsRtxGLoc=-1,vhsRtxRLoc=-1,vhsRtxBLoc=-1,vhsDepthTexLoc=-1;
+        static GLint vhsRtxALoc=-1,vhsRtxGLoc=-1,vhsRtxRLoc=-1,vhsRtxBLoc=-1,vhsRtxDenoiseOnLoc=-1,vhsRtxDenoiseStrengthLoc=-1,vhsDepthTexLoc=-1;
         if(vhsTmLoc<0){
             glUniform1i(glGetUniformLocation(vhsShader,"tex"),0);
             vhsTmLoc=glGetUniformLocation(vhsShader,"tm"); vhsIntenLoc=glGetUniformLocation(vhsShader,"inten");
@@ -373,6 +376,7 @@ int main(){
             vhsFrameGenBlendLoc=glGetUniformLocation(vhsShader,"frameGenBlend"); vhsDepthTexLoc=glGetUniformLocation(vhsShader,"depthTex");
             vhsRtxALoc=glGetUniformLocation(vhsShader,"rtxA"); vhsRtxGLoc=glGetUniformLocation(vhsShader,"rtxG");
             vhsRtxRLoc=glGetUniformLocation(vhsShader,"rtxR"); vhsRtxBLoc=glGetUniformLocation(vhsShader,"rtxB");
+            vhsRtxDenoiseOnLoc=glGetUniformLocation(vhsShader,"rtxDenoiseOn"); vhsRtxDenoiseStrengthLoc=glGetUniformLocation(vhsShader,"rtxDenoiseStrength");
         }
         static int prevAaMode = -1;
         int aaMode = clampAaMode(settings.aaMode);
@@ -404,6 +408,7 @@ int main(){
             glBindTexture(GL_TEXTURE_2D,fboDepthTex);
             glUniform1i(vhsDepthTexLoc,2);
             glUniform1i(vhsRtxALoc,clampSsao(settings.ssaoQuality)); glUniform1i(vhsRtxGLoc,clampGi(settings.giQuality)); glUniform1i(vhsRtxRLoc,settings.godRays?1:0); glUniform1i(vhsRtxBLoc,settings.bloom?1:0);
+            glUniform1i(vhsRtxDenoiseOnLoc,settings.rtxDenoise?1:0); glUniform1f(vhsRtxDenoiseStrengthLoc,settings.rtxDenoiseStrength);
             glActiveTexture(GL_TEXTURE0);
             glUniform1f(vhsTmLoc,vhsTime);
             glUniform1f(vhsIntenLoc,vI);
@@ -464,6 +469,7 @@ int main(){
             glBindTexture(GL_TEXTURE_2D,fboDepthTex);
             glUniform1i(vhsDepthTexLoc,2);
             glUniform1i(vhsRtxALoc,clampSsao(settings.ssaoQuality)); glUniform1i(vhsRtxGLoc,clampGi(settings.giQuality)); glUniform1i(vhsRtxRLoc,settings.godRays?1:0); glUniform1i(vhsRtxBLoc,settings.bloom?1:0);
+            glUniform1i(vhsRtxDenoiseOnLoc,settings.rtxDenoise?1:0); glUniform1f(vhsRtxDenoiseStrengthLoc,settings.rtxDenoiseStrength);
             glActiveTexture(GL_TEXTURE0);
             glUniform1f(vhsTmLoc,vhsTime);
             glUniform1f(vhsIntenLoc,vI);

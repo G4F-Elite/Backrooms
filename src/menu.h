@@ -38,21 +38,23 @@ struct Settings {
     int aaMode=AA_MODE_FXAA;
     bool fastMath=false;
     int ssaoQuality=0; int giQuality=0; bool godRays=false; bool bloom=false;
+    bool rtxDenoise=true;
+    float rtxDenoiseStrength=0.65f;
     int frameGenMode=FRAME_GEN_MODE_OFF;
-    bool vsync=false;
+    bool vsync=true;
     GameplayBinds binds = {};
 };
 inline Settings settings;
 enum SettingsTab {
-    SETTINGS_TAB_AUDIO = 0,
-    SETTINGS_TAB_VIDEO = 1,
-    SETTINGS_TAB_EFFECTS = 2
+    SETTINGS_TAB_VIDEO = 0,
+    SETTINGS_TAB_EFFECTS = 1,
+    SETTINGS_TAB_AUDIO = 2
 };
-inline int settingsTab = SETTINGS_TAB_AUDIO;
+inline int settingsTab = SETTINGS_TAB_VIDEO;
 
 inline int settingsItemsForTab(int tab) {
     if(tab==SETTINGS_TAB_AUDIO) return 7;
-    if(tab==SETTINGS_TAB_EFFECTS) return 6;
+    if(tab==SETTINGS_TAB_EFFECTS) return 8;
     return 12;
 }
 inline int settingsBindsIndexForTab(int tab) {
@@ -60,7 +62,7 @@ inline int settingsBindsIndexForTab(int tab) {
 }
 inline int settingsBackIndexForTab(int tab) {
     if(tab==SETTINGS_TAB_AUDIO) return 6;
-    if(tab==SETTINGS_TAB_EFFECTS) return 5;
+    if(tab==SETTINGS_TAB_EFFECTS) return 7;
     return 11;
 }
 
@@ -301,7 +303,7 @@ inline void drawMenu(float tm) {
     char levelBuf[32];
     buildLevelLabel(gCurrentLevel, levelBuf, 32);
     drawTextCentered(levelBuf,0.0f,0.35f,2.5f,0.7f,0.65f,0.3f,0.8f);
-    const char* it[]={"START GAME","MULTIPLAYER","GUIDE","SETTINGS","QUIT"};
+    const char* it[]={"START GAME","MULTIPLAYER","SETTINGS","GUIDE","QUIT"};
     for(int i=0;i<5;i++){
         float s=(menuSel==i)?1.0f:0.5f; float y=0.10f-i*0.11f;
         float baseX = -measureTextWidthNdc(it[i], 2.0f) * 0.5f;
@@ -318,7 +320,7 @@ inline void drawGuideScreen() {
     glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     drawFullscreenOverlay(0.02f,0.02f,0.03f,0.80f);
     drawTextCentered("GUIDE",0.0f,0.58f,2.8f,0.9f,0.85f,0.4f,0.96f);
-    drawTextCentered("GOAL: COLLECT 5 NOTES AND REACH EXIT",0.0f,0.40f,1.5f,0.82f,0.86f,0.64f,0.94f);
+    drawTextCentered("GOAL: COLLECT NOTES, ATTUNE AN ECHO, THEN REACH EXIT",0.0f,0.40f,1.42f,0.82f,0.86f,0.64f,0.94f);
     drawTextCentered("ECHO SIGNAL: APPROACH AND PRESS E TO ATTUNE",0.0f,0.30f,1.38f,0.72f,0.84f,0.86f,0.92f);
     drawTextCentered("ECHO CAN HEAL, GIVE SUPPLIES OR TRIGGER BREACH",0.0f,0.22f,1.32f,0.76f,0.74f,0.86f,0.92f);
     drawTextCentered("FLOOR HOLES KILL ON FALL. AVOID DARK OPEN CELLS",0.0f,0.12f,1.34f,0.92f,0.66f,0.50f,0.94f);
@@ -338,7 +340,7 @@ inline void drawSettings(bool fp) {
     const bool audioTab = settingsTab == SETTINGS_TAB_AUDIO;
     const bool effectsTab = settingsTab == SETTINGS_TAB_EFFECTS;
     const int itemCount = settingsItemsForTab(settingsTab);
-    const char* tabN[3]={"AUDIO","VIDEO","EFFECTS"}; const char* tabB[3]={"[AUDIO]","[VIDEO]","[EFFECTS]"};
+    const char* tabN[3]={"VIDEO","EFFECTS","AUDIO"}; const char* tabB[3]={"[VIDEO]","[EFFECTS]","[AUDIO]"};
     for(int t=0;t<3;t++){ float a=settingsTab==t?1.0f:0.52f;
         drawTextCentered(settingsTab==t?tabB[t]:tabN[t],-0.30f+0.30f*t,0.44f,1.45f,0.86f*a,0.84f*a,0.58f*a,0.96f);
     }
@@ -364,13 +366,20 @@ inline void drawSettings(bool fp) {
                 drawText(b,0.58f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }
         }else if(effectsTab){
-            const char* lb[]={"SSAO","GI","GOD RAYS","BLOOM","BACK"};
+            const char* lb[]={"SSAO","GI","GOD RAYS","BLOOM","DENOISER","DENOISE STR","BACK"};
             int vi = i - 1;
             drawText(lb[vi],-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             if(vi==0) drawTextCentered(ssaoLabel(settings.ssaoQuality),rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             else if(vi==1) drawTextCentered(giLabel(settings.giQuality),rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             else if(vi==2) drawTextCentered(settings.godRays?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             else if(vi==3) drawTextCentered(settings.bloom?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            else if(vi==4) drawTextCentered(settings.rtxDenoise?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            else if(vi==5){
+                float nv=settings.rtxDenoiseStrength; if(nv>1.0f)nv=1.0f; if(nv<0.0f)nv=0.0f;
+                drawSlider(0.1f,y,0.45f,nv,0.9f*s,0.85f*s,0.4f*s);
+                char b[16]; snprintf(b,16,"%d%%",(int)(nv*100));
+                drawText(b,0.58f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            }
         }else{
             const char* lb[]={"VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","ANTI-ALIASING","FAST MATH","FRAME GEN","V-SYNC","KEY BINDS","BACK"};
             int vi = i - 1;
@@ -423,8 +432,8 @@ inline void drawPause() {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     drawFullscreenOverlay(0.02f,0.02f,0.03f,0.72f);
     drawTextCentered("PAUSED",0.0f,0.25f,3.0f,0.9f,0.85f,0.4f);
-    const char* it[]={"RESUME","GUIDE","TELEPORT EXIT","SETTINGS","MAIN MENU","QUIT"};
-    for(int i=0;i<6;i++){
+    const char* it[]={"RESUME","SETTINGS","GUIDE","MAIN MENU","QUIT"};
+    for(int i=0;i<5;i++){
         float s=(menuSel==i)?1.0f:0.5f,y=-i*0.1f;
         float baseX = -measureTextWidthNdc(it[i], 1.8f) * 0.5f;
         if(menuSel==i)drawText(">",baseX - 0.07f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);

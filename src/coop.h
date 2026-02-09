@@ -17,15 +17,19 @@ inline void updateCoopObjectiveHost(){
 }
 
 inline bool collideCoopDoor(float x, float z, float r){
-    const int notesRequired = 5;
-    if(!shouldBlockStoryDoor(
-        coop.initialized,
-        coop.doorOpen,
-        multiState,
-        MULTI_IN_GAME,
-        storyMgr.totalCollected,
-        notesRequired
-    )) return false;
+    if(multiState==MULTI_IN_GAME){
+        const int notesRequired = 5;
+        if(!shouldBlockStoryDoor(
+            coop.initialized,
+            coop.doorOpen,
+            multiState,
+            MULTI_IN_GAME,
+            storyMgr.totalCollected,
+            notesRequired
+        )) return false;
+    }else{
+        if(!coop.initialized || isStoryExitReady()) return false;
+    }
     return fabsf(x - coop.doorPos.x) < (CS * 0.6f + r) && fabsf(z - coop.doorPos.z) < (CS * 0.2f + r);
 }
 

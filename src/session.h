@@ -64,6 +64,18 @@ struct AbyssLocation {
     bool active;
 };
 
+struct SmileEventState {
+    bool eyeActive;
+    Vec3 eyePos;
+    float eyeLookTime;
+    float eyeLife;
+    float nextSpawnTimer;
+    bool corridorActive;
+    Vec3 returnPos;
+    Vec3 corridorEnd;
+    float corridorTime;
+};
+
 std::vector<WorldItem> worldItems;
 std::vector<FloorHole> floorHoles;
 AbyssLocation abyss = {};
@@ -81,8 +93,11 @@ EchoSignal echoSignal = {};
 float echoSpawnTimer = 14.0f;
 float echoStatusTimer = 0.0f;
 char echoStatusText[96] = {};
+bool storyEchoAttuned = false;
+int storyEchoAttunedCount = 0;
 TrapCorridorState trapCorridor = {};
 DebugToolsState debugTools = {};
+SmileEventState smileEvent = {false, Vec3(0,0,0), 0.0f, 0.0f, 28.0f, false, Vec3(0,0,0), Vec3(0,0,0), 0.0f};
 float anomalyBlur = 0.0f;
 float trapStatusTimer = 0.0f;
 char trapStatusText[96] = {};
@@ -182,7 +197,7 @@ inline void initCoopObjectives(const Vec3& basePos){
     int baseWZ = (int)floorf(basePos.z / CS);
 
     int doorWX = baseWX;
-    int doorWZ = baseWZ + 4;
+    int doorWZ = baseWZ + 12;
     if (!findNearestCell(doorWX, doorWZ, 16, validDoorCell, doorWX, doorWZ)) {
         if (!findNearestCell(baseWX, baseWZ, 34, validDoorCell, doorWX, doorWZ)) {
             if (!findNearestCell(baseWX, baseWZ, 12, openCell, doorWX, doorWZ)) {
@@ -271,4 +286,12 @@ inline void setEchoStatus(const char* msg){
 inline void setTrapStatus(const char* msg){
     snprintf(trapStatusText, sizeof(trapStatusText), "%s", msg);
     trapStatusTimer = 4.0f;
+}
+
+inline int storyNotesRequired(){
+    return 5;
+}
+
+inline bool isStoryExitReady(){
+    return storyMgr.totalCollected >= storyNotesRequired() && (storyEchoAttuned || trapCorridor.resolved);
 }

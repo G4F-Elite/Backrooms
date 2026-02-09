@@ -26,6 +26,7 @@ inline char multiNickname[PLAYER_NAME_BUF_LEN] = "Player";
 inline int multiNetworkMode = 0; // 0 LAN, 1 DEDICATED
 inline char multiMasterIP[64] = "127.0.0.1";
 inline char multiMasterPort[8] = "27017";
+inline char multiConnectStatus[128] = "";
 
 // Draw multiplayer main menu
 inline void drawMultiMenuScreen(float tm) {
@@ -136,6 +137,9 @@ inline void drawJoinMenuScreen(float tm) {
             drawText(targetLine, -0.58f, -1.06f, 1.1f, 0.72f, 0.85f, 0.62f, 0.82f);
         }
     }
+    if (multiConnectStatus[0]) {
+        drawText(multiConnectStatus, -0.58f, -1.13f, 1.04f, 0.90f, 0.66f, 0.46f, 0.90f);
+    }
     
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
@@ -220,6 +224,7 @@ inline void drawWaitingScreen(float tm) {
     }
     
     drawTextCentered("PRESS ESC TO DISCONNECT", 0.0f, -0.7f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);
+    if(multiConnectStatus[0]) drawTextCentered(multiConnectStatus, 0.0f, -0.78f, 1.05f, 0.90f, 0.66f, 0.46f, 0.88f);
     
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
@@ -238,8 +243,8 @@ inline void drawMultiPause(int playerCount) {
     snprintf(buf, 32, "PLAYERS: %d", playerCount);
     drawTextCentered(buf, 0.0f, 0.2f, 1.5f, 0.5f, 0.7f, 0.5f, 0.7f);
     
-    const char* opts[] = {"RESUME", "TELEPORT TO PLAYER", "TELEPORT TO EXIT", "GUIDE", "SETTINGS", "DISCONNECT", "QUIT"};
-    for (int i = 0; i < 7; i++) {
+    const char* opts[] = {"RESUME", "TELEPORT TO PLAYER", "SETTINGS", "GUIDE", "DISCONNECT", "QUIT"};
+    for (int i = 0; i < 6; i++) {
         float s = (menuSel == i) ? 1.0f : 0.5f;
         float y = 0.0f - i * 0.1f;
         if (menuSel == i) drawText(">", -0.35f, y, 1.8f, 0.9f * s, 0.85f * s, 0.4f * s);

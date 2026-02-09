@@ -11,6 +11,10 @@ inline bool isSliderItem(int tab, int sel) {
         int vi = sel - 1;
         return vi == 0 || vi == 1 || vi == 4; // VHS, mouse sens, FSR sharp
     }
+    if(tab == SETTINGS_TAB_EFFECTS) {
+        int vi = sel - 1;
+        return vi == 5; // denoiser strength
+    }
     return false;
 }
 
@@ -33,6 +37,9 @@ inline void applySliderInputValue() {
         if(vi == 0) settings.vhsIntensity = nv;
         else if(vi == 1) settings.mouseSens = nv * 0.006f;
         else if(vi == 4) settings.fsrSharpness = nv;
+    } else if(sliderInputTab == SETTINGS_TAB_EFFECTS) {
+        int vi = sliderInputItem - 1;
+        if(vi == 5) settings.rtxDenoiseStrength = nv;
     }
     sliderInputActive = false;
     sliderInputLen = 0;
@@ -138,6 +145,8 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
         if(vi==1){ settings.giQuality=stepGi(settings.giQuality,dir); return true; }
         if(vi==2){ settings.godRays=!settings.godRays; return true; }
         if(vi==3){ settings.bloom=!settings.bloom; return true; }
+        if(vi==4){ settings.rtxDenoise=!settings.rtxDenoise; return true; }
+        if(vi==5){ settings.rtxDenoiseStrength += 0.05f*(float)dir; if(settings.rtxDenoiseStrength<0.0f)settings.rtxDenoiseStrength=0.0f; if(settings.rtxDenoiseStrength>1.0f)settings.rtxDenoiseStrength=1.0f; return true; }
         return false;
     };
 

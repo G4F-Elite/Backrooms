@@ -101,6 +101,11 @@ void buildGeom(){
         if(poi.type==MAP_POI_OFFICE){
             mkBox(dv, poi.pos.x, 0.0f, poi.pos.z, 1.00f, 0.22f, 1.00f);
             mkBox(dv, poi.pos.x, 0.22f, poi.pos.z - 0.32f, 0.92f, 0.62f, 0.10f);
+            mkBox(dv, poi.pos.x - 0.52f, 0.0f, poi.pos.z + 0.42f, 0.62f, 0.84f, 0.40f);
+            mkBox(dv, poi.pos.x + 0.52f, 0.0f, poi.pos.z + 0.42f, 0.62f, 0.84f, 0.40f);
+            mkBox(dv, poi.pos.x, 0.84f, poi.pos.z + 0.12f, 0.52f, 0.08f, 0.18f);
+            mkBox(dv, poi.pos.x - 0.22f, 0.0f, poi.pos.z - 0.68f, 0.18f, 0.64f, 0.18f);
+            mkBox(dv, poi.pos.x + 0.22f, 0.0f, poi.pos.z - 0.68f, 0.18f, 0.64f, 0.18f);
         }else if(poi.type==MAP_POI_SERVER){
             mkBox(dv, poi.pos.x - 0.32f, 0.0f, poi.pos.z, 0.26f, 1.45f, 0.26f);
             mkBox(dv, poi.pos.x + 0.32f, 0.0f, poi.pos.z, 0.26f, 1.45f, 0.26f);
@@ -121,8 +126,7 @@ void buildGeom(){
             float leverX = sp.x + (coop.switchOn[s] ? 0.14f : -0.14f);
             mkBox(dv, leverX, 0.88f, sp.z, 0.28f, 0.10f, 0.10f);
         }
-        const int notesRequired = 5;
-        bool storyExitReady = storyMgr.totalCollected >= notesRequired;
+        bool storyExitReady = isStoryExitReady();
         bool doorOpenVisual = (multiState==MULTI_IN_GAME) ? coop.doorOpen : storyExitReady;
         const Vec3 dp = coop.doorPos;
         mkBox(dv, dp.x - CS * 0.58f, 0.0f, dp.z, 0.16f, 2.82f, 0.36f);
@@ -251,6 +255,14 @@ void genWorld(){
 
     resetPlayerInterpolation();
     initCoopObjectives(coopBase);
+    {
+        Vec3 d = cam.pos - coop.doorPos;
+        d.y = 0.0f;
+        if(d.len() < 8.0f){
+            Vec3 alt = findSpawnPos(coop.doorPos, 14.0f);
+            cam.pos = Vec3(alt.x, PH, alt.z);
+        }
+    }
     worldItems.clear();
     nextWorldItemId = 1;
     invBattery = invMedkit = invBait = 0;
@@ -258,13 +270,16 @@ void genWorld(){
     echoSpawnTimer = 7.0f + (float)(rng()%6);
     echoStatusTimer = 0.0f;
     echoStatusText[0] = '\0';
+    storyEchoAttuned = false;
+    storyEchoAttunedCount = 0;
     trapStatusTimer = 0.0f;
     trapStatusText[0] = '\0';
+    smileEvent = {false, Vec3(0,0,0), 0.0f, 0.0f, 24.0f + (float)(rng()%16), false, Vec3(0,0,0), Vec3(0,0,0), 0.0f};
     anomalyBlur = 0.0f;
     lightsOutTimer = falseDoorTimer = 0.0f;
     baitEffectTimer = 0.0f;
     itemSpawnTimer = 6.0f;
-    playerHealth=playerSanity=playerStamina=100;
+    playerHealth=playerSanity=100; playerStamina=125;
     flashlightBattery=100;flashlightOn=false;isPlayerDead=false;
     playerEscaped=false;
     flashlightShutdownBlinkActive = false;

@@ -6,10 +6,7 @@
 #include <cstring>
 #include "audio_dsp.h"
 
-const int SAMP_RATE=44100;
-const int BUF_COUNT=3;
-// Smaller audio blocks reduce menu SFX input latency.
-const int BUF_LEN=1024;
+const int SAMP_RATE=44100, BUF_COUNT=3, BUF_LEN=1024;
 
 struct SoundState {
     float humPhase=0;
@@ -43,12 +40,12 @@ struct SoundState {
     float lowStamina=0.0f;
     float monsterProximity=0.0f;
     float monsterMenace=0.0f;
+    bool deathMode=false;
 };
 
 extern SoundState sndState;
 extern std::atomic<bool> audioRunning;
 extern HANDLE hEvent;
-
 inline float carpetStep(float t) {
     float thud = sinf(t * 55.0f) * expf(-t * 35.0f) * 1.2f;
     float rustle = sinf(t * 30.0f) * expf(-t * 50.0f) * 0.4f;
@@ -60,7 +57,6 @@ inline float clamp01Audio(float v) {
     if (v > 1.0f) return 1.0f;
     return v;
 }
-
 inline void updateGameplayAudioState(float moveIntensity, float sprintIntensity, float staminaNorm, float monsterProximity, float monsterMenace) {
     sndState.moveIntensity = clamp01Audio(moveIntensity);
     sndState.sprintIntensity = clamp01Audio(sprintIntensity);
@@ -89,6 +85,9 @@ inline void fillAudio(short* buf, int len) {
     static float runPhase = 0.0f;
     static float runNoise = 0.0f;
     static float monsterPhase = 0.0f;
+    static float deathPhase = 0.0f;
+    static float deathImpact = -1.0f;
+    static bool lastDeathMode = false;
     const float dt = 1.0f / (float)SAMP_RATE;
     const float twoPi = 6.283185307f;
     for(int i=0;i<len;i++) {
@@ -453,7 +452,7 @@ inline void fillAudio(short* buf, int len) {
         }
 
         float monsterTone = 0.0f;
-        if(monsterProx > 0.03f){
+        if(!sndState.deathMode && monsterProx > 0.03f){
             float freq = 34.0f + monsterMenace * 18.0f;
             monsterPhase += dt * (0.5f + monsterProx * 1.9f);
             if(monsterPhase > 1.0f) monsterPhase -= 1.0f;
@@ -464,11 +463,33 @@ inline void fillAudio(short* buf, int len) {
             monsterTone = (baseGrowl + overGrowl) * monsterProx * (0.5f + monsterMenace * 0.7f) * pulse;
         }
 
+        float deathTone = 0.0f;
+        if(sndState.deathMode){
+            deathPhase += dt * 0.11f;
+            if(deathPhase > 1.0f) deathPhase -= 1.0f;
+            float d0 = sinf(twoPi * deathPhase * 44.0f) * 0.11f;
+            float d1 = sinf(twoPi * deathPhase * 22.0f) * 0.18f;
+            deathTone = d0 + d1;
+            if(!lastDeathMode) deathImpact = 0.0f;
+        }
+        if(deathImpact >= 0.0f){
+            float imp = expf(-deathImpact * 3.4f);
+            deathTone += sinf(twoPi * 130.0f * deathImpact) * imp * 0.35f;
+            deathImpact += dt;
+            if(deathImpact > 1.2f) deathImpact = -1.0f;
+        }
+        lastDeathMode = sndState.deathMode;
+
         float ambienceMix = hum*sndState.humVol + amb + distant + roomEventsAmb;
         float sfxMix = step + runBed + scare + flashlightSwitch + flashlightLoop + roomEventsSfx;
         float uiMix = (uiMove + uiAdjust + uiConfirm) * (0.45f + 0.55f * sndState.sfxVol);
         float voiceMix = insane + breath;
-        float musicMix = creepy + monsterTone;
+        float musicMix = sndState.deathMode ? deathTone : (creepy + monsterTone);
+        if(sndState.deathMode){
+            ambienceMix *= 0.15f;
+            sfxMix *= 0.12f;
+            voiceMix *= 0.08f;
+        }
         float v =
             (ambienceMix * sndState.ambienceVol +
              sfxMix * sndState.sfxVol +

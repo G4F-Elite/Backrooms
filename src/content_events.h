@@ -49,7 +49,7 @@ inline bool isEchoInRange(const Vec3& playerPos, const Vec3& echoPos, float rang
 inline void clampVitals(float& hp, float& sanity, float& stamina) {
     if (hp > 100.0f) hp = 100.0f;
     if (sanity > 100.0f) sanity = 100.0f;
-    if (stamina > 100.0f) stamina = 100.0f;
+    if (stamina > 125.0f) stamina = 125.0f;
     if (hp < 0.0f) hp = 0.0f;
     if (sanity < 0.0f) sanity = 0.0f;
     if (stamina < 0.0f) stamina = 0.0f;

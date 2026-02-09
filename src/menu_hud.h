@@ -25,10 +25,10 @@ inline void drawDamageOverlay(float fl,float hp) {
 }
 
 inline void drawStaminaBar(float st) {
-    if(st >= 99.0f) return;
+    if(st >= 124.0f) return;
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    char b[21]; int f=(int)(st/5); for(int i=0;i<20;i++)b[i]=(i<f)?'>':' '; b[20]=0;
-    float yc=(st<20)?0.5f+0.3f*sinf((float)rand()/500.0f):0.7f;
+    char b[21]; int f=(int)(st/6.25f); for(int i=0;i<20;i++)b[i]=(i<f)?'>':' '; b[20]=0;
+    float yc=(st<25)?0.5f+0.3f*sinf((float)rand()/500.0f):0.7f;
     drawText("ST:",-0.95f,-0.78f,1.7f,0.3f,0.6f*yc,0.3f,0.8f); drawText(b,-0.80f,-0.78f,1.7f,0.3f,0.6f*yc,0.3f,0.7f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
@@ -44,7 +44,7 @@ inline void drawFlashlightBattery(float battery, bool isOn) {
 inline void drawNoteCounter(int count) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     char b[16]; snprintf(b,16,"NOTES: %d/5",count);
-    drawText(b,-0.95f,0.9f,1.65f,0.6f,0.55f,0.35f,0.7f);
+    drawText(b,-0.95f,-0.66f,1.5f,0.72f,0.68f,0.46f,0.84f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 

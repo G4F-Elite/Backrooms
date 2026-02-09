@@ -3,6 +3,7 @@
 #include "coop.h"
 #include "perf_overlay.h"
 #include "progression.h"
+#include "smile_event.h"
 
 inline void drawHudText(const char* s, float x, float y, float sc, float r, float g, float b, float a = 0.95f) {
     drawText(s, x - 0.002f, y - 0.002f, sc, 0.0f, 0.0f, 0.0f, a * 0.72f);
@@ -81,15 +82,17 @@ void drawUI(){
                 if(!coop.doorOpen) drawHudText("ACTION HOLD 2 SWITCHES",blockX,blockY,1.02f,0.82f,0.86f,0.62f,0.90f);
                 blockY -= 0.06f;
             }else{
-                const int notesRequired = 5;
-                bool exitReady = storyMgr.totalCollected >= notesRequired;
+                const int notesRequired = storyNotesRequired();
+                bool exitReady = isStoryExitReady();
                 char notesLine[64];
                 snprintf(notesLine,64,"NOTES %d/%d",storyMgr.totalCollected,notesRequired);
                 drawHudText(notesLine,blockX,blockY,1.18f,0.86f,0.90f,0.68f,0.95f);
                 blockY -= 0.06f;
+                drawHudText(storyEchoAttuned?"ECHO ATTUNED":"ECHO NOT ATTUNED",blockX,blockY,1.08f,0.72f,0.86f,0.90f,0.93f);
+                blockY -= 0.06f;
                 drawHudText(exitReady?"EXIT DOOR READY":"EXIT DOOR LOCKED",blockX,blockY,1.16f,0.88f,0.84f,0.62f,0.95f);
                 blockY -= 0.06f;
-                drawHudText(exitReady?"ACTION GO TO DOOR AND PRESS E":"ACTION FIND MORE NOTES",blockX,blockY,1.02f,0.82f,0.86f,0.62f,0.90f);
+                drawHudText(exitReady?"ACTION GO TO DOOR AND PRESS E":"ACTION NOTES + ECHO REQUIRED",blockX,blockY,1.02f,0.82f,0.86f,0.62f,0.90f);
                 blockY -= 0.06f;
             }
             char phaseBuf[64];
@@ -116,8 +119,8 @@ void drawUI(){
             if(multiState!=MULTI_IN_GAME){
                 bool nearExit = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
                 if(nearExit){
-                    if(storyMgr.totalCollected>=5) drawHudTextCentered("[E] EXIT LEVEL",0.0f,-0.35f,1.4f,0.75f,0.88f,0.70f,0.95f);
-                    else drawHudTextCentered("COLLECT 5 NOTES TO UNLOCK EXIT",0.0f,-0.35f,1.3f,0.88f,0.72f,0.58f,0.93f);
+                    if(isStoryExitReady()) drawHudTextCentered("[E] EXIT LEVEL",0.0f,-0.35f,1.4f,0.75f,0.88f,0.70f,0.95f);
+                    else drawHudTextCentered("COLLECT NOTES + ATTUNE ECHO TO UNLOCK EXIT",0.0f,-0.35f,1.2f,0.88f,0.72f,0.58f,0.93f);
                 }
             }else{
                 bool nearExit = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
@@ -146,6 +149,22 @@ void drawUI(){
             }
             if(multiState!=MULTI_IN_GAME && echoStatusTimer>0.0f){
                 drawHudTextCentered(echoStatusText,0.0f,0.62f,1.18f,0.7f,0.86f,0.9f,0.92f);
+            }
+            if(smileEvent.corridorActive){
+                drawFullscreenOverlay(0.20f,0.02f,0.02f,0.18f);
+                drawHudTextCentered("RED CORRIDOR. MOVE TO THE END.",0.0f,0.70f,1.18f,0.92f,0.46f,0.40f,0.95f);
+            }else if(smileEvent.eyeActive){
+                float sx = 0.0f, sy = 0.0f;
+                if(projectToScreen(smileEvent.eyePos, sx, sy)){
+                    drawHudTextCentered("EYE",sx,sy,1.14f,0.90f,0.42f,0.38f,0.95f);
+                }else{
+                    Vec3 rightHint(mCos(cam.yaw), 0.0f, -mSin(cam.yaw));
+                    Vec3 eyeDir = smileEvent.eyePos - cam.pos;
+                    eyeDir.y = 0.0f;
+                    float side = rightHint.dot(eyeDir);
+                    if(side >= 0.0f) drawHudText(">> EYE",0.76f,0.28f,1.18f,0.90f,0.42f,0.38f,0.95f);
+                    else drawHudText("EYE <<",-0.95f,0.28f,1.18f,0.90f,0.42f,0.38f,0.95f);
+                }
             }
             if(minimapEnabled) drawMinimapOverlay();
             if(storyMgr.hasHallucinations())drawHallucinationEffect((50.0f-playerSanity)/50.0f);
@@ -204,6 +223,9 @@ void drawUI(){
             }
             if(debugTools.flyMode){
                 drawHudText("DEBUG FLY: ON",0.52f,0.95f,1.10f,0.78f,0.95f,0.85f,0.98f);
+            }
+            if(debugTools.infiniteStamina){
+                drawHudText("DEBUG STAMINA: INF",0.52f,0.90f,1.02f,0.75f,0.92f,0.78f,0.96f);
             }
             if(multiState==MULTI_IN_GAME && netMgr.connectionUnstable((float)glfwGetTime())){
                 drawHudTextCentered("NETWORK UNSTABLE - RECONNECTING MAY OCCUR",0.0f,0.74f,1.12f,0.95f,0.64f,0.44f,0.95f);

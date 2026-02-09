@@ -183,6 +183,9 @@ inline void updateEchoSignal(){
 
 inline void resolveEchoInteraction(){
     if(!echoSignal.active || multiState==MULTI_IN_GAME) return;
+    bool firstAttune = !storyEchoAttuned;
+    storyEchoAttuned = true;
+    storyEchoAttunedCount++;
     bool breach = false;
     applyEchoOutcome(
         echoSignal.type,
@@ -201,6 +204,9 @@ inline void resolveEchoInteraction(){
         setEchoStatus("ECHO RESONANCE: VITALS RESTORED");
     }else{
         setEchoStatus("ECHO BREACH: HOSTILE SURGE");
+    }
+    if(firstAttune){
+        setTrapStatus("OBJECTIVE UPDATED: EXIT RESONANCE CALIBRATED.");
     }
     if(breach){
         triggerLocalScare(0.30f, 0.17f, 8.0f);

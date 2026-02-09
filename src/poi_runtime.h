@@ -22,7 +22,7 @@ inline void applyPoiLoot(const MapPoi& poi) {
     }
     if (poi.type == MAP_POI_RESTROOM) {
         playerStamina += 15.0f;
-        if (playerStamina > 100.0f) playerStamina = 100.0f;
+        if (playerStamina > 125.0f) playerStamina = 125.0f;
     }
     setEchoStatus("POI DISCOVERED: SUPPLIES FOUND");
 }

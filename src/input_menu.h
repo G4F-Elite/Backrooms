@@ -7,7 +7,7 @@ inline void menuInput(GLFWwindow* w) {
     bool enter = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_SPACE) == GLFW_PRESS;
     
     if (gameState == STATE_MENU) {
-        // Main menu: START GAME, MULTIPLAYER, GUIDE, SETTINGS, QUIT (5 items: 0-4)
+        // Main menu: START GAME, MULTIPLAYER, SETTINGS, GUIDE, QUIT (5 items: 0-4)
         if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 4; triggerMenuNavigateSound(); }
         if (down && !downPressed) { menuSel++; if (menuSel > 4) menuSel = 0; triggerMenuNavigateSound(); }
         if (enter && !enterPressed) {
@@ -23,15 +23,15 @@ inline void menuInput(GLFWwindow* w) {
                 menuSel = 0; 
             }
             else if (menuSel == 2) { 
+                // Settings
+                settingsTab = SETTINGS_TAB_VIDEO;
+                gameState = STATE_SETTINGS; 
+                menuSel = 0; 
+            }
+            else if (menuSel == 3) { 
                 // Guide screen
                 guideReturnToPause = false;
                 gameState = STATE_GUIDE;
-            }
-            else if (menuSel == 3) { 
-                // Settings
-                settingsTab = SETTINGS_TAB_AUDIO;
-                gameState = STATE_SETTINGS; 
-                menuSel = 0; 
             }
             else { 
                 // Quit
@@ -44,17 +44,17 @@ inline void menuInput(GLFWwindow* w) {
             triggerMenuConfirmSound();
             if(guideReturnToPause){
                 gameState = STATE_PAUSE;
-                menuSel = (multiState == MULTI_IN_GAME) ? 3 : 1;
+                menuSel = (multiState == MULTI_IN_GAME) ? 3 : 2;
             }else{
                 gameState = STATE_MENU;
-                menuSel = 2;
+                menuSel = 3;
             }
         }
     }
     else if (gameState == STATE_PAUSE) {
         if (multiState == MULTI_IN_GAME) {
-            if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 6; triggerMenuNavigateSound(); }
-            if (down && !downPressed) { menuSel++; if (menuSel > 6) menuSel = 0; triggerMenuNavigateSound(); }
+            if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 5; triggerMenuNavigateSound(); }
+            if (down && !downPressed) { menuSel++; if (menuSel > 5) menuSel = 0; triggerMenuNavigateSound(); }
             if (esc && !escPressed) { 
                 triggerMenuConfirmSound();
                 gameState = STATE_GAME; 
@@ -76,22 +76,15 @@ inline void menuInput(GLFWwindow* w) {
                     firstMouse = true;
                 }
                 else if (menuSel == 2) { 
-                    extern void teleportToExit();
-                    teleportToExit();
-                    gameState = STATE_GAME;
-                    glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-                    firstMouse = true;
+                    settingsTab = SETTINGS_TAB_VIDEO;
+                    gameState = STATE_SETTINGS_PAUSE; 
+                    menuSel = 0; 
                 }
                 else if (menuSel == 3) {
                     guideReturnToPause = true;
                     gameState = STATE_GUIDE;
                 }
                 else if (menuSel == 4) { 
-                    settingsTab = SETTINGS_TAB_AUDIO;
-                    gameState = STATE_SETTINGS_PAUSE; 
-                    menuSel = 0; 
-                }
-                else if (menuSel == 5) { 
                     // Disconnect
                     netMgr.shutdown();
                     lanDiscovery.stop();
@@ -104,8 +97,8 @@ inline void menuInput(GLFWwindow* w) {
                 }
             }
         } else {
-            if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 5; triggerMenuNavigateSound(); }
-            if (down && !downPressed) { menuSel++; if (menuSel > 5) menuSel = 0; triggerMenuNavigateSound(); }
+            if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 4; triggerMenuNavigateSound(); }
+            if (down && !downPressed) { menuSel++; if (menuSel > 4) menuSel = 0; triggerMenuNavigateSound(); }
             if (esc && !escPressed) { 
                 triggerMenuConfirmSound();
                 gameState = STATE_GAME; 
@@ -120,22 +113,15 @@ inline void menuInput(GLFWwindow* w) {
                     firstMouse = true; 
                 }
                 else if (menuSel == 1) { 
-                    guideReturnToPause = true;
-                    gameState = STATE_GUIDE;
-                }
-                else if (menuSel == 2) {
-                    extern void teleportToExit();
-                    teleportToExit();
-                    gameState = STATE_GAME;
-                    glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-                    firstMouse = true;
-                }
-                else if (menuSel == 3) { 
-                    settingsTab = SETTINGS_TAB_AUDIO;
+                    settingsTab = SETTINGS_TAB_VIDEO;
                     gameState = STATE_SETTINGS_PAUSE; 
                     menuSel = 0; 
                 }
-                else if (menuSel == 4) { 
+                else if (menuSel == 2) { 
+                    guideReturnToPause = true;
+                    gameState = STATE_GUIDE;
+                }
+                else if (menuSel == 3) { 
                     // Main menu
                     extern void genWorld();
                     extern void buildGeom();
@@ -160,6 +146,7 @@ inline void menuInput(GLFWwindow* w) {
         if (tabNow && !tabPressed) multiEditingNickname = !multiEditingNickname;
         if (modeSwitchNow && !modeSwitchPressed) {
             multiNetworkMode = (multiNetworkMode == 0) ? 1 : 0;
+            multiConnectStatus[0] = 0;
             triggerMenuAdjustSound();
         }
         tabPressed = tabNow;
@@ -290,6 +277,7 @@ inline void menuInput(GLFWwindow* w) {
             multiNetworkMode = (multiNetworkMode == 0) ? 1 : 0;
             multiIPManualEdit = false;
             multiMasterManualEdit = false;
+            multiConnectStatus[0] = 0;
             if (multiNetworkMode == 0) {
                 dedicatedDirectory.stop();
                 lanDiscovery.startClient();
@@ -453,6 +441,7 @@ inline void menuInput(GLFWwindow* w) {
                 // Connect to host - go to waiting lobby
                 char fullAddr[64];
                 snprintf(fullAddr, 64, "%s", multiJoinIP);
+                multiConnectStatus[0] = 0;
                 netMgr.init();
                 if (netMgr.joinGame(fullAddr, multiNickname)) {
                     lanDiscovery.stop();
@@ -492,6 +481,8 @@ inline void menuInput(GLFWwindow* w) {
                 multiState = MULTI_NONE;
                 gameState = STATE_MULTI_JOIN;
                 menuSel = 0;
+                if(multiNetworkMode==0) snprintf(multiConnectStatus,sizeof(multiConnectStatus),"LAN blocked or host unreachable. Try SERVERS tab.");
+                else snprintf(multiConnectStatus,sizeof(multiConnectStatus),"Server unreachable. Check MASTER IP/PORT.");
             }
         }
     }

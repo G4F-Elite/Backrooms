@@ -13,6 +13,7 @@ void testClampDebugActionIndex() {
 
 void testDebugActionLabels() {
     assert(std::string(debugActionLabel(DEBUG_ACT_TOGGLE_FLY)) == "TOGGLE FLY");
+    assert(std::string(debugActionLabel(DEBUG_ACT_TOGGLE_INFINITE_STAMINA)) == "INFINITE STAMINA");
     assert(std::string(debugActionLabel(DEBUG_ACT_FORCE_SUPPLY)) == "FORCE SUPPLY CACHE");
 }
 
