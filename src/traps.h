@@ -127,16 +127,60 @@ inline bool isFallCell(int wx, int wz){
 
 inline void spawnFloorHoleEvent(const Vec3& around, int count, float ttl){
     clearFloorHoles();
-    int cx = (int)floorf(around.x / CS);
-    int cz = (int)floorf(around.z / CS);
+    Vec3 targets[MAX_PLAYERS + 1];
+    int targetCount = 0;
+    targets[targetCount++] = around;
+    if(multiState == MULTI_IN_GAME){
+        for(int p=0; p<MAX_PLAYERS; p++){
+            if(p == netMgr.myId || !netMgr.players[p].active || !netMgr.players[p].hasValidPos) continue;
+            targets[targetCount++] = netMgr.players[p].pos;
+            if(targetCount >= MAX_PLAYERS + 1) break;
+        }
+    }
+
+    auto tooCloseToAnyPlayer = [&](int wx, int wz) {
+        for(int i=0; i<targetCount; i++){
+            int px = (int)floorf(targets[i].x / CS);
+            int pz = (int)floorf(targets[i].z / CS);
+            int dx = abs(wx - px);
+            int dz = abs(wz - pz);
+            if(dx <= 2 && dz <= 2) return true;
+        }
+        return false;
+    };
+
     int attempts = 0;
     while((int)floorHoles.size() < count && attempts < count * 40){
         attempts++;
-        int wx = cx + ((int)(rng()%18) - 9);
-        int wz = cz + ((int)(rng()%18) - 9);
+        int ti = (targetCount > 1) ? (int)(rng() % (std::uint32_t)targetCount) : 0;
+        int cx = (int)floorf(targets[ti].x / CS);
+        int cz = (int)floorf(targets[ti].z / CS);
+
+        int radius = 3 + (int)(rng() % 4); // 3..6 cells away
+        int ox = (int)(rng() % (std::uint32_t)(radius * 2 + 1)) - radius;
+        int oz = (int)(rng() % (std::uint32_t)(radius * 2 + 1)) - radius;
+        if(ox == 0 && oz == 0) continue;
+        int wx = cx + ox;
+        int wz = cz + oz;
+
+        if(abs(ox) + abs(oz) < 3) continue;
         if(getCellWorld(wx, wz) != 0) continue;
-        if(abs(wx - cx) <= 1 && abs(wz - cz) <= 1) continue;
+        if(tooCloseToAnyPlayer(wx, wz)) continue;
         if(isFloorHoleCell(wx, wz)) continue;
+
+        bool nearSomeone = false;
+        for(int i=0; i<targetCount; i++){
+            int px = (int)floorf(targets[i].x / CS);
+            int pz = (int)floorf(targets[i].z / CS);
+            int dx = abs(wx - px);
+            int dz = abs(wz - pz);
+            if(dx <= 6 && dz <= 6){
+                nearSomeone = true;
+                break;
+            }
+        }
+        if(!nearSomeone) continue;
+
         FloorHole h{};
         h.wx = wx;
         h.wz = wz;

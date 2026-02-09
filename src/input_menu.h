@@ -196,10 +196,8 @@ inline void menuInput(GLFWwindow* w) {
                     lanDiscovery.requestScan();
                     dedicatedDirectory.stop();
                 } else {
-                    int mPort = backrooms::protocol::kDefaultMasterPort;
-                    if (std::sscanf(multiMasterPort, "%d", &mPort) != 1 || mPort < 1 || mPort > 65535) mPort = backrooms::protocol::kDefaultMasterPort;
-                    dedicatedDirectory.start(multiMasterIP, (unsigned short)mPort);
-                    dedicatedDirectory.requestScan();
+                    dedicatedDirectory.stop();
+                    std::snprintf(multiConnectStatus,sizeof(multiConnectStatus),"PUBLIC ROOM MODE: CONNECT DIRECTLY TO %s:%s", multiMasterIP, multiMasterPort);
                     lanDiscovery.stop();
                 }
             }
@@ -284,11 +282,8 @@ inline void menuInput(GLFWwindow* w) {
                 lanDiscovery.requestScan();
             } else {
                 lanDiscovery.stop();
-                int mPort = backrooms::protocol::kDefaultMasterPort;
-                if (std::sscanf(multiMasterPort, "%d", &mPort) != 1 || mPort < 1 || mPort > 65535) mPort = backrooms::protocol::kDefaultMasterPort;
                 dedicatedDirectory.stop();
-                dedicatedDirectory.start(multiMasterIP, (unsigned short)mPort);
-                dedicatedDirectory.requestScan();
+                std::snprintf(multiConnectStatus,sizeof(multiConnectStatus),"PUBLIC ROOM MODE: CONNECT DIRECTLY TO %s:%s", multiMasterIP, multiMasterPort);
             }
             triggerMenuAdjustSound();
         }
@@ -361,13 +356,7 @@ inline void menuInput(GLFWwindow* w) {
         bool refreshNow = glfwGetKey(w, GLFW_KEY_R) == GLFW_PRESS;
         if (refreshNow && !refreshPressed) {
             if (multiNetworkMode == 0) lanDiscovery.requestScan();
-            else {
-                int mPort = backrooms::protocol::kDefaultMasterPort;
-                if (std::sscanf(multiMasterPort, "%d", &mPort) != 1 || mPort < 1 || mPort > 65535) mPort = backrooms::protocol::kDefaultMasterPort;
-                dedicatedDirectory.stop();
-                dedicatedDirectory.start(multiMasterIP, (unsigned short)mPort);
-                dedicatedDirectory.requestScan();
-            }
+            else std::snprintf(multiConnectStatus,sizeof(multiConnectStatus),"PUBLIC ROOM MODE: DIRECT CONNECT");
         }
         refreshPressed = refreshNow;
         
@@ -383,13 +372,7 @@ inline void menuInput(GLFWwindow* w) {
                     multiIPManualEdit = false;
                 }
             } else {
-                dedicatedDirectory.selectNextRoom();
-                const DedicatedRoomInfo* room = dedicatedDirectory.getSelectedRoom();
-                if (room) {
-                    snprintf(multiJoinIP, sizeof(multiJoinIP), "%s", room->ip);
-                    snprintf(multiJoinPort, sizeof(multiJoinPort), "%hu", room->gamePort);
-                    multiIPManualEdit = false;
-                }
+                std::snprintf(multiConnectStatus,sizeof(multiConnectStatus),"PUBLIC ROOM MODE: USE ENTER/G TO CONNECT");
             }
         }
         pickRoomPressed = pickRoomNow;
@@ -397,20 +380,18 @@ inline void menuInput(GLFWwindow* w) {
         static bool quickConnectPressed = false;
         bool quickConnectNow = glfwGetKey(w, GLFW_KEY_G) == GLFW_PRESS;
         if (quickConnectNow && !quickConnectPressed && multiNetworkMode == 1) {
-            const DedicatedRoomInfo* room = dedicatedDirectory.getSelectedRoom();
-            if (room) {
-                std::snprintf(multiJoinIP, sizeof(multiJoinIP), "%s", room->ip);
-                std::snprintf(multiJoinPort, sizeof(multiJoinPort), "%hu", room->gamePort);
-                char fullAddr[64];
-                std::snprintf(fullAddr, 64, "%s", multiJoinIP);
-                netMgr.init();
-                if (netMgr.joinGame(fullAddr, multiNickname)) {
-                    lanDiscovery.stop();
-                    dedicatedDirectory.stop();
-                    multiState = MULTI_CONNECTING;
-                    gameState = STATE_MULTI_WAIT;
-                    menuSel = 0;
-                }
+            int port = NET_PORT;
+            if (std::sscanf(multiMasterPort, "%d", &port) != 1 || port < 1 || port > 65535) port = NET_PORT;
+            char fullAddr[64];
+            std::snprintf(fullAddr, 64, "%s", multiMasterIP);
+            netMgr.init();
+            if (netMgr.joinGame(fullAddr, multiNickname, (unsigned short)port)) {
+                lanDiscovery.stop();
+                dedicatedDirectory.stop();
+                multiState = MULTI_CONNECTING;
+                gameState = STATE_MULTI_WAIT;
+                menuSel = 0;
+                std::snprintf(multiConnectStatus,sizeof(multiConnectStatus),"CONNECTING TO PUBLIC ROOM %s:%d", fullAddr, port);
             }
         }
         quickConnectPressed = quickConnectNow;
@@ -425,14 +406,7 @@ inline void menuInput(GLFWwindow* w) {
                 }
             }
         } else {
-            dedicatedDirectory.update((float)glfwGetTime());
-            if (!multiIPManualEdit) {
-                const DedicatedRoomInfo* room = dedicatedDirectory.getSelectedRoom();
-                if (room) {
-                    snprintf(multiJoinIP, sizeof(multiJoinIP), "%s", room->ip);
-                    snprintf(multiJoinPort, sizeof(multiJoinPort), "%hu", room->gamePort);
-                }
-            }
+            // Public room mode: keep manual IP/PORT only.
         }
         
         if (enter && !enterPressed) {
@@ -440,15 +414,23 @@ inline void menuInput(GLFWwindow* w) {
             if (menuSel == 0) { 
                 // Connect to host - go to waiting lobby
                 char fullAddr[64];
-                snprintf(fullAddr, 64, "%s", multiJoinIP);
+                int port = NET_PORT;
+                if(multiNetworkMode==0){
+                    snprintf(fullAddr, 64, "%s", multiJoinIP);
+                    if (std::sscanf(multiJoinPort, "%d", &port) != 1 || port < 1 || port > 65535) port = NET_PORT;
+                }else{
+                    snprintf(fullAddr, 64, "%s", multiMasterIP);
+                    if (std::sscanf(multiMasterPort, "%d", &port) != 1 || port < 1 || port > 65535) port = NET_PORT;
+                }
                 multiConnectStatus[0] = 0;
                 netMgr.init();
-                if (netMgr.joinGame(fullAddr, multiNickname)) {
+                if (netMgr.joinGame(fullAddr, multiNickname, (unsigned short)port)) {
                     lanDiscovery.stop();
                     dedicatedDirectory.stop();
                     multiState = MULTI_CONNECTING;
                     gameState = STATE_MULTI_WAIT;  // Wait for host to start
                     menuSel = 0;
+                    if(multiNetworkMode==1) std::snprintf(multiConnectStatus,sizeof(multiConnectStatus),"CONNECTING TO PUBLIC ROOM %s:%d", fullAddr, port);
                 }
             }
             else { 

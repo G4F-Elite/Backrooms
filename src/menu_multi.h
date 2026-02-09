@@ -72,9 +72,9 @@ inline void drawJoinMenuScreen(float tm) {
     drawTextCentered("JOIN GAME", 0.0f, 0.55f, 3.0f, 0.9f, 0.85f, 0.4f, 0.9f);
     drawTextCentered(dedicated ? " LAN   [SERVERS]" : "[LAN]   SERVERS", 0.0f, 0.43f, 1.45f, 0.68f, 0.78f, 0.52f, 0.90f);
 
-    // IP Field (LAN target IP or Dedicated master IP)
+    // IP Field (LAN target IP or Public server IP)
     float ipSel = (multiInputField == 0) ? 1.0f : 0.5f;
-    drawText(dedicated ? "MASTER IP:" : "IP ADDRESS:", -0.45f, 0.25f, 1.8f, 0.6f*ipSel, 0.6f*ipSel, 0.5f*ipSel, 0.8f);
+    drawText(dedicated ? "PUBLIC IP:" : "IP ADDRESS:", -0.45f, 0.25f, 1.8f, 0.6f*ipSel, 0.6f*ipSel, 0.5f*ipSel, 0.8f);
     char ipBuf[48];
     const char* shownIP = dedicated ? multiMasterIP : multiJoinIP;
     if (multiInputField == 0) {
@@ -84,9 +84,9 @@ inline void drawJoinMenuScreen(float tm) {
     }
     drawText(ipBuf, -0.45f, 0.12f, 2.0f, 0.9f*ipSel, 0.9f*ipSel, 0.6f*ipSel, 1.0f);
     
-    // Port Field (LAN target port or Dedicated master port)
+    // Port Field (LAN target port or Public server port)
     float portSel = (multiInputField == 1) ? 1.0f : 0.5f;
-    drawText(dedicated ? "MASTER PORT:" : "PORT:", 0.15f, 0.25f, 1.8f, 0.6f*portSel, 0.6f*portSel, 0.5f*portSel, 0.8f);
+    drawText(dedicated ? "PUBLIC PORT:" : "PORT:", 0.15f, 0.25f, 1.8f, 0.6f*portSel, 0.6f*portSel, 0.5f*portSel, 0.8f);
     char portBuf[24];
     const char* shownPort = dedicated ? multiMasterPort : multiJoinPort;
     if (multiInputField == 1) {
@@ -109,10 +109,10 @@ inline void drawJoinMenuScreen(float tm) {
     drawText(dedicated ? "BACKSPACE TO DELETE     ENTER/G CONNECT" : "BACKSPACE TO DELETE     ENTER TO CONNECT", -0.58f, -0.5f, 1.3f, 0.5f, 0.5f, 0.4f, 0.6f);
     drawText("LEFT/RIGHT OR T: SWITCH LAN/SERVERS TAB", -0.58f, -0.57f, 1.1f, 0.55f, 0.62f, 0.46f, 0.72f);
     if (multiNetworkMode == 0) drawText("AUTO LAN SCAN: R REFRESH, F NEXT ROOM", -0.58f, -0.64f, 1.2f, 0.55f, 0.65f, 0.45f, 0.7f);
-    else drawText("MASTER SCAN: R REFRESH, F NEXT SERVER", -0.58f, -0.64f, 1.2f, 0.55f, 0.65f, 0.45f, 0.7f);
+    else drawText("PUBLIC ROOM: ENTER IP/PORT, G OR ENTER CONNECT", -0.58f, -0.64f, 1.05f, 0.55f, 0.65f, 0.45f, 0.7f);
     
     char roomHead[64];
-    snprintf(roomHead, 64, multiNetworkMode == 0 ? "ROOMS FOUND: %d" : "SERVERS FOUND: %d", multiNetworkMode == 0 ? lanDiscovery.roomCount : dedicatedDirectory.roomCount);
+    snprintf(roomHead, 64, multiNetworkMode == 0 ? "ROOMS FOUND: %d" : "PUBLIC ROOM MODE", multiNetworkMode == 0 ? lanDiscovery.roomCount : dedicatedDirectory.roomCount);
     drawText(roomHead, -0.58f, -0.76f, 1.2f, 0.7f, 0.8f, 0.55f, 0.75f);
     if (!dedicated) {
         for (int i = 0; i < lanDiscovery.roomCount && i < 3; i++) {
@@ -123,19 +123,15 @@ inline void drawJoinMenuScreen(float tm) {
             drawText(roomLine, -0.58f, -0.84f - i * 0.07f, 1.1f, 0.75f, 0.85f, 0.6f, alpha);
         }
     } else {
-        for (int i = 0; i < dedicatedDirectory.roomCount && i < 3; i++) {
-            const DedicatedRoomInfo& room = dedicatedDirectory.rooms[i];
-            char roomLine[128];
-            snprintf(roomLine, 128, "%s:%hu %d/%d %s", room.ip, room.gamePort, (int)room.playerCount, (int)room.maxPlayers, room.inGame ? "IN GAME" : "LOBBY");
-            float alpha = (i == dedicatedDirectory.selectedRoom) ? 0.95f : 0.65f;
-            drawText(roomLine, -0.58f, -0.84f - i * 0.07f, 1.1f, 0.75f, 0.85f, 0.6f, alpha);
-        }
-        const DedicatedRoomInfo* room = dedicatedDirectory.getSelectedRoom();
-        if (room) {
-            char targetLine[128];
-            snprintf(targetLine, 128, "TARGET: %s:%hu", room->ip, room->gamePort);
-            drawText(targetLine, -0.58f, -1.06f, 1.1f, 0.72f, 0.85f, 0.62f, 0.82f);
-        }
+        char roomLine[128];
+        snprintf(roomLine, 128, "TARGET PUBLIC ROOM: %s:%s", multiMasterIP, multiMasterPort);
+        drawText(roomLine, -0.58f, -0.84f, 1.1f, 0.75f, 0.85f, 0.6f, 0.95f);
+        float nowT = (float)glfwGetTime();
+        char linkLine[128];
+        if (dedicatedDirectory.hasRecentResponse(nowT)) snprintf(linkLine, 128, "MASTER LINK: ONLINE (%.1fs ago)", nowT - dedicatedDirectory.lastResponseAt);
+        else if (dedicatedDirectory.queriesSent > 0) snprintf(linkLine, 128, "MASTER LINK: NO RESPONSE YET (%d req)", dedicatedDirectory.queriesSent);
+        else snprintf(linkLine, 128, "MASTER LINK: NOT USED IN PUBLIC DIRECT MODE");
+        drawText(linkLine, -0.58f, -0.99f, 1.06f, 0.78f, 0.86f, 0.62f, 0.86f);
     }
     if (multiConnectStatus[0]) {
         drawText(multiConnectStatus, -0.58f, -1.13f, 1.04f, 0.90f, 0.66f, 0.46f, 0.90f);

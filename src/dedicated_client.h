@@ -47,6 +47,10 @@ public:
     unsigned short masterPort = backrooms::protocol::kDefaultMasterPort;
     float lastScanAt = 0.0f;
     std::uint32_t sequence = 1;
+    float lastQueryAt = 0.0f;
+    float lastResponseAt = -1000.0f;
+    int queriesSent = 0;
+    int responsesReceived = 0;
 
     DedicatedRoomInfo rooms[MAX_DEDICATED_ROOMS];
     int roomCount = 0;
@@ -77,6 +81,11 @@ public:
         master.ipv4HostOrder = parseIpv4HostOrder(masterIP);
         master.portHostOrder = masterPort;
         socket.sendTo(master, packet, written);
+        queriesSent++;
+    }
+
+    bool hasRecentResponse(float nowTime) const {
+        return responsesReceived > 0 && (nowTime - lastResponseAt) <= 5.0f;
     }
 
     void selectNextRoom() {
@@ -95,13 +104,14 @@ public:
         if (!active) return;
         if (nowTime - lastScanAt >= DEDICATED_SCAN_INTERVAL) {
             lastScanAt = nowTime;
+            lastQueryAt = nowTime;
             requestScan();
         }
-        recvResponses();
+        recvResponses(nowTime);
     }
 
 private:
-    void recvResponses() {
+    void recvResponses(float nowTime) {
         std::uint8_t packet[1600] = {};
         backrooms::net::UdpAddress from{};
         while (true) {
@@ -114,6 +124,8 @@ private:
             }
             backrooms::protocol::ServerListResponse resp{};
             if (!backrooms::protocol::decodeServerListResponse(packet, got, resp)) continue;
+            responsesReceived++;
+            lastResponseAt = nowTime;
             roomCount = (int)resp.count;
             if (roomCount > MAX_DEDICATED_ROOMS) roomCount = MAX_DEDICATED_ROOMS;
             for (int i = 0; i < roomCount; i++) {

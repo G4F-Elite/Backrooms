@@ -40,6 +40,7 @@ public:
     unsigned int worldSeed;
     Vec3 spawnPos;
     char hostIP[64];
+    unsigned short hostPort;
     char localPlayerName[PLAYER_NAME_BUF_LEN];
     
     // Sync flags
@@ -128,6 +129,7 @@ public:
         for (int i = 0; i < MAX_SYNC_ITEMS; i++) itemSnapshot[i].active = false;
         for (int i = 0; i < 16; i++) interactRequests[i].valid = false;
         strcpy(hostIP, "192.168.0.1");
+        hostPort = NET_PORT;
         sanitizePlayerName("Player", localPlayerName);
     }
     
@@ -161,8 +163,9 @@ public:
         return true;
     }
     
-    bool joinGame(const char* ip, const char* nickname = nullptr) {
+    bool joinGame(const char* ip, const char* nickname = nullptr, unsigned short port = NET_PORT) {
         strcpy(hostIP, ip);
+        hostPort = port;
         if (nickname) sanitizePlayerName(nickname, localPlayerName);
         sockaddr_in local;
         local.sin_family = AF_INET;
@@ -185,7 +188,7 @@ public:
         sockaddr_in dest;
         dest.sin_family = AF_INET;
         inet_pton(AF_INET, hostIP, &dest.sin_addr);
-        dest.sin_port = htons(NET_PORT);
+        dest.sin_port = htons(hostPort);
         sendto(sock, buf, 64, 0, (sockaddr*)&dest, sizeof(dest));
     }
 
@@ -210,7 +213,7 @@ public:
             sockaddr_in dest;
             dest.sin_family = AF_INET;
             inet_pton(AF_INET, hostIP, &dest.sin_addr);
-            dest.sin_port = htons(NET_PORT);
+            dest.sin_port = htons(hostPort);
             sendto(sock, buf, len, 0, (sockaddr*)&dest, sizeof(dest));
             packetsSent++;
             bytesSent += len;
