@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <unordered_map>
+#include <cstring>
 
 #include "math.h"
 #include "world.h"
@@ -108,6 +109,9 @@ inline int gatherNearestSceneLights(const std::vector<Light>& lights, const Vec3
     int count = 0;
     const float maxDist2 = SCENE_LIGHT_MAX_DIST * SCENE_LIGHT_MAX_DIST;
 
+    // Precompute squared fade-start distance to avoid sqrt for close lights
+    const float fadeStart2 = SCENE_LIGHT_FADE_START * SCENE_LIGHT_FADE_START;
+    
     // First pass: mark all lights as not visible, calculate distances
     for (int i = 0; i < (int)lights.size(); i++) {
         const auto& l = lights[i];
@@ -117,17 +121,19 @@ inline int gatherNearestSceneLights(const std::vector<Light>& lights, const Vec3
         Vec3 d = l.pos - camPos;
         float dist2 = d.lenSq();
         
-        // Calculate distance-based fade (before culling check)
-        // Use fast sqrt when enabled
-        float dist = mSqrt(dist2);
+        // Early rejection: far beyond max distance with no existing state worth keeping
+        int lightId = sceneLightKey(l);
+        auto it = g_lightStates.find(lightId);
+        if (dist2 > maxDist2 * 1.5f && (it == g_lightStates.end() || it->second.currentFade <= 0.001f)) continue;
+        
+        // Only compute sqrt if we need to calculate fade (light is beyond fade start)
         float distFade = 1.0f;
-        if (dist > SCENE_LIGHT_FADE_START) {
-            // Fast smoothstep-like fade
+        if (dist2 > fadeStart2) {
+            float dist = mSqrt(dist2);
             float t = (dist - SCENE_LIGHT_FADE_START) / (SCENE_LIGHT_MAX_DIST - SCENE_LIGHT_FADE_START);
             distFade = 1.0f - fastClamp01(t);
         }
         
-        int lightId = sceneLightKey(l);
         auto& state = g_lightStates[lightId];
         state.targetFade = distFade;
         state.wasVisible = true;
@@ -257,9 +263,7 @@ struct OcclusionGrid {
     bool occupied[GRID_SIZE][GRID_SIZE];
     
     void clear() {
-        for (int i = 0; i < GRID_SIZE; i++)
-            for (int j = 0; j < GRID_SIZE; j++)
-                occupied[i][j] = false;
+        memset(occupied, 0, sizeof(occupied));
     }
     
     void markOccupied(float x, float z) {

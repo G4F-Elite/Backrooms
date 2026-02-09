@@ -20,7 +20,7 @@ inline void mkWall(std::vector<float>& v, float x, float z, float dx, float dz, 
         x + dx, h, z + dz, tx, ty, n.x, n.y, n.z,
         x + dx, 0, z + dz, tx, 0, n.x, n.y, n.z
     };
-    for (int i = 0; i < 48; i++) v.push_back(vv[i]);
+    v.insert(v.end(), vv, vv + 48);
 }
 
 inline void mkPillar(std::vector<float>& v, float cx, float cz, float s, float h) {
@@ -41,7 +41,7 @@ inline void mkPillar(std::vector<float>& v, float cx, float cz, float s, float h
             x2, y2, z2, 1, ty, nx, ny, nz,
             x3, y3, z3, 0, ty, nx, ny, nz
         };
-        for (int i = 0; i < 48; i++) v.push_back(vv[i]);
+        v.insert(v.end(), vv, vv + 48);
     };
 
     // Front (+Z)
@@ -64,7 +64,7 @@ inline void mkLight(std::vector<float>& v, Vec3 pos, float sx, float sz) {
         x + sx, y, z + sz, 1, 1,
         x, y, z + sz, 0, 1
     };
-    for (int i = 0; i < 30; i++) v.push_back(vv[i]);
+    v.insert(v.end(), vv, vv + 30);
 }
 
 inline void mkBox(std::vector<float>& v, float cx, float y0, float cz, float sx, float sy, float sz) {
@@ -88,7 +88,7 @@ inline void mkBox(std::vector<float>& v, float cx, float y0, float cz, float sx,
             c.x, c.y, c.z, uMax, vMax, n.x, n.y, n.z,
             d.x, d.y, d.z, 0, vMax, n.x, n.y, n.z
         };
-        for (int i = 0; i < 48; i++) v.push_back(vv[i]);
+        v.insert(v.end(), vv, vv + 48);
     };
 
     pushQuad(

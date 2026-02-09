@@ -78,9 +78,9 @@ inline float fastDist3D(float x1, float y1, float z1, float x2, float y2, float 
 // FAST TRIGONOMETRY
 // ============================================================================
 inline float wrapFastTrigAngle(float x) {
-    while (x > MATH_PI) x -= MATH_TAU;
-    while (x < -MATH_PI) x += MATH_TAU;
-    return x;
+    x = fmodf(x + MATH_PI, MATH_TAU);
+    if (x < 0.0f) x += MATH_TAU;
+    return x - MATH_PI;
 }
 
 // Fast sin using parabola approximation, error ~0.1%
@@ -427,11 +427,13 @@ struct Mat4 {
     
     Mat4 operator*(const Mat4& o) const {
         Mat4 r;
-        for (int i = 0; i < 16; i++) r.m[i] = 0;
-        for (int i = 0; i < 4; i++)
-            for (int j = 0; j < 4; j++)
-                for (int k = 0; k < 4; k++)
-                    r.m[i * 4 + j] += m[i * 4 + k] * o.m[k * 4 + j];
+        for (int i = 0; i < 4; i++) {
+            float a0 = m[i * 4 + 0], a1 = m[i * 4 + 1], a2 = m[i * 4 + 2], a3 = m[i * 4 + 3];
+            r.m[i * 4 + 0] = a0 * o.m[0] + a1 * o.m[4] + a2 * o.m[8]  + a3 * o.m[12];
+            r.m[i * 4 + 1] = a0 * o.m[1] + a1 * o.m[5] + a2 * o.m[9]  + a3 * o.m[13];
+            r.m[i * 4 + 2] = a0 * o.m[2] + a1 * o.m[6] + a2 * o.m[10] + a3 * o.m[14];
+            r.m[i * 4 + 3] = a0 * o.m[3] + a1 * o.m[7] + a2 * o.m[11] + a3 * o.m[15];
+        }
         return r;
     }
     

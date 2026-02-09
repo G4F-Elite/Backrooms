@@ -32,14 +32,15 @@ inline float percentileFrameTimeMs(const float* history, int count, float percen
     if (!history || count <= 0) return 0.0f;
     if (percentile < 0.0f) percentile = 0.0f;
     if (percentile > 1.0f) percentile = 1.0f;
-    std::vector<float> sorted;
-    sorted.reserve((size_t)count);
-    for (int i = 0; i < count; i++) sorted.push_back(history[i]);
-    std::sort(sorted.begin(), sorted.end());
-    int idx = (int)(percentile * (float)(count - 1) + 0.5f);
+    // Use stack array to avoid heap allocation every call (count <= PERF_GRAPH_SAMPLES)
+    float sorted[PERF_GRAPH_SAMPLES];
+    int n = count <= PERF_GRAPH_SAMPLES ? count : PERF_GRAPH_SAMPLES;
+    for (int i = 0; i < n; i++) sorted[i] = history[i];
+    std::sort(sorted, sorted + n);
+    int idx = (int)(percentile * (float)(n - 1) + 0.5f);
     if (idx < 0) idx = 0;
-    if (idx >= count) idx = count - 1;
-    return sorted[(size_t)idx];
+    if (idx >= n) idx = n - 1;
+    return sorted[idx];
 }
 
 inline char frameTimeLevelChar(float ms) {

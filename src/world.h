@@ -273,21 +273,41 @@ inline void updateVisibleChunks(float px, float pz) {
 
 inline bool collideWorld(float x, float z, float PR) {
     int wx = (int)floorf(x/CS), wz = (int)floorf(z/CS);
+    float PR2 = PR * PR; // Squared radius for comparison without sqrt
     for (int ddx = -1; ddx <= 1; ddx++) for (int ddz = -1; ddz <= 1; ddz++) {
         int chkx = wx+ddx, chkz = wz+ddz;
         if (getCellWorld(chkx, chkz) == 1) { float wx0 = chkx*CS, wx1 = (chkx+1)*CS, wz0 = chkz*CS, wz1 = (chkz+1)*CS;
-            float clx = x<wx0?wx0:(x>wx1?wx1:x), clz = z<wz0?wz0:(z>wz1?wz1:z); if (sqrtf((x-clx)*(x-clx)+(z-clz)*(z-clz)) < PR) return true; }}
-    for (auto& p : pillars) if (fabsf(x-p.x) < 0.5f+PR && fabsf(z-p.z) < 0.5f+PR) return true;
+            float clx = x<wx0?wx0:(x>wx1?wx1:x), clz = z<wz0?wz0:(z>wz1?wz1:z);
+            float dx = x-clx, dz = z-clz;
+            if (dx*dx+dz*dz < PR2) return true; }}
+    for (const auto& p : pillars) if (fabsf(x-p.x) < 0.5f+PR && fabsf(z-p.z) < 0.5f+PR) return true;
     return false;
 }
 
 inline int countReachLocal(int sx, int sz, int range) {
-    std::vector<std::pair<int,int>> vis; vis.reserve(range*range);
-    std::vector<std::pair<int,int>> q; q.push_back({sx, sz}); int cnt = 0;
-    while (!q.empty() && cnt < range*range) { auto c = q.back(); q.pop_back();
-        bool f = false; for (auto& v : vis) if (v.first==c.first && v.second==c.second) { f=true; break; } if (f) continue;
-        vis.push_back(c); if (getCellWorld(c.first, c.second)==1) continue; cnt++;
-        int dx[]={1,-1,0,0}, dz[]={0,0,1,-1}; for (int d=0; d<4; d++) { int nx=c.first+dx[d], nz=c.second+dz[d]; if (abs(nx-sx)<range && abs(nz-sz)<range) q.push_back({nx, nz}); }}
+    // Use a flat bitmap for O(1) visited checks instead of O(n) linear scan
+    int side = range * 2;
+    std::vector<bool> visited(side * side, false);
+    std::vector<std::pair<int,int>> q;
+    q.reserve(side * side);
+    q.push_back({sx, sz});
+    int cnt = 0;
+    while (!q.empty() && cnt < range*range) {
+        auto c = q.back(); q.pop_back();
+        int lx = c.first - sx + range;
+        int lz = c.second - sz + range;
+        if (lx < 0 || lx >= side || lz < 0 || lz >= side) continue;
+        int idx = lx * side + lz;
+        if (visited[idx]) continue;
+        visited[idx] = true;
+        if (getCellWorld(c.first, c.second) == 1) continue;
+        cnt++;
+        int dx[] = {1, -1, 0, 0}, dz[] = {0, 0, 1, -1};
+        for (int d = 0; d < 4; d++) {
+            int nx = c.first + dx[d], nz = c.second + dz[d];
+            if (abs(nx - sx) < range && abs(nz - sz) < range) q.push_back({nx, nz});
+        }
+    }
     return cnt;
 }
 
@@ -417,13 +437,14 @@ inline Vec3 findSafeSpawn() {
 
 inline Vec3 findSpawnPos(Vec3 pPos, float minD) {
     const float spawnRadius = 0.42f;
+    float minD2 = minD * minD; // Squared distance for comparison without sqrt
     for(int a=0;a<80;a++){
         int dx=(rng()%34)-17, dz=(rng()%34)-17;
         int wx=(int)floorf(pPos.x/CS)+dx, wz=(int)floorf(pPos.z/CS)+dz;
         if(getCellWorld(wx,wz)!=0) continue;
         Vec3 p((wx+0.5f)*CS,0,(wz+0.5f)*CS);
         float ddx = p.x-pPos.x, ddz = p.z-pPos.z;
-        if(sqrtf(ddx*ddx+ddz*ddz)<minD) continue;
+        if(ddx*ddx+ddz*ddz<minD2) continue;
         if(collideWorld(p.x,p.z,spawnRadius)) continue;
         return p;
     }

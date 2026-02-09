@@ -8,7 +8,7 @@ uniform vec3 vp;
 
 void main(){
  fp=vec3(M*vec4(p,1));
- nm=mat3(transpose(inverse(M)))*n;
+ nm=mat3(M)*n;
  uv=t;
  
  // Compute TBN matrix for parallax
@@ -78,9 +78,10 @@ void main(){
   if(fade < 0.001) continue;
   
   float d2 = dot(toLight, toLight);
-  float d = sqrt(d2);
-  vec3 L = toLight / max(d, 0.001);
-  float att = 1.0 / (1.0 + 0.1*d + 0.04*d*d);
+  float invD = inversesqrt(max(d2, 0.0001));
+  float d = d2 * invD;
+  vec3 L = toLight * invD;
+  float att = 1.0 / (1.0 + 0.1*d + 0.04*d2);
   float df;
   if(isCeil) {
    float horizDist = length(vec2(toLight.x, toLight.z));
