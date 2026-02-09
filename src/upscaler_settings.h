@@ -3,7 +3,8 @@
 inline constexpr int UPSCALER_MODE_OFF = 0;
 inline constexpr int UPSCALER_MODE_FSR10 = 1;
 inline constexpr int UPSCALER_MODE_FSR20 = 2;
-inline constexpr int UPSCALER_MODE_COUNT = 3;
+inline constexpr int UPSCALER_MODE_NEAREST = 3;
+inline constexpr int UPSCALER_MODE_COUNT = 4;
 
 inline constexpr int AA_MODE_OFF = 0;
 inline constexpr int AA_MODE_FXAA = 1;
@@ -114,6 +115,7 @@ inline const char* upscalerModeLabel(int mode) {
     int clamped = clampUpscalerMode(mode);
     if (clamped == UPSCALER_MODE_FSR10) return "FSR 1.0";
     if (clamped == UPSCALER_MODE_FSR20) return "FSR 2.0";
+    if (clamped == UPSCALER_MODE_NEAREST) return "Nearest";
     return "OFF";
 }
 
