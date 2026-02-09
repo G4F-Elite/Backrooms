@@ -16,6 +16,7 @@ struct SoundState {
     float humVol=0.15f;
     float footPhase=0;
     bool stepTrig=false;
+    float stepPitch=1.0f;
     float ambPhase=0;
     float masterVol=0.7f;
     float dangerLevel=0;
@@ -244,7 +245,11 @@ inline void fillAudio(short* buf, int len) {
         // Footsteps - louder
         float step=0;
         if(sndState.stepTrig) {
-            step = carpetStep(sndState.footPhase);
+            float pitch = sndState.stepPitch;
+            if(pitch < 0.7f) pitch = 0.7f;
+            if(pitch > 1.45f) pitch = 1.45f;
+            step = carpetStep(sndState.footPhase * pitch);
+            step += sinf(twoPi * (90.0f + pitch * 40.0f) * sndState.footPhase) * 0.05f * expf(-sndState.footPhase * 25.0f);
             sndState.footPhase += 1.0f / SAMP_RATE;
             if(sndState.footPhase > 0.2f) { sndState.stepTrig=false; sndState.footPhase=0; }
         }

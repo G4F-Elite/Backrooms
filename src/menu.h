@@ -5,6 +5,7 @@
 #include "upscaler_settings.h"
 #include "rtx_settings.h"
 #include "keybinds.h"
+#include "progression.h"
 
 const unsigned char FONT_DATA[96][7] = {
     {0,0,0,0,0,0,0},{4,4,4,4,0,4,0},{10,10,0,0,0,0,0},{10,31,10,31,10,0,0},{4,15,20,14,5,30,4},{24,25,2,4,8,19,3},{8,20,20,8,21,18,13},{4,4,0,0,0,0,0},
@@ -37,6 +38,7 @@ struct Settings {
     float fsrSharpness=0.35f;
     int aaMode=AA_MODE_FXAA;
     bool fastMath=false;
+    int rtxQuality=RTX_OFF;
     int frameGenMode=FRAME_GEN_MODE_OFF;
     bool vsync=false;
     int rtxMode=RTX_MODE_OFF;
@@ -248,7 +250,9 @@ inline void drawMenu(float tm) {
     drawFullscreenOverlay(0.17f,0.13f,0.08f,0.22f + 0.05f*sinf(tm*0.9f));
     float p=0.8f+0.05f*sinf(tm*2.0f), gl=(rand()%100<3)?(rand()%10-5)*0.003f:0;
     drawTextCentered("THE BACKROOMS",0.0f+gl,0.5f,4.0f,0.9f,0.85f,0.4f,p);
-    drawTextCentered("LEVEL 0",0.0f,0.35f,2.5f,0.7f,0.65f,0.3f,0.8f);
+    char levelBuf[32];
+    buildLevelLabel(gCurrentLevel, levelBuf, 32);
+    drawTextCentered(levelBuf,0.0f,0.35f,2.5f,0.7f,0.65f,0.3f,0.8f);
     const char* it[]={"START GAME","MULTIPLAYER","GUIDE","SETTINGS","QUIT"};
     for(int i=0;i<5;i++){
         float s=(menuSel==i)?1.0f:0.5f; float y=0.10f-i*0.11f;
@@ -311,7 +315,7 @@ inline void drawSettings(bool fp) {
                 drawText(b,0.58f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }
         }else{
-            const char* lb[]={"VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","ANTI-ALIASING","FAST MATH","FRAME GEN","V-SYNC","RTX MODE","KEY BINDS","BACK"};
+            const char* lb[]={"VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","ANTI-ALIASING","RTX","FAST MATH","FRAME GEN","V-SYNC","RTX MODE","KEY BINDS","BACK"};
             int vi = i - 1;
             drawText(lb[vi],-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             if(vi==0 || vi==1 || vi==4){
@@ -337,14 +341,16 @@ inline void drawSettings(bool fp) {
             }else if(vi==5){
                 drawTextCentered(aaModeLabel(settings.aaMode),rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==6){
-                drawTextCentered(settings.fastMath?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+                drawTextCentered(rtxQualityLabel(settings.rtxQuality),rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==7){
-                drawTextCentered(frameGenModeLabel(settings.frameGenMode),rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+                drawTextCentered(settings.fastMath?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==8){
-                drawTextCentered(settings.vsync?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+                drawTextCentered(frameGenModeLabel(settings.frameGenMode),rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==9){
-                drawTextCentered(rtxModeLabel(settings.rtxMode),rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+                drawTextCentered(settings.vsync?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==10){
+                drawTextCentered(rtxModeLabel(settings.rtxMode),rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            }else if(vi==11){
                 drawTextCentered("OPEN",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }
         }

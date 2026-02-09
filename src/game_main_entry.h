@@ -1,4 +1,5 @@
 #pragma once
+#include "progression.h"
 int main(){
     std::random_device rd;rng.seed(rd());
     if(!glfwInit())return -1;
@@ -38,7 +39,7 @@ int main(){
     rtxPipeline.compShader=mkShader(rtxCompVS,rtxCompFS);
     buildGeom();
     computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), renderW, renderH);
-    initFBO(fbo,fboTex,rbo,renderW,renderH);
+    initFBO(fbo,fboTex,fboDepthTex,renderW,renderH);
     if(isRtxEnabled(settings.rtxMode)) initRtxPipeline(rtxPipeline,renderW,renderH,settings.rtxMode);
     initTaaTargets();
     initText();
@@ -81,8 +82,8 @@ int main(){
             renderH = desiredRenderH;
             if(fbo) glDeleteFramebuffers(1, &fbo);
             if(fboTex) glDeleteTextures(1, &fboTex);
-            if(rbo) glDeleteRenderbuffers(1, &rbo);
-            initFBO(fbo, fboTex, rbo, renderW, renderH);
+            if(fboDepthTex) glDeleteTextures(1, &fboDepthTex);
+            initFBO(fbo, fboTex, fboDepthTex, renderW, renderH);
         }
         { static int pRM=settings.rtxMode; // RTX hot-reload
           if(settings.rtxMode!=pRM){if(rtxPipeline.initialized)destroyRtxPipeline(rtxPipeline);
@@ -128,7 +129,7 @@ int main(){
         else if(gameState==STATE_SETTINGS_PAUSE) settingsInput(gWin,true);
         else if(gameState==STATE_KEYBINDS) keybindsInput(gWin,false);
         else if(gameState==STATE_KEYBINDS_PAUSE) keybindsInput(gWin,true);
-        else if(gameState==STATE_MENU||gameState==STATE_PAUSE||
+        else if(gameState==STATE_MENU||gameState==STATE_GUIDE||gameState==STATE_PAUSE||
                  gameState==STATE_MULTI||gameState==STATE_MULTI_HOST||gameState==STATE_MULTI_JOIN||gameState==STATE_MULTI_WAIT){
             menuInput(gWin);
             if(gameState==STATE_MULTI_WAIT && reconnectInProgress){
@@ -172,7 +173,13 @@ int main(){
                 bool eN=glfwGetKey(gWin,GLFW_KEY_ENTER)==GLFW_PRESS||
                         glfwGetKey(gWin,GLFW_KEY_SPACE)==GLFW_PRESS;
                 bool esN=glfwGetKey(gWin,GLFW_KEY_ESCAPE)==GLFW_PRESS;
-                if(eN&&!enterPressed){genWorld();buildGeom();gameState=STATE_INTRO;}
+                if(eN&&!enterPressed){
+                    gCurrentLevel++;
+                    gCompletedLevels++;
+                    genWorld();
+                    buildGeom();
+                    gameState=STATE_INTRO;
+                }
                 if(esN&&!escPressed){
                     gameState=STATE_MENU;menuSel=0;
                     glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
@@ -245,13 +252,15 @@ int main(){
                 bool canSpawnEnt = (multiState!=MULTI_IN_GAME || netMgr.isHost);
                 entitySpawnTimer-=dTime;
                 int maxEnt = computeEntityCap(survivalTime);
+                maxEnt += levelEntityCapBonus(gCurrentLevel);
+                if(maxEnt > 8) maxEnt = 8;
                 if(canSpawnEnt && entitySpawnTimer<=0&&(int)entityMgr.entities.size()<maxEnt){
                     EntityType type = chooseSpawnEntityType(survivalTime, (int)rng(), (int)rng());
                     Vec3 spawnP = findSpawnPos(cam.pos,25.0f);
                     if(!hasEntityNearPos(entityMgr.entities, spawnP, 14.0f)){
                         entityMgr.spawnEntity(type,spawnP,nullptr,0,0);
                     }
-                    entitySpawnTimer = computeEntitySpawnDelay(survivalTime, (int)rng());
+                    entitySpawnTimer = computeEntitySpawnDelay(survivalTime, (int)rng()) * levelSpawnDelayScale(gCurrentLevel);
                 }
                 entityMgr.update(dTime,cam.pos,cam.yaw,nullptr,0,0,CS);
                 if(baitEffectTimer>0){
@@ -299,16 +308,28 @@ int main(){
                     reshuffleTimer=reshuffleDelay+(rng()%10);
                 }else if(reshuffleTimer<=0)reshuffleTimer=8.0f+(rng()%8);
                 
-                if(entityMgr.dangerLevel>0.1f)playerSanity-=entityMgr.dangerLevel*8.0f*dTime;
+                float levelDanger = levelDangerScale(gCurrentLevel);
+                if(entityMgr.dangerLevel>0.1f)playerSanity-=entityMgr.dangerLevel*(8.0f * levelDanger)*dTime;
                 else playerSanity+=2.0f*dTime;
                 playerSanity=playerSanity>100?100:(playerSanity<0?0:playerSanity);
                 int cellX = (int)floorf(cam.pos.x / CS);
                 int cellZ = (int)floorf(cam.pos.z / CS);
-                if(isFloorHoleCell(cellX, cellZ)){
-                    playerHealth = 0.0f;
-                    isPlayerDead = true;
-                    setTrapStatus("FLOOR COLLAPSE. YOU FELL.");
-                    glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
+                if(!playerFalling && isFallCell(cellX, cellZ)){
+                    // Check player is well inside the hole, not just at the edge
+                    float cellCenterX = (cellX + 0.5f) * CS;
+                    float cellCenterZ = (cellZ + 0.5f) * CS;
+                    float dx = cam.pos.x - cellCenterX;
+                    float dz = cam.pos.z - cellCenterZ;
+                    float distFromCenter = sqrtf(dx*dx + dz*dz);
+                    if(distFromCenter < CS * 0.35f){
+                        playerFalling = true;
+                        fallVelocity = 0.0f;
+                        fallTimer = 0.0f;
+                        if(isAbyssCell(cellX, cellZ))
+                            setTrapStatus("THE VOID SWALLOWS YOU.");
+                        else
+                            setTrapStatus("FLOOR COLLAPSE. YOU FELL.");
+                    }
                 }
                 if(playerSanity<=0&&rng()%1000<5){
                     isPlayerDead=true;playerHealth=0;
@@ -367,6 +388,7 @@ int main(){
         static GLint vhsSharpnessLoc=-1,vhsTexelXLoc=-1,vhsTexelYLoc=-1;
         static GLint vhsTaaHistLoc=-1,vhsTaaBlendLoc=-1,vhsTaaJitterLoc=-1,vhsTaaValidLoc=-1;
         static GLint vhsFrameGenLoc=-1,vhsFrameGenBlendLoc=-1;
+        static GLint vhsRtxLoc=-1,vhsDepthTexLoc=-1;
         if(vhsTmLoc<0){
             glUniform1i(glGetUniformLocation(vhsShader,"tex"),0);
             vhsTmLoc = glGetUniformLocation(vhsShader,"tm");
@@ -382,6 +404,8 @@ int main(){
             vhsTaaValidLoc = glGetUniformLocation(vhsShader,"taaValid");
             vhsFrameGenLoc = glGetUniformLocation(vhsShader,"frameGen");
             vhsFrameGenBlendLoc = glGetUniformLocation(vhsShader,"frameGenBlend");
+            vhsRtxLoc = glGetUniformLocation(vhsShader,"rtxLevel");
+            vhsDepthTexLoc = glGetUniformLocation(vhsShader,"depthTex");
         }
         static int prevAaMode = -1;
         int aaMode = clampAaMode(settings.aaMode);
@@ -413,6 +437,10 @@ int main(){
             glActiveTexture(GL_TEXTURE0 + 1);
             glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
             glUniform1i(vhsTaaHistLoc,1);
+            glActiveTexture(GL_TEXTURE0 + 2);
+            glBindTexture(GL_TEXTURE_2D,fboDepthTex);
+            glUniform1i(vhsDepthTexLoc,2);
+            glUniform1i(vhsRtxLoc,clampRtxQuality(settings.rtxQuality));
             glActiveTexture(GL_TEXTURE0);
             glUniform1f(vhsTmLoc,vhsTime);
             glUniform1f(vhsIntenLoc,vI);
@@ -458,6 +486,7 @@ int main(){
             glUniform1f(vhsTaaValidLoc,0.0f);
             glUniform1i(vhsFrameGenLoc,0);
             glUniform1f(vhsFrameGenBlendLoc,0.0f);
+            glUniform1i(vhsRtxLoc,0);
             glBindVertexArray(quadVAO);
             glDrawArrays(GL_TRIANGLES,0,6);
         }else{
@@ -468,6 +497,10 @@ int main(){
             glActiveTexture(GL_TEXTURE0 + 1);
             glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
             glUniform1i(vhsTaaHistLoc,1);
+            glActiveTexture(GL_TEXTURE0 + 2);
+            glBindTexture(GL_TEXTURE_2D,fboDepthTex);
+            glUniform1i(vhsDepthTexLoc,2);
+            glUniform1i(vhsRtxLoc,clampRtxQuality(settings.rtxQuality));
             glActiveTexture(GL_TEXTURE0);
             glUniform1f(vhsTmLoc,vhsTime);
             glUniform1f(vhsIntenLoc,vI);

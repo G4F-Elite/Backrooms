@@ -118,6 +118,23 @@ inline void mkBox(std::vector<float>& v, float cx, float y0, float cz, float sx,
     );
 }
 
+inline void mkShaftWall(std::vector<float>& v, float x, float z, float dx, float dz, float topY, float depth, float CS) {
+    Vec3 n = Vec3(dz, 0, -dx).norm();
+    float wallLen = sqrtf(dx * dx + dz * dz);
+    float tx = (wallLen / CS) * 1.8f;
+    float ty = (depth / 4.5f) * 3.0f;
+    float botY = topY - depth;
+    float vv[] = {
+        x, botY, z, 0, 0, n.x, n.y, n.z,
+        x, topY, z, 0, ty, n.x, n.y, n.z,
+        x + dx, topY, z + dz, tx, ty, n.x, n.y, n.z,
+        x, botY, z, 0, 0, n.x, n.y, n.z,
+        x + dx, topY, z + dz, tx, ty, n.x, n.y, n.z,
+        x + dx, botY, z + dz, tx, 0, n.x, n.y, n.z
+    };
+    for (int i = 0; i < 48; i++) v.push_back(vv[i]);
+}
+
 inline void mkFloorDecal(std::vector<float>& v, float cx, float y, float cz, float sx, float sz) {
     float hx = sx * 0.5f;
     float hz = sz * 0.5f;

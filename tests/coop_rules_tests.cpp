@@ -29,11 +29,29 @@ void testStoryDoorMultiplayerBySwitches() {
     assert(!shouldBlockStoryDoor(true, true, multiInGame, multiInGame, 0, 5));
 }
 
+void testDoorFootprintClearRequiresWidthAndApproach() {
+    auto openField = [](int, int) { return 0; };
+    assert(isDoorFootprintClear(0, 0, openField));
+
+    auto blockedLeft = [](int x, int z) {
+        if (x == -1 && z == 0) return 1;
+        return 0;
+    };
+    assert(!isDoorFootprintClear(0, 0, blockedLeft));
+
+    auto blockedApproach = [](int x, int z) {
+        if ((x == 0 && z == 1) || (x == 0 && z == -1)) return 1;
+        return 0;
+    };
+    assert(!isDoorFootprintClear(0, 0, blockedApproach));
+}
+
 int main() {
     testDoorBlockedOnlyInMultiplayerGame();
     testDoorNotBlockedWhenOpenOrUninitialized();
     testStoryDoorSingleplayerByNotes();
     testStoryDoorMultiplayerBySwitches();
+    testDoorFootprintClearRequiresWidthAndApproach();
     std::cout << "All coop rules tests passed.\n";
     return 0;
 }

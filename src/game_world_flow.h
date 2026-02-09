@@ -17,9 +17,22 @@ void buildGeom(){
                     if(it->second.cells[lx][lz]!=0)continue;
                     float px=wx*CS,pz=wz*CS;
                     const float uvTile = 2.2f;
-                    float fl[]={px,0,pz,0,0,0,1,0,px,0,pz+CS,0,uvTile,0,1,0,px+CS,0,pz+CS,uvTile,uvTile,0,1,0,
-                               px,0,pz,0,0,0,1,0,px+CS,0,pz+CS,uvTile,uvTile,0,1,0,px+CS,0,pz,uvTile,0,0,1,0};
-                    for(int i=0;i<48;i++)fv.push_back(fl[i]);
+                    bool hasHole = isFloorHoleCell(wx,wz) || isAbyssCell(wx,wz);
+                    if(!hasHole){
+                        float fl[]={px,0,pz,0,0,0,1,0,px,0,pz+CS,0,uvTile,0,1,0,px+CS,0,pz+CS,uvTile,uvTile,0,1,0,
+                                   px,0,pz,0,0,0,1,0,px+CS,0,pz+CS,uvTile,uvTile,0,1,0,px+CS,0,pz,uvTile,0,0,1,0};
+                        for(int i=0;i<48;i++)fv.push_back(fl[i]);
+                    }else{
+                        const float shaftDepth = 30.0f;
+                        bool leftSolid = getCellWorld(wx-1,wz)==1 || (!isFloorHoleCell(wx-1,wz) && !isAbyssCell(wx-1,wz) && getCellWorld(wx-1,wz)==0);
+                        bool rightSolid = getCellWorld(wx+1,wz)==1 || (!isFloorHoleCell(wx+1,wz) && !isAbyssCell(wx+1,wz) && getCellWorld(wx+1,wz)==0);
+                        bool backSolid = getCellWorld(wx,wz-1)==1 || (!isFloorHoleCell(wx,wz-1) && !isAbyssCell(wx,wz-1) && getCellWorld(wx,wz-1)==0);
+                        bool frontSolid = getCellWorld(wx,wz+1)==1 || (!isFloorHoleCell(wx,wz+1) && !isAbyssCell(wx,wz+1) && getCellWorld(wx,wz+1)==0);
+                        if(leftSolid) mkShaftWall(wv,px,pz,0,CS,0,shaftDepth,CS);
+                        if(rightSolid) mkShaftWall(wv,px+CS,pz+CS,0,-CS,0,shaftDepth,CS);
+                        if(backSolid) mkShaftWall(wv,px+CS,pz,-CS,0,0,shaftDepth,CS);
+                        if(frontSolid) mkShaftWall(wv,px,pz+CS,CS,0,0,shaftDepth,CS);
+                    }
                     float cl[]={px,WH,pz,0,0,0,-1,0,px,WH,pz+CS,0,uvTile,0,-1,0,px+CS,WH,pz+CS,uvTile,uvTile,0,-1,0,
                                px,WH,pz,0,0,0,-1,0,px+CS,WH,pz+CS,uvTile,uvTile,0,-1,0,px+CS,WH,pz,uvTile,0,0,-1,0};
                     for(int i=0;i<48;i++)cv.push_back(cl[i]);
@@ -105,11 +118,6 @@ void buildGeom(){
             mkBox(dv, dp.x, 0.0f, dp.z + 0.18f, CS * 1.06f, 0.10f, 0.54f);
         }
     }
-    for(auto& h:floorHoles){
-        if(!h.active) continue;
-        float hx=((float)h.wx+0.5f)*CS, hz=((float)h.wz+0.5f)*CS;
-        mkFloorDecal(dv,hx,0.03f,hz,CS*0.72f,CS*0.72f);
-    }
     for(auto&l:lights){
         if(l.on)mkLight(lv,l.pos,l.sizeX,l.sizeZ);
         else mkLight(lvOff,l.pos,l.sizeX,l.sizeZ);
@@ -189,6 +197,42 @@ void genWorld(){
     updateMapContent(playerChunkX,playerChunkZ);
     entityMgr.reset();storyMgr.init();
     initTrapCorridor(sp);
+
+    // Spawn abyss location away from player spawn
+    {
+        int spawnWX = (int)floorf(sp.x / CS);
+        int spawnWZ = (int)floorf(sp.z / CS);
+        abyss.radius = 3 + (int)(rng() % 3); // radius 3-5 cells
+        int attempts = 0;
+        abyss.active = false;
+        while(attempts < 60 && !abyss.active){
+            attempts++;
+            int offX = 20 + (int)(rng() % 20) - 10; // 10-30 cells away
+            int offZ = 20 + (int)(rng() % 20) - 10;
+            if(rng() % 2) offX = -offX;
+            if(rng() % 2) offZ = -offZ;
+            int cx = spawnWX + offX;
+            int cz = spawnWZ + offZ;
+            // Verify center and some cells around it are open
+            bool valid = true;
+            for(int dx = -1; dx <= 1 && valid; dx++)
+                for(int dz = -1; dz <= 1 && valid; dz++)
+                    if(getCellWorld(cx+dx, cz+dz) != 0) valid = false;
+            if(!valid) continue;
+            abyss.centerX = cx;
+            abyss.centerZ = cz;
+            abyss.active = true;
+            // Carve out the abyss area (ensure open cells)
+            for(int dx = -abyss.radius - 1; dx <= abyss.radius + 1; dx++){
+                for(int dz = -abyss.radius - 1; dz <= abyss.radius + 1; dz++){
+                    if(dx*dx + dz*dz <= (abyss.radius+1)*(abyss.radius+1)){
+                        setCellWorld(cx+dx, cz+dz, 0);
+                    }
+                }
+            }
+        }
+    }
+
     resetPlayerInterpolation();
     initCoopObjectives(coopBase);
     worldItems.clear();
@@ -212,6 +256,10 @@ void genWorld(){
     resetScareSystemState(scareState);
     entitySpawnTimer=30;survivalTime=0;reshuffleTimer=15;
     floorHoles.clear();
+    playerFalling = false;
+    fallVelocity = 0.0f;
+    fallTimer = 0.0f;
+    abyss = {};
     lastSpawnedNote=-1;noteSpawnTimer=8.0f;
 }
 

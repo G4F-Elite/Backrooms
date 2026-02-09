@@ -23,7 +23,9 @@ inline float perlin(float x, float y, int oct) {
 
 // Generate RGBA texture with height in alpha for parallax
 inline GLuint genTex(int type) {
-    const int sz=((type==3)||(type==4))?256:512;
+    int sz = 512;
+    if (type == 0 || type == 1 || type == 2) sz = 1024;
+    else if (type == 3 || type == 4) sz = 256;
     unsigned char* d=new unsigned char[sz*sz*4]; // RGBA for height map
     for(int y=0;y<sz;y++) for(int x=0;x<sz;x++) {
         float r=128,g=128,b=128,h=128; // h = height for parallax

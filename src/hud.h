@@ -1,6 +1,7 @@
 #pragma once
 #include "coop.h"
 #include "perf_overlay.h"
+#include "progression.h"
 
 inline void drawHudText(const char* s, float x, float y, float sc, float r, float g, float b, float a = 0.95f) {
     drawText(s, x - 0.002f, y - 0.002f, sc, 0.0f, 0.0f, 0.0f, a * 0.72f);
@@ -44,8 +45,11 @@ void drawUI(){
                 char pingBuf[48];
                 if(multiState==MULTI_IN_GAME) snprintf(pingBuf,48,"PING %.0fms",netMgr.rttMs);
                 else snprintf(pingBuf,48,"PING --");
+                char netBuf[40];
+                if(multiState==MULTI_IN_GAME) snprintf(netBuf,40,"NET %s",netMgr.connectionQualityLabel((float)glfwGetTime()));
+                else snprintf(netBuf,40,"NET --");
                 char perfRow[300];
-                snprintf(perfRow,300,"%s | %s | %s | %s",fpsBuf,fgBuf,upBuf,pingBuf);
+                snprintf(perfRow,300,"%s | %s | %s | %s | %s",fpsBuf,fgBuf,upBuf,pingBuf,netBuf);
                 drawHudText(perfRow,-0.95f,0.95f,1.20f,0.88f,0.93f,0.78f,0.98f);
                 drawHudText("[F6] HUD  [F8] MINIMAP  [F3] DEBUG",-0.95f,0.90f,0.95f,0.70f,0.76f,0.66f,0.90f);
             }else{
@@ -90,6 +94,10 @@ void drawUI(){
             char phaseBuf[64];
             snprintf(phaseBuf,64,"PHASE %s",phaseNames[phaseIdx]);
             drawHudText(phaseBuf,blockX,blockY,1.14f,0.86f,0.80f,0.56f,0.94f);
+            blockY -= 0.06f;
+            char levelBuf[48];
+            buildLevelLabel(gCurrentLevel, levelBuf, 48);
+            drawHudText(levelBuf,blockX,blockY,1.06f,0.80f,0.86f,0.66f,0.93f);
             blockY -= 0.06f;
             char invBuf[64];
             snprintf(invBuf,64,"SUPPLIES B:%d M:%d T:%d",invBattery,invMedkit,invBait);
@@ -195,6 +203,9 @@ void drawUI(){
             }
             if(debugTools.flyMode){
                 drawHudText("DEBUG FLY: ON",0.52f,0.95f,1.10f,0.78f,0.95f,0.85f,0.98f);
+            }
+            if(multiState==MULTI_IN_GAME && netMgr.connectionUnstable((float)glfwGetTime())){
+                drawHudTextCentered("NETWORK UNSTABLE - RECONNECTING MAY OCCUR",0.0f,0.74f,1.12f,0.95f,0.64f,0.44f,0.95f);
             }
             if(debugTools.open){
                 drawFullscreenOverlay(0.02f,0.03f,0.04f,0.62f);

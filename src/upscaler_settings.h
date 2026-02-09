@@ -125,3 +125,26 @@ inline const char* frameGenModeLabel(int mode) {
         default: return "OFF";
     }
 }
+
+inline constexpr int RTX_OFF = 0;
+inline constexpr int RTX_LOW = 1;
+inline constexpr int RTX_MEDIUM = 2;
+inline constexpr int RTX_HIGH = 3;
+inline constexpr int RTX_ULTRA = 4;
+inline constexpr int RTX_COUNT = 5;
+
+inline int clampRtxQuality(int q) {
+    if (q < RTX_OFF) return RTX_OFF;
+    if (q >= RTX_COUNT) return RTX_COUNT - 1;
+    return q;
+}
+inline int stepRtxQuality(int q, int delta) { return clampRtxQuality(q + delta); }
+inline const char* rtxQualityLabel(int q) {
+    switch (clampRtxQuality(q)) {
+        case RTX_LOW: return "LOW";
+        case RTX_MEDIUM: return "MEDIUM";
+        case RTX_HIGH: return "HIGH";
+        case RTX_ULTRA: return "ULTRA";
+        default: return "OFF";
+    }
+}

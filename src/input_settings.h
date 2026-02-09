@@ -66,14 +66,18 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
             return true;
         }
         if (vi == 6) {
-            settings.fastMath = !settings.fastMath;
+            settings.rtxQuality = stepRtxQuality(settings.rtxQuality, dir);
             return true;
         }
         if (vi == 7) {
-            settings.frameGenMode = stepFrameGenMode(settings.frameGenMode, dir);
+            settings.fastMath = !settings.fastMath;
             return true;
         }
         if (vi == 8) {
+            settings.frameGenMode = stepFrameGenMode(settings.frameGenMode, dir);
+            return true;
+        }
+        if (vi == 9) {
             settings.vsync = !settings.vsync;
             return true;
         }

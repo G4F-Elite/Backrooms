@@ -20,3 +20,13 @@ inline bool shouldBlockStoryDoor(
     if (notesRequired < 1) return false;
     return notesCollected < notesRequired;
 }
+
+template <typename CellQuery>
+inline bool isDoorFootprintClear(int wx, int wz, CellQuery cellAt) {
+    if (cellAt(wx, wz) != 0) return false;
+    if (cellAt(wx - 1, wz) != 0) return false;
+    if (cellAt(wx + 1, wz) != 0) return false;
+    bool frontOpen = cellAt(wx, wz + 1) == 0;
+    bool backOpen = cellAt(wx, wz - 1) == 0;
+    return frontOpen || backOpen;
+}

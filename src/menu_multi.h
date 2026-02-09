@@ -201,7 +201,15 @@ inline void drawWaitingScreen(float tm) {
     char pc[48];
     snprintf(pc, 48, "LOBBY: %d/%d PLAYERS", netMgr.getPlayerCount(), MAX_PLAYERS);
     drawTextCentered(pc, 0.0f, -0.05f, 1.4f, 0.65f, 0.75f, 0.55f, 0.8f);
-    float py = -0.18f;
+    if(netMgr.connected){
+        char netLine[72];
+        std::snprintf(netLine, 72, "NET: %s  PING: %.0fms", netMgr.connectionQualityLabel((float)glfwGetTime()), netMgr.rttMs);
+        drawTextCentered(netLine, 0.0f, -0.12f, 1.2f, 0.68f, 0.78f, 0.58f, 0.82f);
+        if(netMgr.connectionUnstable((float)glfwGetTime())){
+            drawTextCentered("CONNECTION UNSTABLE. AUTO-RECOVERY ACTIVE.", 0.0f, -0.20f, 1.12f, 0.9f, 0.62f, 0.42f, 0.9f);
+        }
+    }
+    float py = -0.30f;
     for (int i = 0; i < MAX_PLAYERS; i++) {
         if (!netMgr.players[i].active) continue;
         char line[72];
