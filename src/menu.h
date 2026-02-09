@@ -101,12 +101,7 @@ inline const char* menuBgVS = R"(#version 330 core
 layout(location=0) in vec2 p; out vec2 uv;
 void main() { gl_Position = vec4(p, 0.0, 1.0); uv = p * 0.5 + 0.5; })";
 inline const char* menuBgFS = R"(#version 330 core
-in vec2 uv; out vec4 fc; uniform float tm; uniform sampler2D wallT; uniform sampler2D floorT; uniform sampler2D ceilT; uniform sampler2D lampT; float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);} vec3 tex2(sampler2D t, vec2 q){return texture(t,q).rgb;} void main(){vec2 p=uv*2.0-1.0; p.x*=1.33; float time=tm*0.25; vec3 ro=vec3(0.0,0.1,-1.7); vec3 rd=normalize(vec3(p,1.35)); float yaw=sin(time*0.6)*0.18; rd.xz=mat2(cos(yaw),-sin(yaw),sin(yaw),cos(yaw))*rd.xz; float hw=2.6, hh=1.35; float tMin=1e9; int hit=0; vec3 hp=vec3(0); vec3 n=vec3(0);
-float tF=( -hh-ro.y)/rd.y; if(tF>0.0){vec3 q=ro+rd*tF; if(abs(q.x)<hw){tMin=tF;hit=1;hp=q;n=vec3(0,1,0);} } float tC=( hh-ro.y)/rd.y; if(tC>0.0){vec3 q=ro+rd*tC; if(abs(q.x)<hw && tC<tMin){tMin=tC;hit=2;hp=q;n=vec3(0,-1,0);} }
-float tL=( -hw-ro.x)/rd.x; if(tL>0.0){vec3 q=ro+rd*tL; if(abs(q.y)<hh && tL<tMin){tMin=tL;hit=3;hp=q;n=vec3(1,0,0);} } float tR=( hw-ro.x)/rd.x; if(tR>0.0){vec3 q=ro+rd*tR; if(abs(q.y)<hh && tR<tMin){tMin=tR;hit=4;hp=q;n=vec3(-1,0,0);} }
-vec3 col=vec3(0.04,0.04,0.04); if(hit!=0){float z=hp.z+time*6.0; vec2 q=vec2(0); if(hit==1){q=vec2(hp.x*0.35, z*0.22);} else if(hit==2){q=vec2(hp.x*0.28, z*0.20);} else {q=vec2(z*0.18, (hp.y+hh)*0.42);} vec3 al=(hit==1)?tex2(floorT,q):(hit==2?tex2(ceilT,q):tex2(wallT,q));
-float seg=floor((z+1000.0)*0.6); float lampOn=step(0.85, h(vec2(seg,seg*0.13))); float lampX=sin(seg*2.0)*0.6; vec3 lp=vec3(lampX, hh-0.05, (seg/0.6)-1000.0); float dist=length(hp-lp); float l=lampOn*(2.0/(1.0+dist*dist*0.8)); col=al*(0.20+l); col+=tex2(lampT, vec2(hp.x*0.35, z*0.25))*l*0.35; float ao=clamp(0.65+0.35*abs(n.y),0.0,1.0); col*=ao; }
-float fog=exp(-tMin*0.22); col=mix(vec3(0.02,0.02,0.02),col,fog); float scan=0.97+0.03*sin(uv.y*900.0+tm*40.0); col*=scan; col+=(h(uv*vec2(640.0,360.0)+tm*2.0)-0.5)*0.04; col=clamp(col,0.0,1.0); fc=vec4(col,1.0);} )";
+in vec2 uv; out vec4 fc; uniform float tm; uniform sampler2D wallT; uniform sampler2D floorT; uniform sampler2D ceilT; uniform sampler2D lampT; float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);} vec3 tex2(sampler2D t, vec2 q){return texture(t,q).rgb;} void main(){vec2 p=uv*2.0-1.0; p.x*=1.33; float time=tm*0.18; vec3 ro=vec3(0.0,0.1,-1.7); vec3 rd=normalize(vec3(p,1.35)); float yaw=sin(time*0.6)*0.12; rd.xz=mat2(cos(yaw),-sin(yaw),sin(yaw),cos(yaw))*rd.xz; float hw=2.6, hh=1.35; float tMin=1e9; int hit=0; vec3 hp=vec3(0); vec3 n=vec3(0); float tF=(-hh-ro.y)/rd.y; if(tF>0.0){vec3 q=ro+rd*tF; if(abs(q.x)<hw){tMin=tF;hit=1;hp=q;n=vec3(0,1,0);}} float tC=(hh-ro.y)/rd.y; if(tC>0.0){vec3 q=ro+rd*tC; if(abs(q.x)<hw && tC<tMin){tMin=tC;hit=2;hp=q;n=vec3(0,-1,0);}} float tL=(-hw-ro.x)/rd.x; if(tL>0.0){vec3 q=ro+rd*tL; if(abs(q.y)<hh && tL<tMin){tMin=tL;hit=3;hp=q;n=vec3(1,0,0);}} float tR=(hw-ro.x)/rd.x; if(tR>0.0){vec3 q=ro+rd*tR; if(abs(q.y)<hh && tR<tMin){tMin=tR;hit=4;hp=q;n=vec3(-1,0,0);}} vec3 col=vec3(0.22,0.20,0.14); if(hit!=0){float z=hp.z+time*4.0; vec2 q= (hit==1)?vec2(hp.x*0.35,z*0.22):(hit==2?vec2(hp.x*0.28,z*0.20):vec2(z*0.18,(hp.y+hh)*0.42)); vec3 al=(hit==1)?tex2(floorT,q):(hit==2?tex2(ceilT,q):tex2(wallT,q)); float seg=(z+1000.0)*0.55; float lampZ=(floor(seg)+0.5)/0.55-1000.0; vec3 lp=vec3(0.0,hh-0.06,lampZ); float dist=length(hp-lp); float l=4.5/(1.0+dist*dist*0.55); float ambient=0.55; col=al*(ambient+l); col+=tex2(lampT,vec2(hp.x*0.35,z*0.25))*l*0.55; col*=clamp(0.7+0.3*abs(n.y),0.0,1.0);} float fog=exp(-tMin*0.10); col=mix(vec3(0.12,0.11,0.10),col,fog); col*=0.99+0.01*sin(uv.y*900.0); col+=(h(uv*vec2(640.0,360.0))-0.5)*0.015; col=clamp(col,0.0,1.0); fc=vec4(col,1.0);} )";
 
 inline GLuint genFontTex() {
     unsigned char* data = new unsigned char[96*8*8*3]; memset(data,0,96*8*8*3);
@@ -261,8 +256,9 @@ inline void drawSlider(float x,float y,float w,float val,float r,float g,float b
 inline void drawMenu(float tm) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     drawMainMenuBackdrop(tm);
-    drawFullscreenOverlay(0.015f,0.013f,0.012f,0.72f);
-    drawFullscreenOverlay(0.17f,0.13f,0.08f,0.22f + 0.05f*sinf(tm*0.9f));
+    // Lighter overlays so background stays readable
+    drawFullscreenOverlay(0.02f,0.02f,0.02f,0.28f);
+    drawFullscreenOverlay(0.17f,0.13f,0.08f,0.10f);
     float p=0.8f+0.05f*sinf(tm*2.0f), gl=(rand()%100<3)?(rand()%10-5)*0.003f:0;
     drawTextCentered("THE BACKROOMS",0.0f+gl,0.5f,4.0f,0.9f,0.85f,0.4f,p);
     char levelBuf[32];
