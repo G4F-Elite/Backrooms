@@ -171,6 +171,12 @@ inline void pushMapPropUnique(int cx, int cz, int lx, int lz, int type, float sc
         ((float)(cz * CHUNK_SIZE + lz) + 0.5f) * CS
     );
     Vec3 wp = base;
+    bool foundValid = false;
+    MapProp probe{};
+    probe.type = type;
+    probe.scale = scale;
+    probe.yaw = yaw;
+    float propRadius = mapPropCollisionRadius(probe) * 0.86f;
     const float jitter = CS * 0.22f;
     for (int attempt = 0; attempt < 3; attempt++) {
         float mul = (attempt == 0) ? 1.0f : (attempt == 1 ? 0.6f : 0.3f);
@@ -180,9 +186,12 @@ inline void pushMapPropUnique(int cx, int cz, int lx, int lz, int type, float sc
         int wx = (int)floorf(cand.x / CS);
         int wz = (int)floorf(cand.z / CS);
         if (getCellWorld(wx, wz) != 0) continue;
+        if (propRadius > 0.001f && collideWorld(cand.x, cand.z, propRadius)) continue;
         wp = cand;
+        foundValid = true;
         break;
     }
+    if (!foundValid) return;
     if (hasMapPropNear(wp, CS * (0.40f + scale * 0.22f))) return;
     MapProp pr{};
     pr.pos = wp;
@@ -305,6 +314,12 @@ inline bool isMapPropOnWall(const MapProp& p) {
     return getCellWorld(wx, wz) == 1;
 }
 
+inline bool isMapPropEmbeddedInWall(const MapProp& p) {
+    float r = mapPropCollisionRadius(p) * 0.86f;
+    if (r <= 0.001f) return false;
+    return collideWorld(p.pos.x, p.pos.z, r);
+}
+
 inline void updateMapContent(int pcx, int pcz) {
     float cx = (pcx + 0.5f) * CHUNK_SIZE * CS;
     float cz = (pcz + 0.5f) * CHUNK_SIZE * CS;
@@ -314,7 +329,7 @@ inline void updateMapContent(int pcx, int pcz) {
         std::remove_if(
             mapProps.begin(),
             mapProps.end(),
-            [&](const MapProp& p) { return isMapPropTooFar(p, cx, cz, md) || isMapPropOnWall(p); }
+            [&](const MapProp& p) { return isMapPropTooFar(p, cx, cz, md) || isMapPropOnWall(p) || isMapPropEmbeddedInWall(p); }
         ),
         mapProps.end()
     );

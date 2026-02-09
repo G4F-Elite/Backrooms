@@ -44,13 +44,14 @@ inline void drawMultiMenuScreen(float tm) {
         drawText(opts[i], baseX, y, 2.0f, 0.9f * s, 0.85f * s, 0.4f * s);
     }
     
-    drawTextCentered("USE RADMIN VPN OR HAMACHI FOR LAN", 0.0f, -0.3f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);
-    drawTextCentered("PORT: 27015 UDP", 0.0f, -0.42f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);
-    drawTextCentered(multiNetworkMode == 0 ? "NETWORK MODE: LAN" : "NETWORK MODE: DEDICATED", 0.0f, -0.47f, 1.25f, 0.65f, 0.75f, 0.5f, 0.85f);
+    const bool lanTab = (multiNetworkMode == 0);
+    drawTextCentered(lanTab ? "[LAN]   SERVERS" : " LAN   [SERVERS]", 0.0f, -0.30f, 1.55f, 0.65f, 0.75f, 0.5f, 0.88f);
+    drawTextCentered(lanTab ? "LAN MODE: USE RADMIN OR HAMACHI" : "SERVERS MODE: CENTRALIZED DIRECTORY", 0.0f, -0.40f, 1.3f, 0.55f, 0.62f, 0.46f, 0.74f);
+    drawTextCentered("PORT: 27015 UDP", 0.0f, -0.48f, 1.35f, 0.5f, 0.5f, 0.4f, 0.6f);
     char nickBuf[80];
     snprintf(nickBuf, 80, "NICKNAME: [%s%s]", multiNickname, multiEditingNickname ? "_" : "");
     drawTextCentered(nickBuf, 0.0f, -0.58f, 1.4f, 0.75f, 0.8f, 0.55f, 0.85f);
-    drawTextCentered("TAB: EDIT NICKNAME   T: SWITCH MODE", 0.0f, -0.68f, 1.1f, 0.55f, 0.6f, 0.45f, 0.7f);
+    drawTextCentered("TAB: EDIT NICKNAME   LEFT/RIGHT: SWITCH TAB", 0.0f, -0.68f, 1.1f, 0.55f, 0.6f, 0.45f, 0.7f);
     lanDiscovery.ensureLocalIP();
     char ipLine[96];
     snprintf(ipLine, 96, "LOCAL IP: %s", lanDiscovery.localIP);
@@ -66,9 +67,9 @@ inline void drawJoinMenuScreen(float tm) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
-    drawTextCentered("JOIN GAME", 0.0f, 0.55f, 3.0f, 0.9f, 0.85f, 0.4f, 0.9f);
-    
     bool dedicated = (multiNetworkMode == 1);
+    drawTextCentered("JOIN GAME", 0.0f, 0.55f, 3.0f, 0.9f, 0.85f, 0.4f, 0.9f);
+    drawTextCentered(dedicated ? " LAN   [SERVERS]" : "[LAN]   SERVERS", 0.0f, 0.43f, 1.45f, 0.68f, 0.78f, 0.52f, 0.90f);
 
     // IP Field (LAN target IP or Dedicated master IP)
     float ipSel = (multiInputField == 0) ? 1.0f : 0.5f;
@@ -105,19 +106,20 @@ inline void drawJoinMenuScreen(float tm) {
     
     drawText("TAB TO SWITCH FIELDS    0-9 AND . FOR INPUT", -0.58f, -0.4f, 1.3f, 0.5f, 0.5f, 0.4f, 0.6f);
     drawText(dedicated ? "BACKSPACE TO DELETE     ENTER/G CONNECT" : "BACKSPACE TO DELETE     ENTER TO CONNECT", -0.58f, -0.5f, 1.3f, 0.5f, 0.5f, 0.4f, 0.6f);
-    if (multiNetworkMode == 0) drawText("AUTO LAN SCAN: R REFRESH, F NEXT ROOM", -0.58f, -0.6f, 1.2f, 0.55f, 0.65f, 0.45f, 0.7f);
-    else drawText("MASTER SCAN: R REFRESH, F NEXT SERVER", -0.58f, -0.6f, 1.2f, 0.55f, 0.65f, 0.45f, 0.7f);
+    drawText("LEFT/RIGHT OR T: SWITCH LAN/SERVERS TAB", -0.58f, -0.57f, 1.1f, 0.55f, 0.62f, 0.46f, 0.72f);
+    if (multiNetworkMode == 0) drawText("AUTO LAN SCAN: R REFRESH, F NEXT ROOM", -0.58f, -0.64f, 1.2f, 0.55f, 0.65f, 0.45f, 0.7f);
+    else drawText("MASTER SCAN: R REFRESH, F NEXT SERVER", -0.58f, -0.64f, 1.2f, 0.55f, 0.65f, 0.45f, 0.7f);
     
     char roomHead[64];
     snprintf(roomHead, 64, multiNetworkMode == 0 ? "ROOMS FOUND: %d" : "SERVERS FOUND: %d", multiNetworkMode == 0 ? lanDiscovery.roomCount : dedicatedDirectory.roomCount);
-    drawText(roomHead, -0.58f, -0.72f, 1.2f, 0.7f, 0.8f, 0.55f, 0.75f);
+    drawText(roomHead, -0.58f, -0.76f, 1.2f, 0.7f, 0.8f, 0.55f, 0.75f);
     if (!dedicated) {
         for (int i = 0; i < lanDiscovery.roomCount && i < 3; i++) {
             const LanRoomInfo& room = lanDiscovery.rooms[i];
             char roomLine[128];
             snprintf(roomLine, 128, "%s %d/%d %s", room.ip, (int)room.playerCount, (int)room.maxPlayers, room.gameStarted ? "IN GAME" : "LOBBY");
             float alpha = (i == lanDiscovery.selectedRoom) ? 0.95f : 0.65f;
-            drawText(roomLine, -0.58f, -0.8f - i * 0.07f, 1.1f, 0.75f, 0.85f, 0.6f, alpha);
+            drawText(roomLine, -0.58f, -0.84f - i * 0.07f, 1.1f, 0.75f, 0.85f, 0.6f, alpha);
         }
     } else {
         for (int i = 0; i < dedicatedDirectory.roomCount && i < 3; i++) {
@@ -125,13 +127,13 @@ inline void drawJoinMenuScreen(float tm) {
             char roomLine[128];
             snprintf(roomLine, 128, "%s:%hu %d/%d %s", room.ip, room.gamePort, (int)room.playerCount, (int)room.maxPlayers, room.inGame ? "IN GAME" : "LOBBY");
             float alpha = (i == dedicatedDirectory.selectedRoom) ? 0.95f : 0.65f;
-            drawText(roomLine, -0.58f, -0.8f - i * 0.07f, 1.1f, 0.75f, 0.85f, 0.6f, alpha);
+            drawText(roomLine, -0.58f, -0.84f - i * 0.07f, 1.1f, 0.75f, 0.85f, 0.6f, alpha);
         }
         const DedicatedRoomInfo* room = dedicatedDirectory.getSelectedRoom();
         if (room) {
             char targetLine[128];
             snprintf(targetLine, 128, "TARGET: %s:%hu", room->ip, room->gamePort);
-            drawText(targetLine, -0.58f, -1.02f, 1.1f, 0.72f, 0.85f, 0.62f, 0.82f);
+            drawText(targetLine, -0.58f, -1.06f, 1.1f, 0.72f, 0.85f, 0.62f, 0.82f);
         }
     }
     

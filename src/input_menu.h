@@ -6,9 +6,9 @@ inline void menuInput(GLFWwindow* w) {
     bool enter = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_SPACE) == GLFW_PRESS;
     
     if (gameState == STATE_MENU) {
-        // Main menu: START GAME, MULTIPLAYER, SETTINGS, QUIT (4 items: 0-3)
-        if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 3; triggerMenuNavigateSound(); }
-        if (down && !downPressed) { menuSel++; if (menuSel > 3) menuSel = 0; triggerMenuNavigateSound(); }
+        // Main menu: START GAME, MULTIPLAYER, GUIDE, SETTINGS, QUIT (5 items: 0-4)
+        if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 4; triggerMenuNavigateSound(); }
+        if (down && !downPressed) { menuSel++; if (menuSel > 4) menuSel = 0; triggerMenuNavigateSound(); }
         if (enter && !enterPressed) {
             triggerMenuConfirmSound();
             if (menuSel == 0) { 
@@ -21,6 +21,10 @@ inline void menuInput(GLFWwindow* w) {
                 menuSel = 0; 
             }
             else if (menuSel == 2) { 
+                // Guide screen
+                gameState = STATE_GUIDE;
+            }
+            else if (menuSel == 3) { 
                 // Settings
                 settingsTab = SETTINGS_TAB_AUDIO;
                 gameState = STATE_SETTINGS; 
@@ -32,6 +36,13 @@ inline void menuInput(GLFWwindow* w) {
             }
         }
     } 
+    else if (gameState == STATE_GUIDE) {
+        if ((esc && !escPressed) || (enter && !enterPressed)) {
+            triggerMenuConfirmSound();
+            gameState = STATE_MENU;
+            menuSel = 2;
+        }
+    }
     else if (gameState == STATE_PAUSE) {
         if (multiState == MULTI_IN_GAME) {
             // Multiplayer pause: RESUME, TELEPORT, SETTINGS, DISCONNECT, QUIT (5 items)
@@ -116,7 +127,9 @@ inline void menuInput(GLFWwindow* w) {
         static bool tabPressed = false;
         static bool modeSwitchPressed = false;
         bool tabNow = glfwGetKey(w, GLFW_KEY_TAB) == GLFW_PRESS;
-        bool modeSwitchNow = glfwGetKey(w, GLFW_KEY_T) == GLFW_PRESS;
+        bool leftNow = glfwGetKey(w, GLFW_KEY_LEFT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_A) == GLFW_PRESS;
+        bool rightNow = glfwGetKey(w, GLFW_KEY_RIGHT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_D) == GLFW_PRESS;
+        bool modeSwitchNow = glfwGetKey(w, GLFW_KEY_T) == GLFW_PRESS || leftNow || rightNow;
         if (tabNow && !tabPressed) multiEditingNickname = !multiEditingNickname;
         if (modeSwitchNow && !modeSwitchPressed) {
             multiNetworkMode = (multiNetworkMode == 0) ? 1 : 0;
@@ -237,11 +250,34 @@ inline void menuInput(GLFWwindow* w) {
         
         // TAB to switch between IP and Port fields
         static bool tabPressed = false;
+        static bool modeSwitchPressed = false;
         bool tabNow = glfwGetKey(w, GLFW_KEY_TAB) == GLFW_PRESS;
+        bool leftNow = glfwGetKey(w, GLFW_KEY_LEFT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_A) == GLFW_PRESS;
+        bool rightNow = glfwGetKey(w, GLFW_KEY_RIGHT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_D) == GLFW_PRESS;
+        bool modeSwitchNow = glfwGetKey(w, GLFW_KEY_T) == GLFW_PRESS || leftNow || rightNow;
         if (tabNow && !tabPressed) {
             multiInputField = (multiInputField == 0) ? 1 : 0;
         }
         tabPressed = tabNow;
+        if (modeSwitchNow && !modeSwitchPressed) {
+            multiNetworkMode = (multiNetworkMode == 0) ? 1 : 0;
+            multiIPManualEdit = false;
+            multiMasterManualEdit = false;
+            if (multiNetworkMode == 0) {
+                dedicatedDirectory.stop();
+                lanDiscovery.startClient();
+                lanDiscovery.requestScan();
+            } else {
+                lanDiscovery.stop();
+                int mPort = backrooms::protocol::kDefaultMasterPort;
+                if (std::sscanf(multiMasterPort, "%d", &mPort) != 1 || mPort < 1 || mPort > 65535) mPort = backrooms::protocol::kDefaultMasterPort;
+                dedicatedDirectory.stop();
+                dedicatedDirectory.start(multiMasterIP, (unsigned short)mPort);
+                dedicatedDirectory.requestScan();
+            }
+            triggerMenuAdjustSound();
+        }
+        modeSwitchPressed = modeSwitchNow;
         
         // Number input for IP/Port
         static bool numPressed[11] = {false};

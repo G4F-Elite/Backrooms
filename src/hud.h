@@ -14,6 +14,7 @@ inline void drawHudTextCentered(const char* s, float x, float y, float sc, float
 
 void drawUI(){
     if(gameState==STATE_MENU) drawMenu(vhsTime);
+    else if(gameState==STATE_GUIDE) drawGuideScreen();
     else if(gameState==STATE_MULTI) drawMultiMenuScreen(vhsTime);
     else if(gameState==STATE_MULTI_HOST) drawHostLobbyScreen(vhsTime,netMgr.getPlayerCount());
     else if(gameState==STATE_MULTI_JOIN) drawJoinMenuScreen(vhsTime);
@@ -46,9 +47,9 @@ void drawUI(){
                 char perfRow[300];
                 snprintf(perfRow,300,"%s | %s | %s | %s",fpsBuf,fgBuf,upBuf,pingBuf);
                 drawHudText(perfRow,-0.95f,0.95f,1.20f,0.88f,0.93f,0.78f,0.98f);
-                drawHudText("[F6] HUD  [F8] MINIMAP  [F3] DEBUG  [F1] GUIDE",-0.95f,0.90f,0.95f,0.70f,0.76f,0.66f,0.90f);
+                drawHudText("[F6] HUD  [F8] MINIMAP  [F3] DEBUG",-0.95f,0.90f,0.95f,0.70f,0.76f,0.66f,0.90f);
             }else{
-                drawHudText("[F6] SHOW HUD  [F8] MINIMAP  [F1] GUIDE",-0.95f,0.95f,1.00f,0.80f,0.86f,0.74f,0.95f);
+                drawHudText("[F6] SHOW HUD  [F8] MINIMAP",-0.95f,0.95f,1.00f,0.80f,0.86f,0.74f,0.95f);
             }
 
             if(playerHealth<100)drawHealthBar(playerHealth);
@@ -136,15 +137,6 @@ void drawUI(){
             }
             if(multiState!=MULTI_IN_GAME && echoStatusTimer>0.0f){
                 drawHudTextCentered(echoStatusText,0.0f,0.62f,1.18f,0.7f,0.86f,0.9f,0.92f);
-            }
-            if(gShowGameplayGuide){
-                drawHudText("GUIDE",-0.95f,0.78f,1.05f,0.86f,0.90f,0.72f,0.95f);
-                drawHudText("ECHO: APPROACH SIGNAL, PRESS E TO ATTUNE",-0.95f,0.73f,0.92f,0.72f,0.84f,0.84f,0.92f);
-                drawHudText("ECHO CAN GIVE SUPPLIES, HEAL, OR BREACH",-0.95f,0.68f,0.92f,0.76f,0.74f,0.86f,0.92f);
-                drawHudText("FLOOR HOLES: AVOID DARK OPEN CELLS",-0.95f,0.63f,0.92f,0.92f,0.66f,0.50f,0.92f);
-                drawHudText("LOW SANITY INCREASES DEATH RISK",-0.95f,0.58f,0.92f,0.90f,0.72f,0.64f,0.92f);
-                if(multiState==MULTI_IN_GAME) drawHudText("COOP: HOLD BOTH SWITCHES TO OPEN EXIT DOOR",-0.95f,0.53f,0.92f,0.82f,0.86f,0.64f,0.92f);
-                else drawHudText("GOAL: COLLECT 5 NOTES, THEN EXIT THROUGH DOOR",-0.95f,0.53f,0.92f,0.82f,0.86f,0.64f,0.92f);
             }
             if(minimapEnabled) drawMinimapOverlay();
             if(storyMgr.hasHallucinations())drawHallucinationEffect((50.0f-playerSanity)/50.0f);

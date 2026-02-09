@@ -341,7 +341,12 @@ inline bool wouldBlockPassage(const Chunk& chunk, int lx, int lz) {
 inline void updateLightsAndPillars(int pcx, int pcz) {
     float cx = (pcx+0.5f)*CHUNK_SIZE*CS, cz = (pcz+0.5f)*CHUNK_SIZE*CS, md = (VIEW_CHUNKS+1)*CHUNK_SIZE*CS;
     lights.erase(std::remove_if(lights.begin(),lights.end(),[&](Light&l){ return fabsf(l.pos.x-cx)>md||fabsf(l.pos.z-cz)>md; }),lights.end());
-    pillars.erase(std::remove_if(pillars.begin(),pillars.end(),[&](Vec3&p){ return fabsf(p.x-cx)>md||fabsf(p.z-cz)>md; }),pillars.end());
+    pillars.erase(std::remove_if(pillars.begin(),pillars.end(),[&](Vec3&p){
+        if (fabsf(p.x-cx)>md||fabsf(p.z-cz)>md) return true;
+        int wx = (int)floorf(p.x / CS);
+        int wz = (int)floorf(p.z / CS);
+        return getCellWorld(wx, wz) == 1;
+    }),pillars.end());
     for (int dcx=-VIEW_CHUNKS; dcx<=VIEW_CHUNKS; dcx++) for (int dcz=-VIEW_CHUNKS; dcz<=VIEW_CHUNKS; dcz++) {
         auto it = chunks.find(chunkKey(pcx+dcx, pcz+dcz)); if (it==chunks.end()) continue;
         unsigned int seed = worldSeed ^ (unsigned)((pcx+dcx)*12345+(pcz+dcz)*67890);

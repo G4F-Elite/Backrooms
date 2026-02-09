@@ -67,7 +67,7 @@ inline int clampSettingsSelection(int tab, int idx) {
     return idx;
 }
 
-enum GameState { STATE_MENU, STATE_GAME, STATE_PAUSE, STATE_SETTINGS, STATE_SETTINGS_PAUSE, STATE_KEYBINDS, STATE_KEYBINDS_PAUSE, STATE_INTRO, STATE_NOTE, STATE_MULTI, STATE_MULTI_HOST, STATE_MULTI_JOIN, STATE_MULTI_WAIT };
+enum GameState { STATE_MENU, STATE_GUIDE, STATE_GAME, STATE_PAUSE, STATE_SETTINGS, STATE_SETTINGS_PAUSE, STATE_KEYBINDS, STATE_KEYBINDS_PAUSE, STATE_INTRO, STATE_NOTE, STATE_MULTI, STATE_MULTI_HOST, STATE_MULTI_JOIN, STATE_MULTI_WAIT };
 inline GameState gameState = STATE_MENU;
 inline int menuSel=0, currentWinW=1280, currentWinH=720;
 inline int keybindCaptureIndex = -1;
@@ -247,15 +247,33 @@ inline void drawMenu(float tm) {
     float p=0.8f+0.05f*sinf(tm*2.0f), gl=(rand()%100<3)?(rand()%10-5)*0.003f:0;
     drawTextCentered("THE BACKROOMS",0.0f+gl,0.5f,4.0f,0.9f,0.85f,0.4f,p);
     drawTextCentered("LEVEL 0",0.0f,0.35f,2.5f,0.7f,0.65f,0.3f,0.8f);
-    const char* it[]={"START GAME","MULTIPLAYER","SETTINGS","QUIT"};
-    for(int i=0;i<4;i++){
-        float s=(menuSel==i)?1.0f:0.5f; float y=0.08f-i*0.12f;
+    const char* it[]={"START GAME","MULTIPLAYER","GUIDE","SETTINGS","QUIT"};
+    for(int i=0;i<5;i++){
+        float s=(menuSel==i)?1.0f:0.5f; float y=0.10f-i*0.11f;
         float baseX = -measureTextWidthNdc(it[i], 2.0f) * 0.5f;
         if(menuSel==i)drawText(">", baseX - 0.08f, y, 2.0f, 0.9f*s,0.85f*s,0.4f*s);
         drawText(it[i], baseX, y, 2.0f,0.9f*s,0.85f*s,0.4f*s);
     }
     drawTextCentered("UP/DOWN - SELECT    ENTER - CONFIRM",0.0f,-0.6f,1.5f,0.5f,0.5f,0.4f,0.6f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
+}
+
+inline void drawGuideScreen() {
+    glDisable(GL_DEPTH_TEST);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    drawFullscreenOverlay(0.02f,0.02f,0.03f,0.80f);
+    drawTextCentered("GUIDE",0.0f,0.58f,2.8f,0.9f,0.85f,0.4f,0.96f);
+    drawTextCentered("GOAL: COLLECT 5 NOTES AND REACH EXIT",0.0f,0.40f,1.5f,0.82f,0.86f,0.64f,0.94f);
+    drawTextCentered("ECHO SIGNAL: APPROACH AND PRESS E TO ATTUNE",0.0f,0.30f,1.38f,0.72f,0.84f,0.86f,0.92f);
+    drawTextCentered("ECHO CAN HEAL, GIVE SUPPLIES OR TRIGGER BREACH",0.0f,0.22f,1.32f,0.76f,0.74f,0.86f,0.92f);
+    drawTextCentered("FLOOR HOLES KILL ON FALL. AVOID DARK OPEN CELLS",0.0f,0.12f,1.34f,0.92f,0.66f,0.50f,0.94f);
+    drawTextCentered("LOW SANITY INCREASES DANGER",0.0f,0.04f,1.34f,0.90f,0.72f,0.64f,0.92f);
+    drawTextCentered("COOP: HOLD 2 SWITCHES TO OPEN EXIT DOOR",0.0f,-0.06f,1.34f,0.82f,0.86f,0.64f,0.92f);
+    drawTextCentered("CONTROLS: F FLASHLIGHT, SHIFT SPRINT, C CROUCH, E INTERACT",0.0f,-0.20f,1.26f,0.70f,0.76f,0.66f,0.90f);
+    drawTextCentered("ESC OR ENTER - BACK TO MENU",0.0f,-0.70f,1.4f,0.56f,0.62f,0.50f,0.82f);
+    glDisable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
 }
 
 inline void drawSettings(bool fp) {

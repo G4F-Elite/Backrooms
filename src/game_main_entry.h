@@ -324,7 +324,7 @@ int main(){
         glDisable(GL_DEPTH_TEST);
 
         glUseProgram(vhsShader);
-        bool vhsMenu=(gameState==STATE_MENU||gameState==STATE_MULTI||gameState==STATE_MULTI_HOST||gameState==STATE_MULTI_JOIN||gameState==STATE_MULTI_WAIT);
+        bool vhsMenu=(gameState==STATE_MENU||gameState==STATE_GUIDE||gameState==STATE_MULTI||gameState==STATE_MULTI_HOST||gameState==STATE_MULTI_JOIN||gameState==STATE_MULTI_WAIT);
         bool vhsGameplay=(gameState==STATE_GAME||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_KEYBINDS_PAUSE||gameState==STATE_NOTE||gameState==STATE_INTRO);
         float vI=0.0f;
         if(vhsMenu){

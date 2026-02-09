@@ -82,7 +82,6 @@ void gameInput(GLFWwindow*w){
     static bool debugEscPressed = false;
     static bool perfTogglePressed = false;
     static bool hudTogglePressed = false;
-    static bool guideTogglePressed = false;
     bool debugToggleNow = glfwGetKey(w,GLFW_KEY_F10)==GLFW_PRESS;
     if(debugToggleNow && !debugTogglePressed){
         debugTools.open = !debugTools.open;
@@ -100,12 +99,6 @@ void gameInput(GLFWwindow*w){
         triggerMenuConfirmSound();
     }
     hudTogglePressed = hudToggleNow;
-    bool guideToggleNow = glfwGetKey(w,GLFW_KEY_F1)==GLFW_PRESS;
-    if(guideToggleNow && !guideTogglePressed){
-        gShowGameplayGuide = !gShowGameplayGuide;
-        triggerMenuConfirmSound();
-    }
-    guideTogglePressed = guideToggleNow;
 
     if(debugTools.open){
         bool upNow = glfwGetKey(w,GLFW_KEY_UP)==GLFW_PRESS || glfwGetKey(w,GLFW_KEY_W)==GLFW_PRESS;
