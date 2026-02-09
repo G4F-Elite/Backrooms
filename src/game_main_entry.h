@@ -1,4 +1,5 @@
 #pragma once
+#include "progression.h"
 int main(){
     std::random_device rd;rng.seed(rd());
     if(!glfwInit())return -1;
@@ -147,7 +148,13 @@ int main(){
                 bool eN=glfwGetKey(gWin,GLFW_KEY_ENTER)==GLFW_PRESS||
                         glfwGetKey(gWin,GLFW_KEY_SPACE)==GLFW_PRESS;
                 bool esN=glfwGetKey(gWin,GLFW_KEY_ESCAPE)==GLFW_PRESS;
-                if(eN&&!enterPressed){genWorld();buildGeom();gameState=STATE_INTRO;}
+                if(eN&&!enterPressed){
+                    gCurrentLevel++;
+                    gCompletedLevels++;
+                    genWorld();
+                    buildGeom();
+                    gameState=STATE_INTRO;
+                }
                 if(esN&&!escPressed){
                     gameState=STATE_MENU;menuSel=0;
                     glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
@@ -220,13 +227,15 @@ int main(){
                 bool canSpawnEnt = (multiState!=MULTI_IN_GAME || netMgr.isHost);
                 entitySpawnTimer-=dTime;
                 int maxEnt = computeEntityCap(survivalTime);
+                maxEnt += levelEntityCapBonus(gCurrentLevel);
+                if(maxEnt > 8) maxEnt = 8;
                 if(canSpawnEnt && entitySpawnTimer<=0&&(int)entityMgr.entities.size()<maxEnt){
                     EntityType type = chooseSpawnEntityType(survivalTime, (int)rng(), (int)rng());
                     Vec3 spawnP = findSpawnPos(cam.pos,25.0f);
                     if(!hasEntityNearPos(entityMgr.entities, spawnP, 14.0f)){
                         entityMgr.spawnEntity(type,spawnP,nullptr,0,0);
                     }
-                    entitySpawnTimer = computeEntitySpawnDelay(survivalTime, (int)rng());
+                    entitySpawnTimer = computeEntitySpawnDelay(survivalTime, (int)rng()) * levelSpawnDelayScale(gCurrentLevel);
                 }
                 entityMgr.update(dTime,cam.pos,cam.yaw,nullptr,0,0,CS);
                 if(baitEffectTimer>0){
@@ -274,7 +283,8 @@ int main(){
                     reshuffleTimer=reshuffleDelay+(rng()%10);
                 }else if(reshuffleTimer<=0)reshuffleTimer=8.0f+(rng()%8);
                 
-                if(entityMgr.dangerLevel>0.1f)playerSanity-=entityMgr.dangerLevel*8.0f*dTime;
+                float levelDanger = levelDangerScale(gCurrentLevel);
+                if(entityMgr.dangerLevel>0.1f)playerSanity-=entityMgr.dangerLevel*(8.0f * levelDanger)*dTime;
                 else playerSanity+=2.0f*dTime;
                 playerSanity=playerSanity>100?100:(playerSanity<0?0:playerSanity);
                 int cellX = (int)floorf(cam.pos.x / CS);

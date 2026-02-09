@@ -293,7 +293,11 @@ void gameInput(GLFWwindow*w){
         bobT+=dTime*(spd>5.0f?12.0f:8.0f);
         float cb=mSin(bobT);cam.pos.y=cam.curH+cb*0.04f;
         if(lastB>-0.7f&&cb<=-0.7f&&!sndState.stepTrig){
-            sndState.stepTrig=true;sndState.footPhase=0;
+            sndState.stepTrig=true;
+            sndState.footPhase=0;
+            float pitchRnd = 0.88f + (float)(rand()%30) / 100.0f;
+            if(spd > 5.0f) pitchRnd += 0.10f;
+            sndState.stepPitch = pitchRnd;
         }
         lastB=cb;
     }else{

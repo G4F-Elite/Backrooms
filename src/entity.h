@@ -54,6 +54,21 @@ public:
             if(toEL > 0.01f) { toE.x /= toEL; toE.z /= toEL; }
             bool looking = (look.x*toE.x + look.z*toE.z) > 0.85f && dist < e.detectionRange;
             if(dist < e.detectionRange) { float prox = 1.0f - dist/e.detectionRange; if(prox > dangerLevel) dangerLevel = prox; }
+
+            e.behaviorTimer -= dt;
+            if(e.behaviorTimer <= 0.0f){
+                e.behaviorTimer = 2.0f + (float)(rand()%220) / 100.0f;
+                if(e.type == ENTITY_STALKER){
+                    if(dist < 7.5f && !looking) e.behaviorMode = BEHAVIOR_RUSH;
+                    else if(looking && dist < 12.0f) e.behaviorMode = BEHAVIOR_SNEAK;
+                    else e.behaviorMode = (rand()%100 < 30) ? BEHAVIOR_FLANK : BEHAVIOR_DEFAULT;
+                }else if(e.type == ENTITY_CRAWLER){
+                    e.behaviorMode = (dist < 5.5f) ? BEHAVIOR_RUSH : ((rand()%100 < 35) ? BEHAVIOR_FLANK : BEHAVIOR_DEFAULT);
+                }else if(e.type == ENTITY_SHADOW){
+                    if(looking) e.behaviorMode = BEHAVIOR_FLANK;
+                    else e.behaviorMode = (rand()%100 < 45) ? BEHAVIOR_SNEAK : BEHAVIOR_DEFAULT;
+                }
+            }
             
             if(e.type == ENTITY_STALKER) updateStalker(e, dt, pPos, dist, looking, maze, mzw, mzh, cs);
             else if(e.type == ENTITY_CRAWLER) updateCrawler(e, dt, pPos, dist, maze, mzw, mzh, cs);
@@ -73,23 +88,32 @@ public:
     
     void updateStalker(Entity& e, float dt, Vec3 pPos, float dist, bool looking, int maze[][30], int mzw, int mzh, float cs) {
         e.stateTimer += dt;
+        float speedMul = 1.0f;
+        if(e.behaviorMode == BEHAVIOR_SNEAK) speedMul = 0.72f;
+        else if(e.behaviorMode == BEHAVIOR_RUSH) speedMul = 1.55f;
+        else if(e.behaviorMode == BEHAVIOR_FLANK) speedMul = 1.08f;
         if(looking && dist < e.detectionRange) { e.lastSeenTimer += dt; if(e.lastSeenTimer > 2.0f) e.state = ENT_FLEEING; }
         else { e.lastSeenTimer = 0;
             if(dist < e.detectionRange) { e.state = ENT_STALKING;
                 Vec3 dir = pPos - e.pos; dir.y = 0; float len = sqrtf(dir.x*dir.x + dir.z*dir.z);
                 if(len > 0.1f) { dir.x /= len; dir.z /= len;
-                    float nx = e.pos.x + dir.x*e.speed*dt, nz = e.pos.z + dir.z*e.speed*dt;
+                    if(e.behaviorMode == BEHAVIOR_FLANK){
+                        float ox = dir.x;
+                        dir.x = dir.z;
+                        dir.z = -ox;
+                    }
+                    float nx = e.pos.x + dir.x*e.speed*speedMul*dt, nz = e.pos.z + dir.z*e.speed*speedMul*dt;
                     if(!collideWorld(nx,nz,0.32f)) { e.pos.x = nx; e.pos.z = nz; }
                     else {
-                        float sx = e.pos.x + dir.z*e.speed*0.65f*dt;
-                        float sz = e.pos.z - dir.x*e.speed*0.65f*dt;
+                        float sx = e.pos.x + dir.z*e.speed*0.65f*speedMul*dt;
+                        float sz = e.pos.z - dir.x*e.speed*0.65f*speedMul*dt;
                         if(!collideWorld(sx,sz,0.32f)) { e.pos.x = sx; e.pos.z = sz; }
                     }
                     e.yaw = atan2f(dir.x, dir.z);
                 }
             } else { e.state = ENT_ROAMING;
                 if(e.stateTimer > 2.3f) { e.yaw += ((rand()%100)/50.0f-1.0f)*2.2f; e.stateTimer = 0; }
-                float nx = e.pos.x + mSin(e.yaw)*e.speed*0.3f*dt, nz = e.pos.z + mCos(e.yaw)*e.speed*0.3f*dt;
+                float nx = e.pos.x + mSin(e.yaw)*e.speed*0.3f*speedMul*dt, nz = e.pos.z + mCos(e.yaw)*e.speed*0.3f*speedMul*dt;
                 if(!collideWorld(nx,nz,0.32f)) { e.pos.x = nx; e.pos.z = nz; }
                 else e.yaw += 1.2f;
             }
@@ -106,21 +130,29 @@ public:
     
     void updateCrawler(Entity& e, float dt, Vec3 pPos, float dist, int maze[][30], int mzw, int mzh, float cs) {
         e.stateTimer += dt; e.pos.y = -0.8f; // Stay low
+        float speedMul = 1.0f;
+        if(e.behaviorMode == BEHAVIOR_RUSH) speedMul = 1.40f;
+        else if(e.behaviorMode == BEHAVIOR_FLANK) speedMul = 1.15f;
         if(dist < e.detectionRange) { e.state = ENT_CHASING;
             Vec3 dir = pPos - e.pos; dir.y = 0; float len = sqrtf(dir.x*dir.x + dir.z*dir.z);
             if(len > 0.1f) { dir.x /= len; dir.z /= len;
-                float nx = e.pos.x + dir.x*e.speed*dt, nz = e.pos.z + dir.z*e.speed*dt;
+                if(e.behaviorMode == BEHAVIOR_FLANK){
+                    float ox = dir.x;
+                    dir.x = -dir.z;
+                    dir.z = ox;
+                }
+                float nx = e.pos.x + dir.x*e.speed*speedMul*dt, nz = e.pos.z + dir.z*e.speed*speedMul*dt;
                 if(!collideWorld(nx,nz,0.34f)) { e.pos.x = nx; e.pos.z = nz; }
                 else {
-                    float bx = e.pos.x - dir.z*e.speed*0.7f*dt;
-                    float bz = e.pos.z + dir.x*e.speed*0.7f*dt;
+                    float bx = e.pos.x - dir.z*e.speed*0.7f*speedMul*dt;
+                    float bz = e.pos.z + dir.x*e.speed*0.7f*speedMul*dt;
                     if(!collideWorld(bx,bz,0.34f)) { e.pos.x = bx; e.pos.z = bz; }
                 }
                 e.yaw = atan2f(dir.x, dir.z); }
             if(dist < e.attackRange) e.state = ENT_ATTACKING;
         } else { e.state = ENT_ROAMING;
             if(e.stateTimer > 1.8f) { e.yaw += ((rand()%100)/50.0f-1.0f)*2.6f; e.stateTimer = 0; }
-            float nx = e.pos.x + mSin(e.yaw)*e.speed*0.2f*dt, nz = e.pos.z + mCos(e.yaw)*e.speed*0.2f*dt;
+            float nx = e.pos.x + mSin(e.yaw)*e.speed*0.2f*speedMul*dt, nz = e.pos.z + mCos(e.yaw)*e.speed*0.2f*speedMul*dt;
             if(!collideWorld(nx,nz,0.34f)) { e.pos.x = nx; e.pos.z = nz; }
             else e.yaw += 1.3f; }
     }
@@ -149,8 +181,15 @@ public:
             Vec3 dir = pPos - e.pos; dir.y = 0; float len = sqrtf(dir.x*dir.x+dir.z*dir.z);
             if(len > 0.1f) {
                 dir.x/=len; dir.z/=len;
-                float nx = e.pos.x + dir.x*e.speed*1.6f*dt;
-                float nz = e.pos.z + dir.z*e.speed*1.6f*dt;
+                float moveMul = (e.behaviorMode == BEHAVIOR_SNEAK) ? 0.9f : 1.6f;
+                if(e.behaviorMode == BEHAVIOR_FLANK){
+                    float ox = dir.x;
+                    dir.x = dir.z;
+                    dir.z = -ox;
+                    moveMul = 1.35f;
+                }
+                float nx = e.pos.x + dir.x*e.speed*moveMul*dt;
+                float nz = e.pos.z + dir.z*e.speed*moveMul*dt;
                 if(!collideWorld(nx,nz,0.32f)){ e.pos.x = nx; e.pos.z = nz; }
                 e.yaw = atan2f(dir.x,dir.z);
             }

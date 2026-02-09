@@ -2,6 +2,9 @@
 
 #include <cstdio>
 
+inline int gCurrentLevel = 0;
+inline int gCompletedLevels = 0;
+
 inline int levelEntityCapBonus(int level) {
     if (level <= 0) return 0;
     return level / 2;
@@ -24,4 +27,3 @@ inline void buildLevelLabel(int level, char* out, int outSize) {
     if (level < 0) level = 0;
     std::snprintf(out, outSize, "LEVEL %d", level);
 }
-

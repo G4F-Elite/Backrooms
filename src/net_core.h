@@ -222,6 +222,32 @@ public:
         for (int i = 0; i < MAX_PLAYERS; i++) if (players[i].active) c++;
         return c;
     }
+
+    int connectionQuality(float nowTime) const {
+        if (!connected) return 0; // offline
+        if (isHost) return 4;     // excellent on host local loop
+        float since = nowTime - lastPacketRecvTime;
+        if (since > 4.0f) return 0;
+        if (rttMs <= 0.0f) return 1;
+        if (rttMs < 75.0f && since < 1.0f) return 4;
+        if (rttMs < 130.0f && since < 1.4f) return 3;
+        if (rttMs < 210.0f && since < 2.0f) return 2;
+        return 1;
+    }
+
+    const char* connectionQualityLabel(float nowTime) const {
+        int q = connectionQuality(nowTime);
+        if (q >= 4) return "EXCELLENT";
+        if (q == 3) return "GOOD";
+        if (q == 2) return "FAIR";
+        if (q == 1) return "POOR";
+        return "OFFLINE";
+    }
+
+    bool connectionUnstable(float nowTime) const {
+        int q = connectionQuality(nowTime);
+        return q <= 1;
+    }
     
     Vec3 getOtherPlayerPos() {
         for (int i = 0; i < MAX_PLAYERS; i++) {

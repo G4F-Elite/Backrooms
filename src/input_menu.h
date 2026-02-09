@@ -1,4 +1,5 @@
 #pragma once
+#include "progression.h"
 inline void menuInput(GLFWwindow* w) {
     bool esc = glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS;
     bool up = glfwGetKey(w, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS;
@@ -13,6 +14,7 @@ inline void menuInput(GLFWwindow* w) {
             triggerMenuConfirmSound();
             if (menuSel == 0) { 
                 // Start game - go to intro first
+                gCurrentLevel = 0;
                 gameState = STATE_INTRO;
             }
             else if (menuSel == 1) { 

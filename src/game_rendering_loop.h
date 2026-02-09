@@ -39,6 +39,10 @@ void renderScene(){
     glUseProgram(mainShader);
     Mat4 proj=Mat4::persp(1.2f,(float)winW/winH,0.1f,100.0f);
     float shX=camShake*(rand()%100-50)/500.0f,shY=camShake*(rand()%100-50)/500.0f;
+    float moveSway = sndState.moveIntensity * 0.006f;
+    float sprintSway = sndState.sprintIntensity * 0.004f;
+    shX += sinf(vhsTime * (8.0f + sndState.sprintIntensity * 4.0f)) * (moveSway + sprintSway);
+    shY += cosf(vhsTime * (12.5f + sndState.sprintIntensity * 5.0f)) * (moveSway * 0.75f + sprintSway);
     Vec3 la=cam.pos+Vec3(mSin(cam.yaw+shX)*mCos(cam.pitch+shY),mSin(cam.pitch+shY),
                          mCos(cam.yaw+shX)*mCos(cam.pitch+shY));
     Mat4 view=Mat4::look(cam.pos,la,Vec3(0,1,0)),model;

@@ -4,6 +4,7 @@
 #include <cstdio>
 #include "upscaler_settings.h"
 #include "keybinds.h"
+#include "progression.h"
 
 const unsigned char FONT_DATA[96][7] = {
     {0,0,0,0,0,0,0},{4,4,4,4,0,4,0},{10,10,0,0,0,0,0},{10,31,10,31,10,0,0},{4,15,20,14,5,30,4},{24,25,2,4,8,19,3},{8,20,20,8,21,18,13},{4,4,0,0,0,0,0},
@@ -247,7 +248,9 @@ inline void drawMenu(float tm) {
     drawFullscreenOverlay(0.17f,0.13f,0.08f,0.22f + 0.05f*sinf(tm*0.9f));
     float p=0.8f+0.05f*sinf(tm*2.0f), gl=(rand()%100<3)?(rand()%10-5)*0.003f:0;
     drawTextCentered("THE BACKROOMS",0.0f+gl,0.5f,4.0f,0.9f,0.85f,0.4f,p);
-    drawTextCentered("LEVEL 0",0.0f,0.35f,2.5f,0.7f,0.65f,0.3f,0.8f);
+    char levelBuf[32];
+    buildLevelLabel(gCurrentLevel, levelBuf, 32);
+    drawTextCentered(levelBuf,0.0f,0.35f,2.5f,0.7f,0.65f,0.3f,0.8f);
     const char* it[]={"START GAME","MULTIPLAYER","GUIDE","SETTINGS","QUIT"};
     for(int i=0;i<5;i++){
         float s=(menuSel==i)?1.0f:0.5f; float y=0.10f-i*0.11f;
