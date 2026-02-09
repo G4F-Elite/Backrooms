@@ -1,0 +1,87 @@
+name: Deploy Server Docker
+
+on:
+  push:
+    branches:
+      - master
+      - main
+    paths:
+      - "server/**"
+      - "shared/**"
+      - "build_server_linux.sh"
+      - ".github/workflows/deploy-server-docker.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-server-docker
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: backrooms-server
+      IMAGE_TAG: latest
+      REMOTE_IMAGE_ARCHIVE: /tmp/backrooms-server-image.tar.gz
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: |
+          docker build -f server/Dockerfile -t "$IMAGE_NAME:$IMAGE_TAG" .
+
+      - name: Export Docker image archive
+        run: |
+          docker save "$IMAGE_NAME:$IMAGE_TAG" | gzip > "$REMOTE_IMAGE_ARCHIVE"
+
+      - name: Setup SSH key
+        env:
+          VPS_SSH: ${{ secrets.VPS_SSH }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          set -euo pipefail
+          if [ -z "$VPS_SSH" ] || [ -z "$VPS_HOST" ]; then
+            echo "VPS_SSH or VPS_HOST secret is missing"
+            exit 1
+          fi
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+
+          host_to_scan="$VPS_HOST"
+          host_to_scan="${host_to_scan#*@}"
+          host_to_scan="${host_to_scan%%:*}"
+          ssh-keyscan -H "$host_to_scan" >> ~/.ssh/known_hosts
+
+      - name: Copy image to VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          set -euo pipefail
+          target="$VPS_HOST"
+          if [[ "$target" != *"@"* ]]; then
+            target="root@$target"
+          fi
+          scp -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes "$REMOTE_IMAGE_ARCHIVE" "$target:$REMOTE_IMAGE_ARCHIVE"
+
+      - name: Deploy container on VPS
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+        run: |
+          set -euo pipefail
+          target="$VPS_HOST"
+          if [[ "$target" != *"@"* ]]; then
+            target="root@$target"
+          fi
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes "$target" "
+            set -euo pipefail
+            docker load -i '$REMOTE_IMAGE_ARCHIVE'
+            docker rm -f backrooms-server >/dev/null 2>&1 || true
+            docker run -d \
+              --name backrooms-server \
+              --restart unless-stopped \
+              -p 27015:27015/udp \
+              '$IMAGE_NAME:$IMAGE_TAG'
+            rm -f '$REMOTE_IMAGE_ARCHIVE'
+          "
