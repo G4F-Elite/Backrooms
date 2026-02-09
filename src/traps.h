@@ -114,6 +114,17 @@ inline bool isFloorHoleCell(int wx, int wz){
     return false;
 }
 
+inline bool isAbyssCell(int wx, int wz){
+    if(!abyss.active) return false;
+    int dx = wx - abyss.centerX;
+    int dz = wz - abyss.centerZ;
+    return (dx*dx + dz*dz) <= abyss.radius * abyss.radius;
+}
+
+inline bool isFallCell(int wx, int wz){
+    return isFloorHoleCell(wx, wz) || isAbyssCell(wx, wz);
+}
+
 inline void spawnFloorHoleEvent(const Vec3& around, int count, float ttl){
     clearFloorHoles();
     int cx = (int)floorf(around.x / CS);

@@ -214,6 +214,25 @@ void gameInput(GLFWwindow*w){
     if(k3&&!key3Pressed) applyItemUse(2);
     key1Pressed=k1; key2Pressed=k2; key3Pressed=k3;
     
+    // --- Falling physics ---
+    if(playerFalling){
+        fallTimer += dTime;
+        fallVelocity += 12.0f * dTime;
+        cam.pos.y -= fallVelocity * dTime;
+        // Camera shake while falling
+        camShake = 0.08f + fallTimer * 0.04f;
+        // Tilt camera slightly downward
+        if(cam.pitch > -1.0f) cam.pitch -= 0.5f * dTime;
+        // Kill after falling deep enough or timeout
+        if(cam.pos.y < -25.0f || fallTimer > 3.0f){
+            playerHealth = 0.0f;
+            isPlayerDead = true;
+            playerFalling = false;
+            glfwSetInputMode(w,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
+        }
+        return;
+    }
+
     float spd=4.0f*dTime;
     bool sprinting=glfwGetKey(w,settings.binds.sprint)==GLFW_PRESS&&playerStamina>0&&staminaCooldown<=0;
     if(sprinting){
@@ -224,7 +243,7 @@ void gameInput(GLFWwindow*w){
         if(playerStamina>100)playerStamina=100;
     }
     if(staminaCooldown>0)staminaCooldown-=dTime;
-    
+
     if(debugTools.flyMode){
         cam.crouch=false;
         cam.targetH=PH;
@@ -235,7 +254,7 @@ void gameInput(GLFWwindow*w){
         }else{cam.targetH=PH;cam.crouch=false;}
         cam.curH+=(cam.targetH-cam.curH)*10.0f*dTime;
     }
-    
+
     Vec3 fwd(mSin(cam.yaw),0,mCos(cam.yaw)),right(mCos(cam.yaw),0,-mSin(cam.yaw));
     Vec3 np=cam.pos;bool mv=false;
     if(glfwGetKey(w,settings.binds.forward)==GLFW_PRESS){np=np+fwd*spd;mv=true;}
@@ -246,7 +265,7 @@ void gameInput(GLFWwindow*w){
         if(glfwGetKey(w,GLFW_KEY_SPACE)==GLFW_PRESS){np.y += spd; mv=true;}
         if(glfwGetKey(w,settings.binds.crouch)==GLFW_PRESS){np.y -= spd; mv=true;}
     }
-    
+
     if(debugTools.flyMode){
         cam.pos=np;
     }else{
@@ -268,7 +287,7 @@ void gameInput(GLFWwindow*w){
             if(tryPushMapProps(cam.pos.x,np.z,PR,0.0f,np.z-cam.pos.z)) cam.pos.z=np.z;
         }
     }
-    
+
     static float bobT=0,lastB=0;
     if(mv && !debugTools.flyMode){
         bobT+=dTime*(spd>5.0f?12.0f:8.0f);

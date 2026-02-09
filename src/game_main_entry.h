@@ -279,11 +279,22 @@ int main(){
                 playerSanity=playerSanity>100?100:(playerSanity<0?0:playerSanity);
                 int cellX = (int)floorf(cam.pos.x / CS);
                 int cellZ = (int)floorf(cam.pos.z / CS);
-                if(isFloorHoleCell(cellX, cellZ)){
-                    playerHealth = 0.0f;
-                    isPlayerDead = true;
-                    setTrapStatus("FLOOR COLLAPSE. YOU FELL.");
-                    glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
+                if(!playerFalling && isFallCell(cellX, cellZ)){
+                    // Check player is well inside the hole, not just at the edge
+                    float cellCenterX = (cellX + 0.5f) * CS;
+                    float cellCenterZ = (cellZ + 0.5f) * CS;
+                    float dx = cam.pos.x - cellCenterX;
+                    float dz = cam.pos.z - cellCenterZ;
+                    float distFromCenter = sqrtf(dx*dx + dz*dz);
+                    if(distFromCenter < CS * 0.35f){
+                        playerFalling = true;
+                        fallVelocity = 0.0f;
+                        fallTimer = 0.0f;
+                        if(isAbyssCell(cellX, cellZ))
+                            setTrapStatus("THE VOID SWALLOWS YOU.");
+                        else
+                            setTrapStatus("FLOOR COLLAPSE. YOU FELL.");
+                    }
                 }
                 if(playerSanity<=0&&rng()%1000<5){
                     isPlayerDead=true;playerHealth=0;

@@ -55,8 +55,18 @@ struct FloorHole {
     bool active;
 };
 
+struct AbyssLocation {
+    int centerX, centerZ;
+    int radius;
+    bool active;
+};
+
 std::vector<WorldItem> worldItems;
 std::vector<FloorHole> floorHoles;
+AbyssLocation abyss = {};
+bool playerFalling = false;
+float fallVelocity = 0.0f;
+float fallTimer = 0.0f;
 int nextWorldItemId = 1;
 float itemSpawnTimer = 12.0f;
 float baitEffectTimer = 0.0f;
