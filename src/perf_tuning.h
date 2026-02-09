@@ -1,25 +1,35 @@
 #pragma once
 
 #include <vector>
-#include <cmath>
 #include <unordered_map>
 
+#include "math.h"
 #include "world.h"
 
+// ============================================================================
+// PERFORMANCE TUNING CONSTANTS
+// ============================================================================
 inline constexpr int SCENE_LIGHT_LIMIT = 16;
 inline constexpr float SCENE_LIGHT_MAX_DIST = 50.0f;  // Extended range for smoother transitions
 inline constexpr float SCENE_LIGHT_FADE_START = 35.0f; // Start fading at this distance
 inline constexpr float SCENE_RENDER_SCALE = 0.75f;
 inline constexpr float LIGHT_FADE_SPEED = 3.0f; // How fast lights fade in/out per second
 
+// ============================================================================
+// RENDER TARGET UTILITIES
+// ============================================================================
 inline void computeRenderTargetSize(int winW, int winH, float scale, int& outW, int& outH) {
     if (scale < 0.5f) scale = 0.5f;
     if (scale > 1.0f) scale = 1.0f;
-    outW = (int)floorf((float)winW * scale);
-    outH = (int)floorf((float)winH * scale);
+    outW = fastFloor((float)winW * scale);
+    outH = fastFloor((float)winH * scale);
     if (outW < 320) outW = 320;
     if (outH < 180) outH = 180;
 }
+
+// ============================================================================
+// LIGHT DATA STRUCTURES
+// ============================================================================
 
 // Stores light position + fade factor
 struct SceneLightData {
@@ -39,13 +49,20 @@ struct LightTemporalState {
 inline std::unordered_map<int, LightTemporalState> g_lightStates;
 inline float g_lastLightUpdateTime = 0.0f;
 
+// ============================================================================
+// LIGHT KEY GENERATION
+// Uses fast floor for quantization
+// ============================================================================
 inline int sceneLightKey(const Light& l) {
-    int qx = (int)floorf(l.pos.x * 4.0f);
-    int qy = (int)floorf(l.pos.y * 4.0f);
-    int qz = (int)floorf(l.pos.z * 4.0f);
+    int qx = fastFloor(l.pos.x * 4.0f);
+    int qy = fastFloor(l.pos.y * 4.0f);
+    int qz = fastFloor(l.pos.z * 4.0f);
     return (qx * 73856093) ^ (qy * 19349663) ^ (qz * 83492791);
 }
 
+// ============================================================================
+// TEMPORAL LIGHT STATE UPDATES
+// ============================================================================
 inline void updateLightTemporalStates(float currentTime) {
     float dt = currentTime - g_lastLightUpdateTime;
     if (dt <= 0.0f || dt > 0.5f) dt = 0.016f; // Cap at reasonable value
@@ -76,7 +93,10 @@ inline void cleanupOldLightStates() {
     }
 }
 
-// Returns count of lights, fills outPos[i*3+0..2] with positions, outFade[i] with fade factors
+// ============================================================================
+// MAIN LIGHT GATHERING FUNCTION
+// Uses fast math for distance calculations when enabled
+// ============================================================================
 inline int gatherNearestSceneLights(const std::vector<Light>& lights, const Vec3& camPos, 
                                      float outPos[SCENE_LIGHT_LIMIT * 3], 
                                      float outFade[SCENE_LIGHT_LIMIT],
@@ -93,15 +113,18 @@ inline int gatherNearestSceneLights(const std::vector<Light>& lights, const Vec3
         const auto& l = lights[i];
         if (!l.on) continue;
         
+        // Fast distance squared calculation (no sqrt needed for comparison)
         Vec3 d = l.pos - camPos;
-        float dist2 = d.x * d.x + d.y * d.y + d.z * d.z;
+        float dist2 = d.lenSq();
         
         // Calculate distance-based fade (before culling check)
-        float dist = sqrtf(dist2);
+        // Use fast sqrt when enabled
+        float dist = mSqrt(dist2);
         float distFade = 1.0f;
         if (dist > SCENE_LIGHT_FADE_START) {
-            distFade = 1.0f - (dist - SCENE_LIGHT_FADE_START) / (SCENE_LIGHT_MAX_DIST - SCENE_LIGHT_FADE_START);
-            if (distFade < 0.0f) distFade = 0.0f;
+            // Fast smoothstep-like fade
+            float t = (dist - SCENE_LIGHT_FADE_START) / (SCENE_LIGHT_MAX_DIST - SCENE_LIGHT_FADE_START);
+            distFade = 1.0f - fastClamp01(t);
         }
         
         int lightId = sceneLightKey(l);
@@ -167,4 +190,116 @@ inline int gatherNearestSceneLights(const std::vector<Light>& lights, const Vec3
 inline int gatherNearestSceneLights(const std::vector<Light>& lights, const Vec3& camPos, float outPos[SCENE_LIGHT_LIMIT * 3]) {
     float outFade[SCENE_LIGHT_LIMIT];
     return gatherNearestSceneLights(lights, camPos, outPos, outFade, 0.0f);
+}
+
+// ============================================================================
+// FAST LIGHT ATTENUATION
+// Various attenuation models optimized for performance
+// ============================================================================
+
+// Linear attenuation (fastest)
+inline float lightAttenuationLinear(float dist, float maxDist) {
+    if (dist >= maxDist) return 0.0f;
+    return 1.0f - dist / maxDist;
+}
+
+// Quadratic attenuation (physically accurate)
+inline float lightAttenuationQuadratic(float dist, float radius) {
+    float d = dist / radius;
+    float denom = 1.0f + d * d;
+    return 1.0f / denom;
+}
+
+// Smoothstep attenuation (nice falloff, no hard edge)
+inline float lightAttenuationSmooth(float dist, float innerRadius, float outerRadius) {
+    if (dist <= innerRadius) return 1.0f;
+    if (dist >= outerRadius) return 0.0f;
+    float t = (dist - innerRadius) / (outerRadius - innerRadius);
+    return fastSmoothstep(0.0f, 1.0f, 1.0f - t);
+}
+
+// Exponential attenuation (good for fog-like effects)
+inline float lightAttenuationExp(float dist, float falloff) {
+    return mExp(-dist * falloff);
+}
+
+// ============================================================================
+// CULLING UTILITIES
+// Fast object culling for performance
+// ============================================================================
+
+// Simple frustum culling (sphere test)
+inline bool isInFrustum(const Vec3& objPos, float objRadius, 
+                         const Vec3& camPos, const Vec3& camFwd, 
+                         float nearZ, float farZ, float fovHalfTan) {
+    Vec3 toObj = objPos - camPos;
+    float depth = toObj.dot(camFwd);
+    
+    // Behind near plane or beyond far plane
+    if (depth < nearZ - objRadius || depth > farZ + objRadius) return false;
+    
+    // Check against side planes (simplified cone test)
+    float maxSide = depth * fovHalfTan + objRadius;
+    Vec3 camRight = camFwd.cross(Vec3(0, 1, 0)).norm();
+    Vec3 camUp = camRight.cross(camFwd);
+    
+    float sideX = fastAbs(toObj.dot(camRight));
+    float sideY = fastAbs(toObj.dot(camUp));
+    
+    return sideX <= maxSide && sideY <= maxSide;
+}
+
+// Occlusion grid for simple spatial queries
+struct OcclusionGrid {
+    static constexpr int GRID_SIZE = 32;
+    static constexpr float CELL_SIZE = 4.0f;
+    
+    bool occupied[GRID_SIZE][GRID_SIZE];
+    
+    void clear() {
+        for (int i = 0; i < GRID_SIZE; i++)
+            for (int j = 0; j < GRID_SIZE; j++)
+                occupied[i][j] = false;
+    }
+    
+    void markOccupied(float x, float z) {
+        int gx = fastFloor(x / CELL_SIZE) + GRID_SIZE / 2;
+        int gz = fastFloor(z / CELL_SIZE) + GRID_SIZE / 2;
+        if (gx >= 0 && gx < GRID_SIZE && gz >= 0 && gz < GRID_SIZE) {
+            occupied[gx][gz] = true;
+        }
+    }
+    
+    bool isOccupied(float x, float z) const {
+        int gx = fastFloor(x / CELL_SIZE) + GRID_SIZE / 2;
+        int gz = fastFloor(z / CELL_SIZE) + GRID_SIZE / 2;
+        if (gx >= 0 && gx < GRID_SIZE && gz >= 0 && gz < GRID_SIZE) {
+            return occupied[gx][gz];
+        }
+        return false;
+    }
+};
+
+// ============================================================================
+// LOD SYSTEM
+// Level-of-detail calculations
+// ============================================================================
+
+// Calculate LOD level based on screen-space size
+inline int calculateLodFromScreenSize(float objectSize, float distance, float screenHeight, float fov) {
+    // Approximate screen-space height
+    float screenSize = (objectSize * screenHeight) / (2.0f * distance * mTan(fov * 0.5f));
+    
+    if (screenSize > 200.0f) return 0; // Full detail
+    if (screenSize > 100.0f) return 1;
+    if (screenSize > 50.0f) return 2;
+    if (screenSize > 25.0f) return 3;
+    return 4; // Lowest detail or billboard
+}
+
+// Simple LOD blend factor for smooth transitions
+inline float calculateLodBlendFactor(float distance, float lodStart, float lodEnd) {
+    if (distance <= lodStart) return 0.0f;
+    if (distance >= lodEnd) return 1.0f;
+    return (distance - lodStart) / (lodEnd - lodStart);
 }

@@ -2,9 +2,15 @@
 #include <vector>
 #include "math.h"
 
+// ============================================================================
+// GEOMETRY GENERATION UTILITIES
+// Uses fast math when g_fastMathEnabled is true
+// ============================================================================
+
 inline void mkWall(std::vector<float>& v, float x, float z, float dx, float dz, float h, float CS, float WH) {
     Vec3 n = Vec3(dz, 0, -dx).norm();
-    float tx = (sqrtf(dx * dx + dz * dz) / CS) * 1.8f;
+    float wallLen = g_fastMathEnabled ? fastSqrt(dx * dx + dz * dz) : sqrtf(dx * dx + dz * dz);
+    float tx = (wallLen / CS) * 1.8f;
     float ty = (h / WH) * 1.6f;
     float vv[] = {
         x, 0, z, 0, 0, n.x, n.y, n.z,
@@ -127,11 +133,12 @@ inline void mkFloorDecal(std::vector<float>& v, float cx, float y, float cz, flo
 }
 
 // Note paper model - floating sheet with slight rotation
+// Uses fast sin/cos when enabled for bob animation
 inline void mkNotePaper(std::vector<float>& v, Vec3 pos, float bob, float tm) {
-    float y = 0.8f + sinf(bob) * 0.1f;
+    float y = 0.8f + mSin(bob) * 0.1f;
     float rot = tm * 0.5f;
     float s = 0.25f;
-    float cr = cosf(rot), sr = sinf(rot);
+    float cr = mCos(rot), sr = mSin(rot);
     Vec3 corners[4] = {
         {-s * cr, y, -s * sr},
         {s * cr, y, s * sr},
@@ -158,22 +165,90 @@ inline void mkNotePaper(std::vector<float>& v, Vec3 pos, float bob, float tm) {
 }
 
 // Glowing marker for notes - easy to spot
+// Uses fast sin for bob animation
 inline void mkNoteGlow(std::vector<float>& v, Vec3 pos, float bob) {
-    float y = 0.5f + sinf(bob) * 0.15f;
+    float y = 0.5f + mSin(bob) * 0.15f;
     float s = 0.4f;
     // Vertical quad facing camera (billboard approximation - just 4 directions)
-    for(int dir = 0; dir < 4; dir++) {
-        float ang = dir * 1.5708f;
-        Vec3 n(sinf(ang), 0, cosf(ang));
+    for (int dir = 0; dir < 4; dir++) {
+        float ang = dir * MATH_HALF_PI;
+        float sn = mSin(ang), cn = mCos(ang);
+        Vec3 n(sn, 0, cn);
         float dx = n.x * 0.01f, dz = n.z * 0.01f;
         float vv[] = {
-            pos.x + dx - n.z*s, y, pos.z + dz + n.x*s, 0, 0, n.x, n.y, n.z,
-            pos.x + dx + n.z*s, y, pos.z + dz - n.x*s, 1, 0, n.x, n.y, n.z,
-            pos.x + dx + n.z*s, y + s*2, pos.z + dz - n.x*s, 1, 1, n.x, n.y, n.z,
-            pos.x + dx - n.z*s, y, pos.z + dz + n.x*s, 0, 0, n.x, n.y, n.z,
-            pos.x + dx + n.z*s, y + s*2, pos.z + dz - n.x*s, 1, 1, n.x, n.y, n.z,
-            pos.x + dx - n.z*s, y + s*2, pos.z + dz + n.x*s, 0, 1, n.x, n.y, n.z
+            pos.x + dx - n.z * s, y, pos.z + dz + n.x * s, 0, 0, n.x, n.y, n.z,
+            pos.x + dx + n.z * s, y, pos.z + dz - n.x * s, 1, 0, n.x, n.y, n.z,
+            pos.x + dx + n.z * s, y + s * 2, pos.z + dz - n.x * s, 1, 1, n.x, n.y, n.z,
+            pos.x + dx - n.z * s, y, pos.z + dz + n.x * s, 0, 0, n.x, n.y, n.z,
+            pos.x + dx + n.z * s, y + s * 2, pos.z + dz - n.x * s, 1, 1, n.x, n.y, n.z,
+            pos.x + dx - n.z * s, y + s * 2, pos.z + dz + n.x * s, 0, 1, n.x, n.y, n.z
         };
         for (int i = 0; i < 48; i++) v.push_back(vv[i]);
+    }
+}
+
+// ============================================================================
+// FAST GEOMETRY UTILITIES
+// Distance-based culling and LOD helpers
+// ============================================================================
+
+// Check if point is within view frustum (simplified box check)
+inline bool isInViewBox(const Vec3& point, const Vec3& camPos, const Vec3& camFwd, float maxDist, float fovHalf) {
+    Vec3 toPoint = point - camPos;
+    float dist = toPoint.len();
+    if (dist > maxDist) return false;
+    
+    // Simplified cone check using dot product
+    if (dist > 0.1f) {
+        toPoint.normalize();
+        float dot = toPoint.dot(camFwd);
+        float minDot = mCos(fovHalf * 1.2f); // Some margin
+        if (dot < minDot) return false;
+    }
+    return true;
+}
+
+// Fast distance-squared check for culling (avoids sqrt)
+inline bool isInRange(const Vec3& a, const Vec3& b, float maxDist) {
+    return a.distSqTo(b) <= maxDist * maxDist;
+}
+
+// Calculate LOD level based on distance (0 = highest detail)
+inline int getLodLevel(float distSq, float lodDist0, float lodDist1, float lodDist2) {
+    if (distSq <= lodDist0 * lodDist0) return 0;
+    if (distSq <= lodDist1 * lodDist1) return 1;
+    if (distSq <= lodDist2 * lodDist2) return 2;
+    return 3;
+}
+
+// Fast billboard rotation facing camera (Y-axis only)
+inline void getBillboardRotation(const Vec3& objPos, const Vec3& camPos, float& outAngle) {
+    float dx = camPos.x - objPos.x;
+    float dz = camPos.z - objPos.z;
+    outAngle = mAtan2(dx, dz);
+}
+
+// Generate circular points for effects (uses fast sin/cos)
+inline void generateCirclePoints(float cx, float cy, float radius, int segments, float* outX, float* outY) {
+    float angleStep = MATH_TAU / (float)segments;
+    for (int i = 0; i < segments; i++) {
+        float angle = i * angleStep;
+        outX[i] = cx + radius * mCos(angle);
+        outY[i] = cy + radius * mSin(angle);
+    }
+}
+
+// Generate spiral points (for effects, particle paths)
+inline void generateSpiralPoints(float cx, float cy, float startRadius, float endRadius, 
+                                  float startAngle, float turns, int points, 
+                                  float* outX, float* outY) {
+    float angleStep = turns * MATH_TAU / (float)(points - 1);
+    float radiusStep = (endRadius - startRadius) / (float)(points - 1);
+    
+    for (int i = 0; i < points; i++) {
+        float angle = startAngle + i * angleStep;
+        float radius = startRadius + i * radiusStep;
+        outX[i] = cx + radius * mCos(angle);
+        outY[i] = cy + radius * mSin(angle);
     }
 }
