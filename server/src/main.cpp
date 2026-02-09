@@ -6,6 +6,8 @@
 #include <iostream>
 #include <string>
 #include <thread>
+#include <vector>
+#include <ctime>
 
 #include "../../shared/net/UdpSocketLite.h"
 #include "../../shared/protocol/Packets.h"
@@ -15,6 +17,32 @@ namespace {
 using backrooms::net::UdpAddress;
 using backrooms::net::UdpSocketLite;
 using namespace backrooms::protocol;
+
+// Compatibility with existing client net packet ids.
+constexpr std::uint8_t LEGACY_PKT_PING = 1;
+constexpr std::uint8_t LEGACY_PKT_PONG = 2;
+constexpr std::uint8_t LEGACY_PKT_JOIN = 3;
+constexpr std::uint8_t LEGACY_PKT_WELCOME = 4;
+constexpr std::uint8_t LEGACY_PKT_GAME_START = 14;
+
+struct LegacyClient {
+    UdpAddress addr;
+    std::uint8_t id;
+};
+
+bool sameAddress(const UdpAddress& a, const UdpAddress& b) {
+    return a.ipv4HostOrder == b.ipv4HostOrder && a.portHostOrder == b.portHostOrder;
+}
+
+std::uint8_t findOrAssignClientId(std::vector<LegacyClient>& clients, const UdpAddress& from) {
+    for (const auto& c : clients) {
+        if (sameAddress(c.addr, from)) return c.id;
+    }
+    std::uint8_t nextId = (std::uint8_t)(clients.size() + 1);
+    if (nextId >= (std::uint8_t)kMaxPlayersDedicated) nextId = (std::uint8_t)(kMaxPlayersDedicated - 1);
+    clients.push_back({from, nextId});
+    return nextId;
+}
 
 std::uint32_t parseIpv4HostOrder(const std::string& ip) {
     std::uint32_t a = 127, b = 0, c = 0, d = 1;
@@ -63,12 +91,42 @@ int main(int argc, char** argv) {
     auto lastHeartbeat = std::chrono::steady_clock::now() - std::chrono::seconds(2);
     std::uint8_t playersNow = 0;
     const std::uint8_t playersMax = (std::uint8_t)kMaxPlayersDedicated;
+    const std::uint32_t worldSeed = (std::uint32_t)std::time(nullptr);
+    const float spawnPos[3] = {0.0f, 1.7f, 0.0f};
+    std::vector<LegacyClient> legacyClients;
 
     for (;;) {
         std::uint8_t buf[1400] = {};
         UdpAddress from{};
         int got = socket.recvFrom(from, buf, (int)sizeof(buf));
         if (got > 0) {
+            // Legacy client compatibility path (existing netMgr).
+            if ((std::uint8_t)buf[0] == LEGACY_PKT_JOIN) {
+                const std::uint8_t assignedId = findOrAssignClientId(legacyClients, from);
+
+                std::uint8_t welcome[16] = {};
+                welcome[0] = LEGACY_PKT_WELCOME;
+                welcome[1] = assignedId;
+                std::memcpy(welcome + 2, &worldSeed, 4);
+                socket.sendTo(from, welcome, 16);
+
+                std::uint8_t gameStart[32] = {};
+                gameStart[0] = LEGACY_PKT_GAME_START;
+                std::memcpy(gameStart + 1, &worldSeed, 4);
+                std::memcpy(gameStart + 5, &spawnPos[0], sizeof(spawnPos));
+                socket.sendTo(from, gameStart, 32);
+
+                if (playersNow + 1 < playersMax) playersNow++;
+                continue;
+            }
+            if ((std::uint8_t)buf[0] == LEGACY_PKT_PING && got >= 7) {
+                std::uint8_t pong[8] = {};
+                pong[0] = LEGACY_PKT_PONG;
+                std::memcpy(pong + 1, buf + 1, 6);
+                socket.sendTo(from, pong, 8);
+                continue;
+            }
+
             MessageHeader header{};
             if (decodeHeader(buf, got, header) && header.protocolVersion == kProtocolVersion) {
                 if (header.type == (std::uint8_t)MessageType::HandshakeHello) {
