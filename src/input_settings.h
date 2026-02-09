@@ -66,7 +66,7 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
             return true;
         }
         if (vi == 6) {
-            settings.rtxEnabled = !settings.rtxEnabled;
+            settings.rtxQuality = stepRtxQuality(settings.rtxQuality, dir);
             return true;
         }
         if (vi == 7) {

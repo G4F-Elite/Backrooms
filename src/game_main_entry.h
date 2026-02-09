@@ -369,7 +369,7 @@ int main(){
             vhsTaaValidLoc = glGetUniformLocation(vhsShader,"taaValid");
             vhsFrameGenLoc = glGetUniformLocation(vhsShader,"frameGen");
             vhsFrameGenBlendLoc = glGetUniformLocation(vhsShader,"frameGenBlend");
-            vhsRtxLoc = glGetUniformLocation(vhsShader,"rtx");
+            vhsRtxLoc = glGetUniformLocation(vhsShader,"rtxLevel");
             vhsDepthTexLoc = glGetUniformLocation(vhsShader,"depthTex");
         }
         static int prevAaMode = -1;
@@ -401,7 +401,7 @@ int main(){
             glActiveTexture(GL_TEXTURE0 + 2);
             glBindTexture(GL_TEXTURE_2D,fboDepthTex);
             glUniform1i(vhsDepthTexLoc,2);
-            glUniform1i(vhsRtxLoc,settings.rtxEnabled?1:0);
+            glUniform1i(vhsRtxLoc,clampRtxQuality(settings.rtxQuality));
             glActiveTexture(GL_TEXTURE0);
             glUniform1f(vhsTmLoc,vhsTime);
             glUniform1f(vhsIntenLoc,vI);
@@ -461,7 +461,7 @@ int main(){
             glActiveTexture(GL_TEXTURE0 + 2);
             glBindTexture(GL_TEXTURE_2D,fboDepthTex);
             glUniform1i(vhsDepthTexLoc,2);
-            glUniform1i(vhsRtxLoc,settings.rtxEnabled?1:0);
+            glUniform1i(vhsRtxLoc,clampRtxQuality(settings.rtxQuality));
             glActiveTexture(GL_TEXTURE0);
             glUniform1f(vhsTmLoc,vhsTime);
             glUniform1f(vhsIntenLoc,vI);

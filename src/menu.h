@@ -36,7 +36,7 @@ struct Settings {
     float fsrSharpness=0.35f;
     int aaMode=AA_MODE_FXAA;
     bool fastMath=false;
-    bool rtxEnabled=false;
+    int rtxQuality=RTX_OFF;
     int frameGenMode=FRAME_GEN_MODE_OFF;
     bool vsync=false;
     GameplayBinds binds = {};
@@ -336,7 +336,7 @@ inline void drawSettings(bool fp) {
             }else if(vi==5){
                 drawTextCentered(aaModeLabel(settings.aaMode),rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==6){
-                drawTextCentered(settings.rtxEnabled?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+                drawTextCentered(rtxQualityLabel(settings.rtxQuality),rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==7){
                 drawTextCentered(settings.fastMath?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==8){
