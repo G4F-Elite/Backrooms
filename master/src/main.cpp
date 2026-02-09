@@ -32,14 +32,18 @@ std::uint64_t nowMs() {
     return (std::uint64_t)std::chrono::duration_cast<std::chrono::milliseconds>(now).count();
 }
 
+void copyServerName(char (&dst)[kServerNameLen], const char (&src)[kServerNameLen]) {
+    std::memcpy(dst, src, kServerNameLen);
+    dst[kServerNameLen - 1] = '\0';
+}
+
 void upsertServer(std::vector<RegistryEntry>& entries, std::uint32_t ip, const Heartbeat& hb, std::uint64_t ts) {
     for (auto& e : entries) {
         if (e.ipv4HostOrder == ip && e.gamePort == hb.gamePort) {
             e.currentPlayers = hb.currentPlayers;
             e.maxPlayers = hb.maxPlayers;
             e.flags = hb.flags;
-            std::memset(e.serverName, 0, sizeof(e.serverName));
-            std::strncpy(e.serverName, hb.serverName, sizeof(e.serverName) - 1);
+            copyServerName(e.serverName, hb.serverName);
             e.lastSeenMs = ts;
             return;
         }
@@ -50,8 +54,7 @@ void upsertServer(std::vector<RegistryEntry>& entries, std::uint32_t ip, const H
     e.currentPlayers = hb.currentPlayers;
     e.maxPlayers = hb.maxPlayers;
     e.flags = hb.flags;
-    std::memset(e.serverName, 0, sizeof(e.serverName));
-    std::strncpy(e.serverName, hb.serverName, sizeof(e.serverName) - 1);
+    copyServerName(e.serverName, hb.serverName);
     e.lastSeenMs = ts;
     entries.push_back(e);
 }
@@ -100,8 +103,7 @@ int main(int argc, char** argv) {
                             dst.currentPlayers = s.currentPlayers;
                             dst.maxPlayers = s.maxPlayers;
                             dst.flags = s.flags;
-                            std::memset(dst.serverName, 0, sizeof(dst.serverName));
-                            std::strncpy(dst.serverName, s.serverName, sizeof(dst.serverName) - 1);
+                            copyServerName(dst.serverName, s.serverName);
                         }
                         std::uint8_t out[1400] = {};
                         int outLen = 0;

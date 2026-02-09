@@ -3,7 +3,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends g++ && rm -rf /
 WORKDIR /app
 COPY shared ./shared
 COPY master ./master
-RUN g++ -std=c++17 -O2 -Wall -Wextra -pedantic -I./shared ./master/src/main.cpp -o /out/backrooms_master
+RUN mkdir -p /out && g++ -std=c++17 -O2 -Wall -Wextra -pedantic -I./shared ./master/src/main.cpp -o /out/backrooms_master
 
 FROM debian:bookworm-slim
 WORKDIR /opt/backrooms
