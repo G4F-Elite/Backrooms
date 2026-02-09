@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdio>
 #include "upscaler_settings.h"
+#include "rtx_settings.h"
 #include "keybinds.h"
 
 const unsigned char FONT_DATA[96][7] = {
@@ -38,6 +39,7 @@ struct Settings {
     bool fastMath=false;
     int frameGenMode=FRAME_GEN_MODE_OFF;
     bool vsync=false;
+    int rtxMode=RTX_MODE_OFF;
     GameplayBinds binds = {};
 };
 inline Settings settings;
@@ -48,15 +50,15 @@ enum SettingsTab {
 inline int settingsTab = SETTINGS_TAB_AUDIO;
 
 inline int settingsItemsForTab(int tab) {
-    return (tab == SETTINGS_TAB_AUDIO) ? 7 : 12;
+    return (tab == SETTINGS_TAB_AUDIO) ? 7 : 13;
 }
 
 inline int settingsBindsIndexForTab(int tab) {
-    return (tab == SETTINGS_TAB_VIDEO) ? 10 : -1;
+    return (tab == SETTINGS_TAB_VIDEO) ? 11 : -1;
 }
 
 inline int settingsBackIndexForTab(int tab) {
-    return (tab == SETTINGS_TAB_AUDIO) ? 6 : 11;
+    return (tab == SETTINGS_TAB_AUDIO) ? 6 : 12;
 }
 
 inline int clampSettingsSelection(int tab, int idx) {
@@ -309,7 +311,7 @@ inline void drawSettings(bool fp) {
                 drawText(b,0.58f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }
         }else{
-            const char* lb[]={"VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","ANTI-ALIASING","FAST MATH","FRAME GEN","V-SYNC","KEY BINDS","BACK"};
+            const char* lb[]={"VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","ANTI-ALIASING","FAST MATH","FRAME GEN","V-SYNC","RTX MODE","KEY BINDS","BACK"};
             int vi = i - 1;
             drawText(lb[vi],-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             if(vi==0 || vi==1 || vi==4){
@@ -341,6 +343,8 @@ inline void drawSettings(bool fp) {
             }else if(vi==8){
                 drawTextCentered(settings.vsync?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==9){
+                drawTextCentered(rtxModeLabel(settings.rtxMode),rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            }else if(vi==10){
                 drawTextCentered("OPEN",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }
         }

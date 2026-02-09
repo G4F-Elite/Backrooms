@@ -77,6 +77,10 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
             settings.vsync = !settings.vsync;
             return true;
         }
+        if (vi == 9) {
+            settings.rtxMode = stepRtxMode(settings.rtxMode, dir);
+            return true;
+        }
         return false;
     };
 

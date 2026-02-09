@@ -25,6 +25,10 @@
 #include "textures.h"
 #include "geometry.h"
 #include "render.h"
+#include "rtx_settings.h"
+#include "rtx_pipeline.h"
+#include "rtx_shaders.h"
+#include "rtx_textures.h"
 #include "perf_tuning.h"
 #include "perf_overlay.h"
 #include "world.h"
@@ -123,6 +127,11 @@ bool taaHistoryValid = false;
 int taaFrameIndex = 0;
 int wallVC, floorVC, ceilVC, lightVC, lightOffVC, pillarVC, decorVC;
 
+// RTX pipeline
+RtxPipeline rtxPipeline = {};
+PbrTexSet pbrWall, pbrFloor, pbrCeil, pbrLight, pbrLamp, pbrProp;
+float rtxSsaoKernel[32 * 3] = {};
+
 // Audio
 SoundState sndState;
 std::atomic<bool> audioRunning{true};
@@ -213,6 +222,7 @@ void windowResize(GLFWwindow*, int w, int h) {
     if (rbo) glDeleteRenderbuffers(1, &rbo);
     initFBO(fbo, fboTex, rbo, renderW, renderH);
     initTaaTargets();
+    if (rtxPipeline.initialized) resizeRtxPipeline(rtxPipeline, renderW, renderH);
 }
 
 // Shader compiler

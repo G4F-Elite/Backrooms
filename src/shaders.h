@@ -94,9 +94,7 @@ void main(){
    float NdotL = max(dot(N, L), 0.0);
    df = smoothstep(0.0, 0.5, NdotL);
   }
-  float baseFlick = sin(tm*20.0 + float(i)*2.1) * 0.015;
-  float panicFlick = sin(tm*30.0 + float(i)*3.7) * 0.05 * danger;
-  float fl = 1.0 + baseFlick + panicFlick;
+  float fl = 1.0;
   vec3 lightColor = vec3(1.0, 0.92, 0.75);
   
   // Apply fade factor for smooth light transitions
@@ -146,8 +144,8 @@ void main(){
  fog = clamp(fog, 0.0, 1.0);
  
  // Soft noise without block artifacts
- float fogNoise = hash(fp * 0.17 + vec3(tm * 0.05));
- fog = fog * (0.98 + fogNoise * 0.02);
+ float fogNoise = hash(fp * 0.17);
+ fog = fog * (0.99 + fogNoise * 0.01);
  
  // Darker, warmer fog color
  vec3 fogColor = vec3(0.045, 0.04, 0.035);

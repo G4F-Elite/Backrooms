@@ -18,9 +18,28 @@ int main(){
     genWorld();
     wallTex=genTex(0);floorTex=genTex(1);ceilTex=genTex(2);lightTex=genTex(3);lampTex=genTex(4);propTex=genTex(5);
     mainShader=mkShader(mainVS,mainFS);lightShader=mkShader(lightVS,lightFS);vhsShader=mkShader(vhsVS,vhsFS);
+    
+    // RTX: PBR textures, SSAO kernel, shaders, pipeline init
+    pbrWall=genPbrTexSet(0);pbrFloor=genPbrTexSet(1);pbrCeil=genPbrTexSet(2);
+    pbrLight=genPbrTexSet(3);pbrLamp=genPbrTexSet(4);pbrProp=genPbrTexSet(5);
+    { unsigned int ks=48271; for(int i=0;i<32;i++){
+        ks^=ks<<13;ks^=ks>>17;ks^=ks<<5; float kx=(float)(ks%10000)/5000.0f-1.0f;
+        ks^=ks<<13;ks^=ks>>17;ks^=ks<<5; float ky=(float)(ks%10000)/5000.0f-1.0f;
+        ks^=ks<<13;ks^=ks>>17;ks^=ks<<5; float kz=(float)(ks%10000)/10000.0f;
+        float len=sqrtf(kx*kx+ky*ky+kz*kz);if(len>0.001f){kx/=len;ky/=len;kz/=len;}
+        float sc=(float)i/32.0f;sc=0.1f+sc*sc*0.9f;
+        rtxSsaoKernel[i*3]=kx*sc;rtxSsaoKernel[i*3+1]=ky*sc;rtxSsaoKernel[i*3+2]=kz*sc;
+    }}
+    rtxPipeline.gbufShader=mkShader(rtxGbufVS,rtxGbufFS);
+    rtxPipeline.ssaoShader=mkShader(rtxSsaoVS,rtxSsaoFS);
+    rtxPipeline.ssaoBlurShader=mkShader(rtxSsaoVS,rtxSsaoBlurFS);
+    rtxPipeline.ssrShader=mkShader(rtxSsaoVS,rtxSsrFS);
+    rtxPipeline.volShader=mkShader(rtxSsaoVS,rtxVolFS);
+    rtxPipeline.compShader=mkShader(rtxCompVS,rtxCompFS);
     buildGeom();
     computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), renderW, renderH);
     initFBO(fbo,fboTex,rbo,renderW,renderH);
+    if(isRtxEnabled(settings.rtxMode)) initRtxPipeline(rtxPipeline,renderW,renderH,settings.rtxMode);
     initTaaTargets();
     initText();
     entityMgr.init();
@@ -65,6 +84,12 @@ int main(){
             if(rbo) glDeleteRenderbuffers(1, &rbo);
             initFBO(fbo, fboTex, rbo, renderW, renderH);
         }
+        { static int pRM=settings.rtxMode; // RTX hot-reload
+          if(settings.rtxMode!=pRM){if(rtxPipeline.initialized)destroyRtxPipeline(rtxPipeline);
+            if(isRtxEnabled(settings.rtxMode))initRtxPipeline(rtxPipeline,renderW,renderH,settings.rtxMode);
+            pRM=settings.rtxMode;}
+          else if(isRtxEnabled(settings.rtxMode)&&!rtxPipeline.initialized)initRtxPipeline(rtxPipeline,renderW,renderH,settings.rtxMode);
+          if(rtxPipeline.initialized&&(rtxPipeline.gbuf.width!=renderW||rtxPipeline.gbuf.height!=renderH))resizeRtxPipeline(rtxPipeline,renderW,renderH);}
         sndState.masterVol=settings.masterVol;sndState.dangerLevel=entityMgr.dangerLevel;
         sndState.musicVol=settings.musicVol;
         sndState.ambienceVol=settings.ambienceVol;
@@ -338,19 +363,10 @@ int main(){
             if(stress>1.0f) stress=1.0f;
             vI=settings.vhsIntensity*(0.26f+0.44f*stress);
         }
-        static GLint vhsTmLoc = -1;
-        static GLint vhsIntenLoc = -1;
-        static GLint vhsUpscalerLoc = -1;
-        static GLint vhsAaModeLoc = -1;
-        static GLint vhsSharpnessLoc = -1;
-        static GLint vhsTexelXLoc = -1;
-        static GLint vhsTexelYLoc = -1;
-        static GLint vhsTaaHistLoc = -1;
-        static GLint vhsTaaBlendLoc = -1;
-        static GLint vhsTaaJitterLoc = -1;
-        static GLint vhsTaaValidLoc = -1;
-        static GLint vhsFrameGenLoc = -1;
-        static GLint vhsFrameGenBlendLoc = -1;
+        static GLint vhsTmLoc=-1,vhsIntenLoc=-1,vhsUpscalerLoc=-1,vhsAaModeLoc=-1;
+        static GLint vhsSharpnessLoc=-1,vhsTexelXLoc=-1,vhsTexelYLoc=-1;
+        static GLint vhsTaaHistLoc=-1,vhsTaaBlendLoc=-1,vhsTaaJitterLoc=-1,vhsTaaValidLoc=-1;
+        static GLint vhsFrameGenLoc=-1,vhsFrameGenBlendLoc=-1;
         if(vhsTmLoc<0){
             glUniform1i(glGetUniformLocation(vhsShader,"tex"),0);
             vhsTmLoc = glGetUniformLocation(vhsShader,"tm");
@@ -384,12 +400,16 @@ int main(){
             jitterX = jitterSeq[taaFrameIndex & 7][0] - 0.5f;
             jitterY = jitterSeq[taaFrameIndex & 7][1] - 0.5f;
         }
+        // Choose RTX composited texture or raw fbo texture
+        GLuint displayTex = fboTex;
+        if (rtxPipeline.initialized && isRtxEnabled(settings.rtxMode))
+            displayTex = rtxPipeline.comp.resultTex;
         if(aaMode==AA_MODE_TAA){
             glBindFramebuffer(GL_FRAMEBUFFER,taaResolveFbo);
             glViewport(0,0,winW,winH);
             glClear(GL_COLOR_BUFFER_BIT);
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D,fboTex);
+            glBindTexture(GL_TEXTURE_2D,displayTex);
             glActiveTexture(GL_TEXTURE0 + 1);
             glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
             glUniform1i(vhsTaaHistLoc,1);
@@ -401,7 +421,7 @@ int main(){
             glUniform1f(vhsSharpnessLoc,clampFsrSharpness(settings.fsrSharpness));
             glUniform1f(vhsTexelXLoc,1.0f/(float)renderW);
             glUniform1f(vhsTexelYLoc,1.0f/(float)renderH);
-            glUniform1f(vhsTaaBlendLoc,0.88f);
+            glUniform1f(vhsTaaBlendLoc,0.65f);
             glUniform3f(vhsTaaJitterLoc,jitterX,jitterY,0.0f);
             glUniform1f(vhsTaaValidLoc,taaHistoryValid?1.0f:0.0f);
             glUniform1i(vhsFrameGenLoc,isFrameGenEnabled(settings.frameGenMode)?1:0);
@@ -444,7 +464,7 @@ int main(){
             taaHistoryValid = false;
             taaFrameIndex = 0;
             glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D,fboTex);
+            glBindTexture(GL_TEXTURE_2D,displayTex);
             glActiveTexture(GL_TEXTURE0 + 1);
             glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
             glUniform1i(vhsTaaHistLoc,1);
