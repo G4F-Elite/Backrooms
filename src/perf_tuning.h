@@ -19,12 +19,12 @@ inline constexpr float LIGHT_FADE_SPEED = 3.0f; // How fast lights fade in/out p
 // RENDER TARGET UTILITIES
 // ============================================================================
 inline void computeRenderTargetSize(int winW, int winH, float scale, int& outW, int& outH) {
-    if (scale < 0.5f) scale = 0.5f;
+    if (scale < 0.2f) scale = 0.2f;
     if (scale > 1.0f) scale = 1.0f;
     outW = fastFloor((float)winW * scale);
     outH = fastFloor((float)winH * scale);
-    if (outW < 320) outW = 320;
-    if (outH < 180) outH = 180;
+    if (outW < 160) outW = 160;
+    if (outH < 90) outH = 90;
 }
 
 // ============================================================================

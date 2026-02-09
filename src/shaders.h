@@ -245,6 +245,34 @@ vec3 fsr1Sample(vec2 tc){
  return clamp(rcas, 0.0, 1.0);
 }
 
+vec3 fsr2Sample(vec2 tc){
+ vec3 c = texture(tex, tc).rgb;
+ vec3 n = texture(tex, tc + vec2(0.0, texelY)).rgb;
+ vec3 s = texture(tex, tc - vec2(0.0, texelY)).rgb;
+ vec3 e = texture(tex, tc + vec2(texelX, 0.0)).rgb;
+ vec3 w = texture(tex, tc - vec2(texelX, 0.0)).rgb;
+ vec3 nw = texture(tex, tc + vec2(-texelX, texelY)).rgb;
+ vec3 ne = texture(tex, tc + vec2(texelX, texelY)).rgb;
+ vec3 sw = texture(tex, tc + vec2(-texelX, -texelY)).rgb;
+ vec3 se = texture(tex, tc + vec2(texelX, -texelY)).rgb;
+ vec3 base = (c * 0.30) + (n + s + e + w) * 0.10 + (nw + ne + sw + se) * 0.075;
+
+ if(taaValid > 0.5){
+  vec2 reproj = tc - taaJitter.xy * vec2(texelX, texelY) * 0.75;
+  vec3 hist = texture(histTex, reproj).rgb;
+  vec3 mn = min(c, min(min(n, s), min(e, w)));
+  vec3 mx = max(c, max(max(n, s), max(e, w)));
+  vec3 clampedHist = clamp(hist, mn, mx);
+  float motionEdge = abs(texture(depthTex, tc).r - texture(depthTex, reproj).r);
+  float stability = 1.0 - smoothstep(0.01, 0.12, motionEdge);
+  base = mix(base, clampedHist, (0.35 + sharpness * 0.25) * stability);
+ }
+
+ vec3 lap = (n + s + e + w) - base * 4.0;
+ vec3 rcas = base - lap * (0.24 + sharpness * 0.78);
+ return clamp(rcas, 0.0, 1.0);
+}
+
 vec3 fxaaResolve(vec2 tc, vec3 base){
  vec3 nw = texture(tex, tc + vec2(-texelX, texelY)).rgb;
  vec3 ne = texture(tex, tc + vec2(texelX, texelY)).rgb;
@@ -262,6 +290,9 @@ vec3 fxaaResolve(vec2 tc, vec3 base){
 vec3 sourceSample(vec2 tc){
  if(upscaler == 1){
   return fsr1Sample(tc);
+ }
+ if(upscaler == 2){
+  return fsr2Sample(tc);
  }
  return texture(tex, tc).rgb;
 }
@@ -298,52 +329,53 @@ float linZ(vec2 tc){
 }
 float rtxSSAO(vec2 tc, int ns){
  float z0 = linZ(tc);
- float rad = 0.03 * (1.0 + 2.5 / max(z0, 0.5));
+ if(z0 > 30.0) return 1.0;
+ float rad = 0.012 + 0.02 / max(z0, 0.8);
  float ao = 0.0;
- float rot = rnd(tc * 7.13 + vec2(tm * 0.37, tm * 0.61)) * 6.283;
+ float rot = rnd(floor(gl_FragCoord.xy * 0.25) * 0.17) * 6.283 + tm * 0.02;
  for(int i = 0; i < ns; i++){
   float a = float(i) * 6.283 / float(ns) + rot;
-  float r = rad * (0.25 + 0.75 * rnd(tc * float(i+1) * 0.73 + vec2(tm * 0.53)));
+  float r = rad * (0.3 + 0.7 * float(i+1) / float(ns));
   vec2 sc = tc + vec2(cos(a), sin(a)) * r;
   float diff = z0 - linZ(sc);
-  if(diff > 0.02 && diff < 2.0) ao += (1.0 - diff / 2.0);
+  if(diff > 0.004 && diff < 0.30) ao += smoothstep(0.30, 0.004, diff);
  }
- return clamp(1.0 - ao / float(ns) * 4.0, 0.0, 1.0);
+ return clamp(1.0 - ao / float(ns) * 1.45, 0.56, 1.0);
 }
 vec3 rtxGI(vec2 tc, int ns){
  float z0 = linZ(tc);
- float rad = 0.04 * (1.0 + 2.0 / max(z0, 0.5));
+ float rad = 0.04 + 0.05 / max(z0, 0.8);
  vec3 gi = vec3(0.0); float tw = 0.001;
- float rot = rnd(tc * 11.3 + vec2(tm * 0.41)) * 6.283;
+ float rot = rnd(floor(gl_FragCoord.xy * 0.25) * 0.11 + vec2(0.3)) * 6.283 + tm * 0.02;
  for(int i = 0; i < ns; i++){
   float a = float(i) * 6.283 / float(ns) + rot;
-  float r = rad * (0.3 + 0.7 * rnd(tc * float(i+1) * 0.53 + vec2(tm * 0.29)));
+  float r = rad * (0.3 + 0.7 * float(i+1) / float(ns));
   vec2 sc = tc + vec2(cos(a), sin(a)) * r;
   vec3 sC = texture(tex, sc).rgb;
   float depthDiff = abs(z0 - linZ(sc));
-  float w = max(0.0, 1.0 - depthDiff * 3.0);
-  float br = min(dot(sC, vec3(0.3, 0.59, 0.11)), 0.5);
-  w *= br * 2.5;
+  float w = smoothstep(1.5, 0.0, depthDiff);
+  float br = dot(sC, vec3(0.3, 0.59, 0.11));
+  w *= br;
   gi += sC * w; tw += w;
  }
- return gi / tw;
+ return (gi / tw) * 1.35;
 }
 vec3 rtxRays(vec2 tc, int ns){
  vec3 rays = vec3(0.0);
- float rot = rnd(tc * 5.7 + vec2(tm * 0.17)) * 6.283;
+ float rot = rnd(floor(gl_FragCoord.xy * 0.5) * 0.13) * 6.283 + tm * 0.01;
  for(int i = 0; i < ns; i++){
   float a = float(i) * 6.283 / float(ns) + rot;
-  float r = 0.015 + 0.07 * float(i) / float(ns);
+  float r = 0.02 + 0.12 * float(i) / float(ns);
   vec2 sc = clamp(tc + vec2(cos(a), sin(a)) * r, 0.001, 0.999);
   vec3 s = texture(tex, sc).rgb;
   float lum = dot(s, vec3(0.3, 0.59, 0.11));
-  if(lum > 0.12){
-   float dw = smoothstep(12.0, 1.0, linZ(sc));
+  if(lum > 0.08){
+   float nearW = smoothstep(20.0, 1.0, linZ(sc));
    float decay = 1.0 - float(i) / float(ns);
-   rays += s * (lum - 0.12) * decay * dw * 2.5;
+   rays += s * (lum - 0.08) * decay * decay * nearW;
   }
  }
- return rays / float(ns);
+ return (rays / float(ns)) * 1.45;
 }
 vec3 rtxBloom(vec2 tc, int rad){
  vec3 bl = vec3(0.0); float tw = 0.0;
@@ -351,19 +383,39 @@ vec3 rtxBloom(vec2 tc, int rad){
  for(int x = -rad; x <= rad; x++) for(int y = -rad; y <= rad; y++){
   vec3 s = texture(tex, tc + vec2(float(x)*sx, float(y)*sy)).rgb;
   float lum = dot(s, vec3(0.3, 0.59, 0.11));
-  float w = smoothstep(0.15, 0.45, lum) * exp(-length(vec2(x, y)) * 0.35);
+  float w = smoothstep(0.08, 0.35, lum) * exp(-length(vec2(x, y)) * 0.3);
   bl += s * w; tw += 1.0;
  }
- return bl / max(tw, 1.0);
+ return (bl / max(tw, 1.0)) * 1.35;
+}
+vec3 rtxDenoise(vec2 tc, vec3 orig, vec3 mod_c){
+ float z0 = linZ(tc);
+ vec3 sum = mod_c; float wSum = 1.0;
+ vec3 ratio = mod_c / max(orig, vec3(0.01));
+ ratio = clamp(ratio, vec3(0.0), vec3(2.5));
+ for(int dx = -1; dx <= 1; dx++) for(int dy = -1; dy <= 1; dy++){
+  if(dx == 0 && dy == 0) continue;
+  vec2 sc = tc + vec2(float(dx) * texelX * 2.0, float(dy) * texelY * 2.0);
+  float zn = linZ(sc);
+  vec3 nOrig = texture(tex, sc).rgb;
+  float dw = exp(-abs(z0 - zn) * 12.0);
+  float cw = exp(-length(orig - nOrig) * 6.0);
+  float w = dw * cw;
+  if(w < 0.01) continue;
+  sum += nOrig * ratio * w;
+  wSum += w;
+ }
+ return sum / wSum;
 }
 
 void main(){
  if(inten < 0.02) {
-  vec3 c0 = resolveSample(uv);
-  if(rtxA>0){ int n=rtxA<=1?6:(rtxA<=2?10:(rtxA<=3?14:20)); c0*=rtxSSAO(uv,n); }
-  if(rtxG>0){ int n=rtxG<=1?6:(rtxG<=2?10:16); c0+=rtxGI(uv,n)*0.18; }
-  if(rtxR>0){ c0+=rtxRays(uv,24)*0.45; }
-  if(rtxB>0){ c0+=rtxBloom(uv,3)*0.45; }
+  vec3 c0 = resolveSample(uv); vec3 orig0 = c0;
+  if(rtxA>0){ int n=rtxA<=1?14:(rtxA<=2?24:(rtxA<=3?36:56)); c0*=rtxSSAO(uv,n); }
+  if(rtxG>0){ int n=rtxG<=1?14:(rtxG<=2?26:42); c0+=rtxGI(uv,n)*0.38; }
+  if(rtxR>0){ int n=rtxA>=4?72:48; c0+=rtxRays(uv,n)*0.72; }
+  if(rtxB>0){ c0+=rtxBloom(uv,4)*0.52; }
+  if(rtxA>0||rtxG>0||rtxR>0||rtxB>0) c0=rtxDenoise(uv,orig0,c0);
   F = vec4(c0, 1.0);
  return;
 }
@@ -407,10 +459,12 @@ vec3 c = vec3(r,g,b);
  // Warm tint
  c.g += 0.01 * inten;
 
- if(rtxA>0){ int n=rtxA<=1?6:(rtxA<=2?10:(rtxA<=3?14:20)); c*=rtxSSAO(uv,n); }
- if(rtxG>0){ int n=rtxG<=1?6:(rtxG<=2?10:16); c+=rtxGI(uv,n)*0.18; }
- if(rtxR>0){ c+=rtxRays(uv,24)*0.45; }
- if(rtxB>0){ c+=rtxBloom(uv,3)*0.45; }
+ vec3 preRtx = c;
+ if(rtxA>0){ int n=rtxA<=1?14:(rtxA<=2?24:(rtxA<=3?36:56)); c*=rtxSSAO(uv,n); }
+ if(rtxG>0){ int n=rtxG<=1?14:(rtxG<=2?26:42); c+=rtxGI(uv,n)*0.38; }
+ if(rtxR>0){ int n=rtxA>=4?72:48; c+=rtxRays(uv,n)*0.72; }
+ if(rtxB>0){ c+=rtxBloom(uv,4)*0.52; }
+ if(rtxA>0||rtxG>0||rtxR>0||rtxB>0) c=rtxDenoise(uv,preRtx,c);
 
  F = vec4(c, 1);
 })";

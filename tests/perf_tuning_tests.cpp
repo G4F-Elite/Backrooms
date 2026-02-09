@@ -21,8 +21,13 @@ void testComputeRenderTargetSize() {
     
     // Min scale clamping
     computeRenderTargetSize(1920, 1080, 0.3f, outW, outH);
-    assert(outW == 960);  // 0.5 min scale
-    assert(outH == 540);
+    assert(outW == 576);  // 0.3 scale is now valid
+    assert(outH == 324);
+
+    // New lower minimum scale
+    computeRenderTargetSize(1920, 1080, 0.1f, outW, outH);
+    assert(outW == 384);  // 0.2 min scale
+    assert(outH == 216);
     
     // Max scale clamping
     computeRenderTargetSize(1920, 1080, 1.5f, outW, outH);
@@ -30,9 +35,9 @@ void testComputeRenderTargetSize() {
     assert(outH == 1080);
     
     // Minimum size clamping
-    computeRenderTargetSize(400, 200, 0.5f, outW, outH);
-    assert(outW == 320);  // Min width
-    assert(outH == 180);  // Min height
+    computeRenderTargetSize(400, 200, 0.2f, outW, outH);
+    assert(outW == 160);  // Min width
+    assert(outH == 90);   // Min height
     
     std::cout << "  [PASS] Render target size computation\n";
 }
