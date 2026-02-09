@@ -251,6 +251,14 @@ void genWorld(){
 
     resetPlayerInterpolation();
     initCoopObjectives(coopBase);
+    {
+        Vec3 d = cam.pos - coop.doorPos;
+        d.y = 0.0f;
+        if(d.len() < 8.0f){
+            Vec3 alt = findSpawnPos(coop.doorPos, 14.0f);
+            cam.pos = Vec3(alt.x, PH, alt.z);
+        }
+    }
     worldItems.clear();
     nextWorldItemId = 1;
     invBattery = invMedkit = invBait = 0;
@@ -260,11 +268,12 @@ void genWorld(){
     echoStatusText[0] = '\0';
     trapStatusTimer = 0.0f;
     trapStatusText[0] = '\0';
+    smileEvent = {false, Vec3(0,0,0), 0.0f, 0.0f, 24.0f + (float)(rng()%16), false, Vec3(0,0,0), Vec3(0,0,0), 0.0f};
     anomalyBlur = 0.0f;
     lightsOutTimer = falseDoorTimer = 0.0f;
     baitEffectTimer = 0.0f;
     itemSpawnTimer = 6.0f;
-    playerHealth=playerSanity=playerStamina=100;
+    playerHealth=playerSanity=100; playerStamina=125;
     flashlightBattery=100;flashlightOn=false;isPlayerDead=false;
     playerEscaped=false;
     flashlightShutdownBlinkActive = false;

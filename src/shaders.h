@@ -1,28 +1,22 @@
 #pragma once
-
 const char* mainVS=R"(#version 330
 layout(location=0) in vec3 p; layout(location=1) in vec2 t; layout(location=2) in vec3 n;
 out vec2 uv; out vec3 fp,nm; out vec3 viewTS; out vec3 fragPosTS;
 uniform mat4 M,V,P;
 uniform vec3 vp;
-
 void main(){
  fp=vec3(M*vec4(p,1));
  nm=mat3(M)*n;
  uv=t;
- 
  // Compute TBN matrix for parallax
  vec3 N = normalize(nm);
  vec3 T = normalize(cross(N, vec3(0.0, 1.0, 0.1)));
  vec3 B = cross(N, T);
  mat3 TBN = transpose(mat3(T, B, N));
- 
  viewTS = TBN * normalize(vp - fp);
  fragPosTS = TBN * fp;
- 
  gl_Position=P*V*M*vec4(p,1);
 })";
-
 const char* mainFS=R"(#version 330
 out vec4 F; in vec2 uv; in vec3 fp,nm;
 in vec3 viewTS; in vec3 fragPosTS;
@@ -30,33 +24,26 @@ uniform sampler2D tex; uniform vec3 vp; uniform float tm;
 uniform int nl; uniform vec3 lp[16]; uniform float danger;
 uniform int flashOn; uniform vec3 flashDir;
 uniform int rfc; uniform vec3 rfp[4]; uniform vec3 rfd[4];
-
 float hash(vec3 p) {
  return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
 }
-
 // Optimized single-step parallax for performance
 vec2 parallaxOffset(vec2 texCoords, vec3 viewDir) {
  float height = texture(tex, texCoords).a;
  float heightScale = 0.025; // Subtle effect to avoid artifacts
- 
  // Distance-based LOD - disable parallax at distance
  float dist = length(vp - fp);
  float lodFade = 1.0 - smoothstep(8.0, 15.0, dist);
  if(lodFade < 0.01) return texCoords;
- 
  // Simple offset parallax (fastest method)
  float h = (height - 0.5) * heightScale * lodFade;
  vec2 offset = viewDir.xy * h;
- 
  return texCoords + offset;
 }
-
 void main(){
  // Apply parallax offset to UV
  vec3 V = normalize(viewTS);
  vec2 texCoord = parallaxOffset(uv, V);
- 
  vec3 tc = texture(tex, texCoord).rgb;
  vec3 N = normalize(nm);
  bool isCeil = N.y < -0.5;
@@ -64,10 +51,8 @@ void main(){
  if(isCeil) tc *= vec3(1.02, 1.0, 0.95);
  float ambVal = 0.06 * (1.0 - danger * 0.3);
  vec3 res = vec3(ambVal) * tc;
- 
  for(int i = 0; i < nl && i < 16; i++) {
   vec3 toLight = lp[i] - fp;
-  
   // Calculate distance-based fade for smooth light transitions at edges
   float lightDistFromCam = length(lp[i] - vp);
   float fade = 1.0;
@@ -76,7 +61,6 @@ void main(){
    fade = clamp(fade, 0.0, 1.0);
   }
   if(fade < 0.001) continue;
-  
   float d2 = dot(toLight, toLight);
   float invD = inversesqrt(max(d2, 0.0001));
   float d = d2 * invD;
@@ -99,11 +83,9 @@ void main(){
   float panicFlick = sin(tm*30.0 + float(i)*3.7) * 0.05 * danger;
   float fl = 1.0 + baseFlick + panicFlick;
   vec3 lightColor = vec3(1.0, 0.92, 0.75);
-  
   // Apply fade factor for smooth light transitions
   res += df * lightColor * fl * tc * att * 0.5 * fade;
  }
- 
  // FLASHLIGHT - white cone with red danger edge
  if(flashOn == 1) {
   vec3 toFrag = normalize(fp - vp);
@@ -118,7 +100,6 @@ void main(){
    res += tc * flashColor * spotAtt * distAtt * NdotL * 1.5;
   }
  }
- 
  // REMOTE FLASHLIGHTS (other players in multiplayer)
  for(int i = 0; i < rfc && i < 4; i++) {
   vec3 toFrag = normalize(fp - rfp[i]);
@@ -132,15 +113,12 @@ void main(){
    res += tc * remoteFlash * spotAtt * distAtt * NdotL * 0.95;
   }
  }
- 
  if(isCeil) {
   float maxB = max(res.r, max(res.g, res.b));
   if(maxB > 0.1) res = max(res, tc * 0.15);
  }
- 
  // VOLUMETRIC FOG - layered with height variation for depth
  float dist = length(vp - fp);
- 
  // Multi-layered fog for volumetric feel
  float fogDensityBase = 0.055;
  float fogDensityHigh = 0.075;
@@ -148,13 +126,11 @@ void main(){
  float heightFog = mix(fogDensityHigh, fogDensityBase, smoothstep(0.0, 2.5, fp.y));
  float fog = exp(-dist * heightFog);
  fog = clamp(fog, 0.0, 1.0);
- 
  // Animated volumetric noise - swirling fog
  float fogNoise1 = hash(fp * 0.13 + vec3(tm * 0.03, tm * 0.02, tm * 0.01));
  float fogNoise2 = hash(fp * 0.07 + vec3(-tm * 0.015, tm * 0.025, tm * 0.008));
  float fogNoise = mix(fogNoise1, fogNoise2, 0.5);
  fog = fog * (0.94 + fogNoise * 0.06);
- 
  // Warm atmospheric fog color - tinted by nearby lights
  vec3 baseFogColor = vec3(0.055, 0.048, 0.038);
  // Warm light scatter in fog from nearby lights
@@ -165,54 +141,43 @@ void main(){
  }
  lightScatter = min(lightScatter, 0.5);
  vec3 fogColor = baseFogColor + vec3(0.06, 0.045, 0.02) * lightScatter;
- 
  // Distance-based color desaturation with warm shift
  float desat = smoothstep(6.0, 18.0, dist);
  float gray = dot(res, vec3(0.3, 0.6, 0.1));
  vec3 desatColor = vec3(gray * 1.05, gray * 0.98, gray * 0.88); // warm desaturation
  res = mix(res, desatColor, desat * 0.45);
- 
  // Distance-based darkening before fog (smooth LOD transition)
  float distDarken = smoothstep(12.0, 22.0, dist);
  res *= (1.0 - distDarken * 0.55);
- 
  // Dust particles in light beams (subtle sparkle)
  float dustParticle = hash(fp * 1.7 + vec3(tm * 0.3));
  float dustVisible = smoothstep(0.97, 1.0, dustParticle) * lightScatter * 2.0;
  float dustDist = smoothstep(12.0, 2.0, dist);
  res += vec3(0.8, 0.75, 0.5) * dustVisible * dustDist * 0.12;
- 
  // Apply fog
  res = mix(fogColor, res, fog);
- 
  // Atmospheric warm tint
  res *= vec3(1.02, 0.97, 0.88);
- 
  // Subtle color grading - lift shadows warm, cool highlights
  float lum = dot(res, vec3(0.3, 0.6, 0.1));
  vec3 shadowTint = vec3(0.02, 0.015, 0.005) * (1.0 - smoothstep(0.0, 0.15, lum));
  vec3 highlightTint = vec3(-0.005, 0.0, 0.01) * smoothstep(0.3, 0.8, lum);
  res += shadowTint + highlightTint;
- 
  // Danger red tint in environment
  if(danger > 0.3) {
   res.r += danger * 0.08;
   res.gb *= (1.0 - danger * 0.15);
  }
- 
  if(danger > 0.0) {
   float grayD = dot(res, vec3(0.3, 0.6, 0.1));
   res = mix(res, vec3(grayD), danger * 0.2);
  }
- 
  F = vec4(clamp(res, 0.0, 1.0), 1.0);
 })";
-
 const char* lightVS=R"(#version 330
 layout(location=0) in vec3 p; layout(location=1) in vec2 t;
 out vec2 uv; uniform mat4 M,V,P;
 void main(){ uv=t; gl_Position=P*V*M*vec4(p,1); })";
-
 const char* lightFS=R"(#version 330
 out vec4 F; in vec2 uv;
 uniform sampler2D tex; uniform float inten,tm,fade;
@@ -223,11 +188,9 @@ void main(){
  // Apply fade for smooth light sprite transitions
  F = vec4(c * flick * fade, fade);
 })";
-
 const char* vhsVS=R"(#version 330
 layout(location=0) in vec2 p; layout(location=1) in vec2 t;
 out vec2 uv; void main(){ uv=t; gl_Position=vec4(p,0,1); })";
-
 const char* vhsFS=R"(#version 330
 out vec4 F; in vec2 uv;
 uniform sampler2D tex; uniform float tm,inten;
@@ -243,10 +206,10 @@ uniform float taaValid;
 uniform int frameGen;
 uniform float frameGenBlend;
 uniform int rtxA,rtxG,rtxR,rtxB;
+uniform int rtxDenoiseOn;
+uniform float rtxDenoiseStrength;
 uniform sampler2D depthTex;
-
 float rnd(vec2 s){ return fract(sin(dot(s,vec2(12.9898,78.233)))*43758.5453); }
-
 float noise(vec2 p) {
  vec2 i = floor(p);
  vec2 f = fract(p);
@@ -257,7 +220,6 @@ float noise(vec2 p) {
  float d = rnd(i + vec2(1.0, 1.0));
  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
-
 vec3 fsr1Sample(vec2 tc){
  vec3 c = texture(tex, tc).rgb;
  vec3 n = texture(tex, tc + vec2(0.0, texelY)).rgb;
@@ -272,7 +234,6 @@ vec3 fsr1Sample(vec2 tc){
  vec3 rcas = c - lap * (0.28 + sharpness * 0.92) * adaptive;
  return clamp(rcas, 0.0, 1.0);
 }
-
 vec3 fsr2Sample(vec2 tc){
  vec3 c = texture(tex, tc).rgb;
  vec3 n = texture(tex, tc + vec2(0.0, texelY)).rgb;
@@ -284,7 +245,6 @@ vec3 fsr2Sample(vec2 tc){
  vec3 sw = texture(tex, tc + vec2(-texelX, -texelY)).rgb;
  vec3 se = texture(tex, tc + vec2(texelX, -texelY)).rgb;
  vec3 base = (c * 0.30) + (n + s + e + w) * 0.10 + (nw + ne + sw + se) * 0.075;
-
  if(taaValid > 0.5){
   vec2 reproj = tc - taaJitter.xy * vec2(texelX, texelY) * 0.75;
   vec3 hist = texture(histTex, reproj).rgb;
@@ -295,12 +255,10 @@ vec3 fsr2Sample(vec2 tc){
   float stability = 1.0 - smoothstep(0.01, 0.12, motionEdge);
   base = mix(base, clampedHist, (0.35 + sharpness * 0.25) * stability);
  }
-
  vec3 lap = (n + s + e + w) - base * 4.0;
  vec3 rcas = base - lap * (0.24 + sharpness * 0.78);
  return clamp(rcas, 0.0, 1.0);
 }
-
 vec3 fxaaResolve(vec2 tc, vec3 base){
  vec3 nw = texture(tex, tc + vec2(-texelX, texelY)).rgb;
  vec3 ne = texture(tex, tc + vec2(texelX, texelY)).rgb;
@@ -314,7 +272,6 @@ vec3 fxaaResolve(vec2 tc, vec3 base){
  float blend = smoothstep(0.04, 0.20, contrast) * 0.55;
  return mix(base, avg, blend);
 }
-
 vec3 sourceSample(vec2 tc){
  if(upscaler == 1){
   return fsr1Sample(tc);
@@ -324,7 +281,6 @@ vec3 sourceSample(vec2 tc){
  }
  return texture(tex, tc).rgb;
 }
-
 vec3 taaResolve(vec2 tc){
  vec2 off = taaJitter.xy * vec2(texelX, texelY);
  vec3 cur = sourceSample(tc + off);
@@ -339,7 +295,6 @@ vec3 taaResolve(vec2 tc){
  float useHist = clamp(taaValid, 0.0, 1.0);
  return mix(cur, clampedHist, taaBlend * useHist);
 }
-
 vec3 resolveSample(vec2 tc){
  vec3 base = sourceSample(tc);
  if(aaMode == 1){
@@ -350,7 +305,6 @@ vec3 resolveSample(vec2 tc){
  }
  return base;
 }
-
 float linZ(vec2 tc){
  float d = texture(depthTex, tc).r;
  return 20.0 / (100.1 - (d * 2.0 - 1.0) * 99.9);
@@ -435,7 +389,6 @@ vec3 rtxDenoise(vec2 tc, vec3 orig, vec3 mod_c){
  }
  return sum / wSum;
 }
-
 void main(){
  if(inten < 0.02) {
   vec3 c0 = resolveSample(uv); vec3 orig0 = c0;
@@ -443,11 +396,13 @@ void main(){
   if(rtxG>0){ int n=rtxG<=1?14:(rtxG<=2?26:42); c0+=rtxGI(uv,n)*0.38; }
   if(rtxR>0){ int n=rtxA>=4?72:48; c0+=rtxRays(uv,n)*0.72; }
   if(rtxB>0){ c0+=rtxBloom(uv,4)*0.52; }
-  if(rtxA>0||rtxG>0||rtxR>0||rtxB>0) c0=rtxDenoise(uv,orig0,c0);
+  if((rtxA>0||rtxG>0||rtxR>0||rtxB>0) && rtxDenoiseOn>0){
+   vec3 dn = rtxDenoise(uv,orig0,c0);
+   c0 = mix(c0, dn, clamp(rtxDenoiseStrength, 0.0, 1.0));
+  }
   F = vec4(c0, 1.0);
  return;
 }
-
 // Chromatic aberration - asymmetric for realistic lens feel
 float ab = 0.0018 * inten;
 float abV = 0.0008 * inten; // slight vertical component
@@ -459,7 +414,6 @@ vec3 c = vec3(r,g,b);
   vec3 prev = texture(histTex, uv).rgb;
   c = mix(c, prev, clamp(frameGenBlend, 0.0, 0.6));
  }
- 
  // Film grain - organic noise instead of sharp static
  float grainTime = tm * 0.7;
  float grain1 = rnd(uv * 0.8 + vec2(grainTime, grainTime * 0.73));
@@ -469,18 +423,15 @@ vec3 c = vec3(r,g,b);
  float pixelLum = dot(c, vec3(0.3, 0.6, 0.1));
  float grainStrength = mix(1.5, 0.5, smoothstep(0.0, 0.4, pixelLum));
  c += vec3(filmGrain) * grainStrength;
- 
  // Subtle scanlines - less aggressive, more like CRT phosphor
  float scanline = sin(uv.y * 400.0 + tm * 3.0) * 0.5 + 0.5;
  scanline = pow(scanline, 3.0) * 0.012 * inten;
  c -= vec3(scanline);
- 
  // Horizontal distortion glitch (very rare, subtle)
  if(inten > 0.45 && rnd(vec2(tm * 0.06, floor(uv.y * 40))) > 0.992) {
   float of = (rnd(vec2(tm, floor(uv.y * 40))) - 0.5) * 0.012 * inten;
   c = resolveSample(uv + vec2(of, 0));
  }
- 
  // Vignette - natural camera lens falloff
  vec2 vigUV = uv - 0.5;
  float vigDist = dot(vigUV, vigUV); // squared distance for natural falloff
@@ -490,17 +441,14 @@ vec3 c = vec3(r,g,b);
  c.r *= mix(vig, 1.0, 0.05);
  c.g *= vig;
  c.b *= mix(vig, 1.0, -0.03);
- 
  // Subtle warm light leak from edge (like old camera)
  float leakAngle = atan(vigUV.y, vigUV.x);
  float leak = sin(leakAngle * 1.5 + tm * 0.05) * 0.5 + 0.5;
  float leakMask = smoothstep(0.35, 0.55, length(vigUV)) * leak * 0.015 * inten;
  c += vec3(leakMask * 1.2, leakMask * 0.9, leakMask * 0.4);
- 
  // Ghost frame (very subtle double image with slight color shift)
  vec3 ghost = resolveSample(uv - vec2(0.003, 0.0015));
  c = mix(c, ghost * vec3(1.02, 0.98, 0.96), 0.025 * inten);
- 
  // Cinematic color grading - warm midtones, cool shadows
  float lumC = dot(c, vec3(0.3, 0.6, 0.1));
  // Lift shadows slightly warm
@@ -509,16 +457,16 @@ vec3 c = vec3(r,g,b);
  c.r += 0.008 * smoothstep(0.1, 0.3, lumC) * (1.0 - smoothstep(0.3, 0.6, lumC)) * inten;
  // Slight green in highlights (fluorescent light feel)
  c.g += 0.005 * smoothstep(0.4, 0.8, lumC) * inten;
- 
  // Subtle contrast enhancement
  c = mix(vec3(lumC), c, 1.05);
-
  vec3 preRtx = c;
  if(rtxA>0){ int n=rtxA<=1?14:(rtxA<=2?24:(rtxA<=3?36:56)); c*=rtxSSAO(uv,n); }
  if(rtxG>0){ int n=rtxG<=1?14:(rtxG<=2?26:42); c+=rtxGI(uv,n)*0.38; }
  if(rtxR>0){ int n=rtxA>=4?72:48; c+=rtxRays(uv,n)*0.72; }
  if(rtxB>0){ c+=rtxBloom(uv,4)*0.52; }
- if(rtxA>0||rtxG>0||rtxR>0||rtxB>0) c=rtxDenoise(uv,preRtx,c);
-
+ if((rtxA>0||rtxG>0||rtxR>0||rtxB>0) && rtxDenoiseOn>0){
+  vec3 dn = rtxDenoise(uv,preRtx,c);
+  c = mix(c, dn, clamp(rtxDenoiseStrength, 0.0, 1.0));
+ }
  F = vec4(c, 1);
 })";

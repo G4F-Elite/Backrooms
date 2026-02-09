@@ -238,8 +238,8 @@ inline void drawMultiPause(int playerCount) {
     snprintf(buf, 32, "PLAYERS: %d", playerCount);
     drawTextCentered(buf, 0.0f, 0.2f, 1.5f, 0.5f, 0.7f, 0.5f, 0.7f);
     
-    const char* opts[] = {"RESUME", "TELEPORT TO PLAYER", "TELEPORT TO EXIT", "GUIDE", "SETTINGS", "DISCONNECT", "QUIT"};
-    for (int i = 0; i < 7; i++) {
+    const char* opts[] = {"RESUME", "TELEPORT TO PLAYER", "SETTINGS", "GUIDE", "DISCONNECT", "QUIT"};
+    for (int i = 0; i < 6; i++) {
         float s = (menuSel == i) ? 1.0f : 0.5f;
         float y = 0.0f - i * 0.1f;
         if (menuSel == i) drawText(">", -0.35f, y, 1.8f, 0.9f * s, 0.85f * s, 0.4f * s);
