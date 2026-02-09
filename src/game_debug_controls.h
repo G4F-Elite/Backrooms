@@ -49,6 +49,14 @@ void executeDebugAction(int action){
     }
     if(debugActionSpawnsEntity(action)){
         EntityType t = debugActionEntityType(action);
+        if(multiState==MULTI_IN_GAME && !netMgr.isHost){
+            int reqType = REQ_DEBUG_SPAWN_STALKER;
+            if(t==ENTITY_CRAWLER) reqType = REQ_DEBUG_SPAWN_CRAWLER;
+            else if(t==ENTITY_SHADOW) reqType = REQ_DEBUG_SPAWN_SHADOW;
+            netMgr.sendInteractRequest(reqType, 0);
+            setEchoStatus("DEBUG: SPAWN REQUEST SENT");
+            return;
+        }
         Vec3 sp = findSpawnPos(cam.pos, 6.0f);
         entityMgr.spawnEntity(t, sp, nullptr, 0, 0);
         setEchoStatus("DEBUG: ENTITY SPAWNED");

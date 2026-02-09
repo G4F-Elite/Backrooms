@@ -21,7 +21,10 @@ void buildGeom();
 
 enum InteractRequestType {
     REQ_TOGGLE_SWITCH = 1,
-    REQ_PICK_ITEM
+    REQ_PICK_ITEM = 2,
+    REQ_DEBUG_SPAWN_STALKER = 3,
+    REQ_DEBUG_SPAWN_CRAWLER = 4,
+    REQ_DEBUG_SPAWN_SHADOW = 5
 };
 
 enum RoamEventType {

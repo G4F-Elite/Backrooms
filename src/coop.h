@@ -90,6 +90,16 @@ inline void processHostInteractRequests(){
             }
         }else if(type==REQ_TOGGLE_SWITCH){
             if(target>=0 && target<2) coop.switchOn[target] = !coop.switchOn[target];
+        }else if(type==REQ_DEBUG_SPAWN_STALKER || type==REQ_DEBUG_SPAWN_CRAWLER || type==REQ_DEBUG_SPAWN_SHADOW){
+            Vec3 base = cam.pos;
+            if(pid>=0 && pid<MAX_PLAYERS && netMgr.players[pid].active && netMgr.players[pid].hasValidPos){
+                base = netMgr.players[pid].pos;
+            }
+            EntityType spawnType = ENTITY_STALKER;
+            if(type==REQ_DEBUG_SPAWN_CRAWLER) spawnType = ENTITY_CRAWLER;
+            else if(type==REQ_DEBUG_SPAWN_SHADOW) spawnType = ENTITY_SHADOW;
+            Vec3 sp = findSpawnPos(base, 6.0f);
+            entityMgr.spawnEntity(spawnType, sp, nullptr, 0, 0);
         }
     }
     netMgr.interactRequestCount = 0;
