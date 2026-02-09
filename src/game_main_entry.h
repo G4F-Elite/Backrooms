@@ -20,7 +20,7 @@ int main(){
     mainShader=mkShader(mainVS,mainFS);lightShader=mkShader(lightVS,lightFS);vhsShader=mkShader(vhsVS,vhsFS);
     buildGeom();
     computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), renderW, renderH);
-    initFBO(fbo,fboTex,rbo,renderW,renderH);
+    initFBO(fbo,fboTex,fboDepthTex,renderW,renderH);
     initTaaTargets();
     initText();
     entityMgr.init();
@@ -62,8 +62,8 @@ int main(){
             renderH = desiredRenderH;
             if(fbo) glDeleteFramebuffers(1, &fbo);
             if(fboTex) glDeleteTextures(1, &fboTex);
-            if(rbo) glDeleteRenderbuffers(1, &rbo);
-            initFBO(fbo, fboTex, rbo, renderW, renderH);
+            if(fboDepthTex) glDeleteTextures(1, &fboDepthTex);
+            initFBO(fbo, fboTex, fboDepthTex, renderW, renderH);
         }
         sndState.masterVol=settings.masterVol;sndState.dangerLevel=entityMgr.dangerLevel;
         sndState.musicVol=settings.musicVol;
@@ -349,19 +349,11 @@ int main(){
             if(stress>1.0f) stress=1.0f;
             vI=settings.vhsIntensity*(0.26f+0.44f*stress);
         }
-        static GLint vhsTmLoc = -1;
-        static GLint vhsIntenLoc = -1;
-        static GLint vhsUpscalerLoc = -1;
-        static GLint vhsAaModeLoc = -1;
-        static GLint vhsSharpnessLoc = -1;
-        static GLint vhsTexelXLoc = -1;
-        static GLint vhsTexelYLoc = -1;
-        static GLint vhsTaaHistLoc = -1;
-        static GLint vhsTaaBlendLoc = -1;
-        static GLint vhsTaaJitterLoc = -1;
-        static GLint vhsTaaValidLoc = -1;
-        static GLint vhsFrameGenLoc = -1;
-        static GLint vhsFrameGenBlendLoc = -1;
+        static GLint vhsTmLoc=-1,vhsIntenLoc=-1,vhsUpscalerLoc=-1,vhsAaModeLoc=-1;
+        static GLint vhsSharpnessLoc=-1,vhsTexelXLoc=-1,vhsTexelYLoc=-1;
+        static GLint vhsTaaHistLoc=-1,vhsTaaBlendLoc=-1,vhsTaaJitterLoc=-1,vhsTaaValidLoc=-1;
+        static GLint vhsFrameGenLoc=-1,vhsFrameGenBlendLoc=-1;
+        static GLint vhsRtxLoc=-1,vhsDepthTexLoc=-1;
         if(vhsTmLoc<0){
             glUniform1i(glGetUniformLocation(vhsShader,"tex"),0);
             vhsTmLoc = glGetUniformLocation(vhsShader,"tm");
@@ -377,6 +369,8 @@ int main(){
             vhsTaaValidLoc = glGetUniformLocation(vhsShader,"taaValid");
             vhsFrameGenLoc = glGetUniformLocation(vhsShader,"frameGen");
             vhsFrameGenBlendLoc = glGetUniformLocation(vhsShader,"frameGenBlend");
+            vhsRtxLoc = glGetUniformLocation(vhsShader,"rtx");
+            vhsDepthTexLoc = glGetUniformLocation(vhsShader,"depthTex");
         }
         static int prevAaMode = -1;
         int aaMode = clampAaMode(settings.aaMode);
@@ -404,6 +398,10 @@ int main(){
             glActiveTexture(GL_TEXTURE0 + 1);
             glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
             glUniform1i(vhsTaaHistLoc,1);
+            glActiveTexture(GL_TEXTURE0 + 2);
+            glBindTexture(GL_TEXTURE_2D,fboDepthTex);
+            glUniform1i(vhsDepthTexLoc,2);
+            glUniform1i(vhsRtxLoc,settings.rtxEnabled?1:0);
             glActiveTexture(GL_TEXTURE0);
             glUniform1f(vhsTmLoc,vhsTime);
             glUniform1f(vhsIntenLoc,vI);
@@ -449,6 +447,7 @@ int main(){
             glUniform1f(vhsTaaValidLoc,0.0f);
             glUniform1i(vhsFrameGenLoc,0);
             glUniform1f(vhsFrameGenBlendLoc,0.0f);
+            glUniform1i(vhsRtxLoc,0);
             glBindVertexArray(quadVAO);
             glDrawArrays(GL_TRIANGLES,0,6);
         }else{
@@ -459,6 +458,10 @@ int main(){
             glActiveTexture(GL_TEXTURE0 + 1);
             glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
             glUniform1i(vhsTaaHistLoc,1);
+            glActiveTexture(GL_TEXTURE0 + 2);
+            glBindTexture(GL_TEXTURE_2D,fboDepthTex);
+            glUniform1i(vhsDepthTexLoc,2);
+            glUniform1i(vhsRtxLoc,settings.rtxEnabled?1:0);
             glActiveTexture(GL_TEXTURE0);
             glUniform1f(vhsTmLoc,vhsTime);
             glUniform1f(vhsIntenLoc,vI);

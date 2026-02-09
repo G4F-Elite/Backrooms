@@ -214,6 +214,8 @@ uniform vec3 taaJitter;
 uniform float taaValid;
 uniform int frameGen;
 uniform float frameGenBlend;
+uniform int rtx;
+uniform sampler2D depthTex;
 
 float rnd(vec2 s){ return fract(sin(dot(s,vec2(12.9898,78.233)))*43758.5453); }
 
@@ -290,9 +292,51 @@ vec3 resolveSample(vec2 tc){
  return base;
 }
 
+float linearDepth(float d){
+ float ndc = d * 2.0 - 1.0;
+ float near = 0.1; float far = 100.0;
+ return (2.0 * near * far) / (far + near - ndc * (far - near));
+}
+
+float calcSSAO(vec2 tc){
+ float d0 = linearDepth(texture(depthTex, tc).r);
+ float ao = 0.0;
+ float rad = 3.0 / max(d0, 1.0);
+ vec2 offsets[8] = vec2[8](
+  vec2(1,0),vec2(-1,0),vec2(0,1),vec2(0,-1),
+  vec2(0.7,0.7),vec2(-0.7,0.7),vec2(0.7,-0.7),vec2(-0.7,-0.7)
+ );
+ for(int i=0;i<8;i++){
+  float angle = rnd(tc + float(i)*0.13) * 6.283;
+  vec2 off = offsets[i] * rad;
+  off = vec2(off.x*cos(angle)-off.y*sin(angle), off.x*sin(angle)+off.y*cos(angle));
+  vec2 sc = tc + off * vec2(texelX, texelY) * 2.0;
+  float sd = linearDepth(texture(depthTex, sc).r);
+  float diff = d0 - sd;
+  if(diff > 0.05 && diff < 2.0) ao += smoothstep(0.05, 1.5, diff);
+ }
+ return clamp(1.0 - ao * 0.18, 0.0, 1.0);
+}
+
+vec3 calcBloom(vec2 tc){
+ vec3 bright = vec3(0.0);
+ float total = 0.0;
+ for(int x=-2;x<=2;x++) for(int y=-2;y<=2;y++){
+  vec2 off = vec2(float(x)*texelX*2.0, float(y)*texelY*2.0);
+  vec3 s = texture(tex, tc + off).rgb;
+  float lum = dot(s, vec3(0.299,0.587,0.114));
+  float w = smoothstep(0.55, 0.85, lum);
+  bright += s * w;
+  total += 1.0;
+ }
+ return bright / total;
+}
+
 void main(){
  if(inten < 0.02) {
-  F = vec4(resolveSample(uv), 1.0);
+  vec3 c0 = resolveSample(uv);
+  if(rtx == 1){ c0 *= mix(1.0, calcSSAO(uv), 0.7); c0 += calcBloom(uv) * 0.35; }
+  F = vec4(c0, 1.0);
  return;
 }
 
@@ -334,6 +378,14 @@ vec3 c = vec3(r,g,b);
  
  // Warm tint
  c.g += 0.01 * inten;
- 
+
+ // RTX: SSAO + Bloom
+ if(rtx == 1){
+  float ao = calcSSAO(uv);
+  c *= mix(1.0, ao, 0.7);
+  vec3 bloom = calcBloom(uv);
+  c += bloom * 0.35;
+ }
+
  F = vec4(c, 1);
 })";

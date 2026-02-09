@@ -7,7 +7,7 @@
 struct RenderData {
     GLuint wallVAO, wallVBO, floorVAO, floorVBO, ceilVAO, ceilVBO;
     GLuint lightVAO, lightVBO, pillarVAO, pillarVBO;
-    GLuint quadVAO, quadVBO, fbo, fboTex, rbo;
+    GLuint quadVAO, quadVBO, fbo, fboTex, fboDepthTex;
     int wallVC, floorVC, ceilVC, lightVC, pillarVC;
 };
 
@@ -35,10 +35,10 @@ inline void setupVAO(GLuint& vao, GLuint& vbo, std::vector<float>& d, bool hasNo
     }
 }
 
-inline void initFBO(GLuint& fbo, GLuint& fboTex, GLuint& rbo, int W, int H) {
+inline void initFBO(GLuint& fbo, GLuint& fboTex, GLuint& depthTex, int W, int H) {
     glGenFramebuffers(1, &fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, fbo);
-    
+
     glGenTextures(1, &fboTex);
     glBindTexture(GL_TEXTURE_2D, fboTex);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, W, H, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
@@ -47,12 +47,16 @@ inline void initFBO(GLuint& fbo, GLuint& fboTex, GLuint& rbo, int W, int H) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fboTex, 0);
-    
-    glGenRenderbuffers(1, &rbo);
-    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
-    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, W, H);
-    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
-    
+
+    glGenTextures(1, &depthTex);
+    glBindTexture(GL_TEXTURE_2D, depthTex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, W, H, 0, 0x1902, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTex, 0);
+
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
