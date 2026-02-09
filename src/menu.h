@@ -98,20 +98,48 @@ layout(location=0) in vec2 p; out vec2 uv;
 void main() { gl_Position = vec4(p, 0.0, 1.0); uv = p * 0.5 + 0.5; })";
 inline const char* menuBgFS = R"(#version 330 core
 in vec2 uv; out vec4 fc; uniform float tm;
-float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-void main() {
-    vec2 p = uv * 2.0 - 1.0;
-    float tunnel = 1.0 - smoothstep(0.18, 1.25, abs(p.x) * (1.0 - uv.y * 0.35));
-    float wave = sin((uv.y * 28.0 - tm * 1.4) + sin(uv.x * 7.0 + tm * 0.5) * 1.2);
-    float scan = 0.5 + 0.5 * wave;
-    float drift = 0.5 + 0.5 * sin(tm * 0.35 + uv.x * 5.0 + uv.y * 2.0);
-    float dust = hash(floor(vec2(uv.x * 180.0 + tm * 5.0, uv.y * 120.0 + tm * 3.0)));
-    vec3 base = mix(vec3(0.03, 0.025, 0.02), vec3(0.12, 0.10, 0.06), tunnel * 0.7);
-    vec3 lines = vec3(0.18, 0.14, 0.08) * (scan * 0.35 + drift * 0.2);
-    vec3 col = base + lines * tunnel;
-    col += vec3(0.08, 0.06, 0.03) * smoothstep(0.82, 1.0, uv.y) * 0.25;
-    col += (dust - 0.5) * 0.02;
-    fc = vec4(col, 1.0);
+
+float hash21(vec2 p){ return fract(sin(dot(p,vec2(27.1,113.7)))*43758.5453123); }
+float noise(vec2 p){ vec2 i=floor(p); vec2 f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(hash21(i),hash21(i+vec2(1,0)),f.x), mix(hash21(i+vec2(0,1)),hash21(i+vec2(1,1)),f.x), f.y); }
+float fbm(vec2 p){ float a=0.0, w=0.5; for(int i=0;i<4;i++){ a+=w*noise(p); p*=2.1; w*=0.5; } return a; }
+
+float boxSDF(vec3 p, vec3 b){ vec3 d=abs(p)-b; return min(max(d.x,max(d.y,d.z)),0.0)+length(max(d,0.0)); }
+
+void main(){
+    vec2 p = uv*2.0-1.0; p.x*=1.3;
+    float time = tm*0.55;
+
+    vec3 ro = vec3(0.0, 0.0, -2.0 + sin(time*0.6)*0.4);
+    float ang = sin(time*0.4)*0.35;
+    vec3 rd = normalize(vec3(p,1.2));
+    rd.xz = mat2(cos(ang),-sin(ang),sin(ang),cos(ang)) * rd.xz;
+
+    float t=0.0; float dAcc=0.0; vec3 col=vec3(0.0);
+    for(int i=0;i<42;i++){
+        vec3 pos = ro + rd*t;
+        // repeat backrooms hallways
+        vec3 rp = pos; rp.xz = mod(rp.xz+6.0, 12.0)-6.0;
+        float d = boxSDF(rp, vec3(4.0,1.8,2.5));
+        float cell = boxSDF(rp, vec3(3.8,1.55,2.3));
+        float wall = max(-cell, d);
+        dAcc = mix(dAcc, 1.0-wall*0.18, 0.08);
+        t += clamp(wall*0.65, 0.02, 0.35);
+    }
+
+    float light = fbm(uv*5.0 + vec2(time*0.3, time*0.2))*0.5 + 0.5;
+    float scan = 0.35 + 0.65*sin((uv.y*620.0) + time*35.0 + sin(uv.x*12.0+time));
+    float vign = smoothstep(1.2,0.2,length(p));
+    float dust = (hash21(uv*vec2(320.0,180.0)+time*2.0)-0.5)*0.06;
+
+    vec3 baseA = vec3(0.18,0.16,0.10);
+    vec3 baseB = vec3(0.32,0.26,0.12);
+    col = mix(baseA, baseB, dAcc*vign);
+    col += vec3(0.28,0.23,0.10)*light*0.55;
+    col *= 0.7 + 0.3*vign;
+    col += vec3(0.18,0.16,0.10)*(scan*0.08);
+    col += dust;
+    col = clamp(col,0.0,1.0);
+    fc = vec4(col,1.0);
 })";
 
 inline GLuint genFontTex() {
