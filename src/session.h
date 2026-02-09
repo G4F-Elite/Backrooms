@@ -1,6 +1,7 @@
 #pragma once
 
 #include "reconnect_policy.h"
+#include "coop_rules.h"
 #include "flashlight_behavior.h"
 #include "scare_system.h"
 #include "cheats.h"
@@ -132,11 +133,54 @@ inline void restoreSessionSnapshot(){
 }
 
 inline void initCoopObjectives(const Vec3& basePos){
-    coop.switches[0] = Vec3(basePos.x + CS * 2.0f, 0, basePos.z + CS * 1.0f);
-    coop.switches[1] = Vec3(basePos.x - CS * 2.0f, 0, basePos.z + CS * 1.0f);
+    auto findNearestCell = [](int targetWX, int targetWZ, int maxRadius, auto predicate, int& outWX, int& outWZ) {
+        if (predicate(targetWX, targetWZ)) {
+            outWX = targetWX;
+            outWZ = targetWZ;
+            return true;
+        }
+        for (int r = 1; r <= maxRadius; r++) {
+            for (int dz = -r; dz <= r; dz++) {
+                for (int dx = -r; dx <= r; dx++) {
+                    if (dx != -r && dx != r && dz != -r && dz != r) continue;
+                    int wx = targetWX + dx;
+                    int wz = targetWZ + dz;
+                    if (!predicate(wx, wz)) continue;
+                    outWX = wx;
+                    outWZ = wz;
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+
+    auto openCell = [](int wx, int wz) { return getCellWorld(wx, wz) == 0; };
+    auto validDoorCell = [](int wx, int wz) {
+        return isDoorFootprintClear(wx, wz, [](int cx, int cz) { return getCellWorld(cx, cz); });
+    };
+
+    int baseWX = (int)floorf(basePos.x / CS);
+    int baseWZ = (int)floorf(basePos.z / CS);
+
+    int doorWX = baseWX;
+    int doorWZ = baseWZ + 4;
+    if (!findNearestCell(doorWX, doorWZ, 10, validDoorCell, doorWX, doorWZ)) {
+        findNearestCell(baseWX, baseWZ, 12, openCell, doorWX, doorWZ);
+    }
+
+    int sw0x = baseWX + 2;
+    int sw0z = baseWZ + 1;
+    int sw1x = baseWX - 2;
+    int sw1z = baseWZ + 1;
+    findNearestCell(sw0x, sw0z, 8, openCell, sw0x, sw0z);
+    findNearestCell(sw1x, sw1z, 8, openCell, sw1x, sw1z);
+
+    coop.switches[0] = Vec3((sw0x + 0.5f) * CS, 0, (sw0z + 0.5f) * CS);
+    coop.switches[1] = Vec3((sw1x + 0.5f) * CS, 0, (sw1z + 0.5f) * CS);
     coop.switchOn[0] = false;
     coop.switchOn[1] = false;
-    coop.doorPos = Vec3(basePos.x, 0, basePos.z + CS * 4.0f);
+    coop.doorPos = Vec3((doorWX + 0.5f) * CS, 0, (doorWZ + 0.5f) * CS);
     coop.doorOpen = false;
     coop.initialized = true;
 }
