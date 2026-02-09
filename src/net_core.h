@@ -274,6 +274,7 @@ public:
     }
     
     void shutdown() {
+        if (connected) sendLeave();
         if (sock != INVALID_SOCKET) closesocket(sock);
         sock = INVALID_SOCKET;
         WSACleanup();
@@ -335,6 +336,9 @@ public:
     void sendRoamEvent(int eventType, int a, int b, float duration);
     void sendGameStart(Vec3 spawn);
     void sendPing(float nowTime);
+    void sendLeave();
+    void handleLeave(char* buf, int len);
+    void pruneStalePlayers(float nowTime);
     void update();
     void handlePacket(char* buf, int len, sockaddr_in& from);
     void handleJoin(char* buf, sockaddr_in& from);

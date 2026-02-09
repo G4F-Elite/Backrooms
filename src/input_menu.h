@@ -330,8 +330,15 @@ inline void menuInput(GLFWwindow* w) {
         
         // Backspace handling
         static bool bsPressed = false;
+        static float bsHoldElapsed = 0.0f;
+        static float bsRepeatTimer = 0.0f;
+        static float bsLastTime = 0.0f;
         bool bsNow = glfwGetKey(w, GLFW_KEY_BACKSPACE) == GLFW_PRESS;
-        if (bsNow && !bsPressed) {
+        float bsNowTime = (float)glfwGetTime();
+        float bsDt = bsNowTime - bsLastTime;
+        if(bsDt < 0.0f || bsDt > 0.2f) bsDt = 0.0f;
+        bsLastTime = bsNowTime;
+        auto applyBackspace = [&]() {
             if (multiInputField == 0) {
                 char* targetIP = (multiNetworkMode == 0) ? multiJoinIP : multiMasterIP;
                 int len = (int)strlen(targetIP);
@@ -349,6 +356,23 @@ inline void menuInput(GLFWwindow* w) {
                     else multiMasterManualEdit = true;
                 }
             }
+        };
+        if (bsNow && !bsPressed) {
+            bsHoldElapsed = 0.0f;
+            bsRepeatTimer = 0.0f;
+            applyBackspace();
+        } else if (bsNow) {
+            bsHoldElapsed += bsDt;
+            if (bsHoldElapsed > 0.28f) {
+                bsRepeatTimer += bsDt;
+                while (bsRepeatTimer >= 0.035f) {
+                    bsRepeatTimer -= 0.035f;
+                    applyBackspace();
+                }
+            }
+        } else {
+            bsHoldElapsed = 0.0f;
+            bsRepeatTimer = 0.0f;
         }
         bsPressed = bsNow;
         
@@ -385,12 +409,13 @@ inline void menuInput(GLFWwindow* w) {
             char fullAddr[64];
             std::snprintf(fullAddr, 64, "%s", multiMasterIP);
             netMgr.init();
-            if (netMgr.joinGame(fullAddr, multiNickname, (unsigned short)port)) {
-                lanDiscovery.stop();
-                dedicatedDirectory.stop();
-                multiState = MULTI_CONNECTING;
-                gameState = STATE_MULTI_WAIT;
-                menuSel = 0;
+                if (netMgr.joinGame(fullAddr, multiNickname, (unsigned short)port)) {
+                    lanDiscovery.stop();
+                    dedicatedDirectory.stop();
+                    multiState = MULTI_CONNECTING;
+                    multiWaitBeforeStart = 0.8f;
+                    gameState = STATE_MULTI_WAIT;
+                    menuSel = 0;
                 std::snprintf(multiConnectStatus,sizeof(multiConnectStatus),"CONNECTING TO PUBLIC ROOM %s:%d", fullAddr, port);
             }
         }
@@ -428,6 +453,7 @@ inline void menuInput(GLFWwindow* w) {
                     lanDiscovery.stop();
                     dedicatedDirectory.stop();
                     multiState = MULTI_CONNECTING;
+                    multiWaitBeforeStart = 0.8f;
                     gameState = STATE_MULTI_WAIT;  // Wait for host to start
                     menuSel = 0;
                     if(multiNetworkMode==1) std::snprintf(multiConnectStatus,sizeof(multiConnectStatus),"CONNECTING TO PUBLIC ROOM %s:%d", fullAddr, port);

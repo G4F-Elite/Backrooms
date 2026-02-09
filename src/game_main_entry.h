@@ -127,7 +127,8 @@ int main(){
                     }
                 }
             }
-            if(gameState==STATE_MULTI_WAIT&&netMgr.gameStarted&&netMgr.welcomeReceived){
+            if(gameState==STATE_MULTI_WAIT && multiWaitBeforeStart > 0.0f) multiWaitBeforeStart -= dTime;
+            if(gameState==STATE_MULTI_WAIT&&netMgr.gameStarted&&netMgr.welcomeReceived&&multiWaitBeforeStart<=0.0f){
                 multiState=MULTI_IN_GAME;
                 genWorld();buildGeom();
                 if(restoreAfterReconnect){

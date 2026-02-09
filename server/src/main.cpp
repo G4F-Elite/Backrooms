@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <cstdint>
 #include <cstring>
+#include <cmath>
 #include <iostream>
 #include <string>
 #include <thread>
@@ -27,6 +28,7 @@ constexpr std::uint8_t LEGACY_PKT_WELCOME = 4;
 constexpr std::uint8_t LEGACY_PKT_PLAYER_STATE = 6;
 constexpr std::uint8_t LEGACY_PKT_PLAYER_NAME = 12;
 constexpr std::uint8_t LEGACY_PKT_GAME_START = 14;
+constexpr std::uint8_t LEGACY_PKT_LEAVE = 5;
 constexpr std::uint8_t LEGACY_PKT_ENTITY_SNAPSHOT = 21;
 constexpr std::uint8_t LEGACY_PKT_OBJECTIVE_STATE = 22;
 constexpr std::uint8_t LEGACY_PKT_ITEM_SNAPSHOT = 23;
@@ -76,7 +78,7 @@ int allocateClientSlot(const std::array<LegacyClientState, LEGACY_MAX_PLAYERS>& 
 
 bool isRelayPacket(std::uint8_t type) {
     if (type == LEGACY_PKT_PING || type == LEGACY_PKT_PONG || type == LEGACY_PKT_JOIN ||
-        type == LEGACY_PKT_WELCOME || type == LEGACY_PKT_GAME_START) {
+        type == LEGACY_PKT_WELCOME || type == LEGACY_PKT_GAME_START || type == LEGACY_PKT_LEAVE) {
         return false;
     }
     return type >= LEGACY_PKT_PLAYER_STATE;
@@ -88,6 +90,7 @@ bool isKnownLegacyPacketType(std::uint8_t type) {
         case LEGACY_PKT_PONG:
         case LEGACY_PKT_JOIN:
         case LEGACY_PKT_WELCOME:
+        case LEGACY_PKT_LEAVE:
         case LEGACY_PKT_PLAYER_STATE:
         case LEGACY_PKT_PLAYER_NAME:
         case LEGACY_PKT_GAME_START:
@@ -110,6 +113,7 @@ bool isValidLegacyPacketSize(std::uint8_t type, int len) {
         case LEGACY_PKT_PONG: return len == 8;
         case LEGACY_PKT_JOIN: return len == 64;
         case LEGACY_PKT_WELCOME: return len == 16;
+        case LEGACY_PKT_LEAVE: return len >= 2 && len <= 8;
         case LEGACY_PKT_PLAYER_STATE: return len == 32;
         case LEGACY_PKT_PLAYER_NAME: return len == 2 + kPlayerNameLen;
         case LEGACY_PKT_GAME_START: return len == 32;
@@ -157,6 +161,16 @@ void sendPlayerName(UdpSocketLite& socket, const UdpAddress& to, std::uint8_t id
     pkt[1] = id;
     std::memcpy(pkt + 2, name, kPlayerNameLen);
     socket.sendTo(to, pkt, (int)sizeof(pkt));
+}
+
+void broadcastLeave(UdpSocketLite& socket, const std::array<LegacyClientState, LEGACY_MAX_PLAYERS>& clients, std::uint8_t id) {
+    std::uint8_t pkt[8] = {};
+    pkt[0] = LEGACY_PKT_LEAVE;
+    pkt[1] = id;
+    for (int i = 0; i < LEGACY_MAX_PLAYERS; i++) {
+        if (!clients[i].active) continue;
+        socket.sendTo(clients[i].addr, pkt, 8);
+    }
 }
 
 std::uint32_t parseIpv4HostOrder(const std::string& ip) {
@@ -271,10 +285,16 @@ int main(int argc, char** argv) {
                 std::memcpy(welcome + 2, &worldSeed, 4);
                 socket.sendTo(from, welcome, 16);
 
+                float joinSpawn[3] = {spawnPos[0], spawnPos[1], spawnPos[2]};
+                float ring = 2.2f;
+                float ang = (float)assignedId * 1.5707963f;
+                joinSpawn[0] += std::sin(ang) * ring;
+                joinSpawn[2] += std::cos(ang) * ring;
+
                 std::uint8_t gameStart[32] = {};
                 gameStart[0] = LEGACY_PKT_GAME_START;
                 std::memcpy(gameStart + 1, &worldSeed, 4);
-                std::memcpy(gameStart + 5, &spawnPos[0], sizeof(spawnPos));
+                std::memcpy(gameStart + 5, &joinSpawn[0], sizeof(joinSpawn));
                 socket.sendTo(from, gameStart, 32);
 
                 for (int i = 0; i < LEGACY_MAX_PLAYERS; i++) {
@@ -320,6 +340,14 @@ int main(int argc, char** argv) {
                 clients[senderIdx].name[kPlayerNameLen - 1] = '\0';
                 buf[1] = clients[senderIdx].id;
                 relayToOthers(socket, clients, senderIdx, buf, got);
+                continue;
+            }
+
+            if (!looksProtocolPacket && pktType == LEGACY_PKT_LEAVE) {
+                std::uint8_t leftId = clients[senderIdx].id;
+                clients[senderIdx].active = false;
+                clients[senderIdx].hasPlayerState = false;
+                broadcastLeave(socket, clients, leftId);
                 continue;
             }
 
@@ -369,9 +397,18 @@ int main(int argc, char** argv) {
         for (auto& c : clients) {
             if (!c.active) continue;
             if (now - c.lastSeen > clientTimeout) {
+                std::uint8_t leftId = c.id;
                 c.active = false;
                 c.hasPlayerState = false;
+                broadcastLeave(socket, clients, leftId);
             }
+        }
+
+        if (countActiveClients(clients) == 0) {
+            cachedEntitySnapshot.clear();
+            cachedObjectiveState.clear();
+            cachedItemSnapshot.clear();
+            cachedInventorySync.clear();
         }
 
         if (std::chrono::duration_cast<std::chrono::milliseconds>(now - lastHeartbeat).count() >= 1000) {

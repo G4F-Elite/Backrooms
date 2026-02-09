@@ -225,6 +225,25 @@ inline void NetworkManager::sendPing(float nowTime) {
     broadcast(buf, 8);
 }
 
+inline void NetworkManager::sendLeave() {
+    if (!connected) return;
+    char buf[PACKET_SIZE] = {};
+    buf[0] = PKT_LEAVE;
+    buf[1] = (char)myId;
+    broadcast(buf, 8);
+}
+
+inline void NetworkManager::pruneStalePlayers(float nowTime) {
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        if (i == myId || !players[i].active) continue;
+        if (players[i].lastUpdate <= 0.0f) continue;
+        if (nowTime - players[i].lastUpdate <= 12.0f) continue;
+        players[i].active = false;
+        players[i].hasValidPos = false;
+        players[i].flashlightOn = false;
+    }
+}
+
 inline void NetworkManager::update() {
     if (!connected) return;
     char buf[PACKET_SIZE];
@@ -238,6 +257,7 @@ inline void NetworkManager::update() {
         lastPacketRecvTime = (float)glfwGetTime();
         handlePacket(buf, recv, from);
     }
+    pruneStalePlayers((float)glfwGetTime());
 }
 
 inline void NetworkManager::handlePacket(char* buf, int len, sockaddr_in& from) {
@@ -246,6 +266,7 @@ inline void NetworkManager::handlePacket(char* buf, int len, sockaddr_in& from) 
     else if (type == PKT_PING) handlePing(buf, len, from);
     else if (type == PKT_PONG) handlePong(buf, len);
     else if (type == PKT_WELCOME) handleWelcome(buf);
+    else if (type == PKT_LEAVE) handleLeave(buf, len);
     else if (type == PKT_PLAYER_STATE) handlePlayerState(buf);
     else if (type == PKT_GAME_START) handleGameStart(buf);
     else if (type == PKT_RESHUFFLE) handleReshuffle(buf, len);
@@ -268,6 +289,7 @@ inline void NetworkManager::handleJoin(char* buf, sockaddr_in& from) {
         players[i].addr = from.sin_addr.s_addr;
         players[i].port = from.sin_port;
         players[i].hasValidPos = false;
+        players[i].lastUpdate = (float)glfwGetTime();
         sanitizePlayerName(buf + 1, players[i].name);
         char resp[PACKET_SIZE];
         resp[0] = PKT_WELCOME;
@@ -321,6 +343,7 @@ inline void NetworkManager::handleWelcome(char* buf) {
     players[myId].active = true;
     players[myId].id = myId;
     players[myId].hasValidPos = false;
+    players[myId].lastUpdate = (float)glfwGetTime();
     sanitizePlayerName(localPlayerName, players[myId].name);
 }
 
@@ -330,6 +353,16 @@ inline void NetworkManager::handlePlayerName(char* buf, int len) {
     if (id < 0 || id >= MAX_PLAYERS) return;
     sanitizePlayerName(buf + 2, players[id].name);
     players[id].active = true;
+    players[id].lastUpdate = (float)glfwGetTime();
+}
+
+inline void NetworkManager::handleLeave(char* buf, int len) {
+    if (len < 2) return;
+    int id = (unsigned char)buf[1];
+    if (id < 0 || id >= MAX_PLAYERS || id == myId) return;
+    players[id].active = false;
+    players[id].hasValidPos = false;
+    players[id].flashlightOn = false;
 }
 
 inline void NetworkManager::handlePlayerState(char* buf) {
@@ -341,6 +374,7 @@ inline void NetworkManager::handlePlayerState(char* buf) {
     players[id].flashlightOn = buf[22] != 0;
     players[id].active = true;
     players[id].hasValidPos = true;
+    players[id].lastUpdate = (float)glfwGetTime();
     
     if (isHost) {
         for (int i = 1; i < MAX_PLAYERS; i++) {

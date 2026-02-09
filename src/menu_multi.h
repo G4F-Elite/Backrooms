@@ -27,6 +27,7 @@ inline int multiNetworkMode = 0; // 0 LAN, 1 DEDICATED
 inline char multiMasterIP[64] = "127.0.0.1";
 inline char multiMasterPort[8] = "27015";
 inline char multiConnectStatus[128] = "";
+inline float multiWaitBeforeStart = 0.0f;
 
 // Draw multiplayer main menu
 inline void drawMultiMenuScreen(float tm) {
