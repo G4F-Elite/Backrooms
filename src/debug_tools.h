@@ -6,14 +6,15 @@ enum DebugAction {
     DEBUG_ACT_TOGGLE_FLY = 0,
     DEBUG_ACT_TP_NOTE = 1,
     DEBUG_ACT_TP_ECHO = 2,
-    DEBUG_ACT_SPAWN_STALKER = 3,
-    DEBUG_ACT_SPAWN_CRAWLER = 4,
-    DEBUG_ACT_SPAWN_SHADOW = 5,
-    DEBUG_ACT_FORCE_HOLES = 6,
-    DEBUG_ACT_FORCE_SUPPLY = 7
+    DEBUG_ACT_TP_EXIT = 3,
+    DEBUG_ACT_SPAWN_STALKER = 4,
+    DEBUG_ACT_SPAWN_CRAWLER = 5,
+    DEBUG_ACT_SPAWN_SHADOW = 6,
+    DEBUG_ACT_FORCE_HOLES = 7,
+    DEBUG_ACT_FORCE_SUPPLY = 8
 };
 
-inline constexpr int DEBUG_ACTION_COUNT = 8;
+inline constexpr int DEBUG_ACTION_COUNT = 9;
 
 struct DebugToolsState {
     bool open;
@@ -32,6 +33,7 @@ inline const char* debugActionLabel(int idx) {
         case DEBUG_ACT_TOGGLE_FLY: return "TOGGLE FLY";
         case DEBUG_ACT_TP_NOTE: return "TELEPORT NOTE";
         case DEBUG_ACT_TP_ECHO: return "TELEPORT ECHO";
+        case DEBUG_ACT_TP_EXIT: return "TELEPORT EXIT";
         case DEBUG_ACT_SPAWN_STALKER: return "SPAWN STALKER";
         case DEBUG_ACT_SPAWN_CRAWLER: return "SPAWN CRAWLER";
         case DEBUG_ACT_SPAWN_SHADOW: return "SPAWN SHADOW";

@@ -43,12 +43,26 @@ void executeDebugAction(int action){
         setEchoStatus("DEBUG: TELEPORTED TO ECHO");
         return;
     }
+    if(action==DEBUG_ACT_TP_EXIT){
+        extern void teleportToExit();
+        teleportToExit();
+        setEchoStatus("DEBUG: TELEPORTED TO EXIT");
+        return;
+    }
     if(!canMutateWorld){
         setTrapStatus("DEBUG ACTION: HOST ONLY");
         return;
     }
     if(debugActionSpawnsEntity(action)){
         EntityType t = debugActionEntityType(action);
+        if(multiState==MULTI_IN_GAME && !netMgr.isHost){
+            int reqType = REQ_DEBUG_SPAWN_STALKER;
+            if(t==ENTITY_CRAWLER) reqType = REQ_DEBUG_SPAWN_CRAWLER;
+            else if(t==ENTITY_SHADOW) reqType = REQ_DEBUG_SPAWN_SHADOW;
+            netMgr.sendInteractRequest(reqType, 0);
+            setEchoStatus("DEBUG: SPAWN REQUEST SENT");
+            return;
+        }
         Vec3 sp = findSpawnPos(cam.pos, 6.0f);
         entityMgr.spawnEntity(t, sp, nullptr, 0, 0);
         setEchoStatus("DEBUG: ENTITY SPAWNED");
@@ -67,6 +81,7 @@ void executeDebugAction(int action){
 
 void mouse(GLFWwindow*,double xp,double yp){
     if(gameState!=STATE_GAME&&gameState!=STATE_INTRO)return;
+    if(isPlayerDead || playerEscaped || playerFalling) return;
     if(firstMouse){lastX=(float)xp;lastY=(float)yp;firstMouse=false;}
     cam.yaw-=((float)xp-lastX)*settings.mouseSens;
     cam.pitch+=(lastY-(float)yp)*settings.mouseSens;

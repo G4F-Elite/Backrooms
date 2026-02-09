@@ -125,9 +125,6 @@ int main(){
                     }
                 }
             }
-            if(gameState==STATE_PAUSE&&enterPressed&&menuSel==2){
-                gameState=STATE_MENU;menuSel=0;genWorld();buildGeom();
-            }
             if(gameState==STATE_MULTI_WAIT&&netMgr.gameStarted&&netMgr.welcomeReceived){
                 multiState=MULTI_IN_GAME;
                 genWorld();buildGeom();
@@ -337,7 +334,7 @@ int main(){
         glClearColor(0.02f,0.02f,0.02f,1);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         
-        if(gameState==STATE_GAME||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_KEYBINDS_PAUSE||gameState==STATE_NOTE)
+        if((gameState==STATE_GAME&&!isPlayerDead)||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_KEYBINDS_PAUSE||gameState==STATE_NOTE)
             renderScene();
         
         glBindFramebuffer(GL_FRAMEBUFFER,0);

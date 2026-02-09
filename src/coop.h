@@ -90,6 +90,16 @@ inline void processHostInteractRequests(){
             }
         }else if(type==REQ_TOGGLE_SWITCH){
             if(target>=0 && target<2) coop.switchOn[target] = !coop.switchOn[target];
+        }else if(type==REQ_DEBUG_SPAWN_STALKER || type==REQ_DEBUG_SPAWN_CRAWLER || type==REQ_DEBUG_SPAWN_SHADOW){
+            Vec3 base = cam.pos;
+            if(pid>=0 && pid<MAX_PLAYERS && netMgr.players[pid].active && netMgr.players[pid].hasValidPos){
+                base = netMgr.players[pid].pos;
+            }
+            EntityType spawnType = ENTITY_STALKER;
+            if(type==REQ_DEBUG_SPAWN_CRAWLER) spawnType = ENTITY_CRAWLER;
+            else if(type==REQ_DEBUG_SPAWN_SHADOW) spawnType = ENTITY_SHADOW;
+            Vec3 sp = findSpawnPos(base, 6.0f);
+            entityMgr.spawnEntity(spawnType, sp, nullptr, 0, 0);
         }
     }
     netMgr.interactRequestCount = 0;
@@ -175,7 +185,7 @@ inline void updateRoamEventsHost(){
     else if(typeRoll < 58) type = ROAM_FALSE_DOOR;
     else if(typeRoll < 82) type = ROAM_FLOOR_HOLES;
     else type = ROAM_SUPPLY_CACHE;
-    float duration = (type==ROAM_GEOM_SHIFT) ? 0.1f : 8.0f + (float)(rng()%5);
+    float duration = (type==ROAM_GEOM_SHIFT) ? 0.1f : 11.0f + (float)(rng()%7);
     applyRoamEvent(type, playerChunkX, playerChunkZ, duration);
     if(multiState==MULTI_IN_GAME && netMgr.isHost){
         netMgr.sendRoamEvent(type, playerChunkX & 0xFF, playerChunkZ & 0xFF, duration);

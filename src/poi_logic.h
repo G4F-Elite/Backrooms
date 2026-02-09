@@ -84,5 +84,5 @@ inline float choosePoiRiskDuration(int riskEventType, int roll) {
     int norm = roll % 7;
     if (norm < 0) norm += 7;
     if (riskEventType == 2) return 0.10f;
-    return 7.0f + (float)norm;
+    return 10.0f + (float)norm;
 }

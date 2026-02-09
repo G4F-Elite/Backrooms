@@ -62,5 +62,5 @@ inline int floorHoleCountFromRoll(int roll) {
 inline float floorHoleDurationFromRoll(int roll) {
     int norm = roll % 6;
     if (norm < 0) norm += 6;
-    return 9.0f + (float)norm; // 9..14s
+    return 12.0f + (float)norm; // 12..17s
 }

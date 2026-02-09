@@ -21,7 +21,10 @@ void buildGeom();
 
 enum InteractRequestType {
     REQ_TOGGLE_SWITCH = 1,
-    REQ_PICK_ITEM
+    REQ_PICK_ITEM = 2,
+    REQ_DEBUG_SPAWN_STALKER = 3,
+    REQ_DEBUG_SPAWN_CRAWLER = 4,
+    REQ_DEBUG_SPAWN_SHADOW = 5
 };
 
 enum RoamEventType {
@@ -167,7 +170,12 @@ inline void initCoopObjectives(const Vec3& basePos){
 
     auto openCell = [](int wx, int wz) { return getCellWorld(wx, wz) == 0; };
     auto validDoorCell = [](int wx, int wz) {
-        return isDoorFootprintClear(wx, wz, [](int cx, int cz) { return getCellWorld(cx, cz); });
+        if (!isDoorFootprintClear(wx, wz, [](int cx, int cz) { return getCellWorld(cx, cz); })) return false;
+        bool frontOpen = getCellWorld(wx, wz + 1) == 0;
+        bool backOpen = getCellWorld(wx, wz - 1) == 0;
+        bool leftWall = getCellWorld(wx - 1, wz) == 1;
+        bool rightWall = getCellWorld(wx + 1, wz) == 1;
+        return frontOpen && backOpen && leftWall && rightWall;
     };
 
     int baseWX = (int)floorf(basePos.x / CS);
@@ -175,8 +183,18 @@ inline void initCoopObjectives(const Vec3& basePos){
 
     int doorWX = baseWX;
     int doorWZ = baseWZ + 4;
-    if (!findNearestCell(doorWX, doorWZ, 10, validDoorCell, doorWX, doorWZ)) {
-        findNearestCell(baseWX, baseWZ, 12, openCell, doorWX, doorWZ);
+    if (!findNearestCell(doorWX, doorWZ, 16, validDoorCell, doorWX, doorWZ)) {
+        if (!findNearestCell(baseWX, baseWZ, 34, validDoorCell, doorWX, doorWZ)) {
+            if (!findNearestCell(baseWX, baseWZ, 12, openCell, doorWX, doorWZ)) {
+                doorWX = baseWX;
+                doorWZ = baseWZ + 4;
+            }
+            setCellWorld(doorWX, doorWZ, 0);
+            setCellWorld(doorWX, doorWZ - 1, 0);
+            setCellWorld(doorWX, doorWZ + 1, 0);
+            setCellWorld(doorWX - 1, doorWZ, 1);
+            setCellWorld(doorWX + 1, doorWZ, 1);
+        }
     }
 
     int sw0x = baseWX + 2;
