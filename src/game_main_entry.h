@@ -103,7 +103,7 @@ int main(){
         else if(gameState==STATE_SETTINGS_PAUSE) settingsInput(gWin,true);
         else if(gameState==STATE_KEYBINDS) keybindsInput(gWin,false);
         else if(gameState==STATE_KEYBINDS_PAUSE) keybindsInput(gWin,true);
-        else if(gameState==STATE_MENU||gameState==STATE_PAUSE||
+        else if(gameState==STATE_MENU||gameState==STATE_GUIDE||gameState==STATE_PAUSE||
                  gameState==STATE_MULTI||gameState==STATE_MULTI_HOST||gameState==STATE_MULTI_JOIN||gameState==STATE_MULTI_WAIT){
             menuInput(gWin);
             if(gameState==STATE_MULTI_WAIT && reconnectInProgress){
