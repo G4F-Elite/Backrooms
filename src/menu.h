@@ -24,6 +24,8 @@ const unsigned char FONT_DATA[96][7] = {
 inline GLuint fontTex=0, textShader=0, textVAO=0, textVBO=0;
 inline GLuint overlayShader=0, overlayVAO=0, overlayVBO=0;
 inline GLuint menuBgShader=0;
+// Textures are created in game_main_entry.h (declared in game.cpp)
+extern GLuint wallTex, floorTex, ceilTex, lampTex;
 struct Settings {
     float masterVol=0.7f;
     float musicVol=0.55f;
@@ -99,62 +101,12 @@ inline const char* menuBgVS = R"(#version 330 core
 layout(location=0) in vec2 p; out vec2 uv;
 void main() { gl_Position = vec4(p, 0.0, 1.0); uv = p * 0.5 + 0.5; })";
 inline const char* menuBgFS = R"(#version 330 core
-in vec2 uv; out vec4 fc; uniform float tm;
-
-float hash21(vec2 p){ return fract(sin(dot(p,vec2(27.1,113.7)))*43758.5453123); }
-float noise(vec2 p){ vec2 i=floor(p); vec2 f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(hash21(i),hash21(i+vec2(1,0)),f.x), mix(hash21(i+vec2(0,1)),hash21(i+vec2(1,1)),f.x), f.y); }
-float fbm(vec2 p){ float a=0.0, w=0.55; for(int i=0;i<5;i++){ a+=w*noise(p); p*=2.35; w*=0.55; } return a; }
-
-float boxSDF(vec3 p, vec3 b){ vec3 d=abs(p)-b; return min(max(d.x,max(d.y,d.z)),0.0)+length(max(d,0.0)); }
-
-void main(){
-    vec2 p = uv*2.0-1.0; p.x*=1.32;
-    float time = tm*0.52;
-
-    vec3 ro = vec3(0.0, 0.1, -2.2 + sin(time*0.6)*0.35);
-    float ang = sin(time*0.33)*0.28;
-    vec3 rd = normalize(vec3(p,1.25));
-    rd.xz = mat2(cos(ang),-sin(ang),sin(ang),cos(ang)) * rd.xz;
-
-    float t=0.0; float dAcc=0.0; float fog=1.0;
-    for(int i=0;i<48;i++){
-        vec3 pos = ro + rd*t;
-        vec3 rp = pos; rp.xz = mod(rp.xz+6.0, 12.0)-6.0;
-        float corridor = boxSDF(rp, vec3(4.0,1.9,2.6));
-        float inner = boxSDF(rp, vec3(3.75,1.6,2.3));
-        float d = max(corridor, -inner);
-        dAcc = mix(dAcc, 1.0 - d*0.2, 0.08);
-        t += clamp(d*0.7, 0.02, 0.35);
-        fog = min(fog, exp(-t*0.42));
-    }
-
-    float lightNoise = fbm(uv*6.5 + vec2(time*0.30, time*0.18))*0.5+0.5;
-    float grime = fbm(uv*10.0 + vec2(time*0.12, -time*0.10));
-    float scan = 0.50 + 0.50*sin((uv.y*720.0) + time*38.0 + sin(uv.x*14.0+time*1.2));
-    float vign = smoothstep(1.45,0.35,length(p));
-    float dust = (hash21(uv*vec2(620.0,320.0)+time*3.0)-0.5)*0.08;
-    float lamp = smoothstep(0.0,0.08,cos(uv.x*18.0 + time*0.18))*smoothstep(0.68,1.02,uv.y);
-    float floorMask = smoothstep(-0.02,0.35, -p.y);
-    float stripe = 0.5+0.5*cos(uv.x*12.0 - time*0.6);
-
-    vec3 wallShadow = vec3(0.18,0.16,0.10);
-    vec3 wallLight  = vec3(0.62,0.55,0.32);
-    vec3 floorCol   = vec3(0.24,0.20,0.12);
-    vec3 lampCol    = vec3(1.05,0.98,0.55);
-
-    vec3 col = mix(wallShadow, wallLight, clamp(0.35 + dAcc*0.65, 0.0, 1.0));
-    col = mix(col, floorCol, floorMask*0.7);
-    col += vec3(0.36,0.32,0.16) * lightNoise * 0.75;
-    col += lampCol * lamp * 0.75;
-    col += vec3(0.16,0.14,0.09) * stripe * 0.25;
-    col *= (0.60 + 0.40*vign);
-    col -= grime*0.08;
-    col += vec3(0.28,0.24,0.12)*(scan*0.09);
-    col += dust;
-    col *= fog;
-    col = clamp(col,0.0,1.0);
-    fc = vec4(col,1.0);
-})";
+in vec2 uv; out vec4 fc; uniform float tm; uniform sampler2D wallT; uniform sampler2D floorT; uniform sampler2D ceilT; uniform sampler2D lampT; float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);} vec3 tex2(sampler2D t, vec2 q){return texture(t,q).rgb;} void main(){vec2 p=uv*2.0-1.0; p.x*=1.33; float time=tm*0.25; vec3 ro=vec3(0.0,0.1,-1.7); vec3 rd=normalize(vec3(p,1.35)); float yaw=sin(time*0.6)*0.18; rd.xz=mat2(cos(yaw),-sin(yaw),sin(yaw),cos(yaw))*rd.xz; float hw=2.6, hh=1.35; float tMin=1e9; int hit=0; vec3 hp=vec3(0); vec3 n=vec3(0);
+float tF=( -hh-ro.y)/rd.y; if(tF>0.0){vec3 q=ro+rd*tF; if(abs(q.x)<hw){tMin=tF;hit=1;hp=q;n=vec3(0,1,0);} } float tC=( hh-ro.y)/rd.y; if(tC>0.0){vec3 q=ro+rd*tC; if(abs(q.x)<hw && tC<tMin){tMin=tC;hit=2;hp=q;n=vec3(0,-1,0);} }
+float tL=( -hw-ro.x)/rd.x; if(tL>0.0){vec3 q=ro+rd*tL; if(abs(q.y)<hh && tL<tMin){tMin=tL;hit=3;hp=q;n=vec3(1,0,0);} } float tR=( hw-ro.x)/rd.x; if(tR>0.0){vec3 q=ro+rd*tR; if(abs(q.y)<hh && tR<tMin){tMin=tR;hit=4;hp=q;n=vec3(-1,0,0);} }
+vec3 col=vec3(0.04,0.04,0.04); if(hit!=0){float z=hp.z+time*6.0; vec2 q=vec2(0); if(hit==1){q=vec2(hp.x*0.35, z*0.22);} else if(hit==2){q=vec2(hp.x*0.28, z*0.20);} else {q=vec2(z*0.18, (hp.y+hh)*0.42);} vec3 al=(hit==1)?tex2(floorT,q):(hit==2?tex2(ceilT,q):tex2(wallT,q));
+float seg=floor((z+1000.0)*0.6); float lampOn=step(0.85, h(vec2(seg,seg*0.13))); float lampX=sin(seg*2.0)*0.6; vec3 lp=vec3(lampX, hh-0.05, (seg/0.6)-1000.0); float dist=length(hp-lp); float l=lampOn*(2.0/(1.0+dist*dist*0.8)); col=al*(0.20+l); col+=tex2(lampT, vec2(hp.x*0.35, z*0.25))*l*0.35; float ao=clamp(0.65+0.35*abs(n.y),0.0,1.0); col*=ao; }
+float fog=exp(-tMin*0.22); col=mix(vec3(0.02,0.02,0.02),col,fog); float scan=0.97+0.03*sin(uv.y*900.0+tm*40.0); col*=scan; col+=(h(uv*vec2(640.0,360.0)+tm*2.0)-0.5)*0.04; col=clamp(col,0.0,1.0); fc=vec4(col,1.0);} )";
 
 inline GLuint genFontTex() {
     unsigned char* data = new unsigned char[96*8*8*3]; memset(data,0,96*8*8*3);
@@ -184,6 +136,13 @@ inline void initText() {
     GLuint bfs=glCreateShader(GL_FRAGMENT_SHADER); glShaderSource(bfs,1,&menuBgFS,0); glCompileShader(bfs);
     menuBgShader=glCreateProgram(); glAttachShader(menuBgShader,bvs); glAttachShader(menuBgShader,bfs); glLinkProgram(menuBgShader);
     glDeleteShader(bvs); glDeleteShader(bfs);
+
+    // Bind menu background samplers to fixed texture units
+    glUseProgram(menuBgShader);
+    glUniform1i(glGetUniformLocation(menuBgShader,"wallT"),0);
+    glUniform1i(glGetUniformLocation(menuBgShader,"floorT"),1);
+    glUniform1i(glGetUniformLocation(menuBgShader,"ceilT"),2);
+    glUniform1i(glGetUniformLocation(menuBgShader,"lampT"),3);
 
     float quad[12] = {-1.0f,-1.0f,  1.0f,-1.0f,  1.0f,1.0f,  -1.0f,-1.0f,  1.0f,1.0f,  -1.0f,1.0f};
     glGenVertexArrays(1,&overlayVAO); glGenBuffers(1,&overlayVBO);
@@ -220,6 +179,12 @@ inline void drawOverlayRectNdc(float left, float bottom, float right, float top,
 inline void drawMainMenuBackdrop(float tm) {
     glUseProgram(menuBgShader);
     glUniform1f(glGetUniformLocation(menuBgShader,"tm"),tm);
+
+    glActiveTexture(GL_TEXTURE0+0); glBindTexture(GL_TEXTURE_2D, wallTex);
+    glActiveTexture(GL_TEXTURE0+1); glBindTexture(GL_TEXTURE_2D, floorTex);
+    glActiveTexture(GL_TEXTURE0+2); glBindTexture(GL_TEXTURE_2D, ceilTex);
+    glActiveTexture(GL_TEXTURE0+3); glBindTexture(GL_TEXTURE_2D, lampTex);
+    glActiveTexture(GL_TEXTURE0);
     glBindVertexArray(overlayVAO);
     glDrawArrays(GL_TRIANGLES,0,6);
 }
