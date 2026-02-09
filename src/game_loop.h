@@ -83,6 +83,27 @@ void buildGeom(){
             mkBox(dv, pr.pos.x + 0.28f, 0.0f, pr.pos.z - 0.22f, 0.56f * pr.scale, 0.28f * pr.scale, 0.56f * pr.scale);
         }
     }
+    if(coop.initialized){
+        for(int s=0;s<2;s++){
+            const Vec3 sp = coop.switches[s];
+            mkBox(dv, sp.x, 0.0f, sp.z, 0.84f, 0.22f, 0.84f);
+            mkBox(dv, sp.x, 0.22f, sp.z, 0.20f, 0.82f, 0.20f);
+            float leverX = sp.x + (coop.switchOn[s] ? 0.14f : -0.14f);
+            mkBox(dv, leverX, 0.88f, sp.z, 0.28f, 0.10f, 0.10f);
+        }
+        const int notesRequired = 5;
+        bool storyExitReady = storyMgr.totalCollected >= notesRequired;
+        bool doorOpenVisual = (multiState==MULTI_IN_GAME) ? coop.doorOpen : storyExitReady;
+        const Vec3 dp = coop.doorPos;
+        mkBox(dv, dp.x - CS * 0.58f, 0.0f, dp.z, 0.16f, 2.82f, 0.36f);
+        mkBox(dv, dp.x + CS * 0.58f, 0.0f, dp.z, 0.16f, 2.82f, 0.36f);
+        mkBox(dv, dp.x, 2.72f, dp.z, CS * 1.18f, 0.14f, 0.36f);
+        if(!doorOpenVisual){
+            mkBox(dv, dp.x, 0.0f, dp.z, CS * 1.06f, 2.62f, 0.20f);
+        }else{
+            mkBox(dv, dp.x, 0.0f, dp.z + 0.18f, CS * 1.06f, 0.10f, 0.54f);
+        }
+    }
     for(auto& h:floorHoles){
         if(!h.active) continue;
         float hx=((float)h.wx+0.5f)*CS, hz=((float)h.wz+0.5f)*CS;
@@ -184,6 +205,7 @@ void genWorld(){
     itemSpawnTimer = 6.0f;
     playerHealth=playerSanity=playerStamina=100;
     flashlightBattery=100;flashlightOn=false;isPlayerDead=false;
+    playerEscaped=false;
     flashlightShutdownBlinkActive = false;
     flashlightShutdownBlinkTimer = 0.0f;
     resetScareSystemState(scareState);
@@ -286,6 +308,7 @@ void gameInput(GLFWwindow*w){
     static bool debugEscPressed = false;
     static bool perfTogglePressed = false;
     static bool hudTogglePressed = false;
+    static bool guideTogglePressed = false;
     bool debugToggleNow = glfwGetKey(w,GLFW_KEY_F10)==GLFW_PRESS;
     if(debugToggleNow && !debugTogglePressed){
         debugTools.open = !debugTools.open;
@@ -303,6 +326,12 @@ void gameInput(GLFWwindow*w){
         triggerMenuConfirmSound();
     }
     hudTogglePressed = hudToggleNow;
+    bool guideToggleNow = glfwGetKey(w,GLFW_KEY_F1)==GLFW_PRESS;
+    if(guideToggleNow && !guideTogglePressed){
+        gShowGameplayGuide = !gShowGameplayGuide;
+        triggerMenuConfirmSound();
+    }
+    guideTogglePressed = guideToggleNow;
 
     if(debugTools.open){
         bool upNow = glfwGetKey(w,GLFW_KEY_UP)==GLFW_PRESS || glfwGetKey(w,GLFW_KEY_W)==GLFW_PRESS;
@@ -363,6 +392,10 @@ void gameInput(GLFWwindow*w){
         }
     }
     bool nearEchoSignal = echoSignal.active && isEchoInRange(cam.pos, echoSignal.pos, 2.5f);
+    bool nearExitDoor = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
+    bool exitReady = false;
+    if(multiState==MULTI_IN_GAME) exitReady = coop.doorOpen && storyMgr.totalCollected>=5;
+    else exitReady = storyMgr.totalCollected>=5;
     if(eNow&&!interactPressed&&nearNoteId>=0){
         if(storyMgr.checkNotePickup(cam.pos,4.0f)){
             if(tryTriggerStoryScare(scareState, storyMgr.currentNote)){
@@ -399,6 +432,9 @@ void gameInput(GLFWwindow*w){
         }
     }else if(eNow&&!interactPressed&&nearEchoSignal){
         resolveEchoInteraction();
+    }else if(eNow&&!interactPressed&&nearExitDoor&&exitReady){
+        playerEscaped=true;
+        glfwSetInputMode(w,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
     }
     interactPressed=eNow;
     
@@ -808,7 +844,7 @@ int main(){
             if(gameState==STATE_PAUSE&&enterPressed&&menuSel==2){
                 gameState=STATE_MENU;menuSel=0;genWorld();buildGeom();
             }
-            if(gameState==STATE_MULTI_WAIT&&netMgr.gameStarted){
+            if(gameState==STATE_MULTI_WAIT&&netMgr.gameStarted&&netMgr.welcomeReceived){
                 multiState=MULTI_IN_GAME;
                 genWorld();buildGeom();
                 if(restoreAfterReconnect){
@@ -824,7 +860,17 @@ int main(){
             }
         }else if(gameState==STATE_GAME){
             static int lastHoleCount = -1;
-            if(isPlayerDead){
+            if(playerEscaped){
+                bool eN=glfwGetKey(gWin,GLFW_KEY_ENTER)==GLFW_PRESS||
+                        glfwGetKey(gWin,GLFW_KEY_SPACE)==GLFW_PRESS;
+                bool esN=glfwGetKey(gWin,GLFW_KEY_ESCAPE)==GLFW_PRESS;
+                if(eN&&!enterPressed){genWorld();buildGeom();gameState=STATE_INTRO;}
+                if(esN&&!escPressed){
+                    gameState=STATE_MENU;menuSel=0;
+                    glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
+                }
+                enterPressed=eN;escPressed=esN;
+            }else if(isPlayerDead){
                 bool eN=glfwGetKey(gWin,GLFW_KEY_ENTER)==GLFW_PRESS||
                         glfwGetKey(gWin,GLFW_KEY_SPACE)==GLFW_PRESS;
                 bool esN=glfwGetKey(gWin,GLFW_KEY_ESCAPE)==GLFW_PRESS;

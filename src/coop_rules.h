@@ -6,3 +6,17 @@ inline bool shouldBlockCoopDoor(bool coopInitialized, bool coopDoorOpen, int mul
     if (coopDoorOpen) return false;
     return true;
 }
+
+inline bool shouldBlockStoryDoor(
+    bool coopInitialized,
+    bool coopDoorOpen,
+    int multiState,
+    int multiInGameState,
+    int notesCollected,
+    int notesRequired
+) {
+    if (!coopInitialized) return false;
+    if (multiState == multiInGameState) return !coopDoorOpen;
+    if (notesRequired < 1) return false;
+    return notesCollected < notesRequired;
+}

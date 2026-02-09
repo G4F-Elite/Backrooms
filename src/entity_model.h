@@ -54,16 +54,71 @@ inline void buildStalkerModel(std::vector<float>& verts) {
             lx-legW,0,d,0,0,0,0,1, lx+legW,legLen,d,1,1,0,0,1, lx-legW,legLen,d,0,1,0,0,1 };
         for(size_t i=0;i<sizeof(leg)/sizeof(float);i++) verts.push_back(leg[i]);
     }
+
+    auto emitQuad = [&](
+        float ax,float ay,float az,float au,float av,
+        float bx,float by,float bz,float bu,float bv,
+        float cx,float cy,float cz,float cu,float cv,
+        float dx,float dy,float dz,float du,float dv,
+        float nx,float ny,float nz
+    ) {
+        float tri[] = {
+            ax,ay,az,au,av,nx,ny,nz, bx,by,bz,bu,bv,nx,ny,nz, cx,cy,cz,cu,cv,nx,ny,nz,
+            ax,ay,az,au,av,nx,ny,nz, cx,cy,cz,cu,cv,nx,ny,nz, dx,dy,dz,du,dv,nx,ny,nz
+        };
+        for(int i=0;i<48;i++) verts.push_back(tri[i]);
+    };
+
+    auto addBox = [&](float cx,float cy,float cz,float sx,float sy,float sz) {
+        float hx=sx*0.5f, hy=sy*0.5f, hz=sz*0.5f;
+        emitQuad(cx-hx,cy-hy,cz+hz,0,0, cx+hx,cy-hy,cz+hz,1,0, cx+hx,cy+hy,cz+hz,1,1, cx-hx,cy+hy,cz+hz,0,1, 0,0,1);
+        emitQuad(cx+hx,cy-hy,cz-hz,0,0, cx-hx,cy-hy,cz-hz,1,0, cx-hx,cy+hy,cz-hz,1,1, cx+hx,cy+hy,cz-hz,0,1, 0,0,-1);
+        emitQuad(cx+hx,cy-hy,cz+hz,0,0, cx+hx,cy-hy,cz-hz,1,0, cx+hx,cy+hy,cz-hz,1,1, cx+hx,cy+hy,cz+hz,0,1, 1,0,0);
+        emitQuad(cx-hx,cy-hy,cz-hz,0,0, cx-hx,cy-hy,cz+hz,1,0, cx-hx,cy+hy,cz+hz,1,1, cx-hx,cy+hy,cz-hz,0,1, -1,0,0);
+        emitQuad(cx-hx,cy+hy,cz+hz,0,0, cx+hx,cy+hy,cz+hz,1,0, cx+hx,cy+hy,cz-hz,1,1, cx-hx,cy+hy,cz-hz,0,1, 0,1,0);
+        emitQuad(cx-hx,cy-hy,cz-hz,0,0, cx+hx,cy-hy,cz-hz,1,0, cx+hx,cy-hy,cz+hz,1,1, cx-hx,cy-hy,cz+hz,0,1, 0,-1,0);
+    };
+
+    // Extra silhouette details for a more readable monster profile.
+    addBox(0.0f, h * 0.60f, 0.0f, 0.82f, 0.16f, 0.28f);      // shoulders
+    addBox(0.0f, h * 0.30f, -0.14f, 0.34f, 0.52f, 0.10f);     // spine hump
+    addBox(0.0f, h * 0.52f, 0.18f, 0.36f, 0.30f, 0.10f);      // chest ridge
+    addBox(0.0f, h * 0.04f, -0.02f, 0.54f, 0.08f, 0.32f);     // pelvis skirt
+    for(int side=-1;side<=1;side+=2){
+        addBox(side * (w + 0.17f), h * 0.18f, 0.04f, 0.10f, 0.58f, 0.10f); // forearm bulk
+        addBox(side * (w + 0.26f), h * 0.02f, 0.16f, 0.16f, 0.06f, 0.24f); // claw mass
+        addBox(side * 0.16f, h * 0.86f, -0.05f, 0.08f, 0.20f, 0.08f);      // horn spike
+    }
 }
 
 // Generate dark entity texture
 inline void genEntityTexture(unsigned char* data, int w, int h) {
     for(int y = 0; y < h; y++) for(int x = 0; x < w; x++) {
         int idx = (y * w + x) * 4;
-        float noise = (float)(rand() % 20) / 255.0f;
-        data[idx] = (unsigned char)(5 + noise * 10);
-        data[idx+1] = (unsigned char)(3 + noise * 8);
-        data[idx+2] = (unsigned char)(8 + noise * 12);
+        float noise = (float)(rand() % 40) / 255.0f;
+        float u = (float)x / (float)(w > 1 ? (w - 1) : 1);
+        float v = (float)y / (float)(h > 1 ? (h - 1) : 1);
+        float grime = 0.3f + 0.7f * fabsf(sinf((u * 7.0f + v * 5.0f) * 3.14159f));
+        float r = 8.0f + noise * 26.0f + grime * 7.0f;
+        float g = 6.0f + noise * 18.0f + grime * 5.0f;
+        float b = 12.0f + noise * 30.0f + grime * 9.0f;
+        bool eyeBand = (v > 0.58f && v < 0.68f) && ((u > 0.34f && u < 0.42f) || (u > 0.58f && u < 0.66f));
+        bool chestScar = (fabsf(u - 0.5f) < 0.03f && v > 0.25f && v < 0.85f);
+        if(eyeBand){
+            r = 138.0f + noise * 60.0f;
+            g = 22.0f + noise * 20.0f;
+            b = 20.0f + noise * 20.0f;
+        }else if(chestScar){
+            r += 32.0f;
+            g += 8.0f;
+            b += 8.0f;
+        }
+        if(r > 255.0f) r = 255.0f;
+        if(g > 255.0f) g = 255.0f;
+        if(b > 255.0f) b = 255.0f;
+        data[idx] = (unsigned char)r;
+        data[idx+1] = (unsigned char)g;
+        data[idx+2] = (unsigned char)b;
         data[idx+3] = 255;
     }
 }

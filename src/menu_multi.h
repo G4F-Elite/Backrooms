@@ -162,8 +162,13 @@ inline void drawWaitingScreen(float tm) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     
-    drawTextCentered("CONNECTED TO HOST", 0.0f, 0.3f, 2.5f, 0.3f, 0.8f, 0.3f, 0.9f);
-    drawTextCentered("WAITING FOR HOST TO START...", 0.0f, 0.1f, 2.0f, 0.9f, 0.85f, 0.6f, 0.7f+0.2f*sinf(tm*2.0f));
+    if(netMgr.welcomeReceived){
+        drawTextCentered("CONNECTED TO HOST", 0.0f, 0.3f, 2.5f, 0.3f, 0.8f, 0.3f, 0.9f);
+        drawTextCentered("WAITING FOR HOST TO START...", 0.0f, 0.1f, 2.0f, 0.9f, 0.85f, 0.6f, 0.7f+0.2f*sinf(tm*2.0f));
+    }else{
+        drawTextCentered("CONNECTING TO HOST...", 0.0f, 0.3f, 2.5f, 0.85f, 0.75f, 0.45f, 0.9f);
+        drawTextCentered("NO HANDSHAKE YET", 0.0f, 0.1f, 1.8f, 0.8f, 0.65f, 0.45f, 0.85f);
+    }
     char pc[48];
     snprintf(pc, 48, "LOBBY: %d/%d PLAYERS", netMgr.getPlayerCount(), MAX_PLAYERS);
     drawTextCentered(pc, 0.0f, -0.05f, 1.4f, 0.65f, 0.75f, 0.55f, 0.8f);

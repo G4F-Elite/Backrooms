@@ -317,6 +317,7 @@ inline void NetworkManager::handlePong(char* buf, int len) {
 inline void NetworkManager::handleWelcome(char* buf) {
     myId = buf[1];
     memcpy(&worldSeed, buf + 2, 4);
+    welcomeReceived = true;
     players[myId].active = true;
     players[myId].id = myId;
     players[myId].hasValidPos = false;

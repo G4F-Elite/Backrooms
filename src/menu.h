@@ -359,6 +359,19 @@ inline void drawDeath(float tm) {
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 
+inline void drawEscape(float tm) {
+    glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    float p=0.76f+0.12f*sinf(tm*2.4f);
+    drawTextCentered("YOU ESCAPED",0.0f,0.2f,4.0f,0.75f,0.9f,0.75f,p);
+    drawTextCentered("THE EXIT DOOR OPENED.",0.0f,0.02f,2.0f,0.62f,0.78f,0.62f,0.84f);
+    int m=(int)(gSurvivalTime/60),s=(int)gSurvivalTime%60;
+    char tb[32]; snprintf(tb,32,"SURVIVED: %d:%02d",m,s);
+    drawTextCentered(tb,0.0f,-0.12f,2.0f,0.7f,0.8f,0.68f,0.86f);
+    drawTextCentered("PRESS ENTER TO PLAY AGAIN",0.0f,-0.35f,1.8f,0.55f,0.64f,0.54f,0.7f);
+    drawTextCentered("PRESS ESC FOR MAIN MENU",0.0f,-0.47f,1.8f,0.55f,0.64f,0.54f,0.7f);
+    glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
+}
+
 inline void drawSurvivalTime(float t) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     int m=(int)(t/60),s=(int)t%60; char b[16]; snprintf(b,16,"%d:%02d",m,s);

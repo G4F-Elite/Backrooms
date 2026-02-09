@@ -28,7 +28,8 @@ void drawUI(){
         drawNote(storyMgr.currentNote,NOTE_TITLES[storyMgr.currentNote],NOTE_CONTENTS[storyMgr.currentNote]);
     else if(gameState==STATE_GAME){
         gSurvivalTime=survivalTime;
-        if(isPlayerDead) drawDeath(vhsTime);
+        if(playerEscaped) drawEscape(vhsTime);
+        else if(isPlayerDead) drawDeath(vhsTime);
         else{
             drawDamageOverlay(damageFlash,playerHealth);
             drawSurvivalTime(survivalTime);
@@ -45,9 +46,9 @@ void drawUI(){
                 char perfRow[300];
                 snprintf(perfRow,300,"%s | %s | %s | %s",fpsBuf,fgBuf,upBuf,pingBuf);
                 drawHudText(perfRow,-0.95f,0.95f,1.20f,0.88f,0.93f,0.78f,0.98f);
-                drawHudText("[F6] HUD  [F8] MINIMAP  [F3] DEBUG",-0.95f,0.90f,0.95f,0.70f,0.76f,0.66f,0.90f);
+                drawHudText("[F6] HUD  [F8] MINIMAP  [F3] DEBUG  [F1] GUIDE",-0.95f,0.90f,0.95f,0.70f,0.76f,0.66f,0.90f);
             }else{
-                drawHudText("[F6] SHOW HUD  [F8] MINIMAP",-0.95f,0.95f,1.00f,0.80f,0.86f,0.74f,0.95f);
+                drawHudText("[F6] SHOW HUD  [F8] MINIMAP  [F1] GUIDE",-0.95f,0.95f,1.00f,0.80f,0.86f,0.74f,0.95f);
             }
 
             if(playerHealth<100)drawHealthBar(playerHealth);
@@ -55,7 +56,6 @@ void drawUI(){
             drawStaminaBar(playerStamina);
             if(flashlightBattery<100)drawFlashlightBattery(flashlightBattery,flashlightOn);
 
-            int switchCount = (coop.switchOn[0]?1:0)+(coop.switchOn[1]?1:0);
             float blockX = 0.44f;
             float blockY = 0.90f;
             const char* phaseNames[] = {"INTRO","EXPLORATION","SURVIVAL","DESPERATION"};
@@ -64,12 +64,28 @@ void drawUI(){
             if(phaseIdx > 3) phaseIdx = 3;
             drawHudText("OBJECTIVE",blockX,blockY,1.28f,0.90f,0.94f,0.72f,0.97f);
             blockY -= 0.07f;
-            char objProgress[64];
-            snprintf(objProgress,64,"SWITCHES %d/2",switchCount);
-            drawHudText(objProgress,blockX,blockY,1.18f,0.86f,0.90f,0.68f,0.95f);
-            blockY -= 0.06f;
-            drawHudText(coop.doorOpen?"DOOR OPEN":"DOOR LOCKED",blockX,blockY,1.16f,0.88f,0.84f,0.62f,0.95f);
-            blockY -= 0.06f;
+            if(multiState==MULTI_IN_GAME){
+                int switchCount = (coop.switchOn[0]?1:0)+(coop.switchOn[1]?1:0);
+                char objProgress[64];
+                snprintf(objProgress,64,"SWITCHES %d/2",switchCount);
+                drawHudText(objProgress,blockX,blockY,1.18f,0.86f,0.90f,0.68f,0.95f);
+                blockY -= 0.06f;
+                drawHudText(coop.doorOpen?"DOOR OPEN":"DOOR LOCKED",blockX,blockY,1.16f,0.88f,0.84f,0.62f,0.95f);
+                blockY -= 0.06f;
+                if(!coop.doorOpen) drawHudText("ACTION HOLD 2 SWITCHES",blockX,blockY,1.02f,0.82f,0.86f,0.62f,0.90f);
+                blockY -= 0.06f;
+            }else{
+                const int notesRequired = 5;
+                bool exitReady = storyMgr.totalCollected >= notesRequired;
+                char notesLine[64];
+                snprintf(notesLine,64,"NOTES %d/%d",storyMgr.totalCollected,notesRequired);
+                drawHudText(notesLine,blockX,blockY,1.18f,0.86f,0.90f,0.68f,0.95f);
+                blockY -= 0.06f;
+                drawHudText(exitReady?"EXIT DOOR READY":"EXIT DOOR LOCKED",blockX,blockY,1.16f,0.88f,0.84f,0.62f,0.95f);
+                blockY -= 0.06f;
+                drawHudText(exitReady?"ACTION GO TO DOOR AND PRESS E":"ACTION FIND MORE NOTES",blockX,blockY,1.02f,0.82f,0.86f,0.62f,0.90f);
+                blockY -= 0.06f;
+            }
             char phaseBuf[64];
             snprintf(phaseBuf,64,"PHASE %s",phaseNames[phaseIdx]);
             drawHudText(phaseBuf,blockX,blockY,1.14f,0.86f,0.80f,0.56f,0.94f);
@@ -82,11 +98,23 @@ void drawUI(){
                 drawHudText("EVENT FALSE DOOR SHIFT",blockX,blockY,1.05f,0.95f,0.45f,0.36f,0.92f);
                 blockY -= 0.05f;
             }
-            if(!coop.doorOpen) drawHudText("ACTION HOLD 2 SWITCHES",blockX,blockY,1.02f,0.82f,0.86f,0.62f,0.90f);
 
-            if(!coop.doorOpen){
+            if(multiState==MULTI_IN_GAME && !coop.doorOpen){
                 if(nearPoint2D(cam.pos, coop.switches[0], 2.6f)||nearPoint2D(cam.pos, coop.switches[1], 2.6f))
                     drawHudTextCentered("HOLD SWITCH POSITION",0.0f,-0.35f,1.4f,0.75f,0.8f,0.55f,0.90f);
+            }
+            if(multiState!=MULTI_IN_GAME){
+                bool nearExit = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
+                if(nearExit){
+                    if(storyMgr.totalCollected>=5) drawHudTextCentered("[E] EXIT LEVEL",0.0f,-0.35f,1.4f,0.75f,0.88f,0.70f,0.95f);
+                    else drawHudTextCentered("COLLECT 5 NOTES TO UNLOCK EXIT",0.0f,-0.35f,1.3f,0.88f,0.72f,0.58f,0.93f);
+                }
+            }else{
+                bool nearExit = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
+                if(nearExit){
+                    if(coop.doorOpen && storyMgr.totalCollected>=5) drawHudTextCentered("[E] EXIT LEVEL",0.0f,-0.35f,1.4f,0.75f,0.88f,0.70f,0.95f);
+                    else drawHudTextCentered("OPEN DOOR + COLLECT 5 NOTES TO EXIT",0.0f,-0.35f,1.25f,0.88f,0.72f,0.58f,0.93f);
+                }
             }
             if(storyMgr.totalCollected>0)drawNoteCounter(storyMgr.totalCollected);
             if(nearNoteId>=0)drawInteractPrompt();
@@ -108,6 +136,15 @@ void drawUI(){
             }
             if(multiState!=MULTI_IN_GAME && echoStatusTimer>0.0f){
                 drawHudTextCentered(echoStatusText,0.0f,0.62f,1.18f,0.7f,0.86f,0.9f,0.92f);
+            }
+            if(gShowGameplayGuide){
+                drawHudText("GUIDE",-0.95f,0.78f,1.05f,0.86f,0.90f,0.72f,0.95f);
+                drawHudText("ECHO: APPROACH SIGNAL, PRESS E TO ATTUNE",-0.95f,0.73f,0.92f,0.72f,0.84f,0.84f,0.92f);
+                drawHudText("ECHO CAN GIVE SUPPLIES, HEAL, OR BREACH",-0.95f,0.68f,0.92f,0.76f,0.74f,0.86f,0.92f);
+                drawHudText("FLOOR HOLES: AVOID DARK OPEN CELLS",-0.95f,0.63f,0.92f,0.92f,0.66f,0.50f,0.92f);
+                drawHudText("LOW SANITY INCREASES DEATH RISK",-0.95f,0.58f,0.92f,0.90f,0.72f,0.64f,0.92f);
+                if(multiState==MULTI_IN_GAME) drawHudText("COOP: HOLD BOTH SWITCHES TO OPEN EXIT DOOR",-0.95f,0.53f,0.92f,0.82f,0.86f,0.64f,0.92f);
+                else drawHudText("GOAL: COLLECT 5 NOTES, THEN EXIT THROUGH DOOR",-0.95f,0.53f,0.92f,0.82f,0.86f,0.64f,0.92f);
             }
             if(minimapEnabled) drawMinimapOverlay();
             if(storyMgr.hasHallucinations())drawHallucinationEffect((50.0f-playerSanity)/50.0f);
@@ -136,12 +173,12 @@ void drawUI(){
                 drawHudText(holeBuf,-0.95f,0.44f,1.10f,0.92f,0.58f,0.38f,0.90f);
             }
             if(trapCorridor.locked){
-                float sx=0, sy=0;
-                if(projectToScreen(trapCorridor.anomalyPos, sx, sy)){
-                    float jitter = ((rng()%100)-50) * 0.0007f;
-                    float alpha = flashlightOn ? 0.45f : 0.9f;
-                    drawText(":)",sx-0.018f+jitter,sy,1.35f,0.95f,0.95f,0.95f,alpha);
-                }
+                float t = trapCorridor.stareProgress / 2.6f;
+                if(t < 0.0f) t = 0.0f;
+                if(t > 1.0f) t = 1.0f;
+                char anomBuf[64];
+                snprintf(anomBuf,64,"ANOMALY LOCK %.0f%%",t * 100.0f);
+                drawHudText(anomBuf,-0.95f,0.38f,1.0f,0.88f,0.78f,0.90f,0.92f);
             }
             const char* mmState = minimapEnabled ? "MINIMAP ON [M/F8]" : "MINIMAP OFF [M/F8]";
             drawHudText(mmState,-0.95f,0.84f,0.95f,0.88f,0.93f,0.78f,0.95f);

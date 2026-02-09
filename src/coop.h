@@ -17,7 +17,15 @@ inline void updateCoopObjectiveHost(){
 }
 
 inline bool collideCoopDoor(float x, float z, float r){
-    if(!shouldBlockCoopDoor(coop.initialized, coop.doorOpen, multiState, MULTI_IN_GAME)) return false;
+    const int notesRequired = 5;
+    if(!shouldBlockStoryDoor(
+        coop.initialized,
+        coop.doorOpen,
+        multiState,
+        MULTI_IN_GAME,
+        storyMgr.totalCollected,
+        notesRequired
+    )) return false;
     return fabsf(x - coop.doorPos.x) < (CS * 0.6f + r) && fabsf(z - coop.doorPos.z) < (CS * 0.2f + r);
 }
 

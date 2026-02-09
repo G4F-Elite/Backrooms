@@ -622,6 +622,16 @@ inline void menuInput(GLFWwindow* w) {
         }
         // Keep updating network for game start signal
         netMgr.update();
+        if (!netMgr.welcomeReceived) {
+            float sincePacket = (float)glfwGetTime() - netMgr.lastPacketRecvTime;
+            if (sincePacket > 6.0f) {
+                netMgr.shutdown();
+                lanDiscovery.stop();
+                multiState = MULTI_NONE;
+                gameState = STATE_MULTI_JOIN;
+                menuSel = 0;
+            }
+        }
     }
     
     escPressed = esc;

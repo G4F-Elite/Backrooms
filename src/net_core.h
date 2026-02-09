@@ -34,6 +34,7 @@ public:
     bool isHost;
     bool connected;
     bool gameStarted;
+    bool welcomeReceived;
     int myId;
     NetPlayer players[MAX_PLAYERS];
     unsigned int worldSeed;
@@ -88,6 +89,7 @@ public:
         isHost = false;
         connected = false;
         gameStarted = false;
+        welcomeReceived = false;
         myId = 0;
         worldSeed = 0;
         spawnPos = Vec3(0, 1.7f, 0);
@@ -147,6 +149,7 @@ public:
         if (bind(sock, (sockaddr*)&addr, sizeof(addr)) == SOCKET_ERROR) return false;
         isHost = true;
         connected = true;
+        welcomeReceived = true;
         lastPacketRecvTime = (float)glfwGetTime();
         myId = 0;
         worldSeed = seed;
@@ -168,6 +171,7 @@ public:
         bind(sock, (sockaddr*)&local, sizeof(local));
         sendJoinRequest(localPlayerName);
         connected = true;
+        welcomeReceived = false;
         lastPacketRecvTime = (float)glfwGetTime();
         return true;
     }
@@ -246,6 +250,7 @@ public:
         WSACleanup();
         connected = false;
         gameStarted = false;
+        welcomeReceived = false;
         isHost = false;
         myId = 0;
         reshuffleReceived = false;
