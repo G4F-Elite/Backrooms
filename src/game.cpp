@@ -99,6 +99,7 @@ bool upPressed, downPressed, leftPressed, rightPressed;
 float gPerfFrameMs = 16.6f;
 float gPerfFpsSmoothed = 60.0f;
 bool gPerfDebugOverlay = false;
+bool gHudTelemetryVisible = true;
 int gPerfRefreshHz = 60;
 int gPerfFrameGenBaseCap = 0;
 float gPerfFrameTimeHistory[PERF_GRAPH_SAMPLES] = {};

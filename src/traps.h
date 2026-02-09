@@ -206,11 +206,11 @@ inline void drawMinimapOverlay(){
     char rows[MINIMAP_DIAMETER][MINIMAP_DIAMETER + 1];
     buildMinimapRows(rows, playerWX, playerWZ, minimapWallSampler);
 
-    drawFullscreenOverlay(0.02f,0.025f,0.03f,0.34f);
-    drawText("MINIMAP",-0.95f,0.56f,1.20f,0.88f,0.92f,0.72f,0.95f);
+    drawFullscreenOverlay(0.02f,0.025f,0.03f,0.28f);
+    drawText("MINIMAP [M/F8]",-0.95f,0.58f,1.28f,0.88f,0.92f,0.72f,0.97f);
     float y = 0.50f;
     for(int r=0;r<MINIMAP_DIAMETER;r++){
-        drawText(rows[r],-0.95f,y,1.10f,0.86f,0.90f,0.72f,0.90f);
-        y -= 0.045f;
+        drawText(rows[r],-0.95f,y,1.24f,0.86f,0.90f,0.72f,0.93f);
+        y -= 0.052f;
     }
 }

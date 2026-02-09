@@ -49,7 +49,7 @@ void testMinimapRowsBuild() {
 
     int wallRow = center + 2;
     int wallCol = center + 3;
-    assert(rows[wallRow][wallCol] == '#');
+    assert(rows[wallRow][wallCol] == 'X');
 }
 
 void testMinimapNullSampler() {

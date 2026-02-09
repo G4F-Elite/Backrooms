@@ -2,6 +2,16 @@
 #include "coop.h"
 #include "perf_overlay.h"
 
+inline void drawHudText(const char* s, float x, float y, float sc, float r, float g, float b, float a = 0.95f) {
+    drawText(s, x - 0.002f, y - 0.002f, sc, 0.0f, 0.0f, 0.0f, a * 0.72f);
+    drawText(s, x, y, sc, r, g, b, a);
+}
+
+inline void drawHudTextCentered(const char* s, float x, float y, float sc, float r, float g, float b, float a = 0.95f) {
+    drawTextCentered(s, x - 0.002f, y - 0.002f, sc, 0.0f, 0.0f, 0.0f, a * 0.72f);
+    drawTextCentered(s, x, y, sc, r, g, b, a);
+}
+
 void drawUI(){
     if(gameState==STATE_MENU) drawMenu(vhsTime);
     else if(gameState==STATE_MULTI) drawMultiMenuScreen(vhsTime);
@@ -23,56 +33,64 @@ void drawUI(){
             drawDamageOverlay(damageFlash,playerHealth);
             drawSurvivalTime(survivalTime);
             char fpsBuf[48];
-            snprintf(fpsBuf,48,"FPS: %.0f",gPerfFpsSmoothed);
-            drawText(fpsBuf,-0.10f,0.95f,1.20f,0.0f,0.0f,0.0f,0.72f);
-            drawText(fpsBuf,-0.10f,0.95f,1.20f,0.86f,0.91f,0.76f,0.98f);
+            snprintf(fpsBuf,48,"FPS %.0f",gPerfFpsSmoothed);
             char fgBuf[80];
-            formatFrameGenPipeline(
-                fgBuf,
-                80,
-                gPerfRefreshHz,
-                gPerfFrameGenBaseCap,
-                settings.frameGenMode,
-                settings.vsync
-            );
-            drawText(fgBuf,-0.10f,0.90f,1.08f,0.84f,0.89f,0.72f,0.95f);
+            formatFrameGenPipeline(fgBuf,80,gPerfRefreshHz,gPerfFrameGenBaseCap,settings.frameGenMode,settings.vsync);
             char upBuf[96];
-            formatUpscalePipeline(
-                upBuf,
-                96,
-                settings.upscalerMode,
-                renderW,
-                renderH,
-                winW,
-                winH
-            );
-            drawText(upBuf,-0.10f,0.85f,1.03f,0.78f,0.84f,0.70f,0.92f);
+            formatUpscalePipeline(upBuf,96,settings.upscalerMode,renderW,renderH,winW,winH);
+            if(gHudTelemetryVisible){
+                char perfRow[240];
+                snprintf(perfRow,240,"%s | %s | %s",fpsBuf,fgBuf,upBuf);
+                drawHudText(perfRow,-0.95f,0.95f,1.20f,0.88f,0.93f,0.78f,0.98f);
+                drawHudText("[F6] HUD  [F8] MINIMAP  [F3] DEBUG",-0.95f,0.90f,0.95f,0.70f,0.76f,0.66f,0.90f);
+            }else{
+                drawHudText("[F6] SHOW HUD  [F8] MINIMAP",-0.95f,0.95f,1.00f,0.80f,0.86f,0.74f,0.95f);
+            }
+
             if(playerHealth<100)drawHealthBar(playerHealth);
             if(playerSanity<100)drawSanityBar(playerSanity);
             drawStaminaBar(playerStamina);
             if(flashlightBattery<100)drawFlashlightBattery(flashlightBattery,flashlightOn);
-            char invBuf[64];
-            snprintf(invBuf,64,"INV B:%d M:%d T:%d",invBattery,invMedkit,invBait);
-            drawText(invBuf,-0.95f,0.84f,1.35f,0.55f,0.7f,0.5f,0.75f);
+
             int switchCount = (coop.switchOn[0]?1:0)+(coop.switchOn[1]?1:0);
-            drawText("OBJECTIVE",0.44f,0.82f,1.35f,0.88f,0.92f,0.68f,0.97f);
+            float blockX = 0.44f;
+            float blockY = 0.90f;
+            const char* phaseNames[] = {"INTRO","EXPLORATION","SURVIVAL","DESPERATION"};
+            int phaseIdx = (int)storyMgr.getPhase();
+            if(phaseIdx < 0) phaseIdx = 0;
+            if(phaseIdx > 3) phaseIdx = 3;
+            drawHudText("OBJECTIVE",blockX,blockY,1.28f,0.90f,0.94f,0.72f,0.97f);
+            blockY -= 0.07f;
             char objProgress[64];
-            snprintf(objProgress,64,"SWITCHES: %d / 2",switchCount);
-            drawText(objProgress,0.44f,0.75f,1.25f,0.84f,0.88f,0.64f,0.95f);
-            drawText(coop.doorOpen?"DOOR: OPEN":"DOOR: LOCKED",0.44f,0.68f,1.25f,0.88f,0.83f,0.6f,0.95f);
-            if(!coop.doorOpen) drawText("ACTION: HOLD 2 SWITCHES",0.44f,0.61f,1.15f,0.8f,0.84f,0.6f,0.92f);
+            snprintf(objProgress,64,"SWITCHES %d/2",switchCount);
+            drawHudText(objProgress,blockX,blockY,1.18f,0.86f,0.90f,0.68f,0.95f);
+            blockY -= 0.06f;
+            drawHudText(coop.doorOpen?"DOOR OPEN":"DOOR LOCKED",blockX,blockY,1.16f,0.88f,0.84f,0.62f,0.95f);
+            blockY -= 0.06f;
+            char phaseBuf[64];
+            snprintf(phaseBuf,64,"PHASE %s",phaseNames[phaseIdx]);
+            drawHudText(phaseBuf,blockX,blockY,1.14f,0.86f,0.80f,0.56f,0.94f);
+            blockY -= 0.06f;
+            char invBuf[64];
+            snprintf(invBuf,64,"SUPPLIES B:%d M:%d T:%d",invBattery,invMedkit,invBait);
+            drawHudText(invBuf,blockX,blockY,1.06f,0.76f,0.86f,0.70f,0.93f);
+            blockY -= 0.06f;
+            if(falseDoorTimer>0) {
+                drawHudText("EVENT FALSE DOOR SHIFT",blockX,blockY,1.05f,0.95f,0.45f,0.36f,0.92f);
+                blockY -= 0.05f;
+            }
+            if(!coop.doorOpen) drawHudText("ACTION HOLD 2 SWITCHES",blockX,blockY,1.02f,0.82f,0.86f,0.62f,0.90f);
+
             if(!coop.doorOpen){
                 if(nearPoint2D(cam.pos, coop.switches[0], 2.6f)||nearPoint2D(cam.pos, coop.switches[1], 2.6f))
-                    drawText("HOLD SWITCH POSITION",-0.24f,-0.35f,1.4f,0.75f,0.8f,0.55f,0.85f);
+                    drawHudTextCentered("HOLD SWITCH POSITION",0.0f,-0.35f,1.4f,0.75f,0.8f,0.55f,0.90f);
             }
-            if(falseDoorTimer>0) drawText("FALSE DOOR SHIFT",0.48f,0.67f,1.0f,0.9f,0.35f,0.25f,0.7f);
             if(storyMgr.totalCollected>0)drawNoteCounter(storyMgr.totalCollected);
-            drawPhaseIndicator((int)storyMgr.getPhase());
             if(nearNoteId>=0)drawInteractPrompt();
             if(nearbyWorldItemId>=0){
-                if(nearbyWorldItemType==0) drawText("[E] PICK BATTERY",-0.18f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.8f);
-                else if(nearbyWorldItemType==1) drawText("[E] PICK MEDKIT",-0.16f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.8f);
-                else if(nearbyWorldItemType==2) drawText("[E] PICK BAIT",-0.14f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.8f);
+                if(nearbyWorldItemType==0) drawHudTextCentered("[E] PICK BATTERY",0.0f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.9f);
+                else if(nearbyWorldItemType==1) drawHudTextCentered("[E] PICK MEDKIT",0.0f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.9f);
+                else if(nearbyWorldItemType==2) drawHudTextCentered("[E] PICK BAIT",0.0f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.9f);
             }
             if(multiState!=MULTI_IN_GAME && echoSignal.active){
                 Vec3 d = echoSignal.pos - cam.pos;
@@ -80,18 +98,13 @@ void drawUI(){
                 float dist = d.len();
                 char echoBuf[72];
                 snprintf(echoBuf,72,"ECHO SIGNAL %.0fm",dist);
-                drawText(echoBuf,-0.95f,0.50f,1.15f,0.62f,0.85f,0.86f,0.76f);
+                drawHudText(echoBuf,-0.95f,0.50f,1.18f,0.62f,0.85f,0.86f,0.90f);
                 if(isEchoInRange(cam.pos, echoSignal.pos, 2.5f)){
-                    drawText("[E] ATTUNE ECHO",-0.17f,-0.50f,1.35f,0.72f,0.88f,0.9f,0.85f);
-                }else{
-                    float sx=0, sy=0;
-                    if(projectToScreen(echoSignal.pos + Vec3(0,1.1f,0), sx, sy)){
-                        drawText("ECHO",sx-0.045f,sy,1.05f,0.7f,0.88f,0.92f,0.82f);
-                    }
+                    drawHudTextCentered("[E] ATTUNE ECHO",0.0f,-0.50f,1.35f,0.72f,0.88f,0.9f,0.90f);
                 }
             }
             if(multiState!=MULTI_IN_GAME && echoStatusTimer>0.0f){
-                drawText(echoStatusText,-0.25f,0.56f,1.2f,0.7f,0.86f,0.9f,0.8f);
+                drawHudTextCentered(echoStatusText,0.0f,0.62f,1.18f,0.7f,0.86f,0.9f,0.92f);
             }
             if(minimapEnabled) drawMinimapOverlay();
             if(storyMgr.hasHallucinations())drawHallucinationEffect((50.0f-playerSanity)/50.0f);
@@ -108,21 +121,21 @@ void drawUI(){
                     if(dist > 40.0f) continue;
                     const char* nm = netMgr.players[i].name[0] ? netMgr.players[i].name : "Player";
                     float xOff = (float)strlen(nm) * 0.012f;
-                    drawText(nm, sx - xOff, sy, 1.1f, 0.85f, 0.9f, 0.7f, 0.85f);
+                    drawHudText(nm, sx - xOff, sy, 1.1f, 0.85f, 0.9f, 0.7f, 0.90f);
                 }
             }
             if(multiState==MULTI_IN_GAME){
                 char netBuf[96];
                 snprintf(netBuf,96,"RTT %.0fms TX %d RX %d",netMgr.rttMs,netMgr.packetsSent,netMgr.packetsRecv);
-                drawText(netBuf,0.45f,0.60f,1.0f,0.55f,0.65f,0.8f,0.7f);
+                drawHudText(netBuf,0.45f,0.60f,1.0f,0.55f,0.65f,0.8f,0.78f);
             }
             if(trapCorridor.active && trapStatusTimer > 0.0f){
-                drawText(trapStatusText,-0.33f,0.50f,1.2f,0.82f,0.78f,0.9f,0.85f);
+                drawHudTextCentered(trapStatusText,0.0f,0.55f,1.2f,0.82f,0.78f,0.9f,0.90f);
             }
             if(!floorHoles.empty()){
                 char holeBuf[64];
                 snprintf(holeBuf,64,"FLOOR HAZARDS: %d", (int)floorHoles.size());
-                drawText(holeBuf,-0.95f,0.44f,1.10f,0.92f,0.58f,0.38f,0.84f);
+                drawHudText(holeBuf,-0.95f,0.44f,1.10f,0.92f,0.58f,0.38f,0.90f);
             }
             if(trapCorridor.locked){
                 float sx=0, sy=0;
@@ -132,9 +145,8 @@ void drawUI(){
                     drawText(":)",sx-0.018f+jitter,sy,1.35f,0.95f,0.95f,0.95f,alpha);
                 }
             }
-            const char* mmState = minimapEnabled ? "MINIMAP ON [M]" : "MINIMAP OFF [M]";
-            drawText(mmState,-0.95f,0.95f,1.15f,0.0f,0.0f,0.0f,0.72f);
-            drawText(mmState,-0.95f,0.95f,1.15f,0.88f,0.93f,0.78f,0.98f);
+            const char* mmState = minimapEnabled ? "MINIMAP ON [M/F8]" : "MINIMAP OFF [M/F8]";
+            drawHudText(mmState,-0.95f,0.84f,0.95f,0.88f,0.93f,0.78f,0.95f);
             if(gPerfDebugOverlay){
                 char graph[40];
                 buildFrameTimeGraph(
@@ -151,22 +163,22 @@ void drawUI(){
                 char dbgB[96];
                 snprintf(dbgA,96,"DEBUG PERF [F3] FT %.2fms AVG %.2f P95 %.2f",gPerfFrameMs,avgMs,p95Ms);
                 snprintf(dbgB,96,"GRAPH %s",graph);
-                drawText(dbgA,0.12f,-0.74f,1.00f,0.70f,0.85f,0.92f,0.90f);
-                drawText(dbgB,0.12f,-0.80f,1.00f,0.72f,0.82f,0.88f,0.90f);
+                drawHudText(dbgA,0.12f,-0.74f,1.00f,0.70f,0.85f,0.92f,0.93f);
+                drawHudText(dbgB,0.12f,-0.80f,1.00f,0.72f,0.82f,0.88f,0.93f);
             }
             if(debugTools.flyMode){
-                drawText("DEBUG FLY: ON",0.52f,0.95f,1.10f,0.78f,0.95f,0.85f,0.96f);
+                drawHudText("DEBUG FLY: ON",0.52f,0.95f,1.10f,0.78f,0.95f,0.85f,0.98f);
             }
             if(debugTools.open){
                 drawFullscreenOverlay(0.02f,0.03f,0.04f,0.62f);
-                drawText("DEBUG TOOLS",-0.28f,0.56f,1.8f,0.9f,0.95f,0.82f,0.98f);
+                drawHudText("DEBUG TOOLS",-0.28f,0.56f,1.8f,0.9f,0.95f,0.82f,0.98f);
                 for(int i=0;i<DEBUG_ACTION_COUNT;i++){
                     float y = 0.47f - i*0.08f;
                     float s = (debugTools.selectedAction==i)?1.0f:0.65f;
-                    if(debugTools.selectedAction==i) drawText(">",-0.39f,y,1.4f,0.92f,0.9f,0.65f,0.95f);
-                    drawText(debugActionLabel(i),-0.34f,y,1.35f,0.82f*s,0.88f*s,0.72f*s,0.92f);
+                    if(debugTools.selectedAction==i) drawHudText(">",-0.39f,y,1.4f,0.92f,0.9f,0.65f,0.95f);
+                    drawHudText(debugActionLabel(i),-0.34f,y,1.35f,0.82f*s,0.88f*s,0.72f*s,0.92f);
                 }
-                drawText("F10 TOGGLE  ENTER APPLY  ESC CLOSE",-0.42f,-0.20f,1.15f,0.67f,0.72f,0.78f,0.86f);
+                drawHudText("F10 TOGGLE  ENTER APPLY  ESC CLOSE",-0.42f,-0.20f,1.15f,0.67f,0.72f,0.78f,0.90f);
             }
         }
     }

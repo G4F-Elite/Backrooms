@@ -285,6 +285,7 @@ void gameInput(GLFWwindow*w){
     static bool debugEnterPressed = false;
     static bool debugEscPressed = false;
     static bool perfTogglePressed = false;
+    static bool hudTogglePressed = false;
     bool debugToggleNow = glfwGetKey(w,GLFW_KEY_F10)==GLFW_PRESS;
     if(debugToggleNow && !debugTogglePressed){
         debugTools.open = !debugTools.open;
@@ -296,6 +297,12 @@ void gameInput(GLFWwindow*w){
         triggerMenuConfirmSound();
     }
     perfTogglePressed = perfToggleNow;
+    bool hudToggleNow = glfwGetKey(w,GLFW_KEY_F6)==GLFW_PRESS;
+    if(hudToggleNow && !hudTogglePressed){
+        gHudTelemetryVisible = !gHudTelemetryVisible;
+        triggerMenuConfirmSound();
+    }
+    hudTogglePressed = hudToggleNow;
 
     if(debugTools.open){
         bool upNow = glfwGetKey(w,GLFW_KEY_UP)==GLFW_PRESS || glfwGetKey(w,GLFW_KEY_W)==GLFW_PRESS;
@@ -512,6 +519,10 @@ void gameInput(GLFWwindow*w){
 }
 
 void renderScene(){
+    glDisable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+
     struct MainUniforms {
         GLint P, V, M, vp, tm, danger, flashOn, flashDir, rfc, rfp, rfd, nl, lp;
     };
@@ -1127,6 +1138,9 @@ int main(){
         glEnable(GL_DEPTH_TEST);
         
         drawUI();
+        glDisable(GL_BLEND);
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
         
         int frameGenBaseCap = frameGenBaseFpsCap(cachedRefreshRateHz, settings.frameGenMode, settings.vsync);
         gPerfFrameGenBaseCap = frameGenBaseCap;

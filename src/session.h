@@ -174,7 +174,8 @@ inline void updateMinimapCheat(GLFWwindow* w){
     static MinimapBindingState minimapBindingState = {};
 
     bool mNow = glfwGetKey(w, GLFW_KEY_M) == GLFW_PRESS;
-    if(shouldToggleMinimapFromBindings(mNow, minimapBindingState)){
+    bool f8Now = glfwGetKey(w, GLFW_KEY_F8) == GLFW_PRESS;
+    if(shouldToggleMinimapFromBindings(mNow, f8Now, minimapBindingState)){
         minimapEnabled = !minimapEnabled;
     }
 

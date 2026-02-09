@@ -152,6 +152,23 @@ inline void drawFullscreenOverlay(float r, float g, float b, float a) {
     glDrawArrays(GL_TRIANGLES,0,6);
 }
 
+inline void drawOverlayRectNdc(float left, float bottom, float right, float top, float r, float g, float b, float a) {
+    if (right <= left || top <= bottom) return;
+    const float rectQuad[12] = {
+        left,bottom, right,bottom, right,top,
+        left,bottom, right,top, left,top
+    };
+    const float fullQuad[12] = {
+        -1.0f,-1.0f, 1.0f,-1.0f, 1.0f,1.0f,
+        -1.0f,-1.0f, 1.0f,1.0f, -1.0f,1.0f
+    };
+    glBindBuffer(GL_ARRAY_BUFFER,overlayVBO);
+    glBufferData(GL_ARRAY_BUFFER,sizeof(rectQuad),rectQuad,GL_STATIC_DRAW);
+    drawFullscreenOverlay(r, g, b, a);
+    glBindBuffer(GL_ARRAY_BUFFER,overlayVBO);
+    glBufferData(GL_ARRAY_BUFFER,sizeof(fullQuad),fullQuad,GL_STATIC_DRAW);
+}
+
 inline void drawMainMenuBackdrop(float tm) {
     glUseProgram(menuBgShader);
     glUniform1f(glGetUniformLocation(menuBgShader,"tm"),tm);
@@ -460,16 +477,11 @@ inline void drawIntro(int line, float timer, float lineTime, const char** introL
 }
 
 inline void drawNote(int noteId, const char* title, const char* content) {
+    (void)noteId;
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    drawFullscreenOverlay(0.0f,0.0f,0.0f,0.94f);
-    drawFullscreenOverlay(0.10f,0.08f,0.05f,0.38f);
-
-    const char* panelShadow = "                                                  ";
-    const char* panelBody = "                                              ";
-    for(float yp = 0.76f; yp >= -0.74f; yp -= 0.09f) {
-        drawTextCentered(panelShadow, 0.0f, yp - 0.012f, 3.05f, 0.0f, 0.0f, 0.0f, 0.82f);
-        drawTextCentered(panelBody, 0.0f, yp, 3.05f, 0.91f, 0.86f, 0.72f, 1.0f);
-    }
+    drawOverlayRectNdc(-0.56f, -0.84f, 0.58f, 0.82f, 0.12f, 0.09f, 0.05f, 0.42f);
+    drawOverlayRectNdc(-0.54f, -0.82f, 0.56f, 0.80f, 0.92f, 0.87f, 0.74f, 0.95f);
+    drawOverlayRectNdc(-0.50f, -0.78f, 0.52f, 0.76f, 0.96f, 0.91f, 0.79f, 0.92f);
 
     drawTextCentered(title, 0.0f, 0.56f, 2.6f, 0.10f, 0.08f, 0.05f, 1.0f);
     drawTextCentered("________________________________", 0.0f, 0.46f, 1.5f, 0.16f, 0.12f, 0.08f, 1.0f);

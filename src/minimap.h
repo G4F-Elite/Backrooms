@@ -8,7 +8,7 @@ using MinimapWallSampler = int(*)(int wx, int wz);
 inline char minimapGlyphForCell(int wx, int wz, int playerWX, int playerWZ, MinimapWallSampler sampler) {
     if (wx == playerWX && wz == playerWZ) return 'P';
     if (!sampler) return '?';
-    return sampler(wx, wz) ? '#' : '.';
+    return sampler(wx, wz) ? 'X' : '-';
 }
 
 inline void buildMinimapRows(
