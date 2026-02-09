@@ -12,38 +12,74 @@
 class EntityManager {
 public:
     std::vector<Entity> entities;
-    GLuint entityVAO, entityVBO, entityTex;
-    int entityVC;
+    GLuint entityVAO[4], entityVBO[4], entityTex[4];
+    int entityVC[4];
     float spawnTimer, maxEntities, dangerLevel;
+    Vec3 lastPlayerPos;
+    bool hasLastPlayerPos;
     
-    EntityManager() : entityVAO(0), entityVBO(0), entityTex(0), entityVC(0), 
-                      spawnTimer(0), maxEntities(3), dangerLevel(0) {}
+    EntityManager() : spawnTimer(0), maxEntities(3), dangerLevel(0), lastPlayerPos(0,0,0), hasLastPlayerPos(false) {
+        for(int i=0;i<4;i++){
+            entityVAO[i] = 0;
+            entityVBO[i] = 0;
+            entityTex[i] = 0;
+            entityVC[i] = 0;
+        }
+    }
     
     void init() {
-        std::vector<float> verts; buildStalkerModel(verts); entityVC = (int)verts.size() / 8;
-        glGenVertexArrays(1, &entityVAO); glGenBuffers(1, &entityVBO);
-        glBindVertexArray(entityVAO); glBindBuffer(GL_ARRAY_BUFFER, entityVBO);
-        glBufferData(GL_ARRAY_BUFFER, verts.size()*sizeof(float), verts.data(), GL_STATIC_DRAW);
-        glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,32,(void*)0); glEnableVertexAttribArray(0);
-        glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,32,(void*)12); glEnableVertexAttribArray(1);
-        glVertexAttribPointer(2,3,GL_FLOAT,GL_FALSE,32,(void*)20); glEnableVertexAttribArray(2);
-        unsigned char* td = new unsigned char[64*64*4]; genEntityTexture(td, 64, 64);
-        glGenTextures(1, &entityTex); glBindTexture(GL_TEXTURE_2D, entityTex);
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-        glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,64,64,0,GL_RGBA,GL_UNSIGNED_BYTE,td); delete[] td;
+        auto buildForType = [&](EntityType type, void (*builder)(std::vector<float>&)) {
+            std::vector<float> verts;
+            builder(verts);
+            int ti = (int)type;
+            entityVC[ti] = (int)verts.size() / 8;
+            glGenVertexArrays(1, &entityVAO[ti]);
+            glGenBuffers(1, &entityVBO[ti]);
+            glBindVertexArray(entityVAO[ti]);
+            glBindBuffer(GL_ARRAY_BUFFER, entityVBO[ti]);
+            glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), verts.data(), GL_STATIC_DRAW);
+            glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,32,(void*)0); glEnableVertexAttribArray(0);
+            glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,32,(void*)12); glEnableVertexAttribArray(1);
+            glVertexAttribPointer(2,3,GL_FLOAT,GL_FALSE,32,(void*)20); glEnableVertexAttribArray(2);
+
+            unsigned char* td = new unsigned char[64 * 64 * 4];
+            genEntityTextureByType(type, td, 64, 64);
+            glGenTextures(1, &entityTex[ti]);
+            glBindTexture(GL_TEXTURE_2D, entityTex[ti]);
+            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+            glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,64,64,0,GL_RGBA,GL_UNSIGNED_BYTE,td);
+            delete[] td;
+        };
+
+        buildForType(ENTITY_STALKER, buildStalkerModel);
+        buildForType(ENTITY_CRAWLER, buildCrawlerModel);
+        buildForType(ENTITY_SHADOW, buildShadowModel);
     }
     
     void spawnEntity(EntityType type, Vec3 pos, int maze[][30], int mzw, int mzh) {
+        (void)maze; (void)mzw; (void)mzh;
         Entity e; e.type = type; e.pos = pos; e.pos.y = 0; e.active = true; e.state = ENT_ROAMING;
-        if(type==ENTITY_STALKER) { e.speed=1.5f; e.detectionRange=20.0f; e.attackRange=1.0f; }
-        else if(type==ENTITY_CRAWLER) { e.speed=5.0f; e.detectionRange=15.0f; e.attackRange=1.5f; e.pos.y=-0.8f; }
-        else if(type==ENTITY_SHADOW) { e.speed=0.5f; e.detectionRange=8.0f; e.attackRange=2.0f; }
+        if(type==ENTITY_STALKER) { e.speed=1.7f; e.detectionRange=22.0f; e.attackRange=1.15f; }
+        else if(type==ENTITY_CRAWLER) { e.speed=3.4f; e.detectionRange=17.0f; e.attackRange=1.35f; e.pos.y=-0.8f; }
+        else if(type==ENTITY_SHADOW) { e.speed=1.15f; e.detectionRange=12.0f; e.attackRange=1.8f; }
+        e.behaviorMode = BEHAVIOR_DEFAULT;
+        e.behaviorTimer = 0.8f + (float)(rand()%120) * 0.01f;
+        e.stateTimer = 0.0f;
         entities.push_back(e);
     }
     
     void update(float dt, Vec3 pPos, float pYaw, int maze[][30], int mzw, int mzh, float cs) {
+        (void)maze; (void)mzw; (void)mzh; (void)cs;
         dangerLevel = 0;
+        float playerMove = 0.0f;
+        if(hasLastPlayerPos){
+            Vec3 pm = pPos - lastPlayerPos;
+            pm.y = 0.0f;
+            playerMove = pm.len();
+        }
+        hasLastPlayerPos = true;
+        lastPlayerPos = pPos;
         for(auto& e : entities) {
             if(!e.active) continue;
             EntityState prevState = e.state;
@@ -53,26 +89,31 @@ public:
             float toEL = sqrtf(toE.x*toE.x + toE.z*toE.z);
             if(toEL > 0.01f) { toE.x /= toEL; toE.z /= toEL; }
             bool looking = (look.x*toE.x + look.z*toE.z) > 0.85f && dist < e.detectionRange;
-            if(dist < e.detectionRange) { float prox = 1.0f - dist/e.detectionRange; if(prox > dangerLevel) dangerLevel = prox; }
+            if(dist < e.detectionRange + 5.0f) {
+                float prox = 1.0f - dist/(e.detectionRange + 5.0f);
+                if(prox > dangerLevel) dangerLevel = prox;
+            }
 
             e.behaviorTimer -= dt;
             if(e.behaviorTimer <= 0.0f){
-                e.behaviorTimer = 2.0f + (float)(rand()%220) / 100.0f;
+                e.behaviorTimer = 0.9f + (float)(rand()%190) / 100.0f;
                 if(e.type == ENTITY_STALKER){
-                    if(dist < 7.5f && !looking) e.behaviorMode = BEHAVIOR_RUSH;
-                    else if(looking && dist < 12.0f) e.behaviorMode = BEHAVIOR_SNEAK;
-                    else e.behaviorMode = (rand()%100 < 30) ? BEHAVIOR_FLANK : BEHAVIOR_DEFAULT;
+                    if(dist < 8.0f && !looking) e.behaviorMode = BEHAVIOR_RUSH;
+                    else if(looking && dist < 14.0f) e.behaviorMode = BEHAVIOR_SNEAK;
+                    else e.behaviorMode = (rand()%100 < 48) ? BEHAVIOR_FLANK : BEHAVIOR_DEFAULT;
                 }else if(e.type == ENTITY_CRAWLER){
-                    e.behaviorMode = (dist < 5.5f) ? BEHAVIOR_RUSH : ((rand()%100 < 35) ? BEHAVIOR_FLANK : BEHAVIOR_DEFAULT);
+                    if(dist < 6.5f && playerMove > 0.02f) e.behaviorMode = BEHAVIOR_RUSH;
+                    else e.behaviorMode = (rand()%100 < 50) ? BEHAVIOR_FLANK : BEHAVIOR_DEFAULT;
                 }else if(e.type == ENTITY_SHADOW){
                     if(looking) e.behaviorMode = BEHAVIOR_FLANK;
-                    else e.behaviorMode = (rand()%100 < 45) ? BEHAVIOR_SNEAK : BEHAVIOR_DEFAULT;
+                    else if(playerMove > 0.03f) e.behaviorMode = BEHAVIOR_RUSH;
+                    else e.behaviorMode = (rand()%100 < 55) ? BEHAVIOR_SNEAK : BEHAVIOR_DEFAULT;
                 }
             }
             
             if(e.type == ENTITY_STALKER) updateStalker(e, dt, pPos, dist, looking, maze, mzw, mzh, cs);
             else if(e.type == ENTITY_CRAWLER) updateCrawler(e, dt, pPos, dist, maze, mzw, mzh, cs);
-            else if(e.type == ENTITY_SHADOW) updateShadow(e, dt, pPos, dist, looking);
+            else if(e.type == ENTITY_SHADOW) updateShadow(e, dt, pPos, dist, looking, pYaw);
             // Check for attacking state for shadow/crawler
             if(e.type == ENTITY_SHADOW && dist < e.attackRange && !looking) e.state = ENT_ATTACKING;
             if(e.type == ENTITY_CRAWLER && dist < e.attackRange) e.state = ENT_ATTACKING;
@@ -81,18 +122,22 @@ public:
             e.animPhase += dt * 3.0f; if(e.animPhase > 6.283f) e.animPhase -= 6.283f;
             e.flickerTimer += dt;
             if(e.type != ENTITY_SHADOW) e.visible = true;
-            else e.visible = (dist < 4.0f) ? ((int)(e.flickerTimer*14)%3) != 0 : true;
+            else e.visible = (dist < 6.0f) ? ((int)(e.flickerTimer*15)%4) != 0 : true;
         }
         entities.erase(std::remove_if(entities.begin(), entities.end(), [](const Entity& e) { return !e.active; }), entities.end());
     }
     
     void updateStalker(Entity& e, float dt, Vec3 pPos, float dist, bool looking, int maze[][30], int mzw, int mzh, float cs) {
+        (void)maze; (void)mzw; (void)mzh; (void)cs;
         e.stateTimer += dt;
         float speedMul = 1.0f;
-        if(e.behaviorMode == BEHAVIOR_SNEAK) speedMul = 0.72f;
-        else if(e.behaviorMode == BEHAVIOR_RUSH) speedMul = 1.55f;
-        else if(e.behaviorMode == BEHAVIOR_FLANK) speedMul = 1.08f;
-        if(looking && dist < e.detectionRange) { e.lastSeenTimer += dt; if(e.lastSeenTimer > 2.0f) e.state = ENT_FLEEING; }
+        if(e.behaviorMode == BEHAVIOR_SNEAK) speedMul = 0.64f;
+        else if(e.behaviorMode == BEHAVIOR_RUSH) speedMul = 1.72f;
+        else if(e.behaviorMode == BEHAVIOR_FLANK) speedMul = 1.12f;
+        if(looking && dist < e.detectionRange) {
+            e.lastSeenTimer += dt;
+            if(e.lastSeenTimer > 2.5f) e.state = ENT_FLEEING;
+        }
         else { e.lastSeenTimer = 0;
             if(dist < e.detectionRange) { e.state = ENT_STALKING;
                 Vec3 dir = pPos - e.pos; dir.y = 0; float len = sqrtf(dir.x*dir.x + dir.z*dir.z);
@@ -118,6 +163,21 @@ public:
                 else e.yaw += 1.2f;
             }
         }
+        if(!looking && dist > 10.0f && dist < 22.0f && (rand()%1000) < 10){
+            Vec3 dir = pPos - e.pos;
+            dir.y = 0.0f;
+            float len = dir.len();
+            if(len > 0.1f){
+                dir = dir * (1.0f / len);
+                float nx = pPos.x - dir.x * (3.0f + (float)(rand()%4));
+                float nz = pPos.z - dir.z * (3.0f + (float)(rand()%4));
+                if(!collideWorld(nx, nz, 0.32f)){
+                    e.pos.x = nx;
+                    e.pos.z = nz;
+                    e.behaviorMode = BEHAVIOR_RUSH;
+                }
+            }
+        }
         if(e.state == ENT_FLEEING) { Vec3 dir = e.pos - pPos; dir.y = 0; float len = sqrtf(dir.x*dir.x+dir.z*dir.z);
             if(len > 0.1f) {
                 dir.x/=len; dir.z/=len;
@@ -129,10 +189,18 @@ public:
     }
     
     void updateCrawler(Entity& e, float dt, Vec3 pPos, float dist, int maze[][30], int mzw, int mzh, float cs) {
+        (void)maze; (void)mzw; (void)mzh; (void)cs;
         e.stateTimer += dt; e.pos.y = -0.8f; // Stay low
         float speedMul = 1.0f;
-        if(e.behaviorMode == BEHAVIOR_RUSH) speedMul = 1.40f;
+        if(e.behaviorMode == BEHAVIOR_RUSH) speedMul = 1.70f;
         else if(e.behaviorMode == BEHAVIOR_FLANK) speedMul = 1.15f;
+        if(dist < 9.0f && e.stateTimer > 1.2f && e.behaviorMode != BEHAVIOR_RUSH){
+            e.state = ENT_IDLE;
+            if(e.stateTimer > 2.1f) {
+                e.behaviorMode = BEHAVIOR_RUSH;
+                e.stateTimer = 0.0f;
+            }
+        }
         if(dist < e.detectionRange) { e.state = ENT_CHASING;
             Vec3 dir = pPos - e.pos; dir.y = 0; float len = sqrtf(dir.x*dir.x + dir.z*dir.z);
             if(len > 0.1f) { dir.x /= len; dir.z /= len;
@@ -149,6 +217,10 @@ public:
                     if(!collideWorld(bx,bz,0.34f)) { e.pos.x = bx; e.pos.z = bz; }
                 }
                 e.yaw = atan2f(dir.x, dir.z); }
+            if(e.behaviorMode == BEHAVIOR_RUSH && dist > 6.0f && e.stateTimer > 1.6f){
+                e.behaviorMode = BEHAVIOR_DEFAULT;
+                e.stateTimer = 0.0f;
+            }
             if(dist < e.attackRange) e.state = ENT_ATTACKING;
         } else { e.state = ENT_ROAMING;
             if(e.stateTimer > 1.8f) { e.yaw += ((rand()%100)/50.0f-1.0f)*2.6f; e.stateTimer = 0; }
@@ -157,17 +229,18 @@ public:
             else e.yaw += 1.3f; }
     }
     
-    void updateShadow(Entity& e, float dt, Vec3 pPos, float dist, bool looking) {
+    void updateShadow(Entity& e, float dt, Vec3 pPos, float dist, bool looking, float pYaw) {
         if(looking && dist < 13.0f){
             e.lastSeenTimer += dt;
-            if(e.lastSeenTimer > 1.1f){
+            if(e.lastSeenTimer > 0.8f){
                 for(int i=0;i<8;i++){
                     float ang = ((float)(rand()%628) / 100.0f);
-                    float r = 5.0f + (float)(rand()%5);
+                    float r = 6.5f + (float)(rand()%7);
                     float nx = pPos.x + mSin(ang) * r;
                     float nz = pPos.z + mCos(ang) * r;
                     if(!collideWorld(nx,nz,0.32f)){
                         e.pos.x = nx; e.pos.z = nz;
+                        e.visible = false;
                         break;
                     }
                 }
@@ -176,12 +249,26 @@ public:
         }else{
             e.lastSeenTimer = 0.0f;
         }
-        e.visible = !looking && (dist < e.detectionRange + 6.0f);
+        if(!looking && dist < e.detectionRange + 8.0f && (rand()%1000) < 9){
+            float jitter = ((float)(rand()%628) / 100.0f);
+            Vec3 backDir(-mSin(pYaw), 0.0f, -mCos(pYaw));
+            Vec3 sideDir(mCos(pYaw), 0.0f, -mSin(pYaw));
+            float backDist = 2.8f + (float)(rand()%4);
+            float sideDist = (mSin(jitter) > 0.0f ? 1.0f : -1.0f) * (0.9f + (float)(rand()%10) * 0.1f);
+            float nx = pPos.x + backDir.x * backDist + sideDir.x * sideDist;
+            float nz = pPos.z + backDir.z * backDist + sideDir.z * sideDist;
+            if(!collideWorld(nx,nz,0.32f)){
+                e.pos.x = nx;
+                e.pos.z = nz;
+                e.visible = false;
+            }
+        }
+        e.visible = !looking && (dist < e.detectionRange + 8.0f);
         if(!looking && dist < e.detectionRange + 3.0f && dist > e.attackRange) {
             Vec3 dir = pPos - e.pos; dir.y = 0; float len = sqrtf(dir.x*dir.x+dir.z*dir.z);
             if(len > 0.1f) {
                 dir.x/=len; dir.z/=len;
-                float moveMul = (e.behaviorMode == BEHAVIOR_SNEAK) ? 0.9f : 1.6f;
+                float moveMul = (e.behaviorMode == BEHAVIOR_SNEAK) ? 0.8f : 1.95f;
                 if(e.behaviorMode == BEHAVIOR_FLANK){
                     float ox = dir.x;
                     dir.x = dir.z;
@@ -194,21 +281,51 @@ public:
                 e.yaw = atan2f(dir.x,dir.z);
             }
         }
-        if(dist > 28.0f) e.active = false;
+        if(dist < 11.0f && !looking && (rand()%1000) < 12){
+            for(int i=0;i<8;i++){
+                float ang = ((float)(rand()%628) / 100.0f);
+                float r = 2.4f + (float)(rand()%4);
+                float nx = pPos.x + mSin(ang) * r;
+                float nz = pPos.z + mCos(ang) * r;
+                if(!collideWorld(nx,nz,0.32f)){
+                    e.pos.x = nx;
+                    e.pos.z = nz;
+                    break;
+                }
+            }
+        }
+        if(dist > 32.0f) e.active = false;
     }
     
     void render(GLuint shader, Mat4& proj, Mat4& view) {
         glUseProgram(shader);
         glUniformMatrix4fv(glGetUniformLocation(shader,"P"),1,GL_FALSE,proj.m);
         glUniformMatrix4fv(glGetUniformLocation(shader,"V"),1,GL_FALSE,view.m);
-        glBindTexture(GL_TEXTURE_2D, entityTex); glBindVertexArray(entityVAO);
         for(auto& e : entities) {
             if(!e.active || !e.visible) continue;
             Mat4 model; float c=mCos(e.yaw), s=mSin(e.yaw);
             model.m[0]=c; model.m[2]=s; model.m[8]=-s; model.m[10]=c;
-            model.m[12]=e.pos.x+mSin(e.animPhase)*0.02f; model.m[13]=e.pos.y; model.m[14]=e.pos.z;
+            float bobAmp = 0.02f;
+            float yOffset = e.pos.y;
+            if(e.type==ENTITY_CRAWLER){
+                bobAmp = 0.03f;
+                model.m[0] = c * 0.95f;
+                model.m[2] = s * 0.95f;
+                model.m[8] = -s * 1.15f;
+                model.m[10] = c * 1.15f;
+            }else if(e.type==ENTITY_SHADOW){
+                bobAmp = 0.06f;
+                yOffset += 0.08f * mSin(e.animPhase * 0.7f);
+            }
+            model.m[12]=e.pos.x + mSin(e.animPhase) * bobAmp;
+            model.m[13]=yOffset;
+            model.m[14]=e.pos.z;
             glUniformMatrix4fv(glGetUniformLocation(shader,"M"),1,GL_FALSE,model.m);
-            glDrawArrays(GL_TRIANGLES, 0, entityVC);
+            int ti = (int)e.type;
+            if(ti < 0 || ti > 3 || entityVC[ti] <= 0) continue;
+            glBindTexture(GL_TEXTURE_2D, entityTex[ti]);
+            glBindVertexArray(entityVAO[ti]);
+            glDrawArrays(GL_TRIANGLES, 0, entityVC[ti]);
         }
     }
     
@@ -219,7 +336,7 @@ public:
         return false;
     }
     
-    void reset() { entities.clear(); spawnTimer = 0; dangerLevel = 0; }
+    void reset() { entities.clear(); spawnTimer = 0; dangerLevel = 0; hasLastPlayerPos = false; }
 };
 
 #endif

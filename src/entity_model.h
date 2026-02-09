@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <cmath>
+#include "entity_types.h"
 
 // Stalker model vertices (procedural humanoid silhouette)
 inline void buildStalkerModel(std::vector<float>& verts) {
@@ -91,27 +92,108 @@ inline void buildStalkerModel(std::vector<float>& verts) {
     }
 }
 
+inline void buildCrawlerModel(std::vector<float>& verts) {
+    verts.clear();
+    auto emitQuad = [&](float ax,float ay,float az,float bx,float by,float bz,float cx,float cy,float cz,float dx,float dy,float dz,float nx,float ny,float nz){
+        float tri[] = {
+            ax,ay,az,0,0,nx,ny,nz, bx,by,bz,1,0,nx,ny,nz, cx,cy,cz,1,1,nx,ny,nz,
+            ax,ay,az,0,0,nx,ny,nz, cx,cy,cz,1,1,nx,ny,nz, dx,dy,dz,0,1,nx,ny,nz
+        };
+        for(int i=0;i<48;i++) verts.push_back(tri[i]);
+    };
+    auto addBox = [&](float cx,float cy,float cz,float sx,float sy,float sz){
+        float hx=sx*0.5f, hy=sy*0.5f, hz=sz*0.5f;
+        emitQuad(cx-hx,cy-hy,cz+hz, cx+hx,cy-hy,cz+hz, cx+hx,cy+hy,cz+hz, cx-hx,cy+hy,cz+hz, 0,0,1);
+        emitQuad(cx+hx,cy-hy,cz-hz, cx-hx,cy-hy,cz-hz, cx-hx,cy+hy,cz-hz, cx+hx,cy+hy,cz-hz, 0,0,-1);
+        emitQuad(cx+hx,cy-hy,cz+hz, cx+hx,cy-hy,cz-hz, cx+hx,cy+hy,cz-hz, cx+hx,cy+hy,cz+hz, 1,0,0);
+        emitQuad(cx-hx,cy-hy,cz-hz, cx-hx,cy-hy,cz+hz, cx-hx,cy+hy,cz+hz, cx-hx,cy+hy,cz-hz, -1,0,0);
+        emitQuad(cx-hx,cy+hy,cz+hz, cx+hx,cy+hy,cz+hz, cx+hx,cy+hy,cz-hz, cx-hx,cy+hy,cz-hz, 0,1,0);
+        emitQuad(cx-hx,cy-hy,cz-hz, cx+hx,cy-hy,cz-hz, cx+hx,cy-hy,cz+hz, cx-hx,cy-hy,cz+hz, 0,-1,0);
+    };
+
+    addBox(0.0f, -0.42f, 0.0f, 1.00f, 0.34f, 0.70f);
+    addBox(0.0f, -0.22f, 0.28f, 0.54f, 0.18f, 0.28f);
+    addBox(0.0f, -0.20f, -0.30f, 0.62f, 0.20f, 0.26f);
+    addBox(0.0f, -0.05f, 0.0f, 0.36f, 0.18f, 0.44f);
+    for(int side=-1;side<=1;side+=2){
+        addBox(side*0.42f, -0.36f, 0.22f, 0.16f, 0.14f, 0.42f);
+        addBox(side*0.42f, -0.36f, -0.20f, 0.16f, 0.14f, 0.42f);
+        addBox(side*0.54f, -0.40f, 0.48f, 0.10f, 0.06f, 0.18f);
+        addBox(side*0.54f, -0.40f, -0.46f, 0.10f, 0.06f, 0.18f);
+    }
+    addBox(0.0f, 0.00f, 0.40f, 0.24f, 0.12f, 0.18f);
+}
+
+inline void buildShadowModel(std::vector<float>& verts) {
+    verts.clear();
+    auto emitBillboard = [&](float y0,float y1,float halfW,float nz){
+        float tri[] = {
+            -halfW,y0,0,0,0,0,0,nz, halfW,y0,0,1,0,0,0,nz, halfW,y1,0,1,1,0,0,nz,
+            -halfW,y0,0,0,0,0,0,nz, halfW,y1,0,1,1,0,0,nz, -halfW,y1,0,0,1,0,0,nz
+        };
+        for(int i=0;i<48;i++) verts.push_back(tri[i]);
+    };
+    emitBillboard(-0.05f, 2.65f, 0.58f, 1.0f);
+    emitBillboard(-0.05f, 2.65f, 0.58f, -1.0f);
+    emitBillboard(0.10f, 2.45f, 0.30f, 1.0f);
+    emitBillboard(0.10f, 2.45f, 0.30f, -1.0f);
+}
+
 // Generate dark entity texture
-inline void genEntityTexture(unsigned char* data, int w, int h) {
+inline void genEntityTextureByType(EntityType type, unsigned char* data, int w, int h) {
     for(int y = 0; y < h; y++) for(int x = 0; x < w; x++) {
         int idx = (y * w + x) * 4;
         float noise = (float)(rand() % 40) / 255.0f;
         float u = (float)x / (float)(w > 1 ? (w - 1) : 1);
         float v = (float)y / (float)(h > 1 ? (h - 1) : 1);
-        float grime = 0.3f + 0.7f * fabsf(sinf((u * 7.0f + v * 5.0f) * 3.14159f));
-        float r = 8.0f + noise * 26.0f + grime * 7.0f;
-        float g = 6.0f + noise * 18.0f + grime * 5.0f;
-        float b = 12.0f + noise * 30.0f + grime * 9.0f;
-        bool eyeBand = (v > 0.58f && v < 0.68f) && ((u > 0.34f && u < 0.42f) || (u > 0.58f && u < 0.66f));
-        bool chestScar = (fabsf(u - 0.5f) < 0.03f && v > 0.25f && v < 0.85f);
-        if(eyeBand){
-            r = 138.0f + noise * 60.0f;
-            g = 22.0f + noise * 20.0f;
-            b = 20.0f + noise * 20.0f;
-        }else if(chestScar){
-            r += 32.0f;
-            g += 8.0f;
-            b += 8.0f;
+        float pat = fabsf(sinf((u * 7.0f + v * 5.0f) * 3.14159f));
+        float r = 10.0f + noise * 20.0f;
+        float g = 8.0f + noise * 16.0f;
+        float b = 12.0f + noise * 24.0f;
+        if(type == ENTITY_STALKER){
+            float grime = 0.3f + 0.7f * pat;
+            r += grime * 8.0f;
+            g += grime * 6.0f;
+            b += grime * 10.0f;
+            bool eyeBand = (v > 0.58f && v < 0.68f) && ((u > 0.34f && u < 0.42f) || (u > 0.58f && u < 0.66f));
+            bool chestScar = (fabsf(u - 0.5f) < 0.03f && v > 0.25f && v < 0.85f);
+            if(eyeBand){
+                r = 138.0f + noise * 60.0f;
+                g = 22.0f + noise * 20.0f;
+                b = 20.0f + noise * 20.0f;
+            }else if(chestScar){
+                r += 32.0f;
+                g += 8.0f;
+                b += 8.0f;
+            }
+        }else if(type == ENTITY_CRAWLER){
+            float bone = 0.55f + 0.45f * pat;
+            r = 36.0f + noise * 24.0f + bone * 34.0f;
+            g = 26.0f + noise * 18.0f + bone * 26.0f;
+            b = 18.0f + noise * 14.0f + bone * 14.0f;
+            bool maw = (v > 0.40f && v < 0.56f) && fabsf(u - 0.5f) < 0.24f;
+            bool teeth = maw && (fmodf(u * 26.0f, 2.0f) > 1.0f);
+            if(maw){
+                r = 58.0f + noise * 14.0f;
+                g = 10.0f + noise * 7.0f;
+                b = 9.0f + noise * 7.0f;
+                if(teeth){
+                    r = 180.0f;
+                    g = 170.0f;
+                    b = 146.0f;
+                }
+            }
+        }else{
+            float veil = 0.2f + 0.8f * pat;
+            r = 14.0f + noise * 12.0f + veil * 16.0f;
+            g = 12.0f + noise * 10.0f + veil * 14.0f;
+            b = 22.0f + noise * 22.0f + veil * 44.0f;
+            bool core = fabsf(u - 0.5f) < 0.12f && v > 0.30f && v < 0.72f;
+            if(core){
+                r = 96.0f + noise * 32.0f;
+                g = 40.0f + noise * 20.0f;
+                b = 140.0f + noise * 36.0f;
+            }
         }
         if(r > 255.0f) r = 255.0f;
         if(g > 255.0f) g = 255.0f;
@@ -121,6 +203,10 @@ inline void genEntityTexture(unsigned char* data, int w, int h) {
         data[idx+2] = (unsigned char)b;
         data[idx+3] = 255;
     }
+}
+
+inline void genEntityTexture(unsigned char* data, int w, int h) {
+    genEntityTextureByType(ENTITY_STALKER, data, w, h);
 }
 
 #endif

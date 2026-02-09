@@ -11,11 +11,12 @@ enum DebugAction {
     DEBUG_ACT_SPAWN_STALKER = 5,
     DEBUG_ACT_SPAWN_CRAWLER = 6,
     DEBUG_ACT_SPAWN_SHADOW = 7,
-    DEBUG_ACT_FORCE_HOLES = 8,
-    DEBUG_ACT_FORCE_SUPPLY = 9
+    DEBUG_ACT_TRIGGER_EYE = 8,
+    DEBUG_ACT_FORCE_HOLES = 9,
+    DEBUG_ACT_FORCE_SUPPLY = 10
 };
 
-inline constexpr int DEBUG_ACTION_COUNT = 10;
+inline constexpr int DEBUG_ACTION_COUNT = 11;
 
 struct DebugToolsState {
     bool open;
@@ -40,6 +41,7 @@ inline const char* debugActionLabel(int idx) {
         case DEBUG_ACT_SPAWN_STALKER: return "SPAWN STALKER";
         case DEBUG_ACT_SPAWN_CRAWLER: return "SPAWN CRAWLER";
         case DEBUG_ACT_SPAWN_SHADOW: return "SPAWN SHADOW";
+        case DEBUG_ACT_TRIGGER_EYE: return "TRIGGER EYE EVENT";
         case DEBUG_ACT_FORCE_HOLES: return "FORCE FLOOR HOLES";
         default: return "FORCE SUPPLY CACHE";
     }

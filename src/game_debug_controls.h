@@ -78,6 +78,31 @@ void executeDebugAction(int action){
         setEchoStatus("DEBUG: TELEPORTED TO EXIT");
         return;
     }
+    if(action==DEBUG_ACT_TRIGGER_EYE){
+        if(smileEvent.corridorActive){
+            setTrapStatus("DEBUG: EYE EVENT ALREADY ACTIVE");
+            return;
+        }
+        if(!smileEvent.eyeActive){
+            Vec3 fwd(mSin(cam.yaw), 0.0f, mCos(cam.yaw));
+            Vec3 right(mCos(cam.yaw), 0.0f, -mSin(cam.yaw));
+            Vec3 cand = cam.pos + fwd * 10.0f + right * (((rng()%2)==0) ? -4.5f : 4.5f);
+            int wx = (int)floorf(cand.x / CS);
+            int wz = (int)floorf(cand.z / CS);
+            if(getCellWorld(wx, wz) != 0){
+                cand = findSpawnPos(cam.pos, 8.0f);
+            }
+            smileEvent.eyePos = Vec3(cand.x, PH + 0.3f, cand.z);
+            smileEvent.eyeLife = 18.0f;
+            smileEvent.eyeLookTime = 0.0f;
+            smileEvent.eyeActive = true;
+            setEchoStatus("DEBUG: EYE SPAWNED");
+        }else{
+            triggerSmileCorridor();
+            setEchoStatus("DEBUG: EYE CORRIDOR TRIGGERED");
+        }
+        return;
+    }
     if(!canMutateWorld){
         setTrapStatus("DEBUG ACTION: HOST ONLY");
         return;
@@ -110,6 +135,12 @@ void executeDebugAction(int action){
 
 void mouse(GLFWwindow*,double xp,double yp){
     if(gameState!=STATE_GAME&&gameState!=STATE_INTRO)return;
+    if(debugTools.open) {
+        lastX = (float)xp;
+        lastY = (float)yp;
+        firstMouse = true;
+        return;
+    }
     if(isPlayerDead || playerEscaped || playerFalling) return;
     if(firstMouse){lastX=(float)xp;lastY=(float)yp;firstMouse=false;}
     cam.yaw-=((float)xp-lastX)*settings.mouseSens;
@@ -131,6 +162,7 @@ void gameInput(GLFWwindow*w){
         debugTools.open = !debugTools.open;
         if(debugTools.open){
             glfwSetInputMode(w,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
+            firstMouse = true;
         }else{
             glfwSetInputMode(w,GLFW_CURSOR,GLFW_CURSOR_DISABLED);
             firstMouse = true;

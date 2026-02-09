@@ -25,11 +25,18 @@ inline void triggerSmileCorridor() {
     smileEvent.returnPos = cam.pos;
     int baseWX = (int)floorf(cam.pos.x / CS);
     int baseWZ = (int)floorf(cam.pos.z / CS);
-    int dirX = (mSin(cam.yaw) > 0.0f) ? 1 : -1;
-    int dirZ = (mCos(cam.yaw) > 0.0f) ? 1 : -1;
+    float sx = mSin(cam.yaw);
+    float sz = mCos(cam.yaw);
+    int dirX = 0;
+    int dirZ = 0;
+    if (fabsf(sx) > fabsf(sz)) {
+        dirX = (sx > 0.0f) ? 1 : -1;
+    } else {
+        dirZ = (sz > 0.0f) ? 1 : -1;
+    }
     int startWX = baseWX + dirX * 22;
     int startWZ = baseWZ + dirZ * 22;
-    int len = 18;
+    int len = 24;
     buildSmileCorridorAt(startWX, startWZ, len, dirX, dirZ);
     smileEvent.corridorEnd = Vec3((startWX + dirX * (len - 1) + 0.5f) * CS, PH, (startWZ + dirZ * (len - 1) + 0.5f) * CS);
     cam.pos = Vec3((startWX + 0.5f) * CS, PH, (startWZ + 0.5f) * CS);
@@ -46,7 +53,9 @@ inline void updateSmileEvent() {
         smileEvent.corridorTime += dTime;
         Vec3 d = cam.pos - smileEvent.corridorEnd;
         d.y = 0.0f;
-        if (d.len() < 2.2f || smileEvent.corridorTime > 35.0f) {
+        bool reachedEnd = d.len() < 2.2f;
+        bool timedOut = smileEvent.corridorTime > 22.0f;
+        if (reachedEnd || timedOut) {
             cam.pos = Vec3(smileEvent.returnPos.x, PH, smileEvent.returnPos.z);
             smileEvent.corridorActive = false;
             smileEvent.nextSpawnTimer = 34.0f + (float)(rng()%20);
@@ -54,7 +63,16 @@ inline void updateSmileEvent() {
             updateLightsAndPillars(playerChunkX, playerChunkZ);
             updateMapContent(playerChunkX, playerChunkZ);
             buildGeom();
-            setEchoStatus("ECHO RESTORED");
+            if (reachedEnd) {
+                setEchoStatus("ECHO RESTORED");
+            } else {
+                playerSanity -= 18.0f;
+                if (playerSanity < 0.0f) playerSanity = 0.0f;
+                playerHealth -= 14.0f;
+                if (playerHealth < 1.0f) playerHealth = 1.0f;
+                setEchoStatus("THE EYE CAUGHT UP");
+                triggerLocalScare(0.36f, 0.18f, 4.0f);
+            }
             triggerScare();
         }
         return;

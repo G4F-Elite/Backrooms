@@ -15,6 +15,15 @@ inline void drawHudTextCentered(const char* s, float x, float y, float sc, float
     drawTextCentered(s, x, y, sc, r, g, b, a);
 }
 
+inline void drawEyeMarker(float sx, float sy, float scale, float alpha) {
+    float w = 0.050f * scale;
+    float h = 0.022f * scale;
+    drawOverlayRectNdc(sx - w, sy - h, sx + w, sy + h, 0.46f, 0.08f, 0.08f, alpha * 0.62f);
+    drawOverlayRectNdc(sx - w * 0.86f, sy - h * 0.68f, sx + w * 0.86f, sy + h * 0.68f, 0.84f, 0.16f, 0.14f, alpha * 0.92f);
+    drawOverlayRectNdc(sx - w * 0.28f, sy - h * 0.58f, sx + w * 0.28f, sy + h * 0.58f, 0.05f, 0.02f, 0.02f, alpha);
+    drawOverlayRectNdc(sx - w * 0.10f, sy - h * 0.20f, sx + w * 0.10f, sy + h * 0.20f, 0.90f, 0.30f, 0.24f, alpha);
+}
+
 void drawUI(){
     if(gameState==STATE_MENU) drawMenu(vhsTime);
     else if(gameState==STATE_GUIDE) drawGuideScreen();
@@ -53,9 +62,8 @@ void drawUI(){
                 char perfRow[300];
                 snprintf(perfRow,300,"%s | %s | %s | %s | %s",fpsBuf,fgBuf,upBuf,pingBuf,netBuf);
                 drawHudText(perfRow,-0.95f,0.95f,1.20f,0.88f,0.93f,0.78f,0.98f);
-                drawHudText("[F6] HUD  [F8] MINIMAP  [F3] DEBUG",-0.95f,-0.92f,0.95f,0.70f,0.76f,0.66f,0.90f);
             }else{
-                drawHudText("[F6] SHOW HUD  [F8] MINIMAP",-0.95f,0.95f,1.00f,0.80f,0.86f,0.74f,0.95f);
+                drawHudText("HUD HIDDEN",-0.95f,0.95f,1.00f,0.80f,0.86f,0.74f,0.95f);
             }
 
             if(playerHealth<100)drawHealthBar(playerHealth);
@@ -156,14 +164,19 @@ void drawUI(){
             }else if(smileEvent.eyeActive){
                 float sx = 0.0f, sy = 0.0f;
                 if(projectToScreen(smileEvent.eyePos, sx, sy)){
-                    drawHudTextCentered("EYE",sx,sy,1.14f,0.90f,0.42f,0.38f,0.95f);
+                    drawEyeMarker(sx, sy, 1.0f, 0.98f);
                 }else{
                     Vec3 rightHint(mCos(cam.yaw), 0.0f, -mSin(cam.yaw));
                     Vec3 eyeDir = smileEvent.eyePos - cam.pos;
                     eyeDir.y = 0.0f;
                     float side = rightHint.dot(eyeDir);
-                    if(side >= 0.0f) drawHudText(">> EYE",0.76f,0.28f,1.18f,0.90f,0.42f,0.38f,0.95f);
-                    else drawHudText("EYE <<",-0.95f,0.28f,1.18f,0.90f,0.42f,0.38f,0.95f);
+                    if(side >= 0.0f){
+                        drawEyeMarker(0.88f, 0.31f, 0.82f, 0.96f);
+                        drawHudText(">>",0.80f,0.27f,1.20f,0.90f,0.42f,0.38f,0.95f);
+                    }else{
+                        drawEyeMarker(-0.88f, 0.31f, 0.82f, 0.96f);
+                        drawHudText("<<",-0.95f,0.27f,1.20f,0.90f,0.42f,0.38f,0.95f);
+                    }
                 }
             }
             if(minimapEnabled) drawMinimapOverlay();

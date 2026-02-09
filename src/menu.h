@@ -287,7 +287,7 @@ inline void drawGuideScreen() {
     drawTextCentered("FLOOR HOLES KILL ON FALL. AVOID DARK OPEN CELLS",0.0f,0.12f,1.34f,0.92f,0.66f,0.50f,0.94f);
     drawTextCentered("LOW SANITY INCREASES DANGER",0.0f,0.04f,1.34f,0.90f,0.72f,0.64f,0.92f);
     drawTextCentered("COOP: HOLD 2 SWITCHES TO OPEN EXIT DOOR",0.0f,-0.06f,1.34f,0.82f,0.86f,0.64f,0.92f);
-    drawTextCentered("CONTROLS: F FLASHLIGHT, SHIFT SPRINT, C CROUCH, E INTERACT",0.0f,-0.20f,1.26f,0.70f,0.76f,0.66f,0.90f);
+    drawTextCentered("CONTROLS: WASD MOVE, SHIFT SPRINT, C CROUCH, E INTERACT",0.0f,-0.20f,1.24f,0.70f,0.76f,0.66f,0.90f); drawTextCentered("FLASHLIGHT F  ITEMS 1/2/3  HUD F6  MINIMAP F8  DEBUG F3/F10",0.0f,-0.30f,1.20f,0.68f,0.74f,0.64f,0.88f);
     drawTextCentered("ESC OR ENTER - BACK",0.0f,-0.70f,1.4f,0.56f,0.62f,0.50f,0.82f);
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
@@ -481,14 +481,40 @@ inline void drawIntro(int line, float timer, float lineTime, const char** introL
 inline void drawNote(int noteId, const char* title, const char* content) {
     (void)noteId;
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    drawOverlayRectNdc(-0.56f, -0.84f, 0.58f, 0.82f, 0.12f, 0.09f, 0.05f, 0.42f);
-    drawOverlayRectNdc(-0.54f, -0.82f, 0.56f, 0.80f, 0.92f, 0.87f, 0.74f, 0.95f);
-    drawOverlayRectNdc(-0.50f, -0.78f, 0.52f, 0.76f, 0.96f, 0.91f, 0.79f, 0.92f);
+    int lineCount = 1;
+    int curLen = 0;
+    int maxLen = 0;
+    for(const char* p = content; *p; p++) {
+        if(*p == '\n') {
+            if(curLen > maxLen) maxLen = curLen;
+            curLen = 0;
+            lineCount++;
+        } else {
+            curLen++;
+        }
+    }
+    if(curLen > maxLen) maxLen = curLen;
+    int titleLen = (int)strlen(title);
+    if(titleLen > maxLen) maxLen = titleLen;
+    if(maxLen < 24) maxLen = 24;
+    if(maxLen > 56) maxLen = 56;
+    if(lineCount < 3) lineCount = 3;
+    if(lineCount > 12) lineCount = 12;
+    float width = 0.28f + (float)maxLen * 0.0135f;
+    float height = 0.56f + (float)lineCount * 0.084f;
+    if(width > 0.74f) width = 0.74f;
+    if(height > 1.58f) height = 1.58f;
+    float left = -width;
+    float right = width;
+    float bottom = -height * 0.52f;
+    float top = height * 0.48f;
 
-    drawTextCentered(title, 0.0f, 0.56f, 2.6f, 0.10f, 0.08f, 0.05f, 1.0f);
-    drawTextCentered("________________________________", 0.0f, 0.46f, 1.5f, 0.16f, 0.12f, 0.08f, 1.0f);
-
-    float ty = 0.30f;
+    drawOverlayRectNdc(left - 0.02f, bottom - 0.03f, right + 0.03f, top + 0.03f, 0.16f, 0.12f, 0.07f, 0.58f);
+    drawOverlayRectNdc(left, bottom, right, top, 0.95f, 0.89f, 0.75f, 0.97f); drawOverlayRectNdc(left + 0.03f, bottom + 0.03f, right - 0.03f, top - 0.03f, 0.98f, 0.93f, 0.80f, 0.90f);
+    float titleY = top - 0.18f;
+    drawTextCentered(title, 0.0f, titleY, 2.4f, 0.10f, 0.08f, 0.05f, 1.0f);
+    drawTextCentered("________________________________", 0.0f, titleY - 0.10f, 1.5f, 0.16f, 0.12f, 0.08f, 1.0f);
+    float ty = titleY - 0.26f;
     char line[64];
     int li = 0;
     for(const char* p = content; *p; p++) {
@@ -505,6 +531,6 @@ inline void drawNote(int noteId, const char* title, const char* content) {
         line[li] = 0;
         drawTextCentered(line, 0.0f, ty, 1.62f, 0.08f, 0.07f, 0.05f, 1.0f);
     }
-    drawTextCentered("PRESS E OR ESC TO CLOSE", 0.0f, -0.75f, 1.55f, 0.17f, 0.13f, 0.08f, 1.0f);
+    drawTextCentered("PRESS E OR ESC TO CLOSE", 0.0f, bottom + 0.08f, 1.55f, 0.17f, 0.13f, 0.08f, 1.0f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
