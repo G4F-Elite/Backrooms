@@ -101,7 +101,7 @@ in vec2 uv; out vec4 fc; uniform float tm;
 
 float hash21(vec2 p){ return fract(sin(dot(p,vec2(27.1,113.7)))*43758.5453123); }
 float noise(vec2 p){ vec2 i=floor(p); vec2 f=fract(p); f=f*f*(3.0-2.0*f); return mix(mix(hash21(i),hash21(i+vec2(1,0)),f.x), mix(hash21(i+vec2(0,1)),hash21(i+vec2(1,1)),f.x), f.y); }
-float fbm(vec2 p){ float a=0.0, w=0.5; for(int i=0;i<4;i++){ a+=w*noise(p); p*=2.1; w*=0.5; } return a; }
+float fbm(vec2 p){ float a=0.0, w=0.55; for(int i=0;i<5;i++){ a+=w*noise(p); p*=2.35; w*=0.55; } return a; }
 
 float boxSDF(vec3 p, vec3 b){ vec3 d=abs(p)-b; return min(max(d.x,max(d.y,d.z)),0.0)+length(max(d,0.0)); }
 
@@ -126,17 +126,23 @@ void main(){
         t += clamp(wall*0.65, 0.02, 0.35);
     }
 
-    float light = fbm(uv*5.0 + vec2(time*0.3, time*0.2))*0.5 + 0.5;
-    float scan = 0.35 + 0.65*sin((uv.y*620.0) + time*35.0 + sin(uv.x*12.0+time));
-    float vign = smoothstep(1.2,0.2,length(p));
-    float dust = (hash21(uv*vec2(320.0,180.0)+time*2.0)-0.5)*0.06;
+    float light = fbm(uv*6.0 + vec2(time*0.38, time*0.27))*0.5 + 0.5;
+    float grime = fbm(uv*12.0 + vec2(time*0.2, -time*0.15));
+    float scan = 0.40 + 0.60*sin((uv.y*660.0) + time*42.0 + sin(uv.x*16.0+time*1.2));
+    float vign = smoothstep(1.25,0.25,length(p));
+    float dust = (hash21(uv*vec2(420.0,220.0)+time*3.2)-0.5)*0.08;
+    float lamp = smoothstep(0.0,0.12,cos(uv.x*18.0 + time*0.6))*smoothstep(0.75,1.05,uv.y);
 
-    vec3 baseA = vec3(0.18,0.16,0.10);
-    vec3 baseB = vec3(0.32,0.26,0.12);
+    vec3 baseA = vec3(0.20,0.17,0.09);
+    vec3 baseB = vec3(0.40,0.33,0.16);
+    vec3 leak = vec3(0.55,0.50,0.24);
+
     col = mix(baseA, baseB, dAcc*vign);
-    col += vec3(0.28,0.23,0.10)*light*0.55;
-    col *= 0.7 + 0.3*vign;
-    col += vec3(0.18,0.16,0.10)*(scan*0.08);
+    col += vec3(0.30,0.27,0.12)*light*0.65;
+    col += leak * lamp * 0.45;
+    col *= 0.65 + 0.35*vign;
+    col -= grime*0.12;
+    col += vec3(0.22,0.20,0.11)*(scan*0.09);
     col += dust;
     col = clamp(col,0.0,1.0);
     fc = vec4(col,1.0);
