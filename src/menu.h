@@ -126,26 +126,28 @@ void main(){
         fog = min(fog, exp(-t*0.42));
     }
 
-    float lightNoise = fbm(uv*8.0 + vec2(time*0.35, time*0.22))*0.5+0.5;
-    float grime = fbm(uv*14.0 + vec2(time*0.18, -time*0.14));
-    float scan = 0.45 + 0.55*sin((uv.y*880.0) + time*48.0 + sin(uv.x*18.0+time*1.4));
-    float vign = smoothstep(1.35,0.25,length(p));
-    float dust = (hash21(uv*vec2(520.0,260.0)+time*3.6)-0.5)*0.10;
-    float lamp = smoothstep(0.0,0.10,cos(uv.x*20.0 + time*0.25))*smoothstep(0.70,1.05,uv.y);
-    float floorMask = smoothstep(-0.05,0.25, -p.y);
+    float lightNoise = fbm(uv*6.5 + vec2(time*0.30, time*0.18))*0.5+0.5;
+    float grime = fbm(uv*10.0 + vec2(time*0.12, -time*0.10));
+    float scan = 0.50 + 0.50*sin((uv.y*720.0) + time*38.0 + sin(uv.x*14.0+time*1.2));
+    float vign = smoothstep(1.45,0.35,length(p));
+    float dust = (hash21(uv*vec2(620.0,320.0)+time*3.0)-0.5)*0.08;
+    float lamp = smoothstep(0.0,0.08,cos(uv.x*18.0 + time*0.18))*smoothstep(0.68,1.02,uv.y);
+    float floorMask = smoothstep(-0.02,0.35, -p.y);
+    float stripe = 0.5+0.5*cos(uv.x*12.0 - time*0.6);
 
-    vec3 wallA = vec3(0.26,0.22,0.12);
-    vec3 wallB = vec3(0.48,0.40,0.20);
-    vec3 floorCol = vec3(0.18,0.15,0.10);
-    vec3 lampCol = vec3(0.80,0.74,0.38);
+    vec3 wallShadow = vec3(0.18,0.16,0.10);
+    vec3 wallLight  = vec3(0.62,0.55,0.32);
+    vec3 floorCol   = vec3(0.24,0.20,0.12);
+    vec3 lampCol    = vec3(1.05,0.98,0.55);
 
-    vec3 col = mix(wallA, wallB, dAcc*vign);
-    col = mix(col, floorCol, floorMask*0.6);
-    col += vec3(0.32,0.29,0.14) * lightNoise * 0.7;
-    col += lampCol * lamp * 0.55;
-    col *= (0.55 + 0.45*vign);
-    col -= grime*0.16;
-    col += vec3(0.24,0.21,0.12)*(scan*0.08);
+    vec3 col = mix(wallShadow, wallLight, clamp(0.35 + dAcc*0.65, 0.0, 1.0));
+    col = mix(col, floorCol, floorMask*0.7);
+    col += vec3(0.36,0.32,0.16) * lightNoise * 0.75;
+    col += lampCol * lamp * 0.75;
+    col += vec3(0.16,0.14,0.09) * stripe * 0.25;
+    col *= (0.60 + 0.40*vign);
+    col -= grime*0.08;
+    col += vec3(0.28,0.24,0.12)*(scan*0.09);
     col += dust;
     col *= fog;
     col = clamp(col,0.0,1.0);
