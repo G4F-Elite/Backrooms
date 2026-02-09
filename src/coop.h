@@ -185,7 +185,7 @@ inline void updateRoamEventsHost(){
     else if(typeRoll < 58) type = ROAM_FALSE_DOOR;
     else if(typeRoll < 82) type = ROAM_FLOOR_HOLES;
     else type = ROAM_SUPPLY_CACHE;
-    float duration = (type==ROAM_GEOM_SHIFT) ? 0.1f : 8.0f + (float)(rng()%5);
+    float duration = (type==ROAM_GEOM_SHIFT) ? 0.1f : 11.0f + (float)(rng()%7);
     applyRoamEvent(type, playerChunkX, playerChunkZ, duration);
     if(multiState==MULTI_IN_GAME && netMgr.isHost){
         netMgr.sendRoamEvent(type, playerChunkX & 0xFF, playerChunkZ & 0xFF, duration);

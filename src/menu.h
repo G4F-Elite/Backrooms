@@ -75,6 +75,7 @@ inline int clampSettingsSelection(int tab, int idx) {
 enum GameState { STATE_MENU, STATE_GUIDE, STATE_GAME, STATE_PAUSE, STATE_SETTINGS, STATE_SETTINGS_PAUSE, STATE_KEYBINDS, STATE_KEYBINDS_PAUSE, STATE_INTRO, STATE_NOTE, STATE_MULTI, STATE_MULTI_HOST, STATE_MULTI_JOIN, STATE_MULTI_WAIT };
 inline GameState gameState = STATE_MENU;
 inline int menuSel=0, currentWinW=1280, currentWinH=720;
+inline bool guideReturnToPause = false;
 inline int keybindCaptureIndex = -1;
 inline float gSurvivalTime = 0;
 
@@ -278,7 +279,7 @@ inline void drawGuideScreen() {
     drawTextCentered("LOW SANITY INCREASES DANGER",0.0f,0.04f,1.34f,0.90f,0.72f,0.64f,0.92f);
     drawTextCentered("COOP: HOLD 2 SWITCHES TO OPEN EXIT DOOR",0.0f,-0.06f,1.34f,0.82f,0.86f,0.64f,0.92f);
     drawTextCentered("CONTROLS: F FLASHLIGHT, SHIFT SPRINT, C CROUCH, E INTERACT",0.0f,-0.20f,1.26f,0.70f,0.76f,0.66f,0.90f);
-    drawTextCentered("ESC OR ENTER - BACK TO MENU",0.0f,-0.70f,1.4f,0.56f,0.62f,0.50f,0.82f);
+    drawTextCentered("ESC OR ENTER - BACK",0.0f,-0.70f,1.4f,0.56f,0.62f,0.50f,0.82f);
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
 }
@@ -365,8 +366,8 @@ inline void drawPause() {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     drawFullscreenOverlay(0.02f,0.02f,0.03f,0.72f);
     drawTextCentered("PAUSED",0.0f,0.25f,3.0f,0.9f,0.85f,0.4f);
-    const char* it[]={"RESUME","SETTINGS","MAIN MENU","QUIT"};
-    for(int i=0;i<4;i++){
+    const char* it[]={"RESUME","GUIDE","TELEPORT EXIT","SETTINGS","MAIN MENU","QUIT"};
+    for(int i=0;i<6;i++){
         float s=(menuSel==i)?1.0f:0.5f,y=-i*0.1f;
         float baseX = -measureTextWidthNdc(it[i], 1.8f) * 0.5f;
         if(menuSel==i)drawText(">",baseX - 0.07f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
@@ -378,9 +379,12 @@ inline void drawPause() {
 
 inline void drawDeath(float tm) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    float fl=(rand()%100<15)?0.3f:1.0f, p=0.7f+0.15f*sinf(tm*3.0f);
-    drawTextCentered("YOU DIED",0.0f,0.2f,4.0f,0.8f*fl,0.1f*fl,0.1f*fl,p);
-    drawTextCentered("IT GOT YOU...",0.0f,0.02f,2.0f,0.6f,0.15f,0.15f,0.7f);
+    float fl=(rand()%100<28)?0.25f:1.0f, p=0.68f+0.22f*sinf(tm*4.2f);
+    drawFullscreenOverlay(0.01f,0.0f,0.0f,0.88f);
+    drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.86f,0.32f,0.02f,0.02f,0.55f);
+    drawOverlayRectNdc(-1.0f,0.86f,1.0f,1.0f,0.32f,0.02f,0.02f,0.55f);
+    drawTextCentered("YOU DIED",0.0f,0.2f,4.2f,0.9f*fl,0.08f*fl,0.08f*fl,p);
+    drawTextCentered("IT GOT YOU...",0.0f,0.01f,2.1f,0.72f,0.12f,0.12f,0.76f);
     int m=(int)(gSurvivalTime/60),s=(int)gSurvivalTime%60;
     char tb[32]; snprintf(tb,32,"SURVIVED: %d:%02d",m,s);
     drawTextCentered(tb,0.0f,-0.12f,2.0f,0.7f,0.6f,0.3f,0.8f);

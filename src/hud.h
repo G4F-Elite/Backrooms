@@ -52,7 +52,7 @@ void drawUI(){
                 char perfRow[300];
                 snprintf(perfRow,300,"%s | %s | %s | %s | %s",fpsBuf,fgBuf,upBuf,pingBuf,netBuf);
                 drawHudText(perfRow,-0.95f,0.95f,1.20f,0.88f,0.93f,0.78f,0.98f);
-                drawHudText("[F6] HUD  [F8] MINIMAP  [F3] DEBUG",-0.95f,0.90f,0.95f,0.70f,0.76f,0.66f,0.90f);
+                drawHudText("[F6] HUD  [F8] MINIMAP  [F3] DEBUG",-0.95f,-0.92f,0.95f,0.70f,0.76f,0.66f,0.90f);
             }else{
                 drawHudText("[F6] SHOW HUD  [F8] MINIMAP",-0.95f,0.95f,1.00f,0.80f,0.86f,0.74f,0.95f);
             }

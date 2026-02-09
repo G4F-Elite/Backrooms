@@ -24,6 +24,7 @@ inline void menuInput(GLFWwindow* w) {
             }
             else if (menuSel == 2) { 
                 // Guide screen
+                guideReturnToPause = false;
                 gameState = STATE_GUIDE;
             }
             else if (menuSel == 3) { 
@@ -41,15 +42,19 @@ inline void menuInput(GLFWwindow* w) {
     else if (gameState == STATE_GUIDE) {
         if ((esc && !escPressed) || (enter && !enterPressed)) {
             triggerMenuConfirmSound();
-            gameState = STATE_MENU;
-            menuSel = 2;
+            if(guideReturnToPause){
+                gameState = STATE_PAUSE;
+                menuSel = (multiState == MULTI_IN_GAME) ? 3 : 1;
+            }else{
+                gameState = STATE_MENU;
+                menuSel = 2;
+            }
         }
     }
     else if (gameState == STATE_PAUSE) {
         if (multiState == MULTI_IN_GAME) {
-            // Multiplayer pause: RESUME, TELEPORT, SETTINGS, DISCONNECT, QUIT (5 items)
-            if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 4; triggerMenuNavigateSound(); }
-            if (down && !downPressed) { menuSel++; if (menuSel > 4) menuSel = 0; triggerMenuNavigateSound(); }
+            if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 6; triggerMenuNavigateSound(); }
+            if (down && !downPressed) { menuSel++; if (menuSel > 6) menuSel = 0; triggerMenuNavigateSound(); }
             if (esc && !escPressed) { 
                 triggerMenuConfirmSound();
                 gameState = STATE_GAME; 
@@ -64,7 +69,6 @@ inline void menuInput(GLFWwindow* w) {
                     firstMouse = true; 
                 }
                 else if (menuSel == 1) { 
-                    // Teleport to player - defined in game_loop.h
                     extern void teleportToPlayer();
                     teleportToPlayer();
                     gameState = STATE_GAME;
@@ -72,11 +76,22 @@ inline void menuInput(GLFWwindow* w) {
                     firstMouse = true;
                 }
                 else if (menuSel == 2) { 
+                    extern void teleportToExit();
+                    teleportToExit();
+                    gameState = STATE_GAME;
+                    glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                    firstMouse = true;
+                }
+                else if (menuSel == 3) {
+                    guideReturnToPause = true;
+                    gameState = STATE_GUIDE;
+                }
+                else if (menuSel == 4) { 
                     settingsTab = SETTINGS_TAB_AUDIO;
                     gameState = STATE_SETTINGS_PAUSE; 
                     menuSel = 0; 
                 }
-                else if (menuSel == 3) { 
+                else if (menuSel == 5) { 
                     // Disconnect
                     netMgr.shutdown();
                     lanDiscovery.stop();
@@ -89,9 +104,8 @@ inline void menuInput(GLFWwindow* w) {
                 }
             }
         } else {
-            // Single player pause: RESUME, SETTINGS, MAIN MENU, QUIT (4 items)
-            if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 3; triggerMenuNavigateSound(); }
-            if (down && !downPressed) { menuSel++; if (menuSel > 3) menuSel = 0; triggerMenuNavigateSound(); }
+            if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 5; triggerMenuNavigateSound(); }
+            if (down && !downPressed) { menuSel++; if (menuSel > 5) menuSel = 0; triggerMenuNavigateSound(); }
             if (esc && !escPressed) { 
                 triggerMenuConfirmSound();
                 gameState = STATE_GAME; 
@@ -106,11 +120,22 @@ inline void menuInput(GLFWwindow* w) {
                     firstMouse = true; 
                 }
                 else if (menuSel == 1) { 
+                    guideReturnToPause = true;
+                    gameState = STATE_GUIDE;
+                }
+                else if (menuSel == 2) {
+                    extern void teleportToExit();
+                    teleportToExit();
+                    gameState = STATE_GAME;
+                    glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+                    firstMouse = true;
+                }
+                else if (menuSel == 3) { 
                     settingsTab = SETTINGS_TAB_AUDIO;
                     gameState = STATE_SETTINGS_PAUSE; 
                     menuSel = 0; 
                 }
-                else if (menuSel == 2) { 
+                else if (menuSel == 4) { 
                     // Main menu
                     extern void genWorld();
                     extern void buildGeom();

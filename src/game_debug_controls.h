@@ -43,6 +43,12 @@ void executeDebugAction(int action){
         setEchoStatus("DEBUG: TELEPORTED TO ECHO");
         return;
     }
+    if(action==DEBUG_ACT_TP_EXIT){
+        extern void teleportToExit();
+        teleportToExit();
+        setEchoStatus("DEBUG: TELEPORTED TO EXIT");
+        return;
+    }
     if(!canMutateWorld){
         setTrapStatus("DEBUG ACTION: HOST ONLY");
         return;
@@ -75,6 +81,7 @@ void executeDebugAction(int action){
 
 void mouse(GLFWwindow*,double xp,double yp){
     if(gameState!=STATE_GAME&&gameState!=STATE_INTRO)return;
+    if(isPlayerDead || playerEscaped || playerFalling) return;
     if(firstMouse){lastX=(float)xp;lastY=(float)yp;firstMouse=false;}
     cam.yaw-=((float)xp-lastX)*settings.mouseSens;
     cam.pitch+=(lastY-(float)yp)*settings.mouseSens;

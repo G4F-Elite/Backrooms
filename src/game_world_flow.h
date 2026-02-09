@@ -291,3 +291,12 @@ void teleportToPlayer(){
     buildGeom();
 }
 
+void teleportToExit(){
+    if(!coop.initialized) return;
+    cam.pos=Vec3(coop.doorPos.x,PH,coop.doorPos.z-2.0f);
+    updateVisibleChunks(cam.pos.x,cam.pos.z);
+    updateLightsAndPillars(playerChunkX,playerChunkZ);
+    updateMapContent(playerChunkX,playerChunkZ);
+    buildGeom();
+}
+

@@ -304,7 +304,7 @@ inline bool isLikelyOfficeChunk(const Chunk& c) {
 inline void spawnOfficeFurniture(const Chunk& c) {
     if (!isLikelyOfficeChunk(c)) return;
     std::mt19937 cr(chunkMapContentSeed(c.cx, c.cz, 0xB44231u));
-    int rows = 1 + (int)(cr() % 2);
+    int rows = 2 + (int)(cr() % 3);
     for (int i = 0; i < rows; i++) {
         int lx = 2 + (int)(cr() % (CHUNK_SIZE - 4));
         int lz = 2 + (int)(cr() % (CHUNK_SIZE - 4));
@@ -319,6 +319,15 @@ inline void spawnOfficeFurniture(const Chunk& c) {
         }
         if (isMapPropCellValid(c, lx - 1, lz) && (cr() % 100) < 45) {
             pushMapPropUnique(c.cx, c.cz, lx - 1, lz, MAP_PROP_PARTITION, 1.0f, 0.0f);
+        }
+        if (isMapPropCellValid(c, lx + 1, lz + 1) && (cr() % 100) < 62) {
+            pushMapPropUnique(c.cx, c.cz, lx + 1, lz + 1, MAP_PROP_CHAIR, 0.92f, 0.0f);
+        }
+        if (isMapPropCellValid(c, lx - 1, lz - 1) && (cr() % 100) < 56) {
+            pushMapPropUnique(c.cx, c.cz, lx - 1, lz - 1, MAP_PROP_LOCKER_BANK, 0.90f, 0.0f);
+        }
+        if (isMapPropCellValid(c, lx, lz - 1) && (cr() % 100) < 52) {
+            pushMapPropUnique(c.cx, c.cz, lx, lz - 1, MAP_PROP_PARTITION, 0.92f, 0.0f);
         }
     }
 }

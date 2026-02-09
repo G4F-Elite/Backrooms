@@ -83,7 +83,8 @@ inline float getDistanceToNearestEntity(const std::vector<Entity>& entities, con
 // ============================================================================
 
 inline EntityType chooseSpawnEntityType(float survivalTime, int rollA, int rollB) {
-    if (survivalTime > 260.0f && (rollA % 100) < 45) return ENTITY_SHADOW;
+    if (survivalTime > 220.0f && (rollA % 100) < 60) return ENTITY_SHADOW;
+    if (survivalTime > 120.0f && (rollA % 100) < 35) return ENTITY_SHADOW;
     if (survivalTime > 140.0f && (rollB % 100) < 45) return ENTITY_CRAWLER;
     return ENTITY_STALKER;
 }
