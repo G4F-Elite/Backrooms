@@ -25,7 +25,7 @@ inline bool multiEditingNickname = false;
 inline char multiNickname[PLAYER_NAME_BUF_LEN] = "Player";
 inline int multiNetworkMode = 0; // 0 LAN, 1 DEDICATED
 inline char multiMasterIP[64] = "127.0.0.1";
-inline char multiMasterPort[8] = "27017";
+inline char multiMasterPort[8] = "27015";
 inline char multiConnectStatus[128] = "";
 
 // Draw multiplayer main menu
