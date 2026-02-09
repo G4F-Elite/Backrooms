@@ -304,7 +304,7 @@ inline bool isLikelyOfficeChunk(const Chunk& c) {
 inline void spawnOfficeFurniture(const Chunk& c) {
     if (!isLikelyOfficeChunk(c)) return;
     std::mt19937 cr(chunkMapContentSeed(c.cx, c.cz, 0xB44231u));
-    int rows = 2 + (int)(cr() % 3);
+    int rows = 3 + (int)(cr() % 4);
     for (int i = 0; i < rows; i++) {
         int lx = 2 + (int)(cr() % (CHUNK_SIZE - 4));
         int lz = 2 + (int)(cr() % (CHUNK_SIZE - 4));
@@ -313,6 +313,9 @@ inline void spawnOfficeFurniture(const Chunk& c) {
         pushMapPropUnique(c.cx, c.cz, lx, lz, MAP_PROP_DESK, 0.95f, 0.0f);
         if (isMapPropCellValid(c, lx + 1, lz)) {
             pushMapPropUnique(c.cx, c.cz, lx + 1, lz, MAP_PROP_CHAIR, 0.9f, 0.0f);
+        }
+        if (isMapPropCellValid(c, lx - 1, lz)) {
+            pushMapPropUnique(c.cx, c.cz, lx - 1, lz, MAP_PROP_CHAIR, 0.88f, 0.0f);
         }
         if (isMapPropCellValid(c, lx, lz + 1) && (cr() % 100) < 55) {
             pushMapPropUnique(c.cx, c.cz, lx, lz + 1, MAP_PROP_CABINET, 0.95f, 0.0f);
@@ -353,7 +356,7 @@ inline void pushMapPoiUnique(int cx, int cz, int lx, int lz, int type, float rad
 inline void spawnChunkPoiRooms(const Chunk& c) {
     std::mt19937 cr(chunkMapContentSeed(c.cx, c.cz, 0x71D9A3u));
     int spawnRoll = (int)(cr() % 100);
-    if (spawnRoll > 27) return;
+    if (spawnRoll > 45) return;
     int tries = 10;
     while (tries-- > 0) {
         int lx = 3 + (int)(cr() % (CHUNK_SIZE - 6));
@@ -363,9 +366,9 @@ inline void spawnChunkPoiRooms(const Chunk& c) {
         if (open < 3) continue;
         int typeRoll = (int)(cr() % 100);
         int type = MAP_POI_OFFICE;
-        if (typeRoll < 30) type = MAP_POI_OFFICE;
-        else if (typeRoll < 55) type = MAP_POI_SERVER;
-        else if (typeRoll < 80) type = MAP_POI_STORAGE;
+        if (typeRoll < 46) type = MAP_POI_OFFICE;
+        else if (typeRoll < 66) type = MAP_POI_SERVER;
+        else if (typeRoll < 86) type = MAP_POI_STORAGE;
         else type = MAP_POI_RESTROOM;
         pushMapPoiUnique(c.cx, c.cz, lx, lz, type, CS * 1.8f);
         break;

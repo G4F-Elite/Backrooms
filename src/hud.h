@@ -82,15 +82,17 @@ void drawUI(){
                 if(!coop.doorOpen) drawHudText("ACTION HOLD 2 SWITCHES",blockX,blockY,1.02f,0.82f,0.86f,0.62f,0.90f);
                 blockY -= 0.06f;
             }else{
-                const int notesRequired = 5;
-                bool exitReady = storyMgr.totalCollected >= notesRequired;
+                const int notesRequired = storyNotesRequired();
+                bool exitReady = isStoryExitReady();
                 char notesLine[64];
                 snprintf(notesLine,64,"NOTES %d/%d",storyMgr.totalCollected,notesRequired);
                 drawHudText(notesLine,blockX,blockY,1.18f,0.86f,0.90f,0.68f,0.95f);
                 blockY -= 0.06f;
+                drawHudText(storyEchoAttuned?"ECHO ATTUNED":"ECHO NOT ATTUNED",blockX,blockY,1.08f,0.72f,0.86f,0.90f,0.93f);
+                blockY -= 0.06f;
                 drawHudText(exitReady?"EXIT DOOR READY":"EXIT DOOR LOCKED",blockX,blockY,1.16f,0.88f,0.84f,0.62f,0.95f);
                 blockY -= 0.06f;
-                drawHudText(exitReady?"ACTION GO TO DOOR AND PRESS E":"ACTION FIND MORE NOTES",blockX,blockY,1.02f,0.82f,0.86f,0.62f,0.90f);
+                drawHudText(exitReady?"ACTION GO TO DOOR AND PRESS E":"ACTION NOTES + ECHO REQUIRED",blockX,blockY,1.02f,0.82f,0.86f,0.62f,0.90f);
                 blockY -= 0.06f;
             }
             char phaseBuf[64];
@@ -117,8 +119,8 @@ void drawUI(){
             if(multiState!=MULTI_IN_GAME){
                 bool nearExit = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
                 if(nearExit){
-                    if(storyMgr.totalCollected>=5) drawHudTextCentered("[E] EXIT LEVEL",0.0f,-0.35f,1.4f,0.75f,0.88f,0.70f,0.95f);
-                    else drawHudTextCentered("COLLECT 5 NOTES TO UNLOCK EXIT",0.0f,-0.35f,1.3f,0.88f,0.72f,0.58f,0.93f);
+                    if(isStoryExitReady()) drawHudTextCentered("[E] EXIT LEVEL",0.0f,-0.35f,1.4f,0.75f,0.88f,0.70f,0.95f);
+                    else drawHudTextCentered("COLLECT NOTES + ATTUNE ECHO TO UNLOCK EXIT",0.0f,-0.35f,1.2f,0.88f,0.72f,0.58f,0.93f);
                 }
             }else{
                 bool nearExit = nearPoint2D(cam.pos, coop.doorPos, 2.4f);

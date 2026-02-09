@@ -146,6 +146,7 @@ inline void menuInput(GLFWwindow* w) {
         if (tabNow && !tabPressed) multiEditingNickname = !multiEditingNickname;
         if (modeSwitchNow && !modeSwitchPressed) {
             multiNetworkMode = (multiNetworkMode == 0) ? 1 : 0;
+            multiConnectStatus[0] = 0;
             triggerMenuAdjustSound();
         }
         tabPressed = tabNow;
@@ -276,6 +277,7 @@ inline void menuInput(GLFWwindow* w) {
             multiNetworkMode = (multiNetworkMode == 0) ? 1 : 0;
             multiIPManualEdit = false;
             multiMasterManualEdit = false;
+            multiConnectStatus[0] = 0;
             if (multiNetworkMode == 0) {
                 dedicatedDirectory.stop();
                 lanDiscovery.startClient();
@@ -439,6 +441,7 @@ inline void menuInput(GLFWwindow* w) {
                 // Connect to host - go to waiting lobby
                 char fullAddr[64];
                 snprintf(fullAddr, 64, "%s", multiJoinIP);
+                multiConnectStatus[0] = 0;
                 netMgr.init();
                 if (netMgr.joinGame(fullAddr, multiNickname)) {
                     lanDiscovery.stop();
@@ -478,6 +481,8 @@ inline void menuInput(GLFWwindow* w) {
                 multiState = MULTI_NONE;
                 gameState = STATE_MULTI_JOIN;
                 menuSel = 0;
+                if(multiNetworkMode==0) snprintf(multiConnectStatus,sizeof(multiConnectStatus),"LAN blocked or host unreachable. Try SERVERS tab.");
+                else snprintf(multiConnectStatus,sizeof(multiConnectStatus),"Server unreachable. Check MASTER IP/PORT.");
             }
         }
     }

@@ -24,7 +24,8 @@ inline float perlin(float x, float y, int oct) {
 // Generate RGBA texture with height in alpha for parallax
 inline GLuint genTex(int type) {
     int sz = 512;
-    if (type == 0 || type == 1 || type == 2) sz = 1024;
+    if (type == 0 || type == 1) sz = 2048;
+    else if (type == 2) sz = 1024;
     else if (type == 3 || type == 4) sz = 256;
     unsigned char* d=new unsigned char[sz*sz*4]; // RGBA for height map
     for(int y=0;y<sz;y++) for(int x=0;x<sz;x++) {
@@ -269,10 +270,12 @@ inline GLuint genTex(int type) {
             float rustMask = rust > 0.45f ? (rust - 0.45f) * 90.0f : 0.0f;
             float tapeLine = fmodf((float)x, 96.0f);
             float tape = (tapeLine > 42.0f && tapeLine < 54.0f) ? 18.0f : 0.0f;
-            r = 128.0f + grains + ridges * 0.3f + tape - rustMask * 0.25f;
-            g = 119.0f + grains * 0.9f + ridges * 0.2f + tape * 0.9f - rustMask * 0.55f;
-            b = 104.0f + grains * 0.7f + ridges * 0.12f + tape * 0.4f - rustMask * 0.75f;
-            h = 128.0f + ridges * 0.5f + grains * 0.3f;
+            float panel = (fmodf((float)x, 128.0f) < 4.0f || fmodf((float)y, 128.0f) < 4.0f) ? 24.0f : 0.0f;
+            float card = perlin(x * 0.09f + 6.0f, y * 0.09f + 2.0f, 3) * 10.0f;
+            r = 116.0f + grains * 0.7f + ridges * 0.2f + tape + panel * 0.2f + card - rustMask * 0.20f;
+            g = 104.0f + grains * 0.6f + ridges * 0.15f + tape * 0.8f + panel * 0.35f + card * 0.9f - rustMask * 0.42f;
+            b = 86.0f + grains * 0.5f + ridges * 0.1f + tape * 0.35f + panel * 0.50f + card * 0.5f - rustMask * 0.62f;
+            h = 122.0f + ridges * 0.55f + grains * 0.24f + panel * 0.7f;
         }
         
         // Clamp and store RGBA

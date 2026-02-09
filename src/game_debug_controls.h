@@ -214,7 +214,7 @@ void gameInput(GLFWwindow*w){
     bool nearExitDoor = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
     bool exitReady = false;
     if(multiState==MULTI_IN_GAME) exitReady = coop.doorOpen && storyMgr.totalCollected>=5;
-    else exitReady = storyMgr.totalCollected>=5;
+    else exitReady = isStoryExitReady();
     if(eNow&&!interactPressed&&nearNoteId>=0){
         if(storyMgr.checkNotePickup(cam.pos,4.0f)){
             if(tryTriggerStoryScare(scareState, storyMgr.currentNote)){

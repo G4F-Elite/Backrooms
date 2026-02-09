@@ -280,7 +280,7 @@ inline void drawGuideScreen() {
     glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     drawFullscreenOverlay(0.02f,0.02f,0.03f,0.80f);
     drawTextCentered("GUIDE",0.0f,0.58f,2.8f,0.9f,0.85f,0.4f,0.96f);
-    drawTextCentered("GOAL: COLLECT 5 NOTES AND REACH EXIT",0.0f,0.40f,1.5f,0.82f,0.86f,0.64f,0.94f);
+    drawTextCentered("GOAL: COLLECT NOTES, ATTUNE AN ECHO, THEN REACH EXIT",0.0f,0.40f,1.42f,0.82f,0.86f,0.64f,0.94f);
     drawTextCentered("ECHO SIGNAL: APPROACH AND PRESS E TO ATTUNE",0.0f,0.30f,1.38f,0.72f,0.84f,0.86f,0.92f);
     drawTextCentered("ECHO CAN HEAL, GIVE SUPPLIES OR TRIGGER BREACH",0.0f,0.22f,1.32f,0.76f,0.74f,0.86f,0.92f);
     drawTextCentered("FLOOR HOLES KILL ON FALL. AVOID DARK OPEN CELLS",0.0f,0.12f,1.34f,0.92f,0.66f,0.50f,0.94f);

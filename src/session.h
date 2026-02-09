@@ -93,6 +93,8 @@ EchoSignal echoSignal = {};
 float echoSpawnTimer = 14.0f;
 float echoStatusTimer = 0.0f;
 char echoStatusText[96] = {};
+bool storyEchoAttuned = false;
+int storyEchoAttunedCount = 0;
 TrapCorridorState trapCorridor = {};
 DebugToolsState debugTools = {};
 SmileEventState smileEvent = {false, Vec3(0,0,0), 0.0f, 0.0f, 28.0f, false, Vec3(0,0,0), Vec3(0,0,0), 0.0f};
@@ -284,4 +286,12 @@ inline void setEchoStatus(const char* msg){
 inline void setTrapStatus(const char* msg){
     snprintf(trapStatusText, sizeof(trapStatusText), "%s", msg);
     trapStatusTimer = 4.0f;
+}
+
+inline int storyNotesRequired(){
+    return 5;
+}
+
+inline bool isStoryExitReady(){
+    return storyMgr.totalCollected >= storyNotesRequired() && (storyEchoAttuned || trapCorridor.resolved);
 }
