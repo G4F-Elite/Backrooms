@@ -114,9 +114,16 @@ inline void menuInput(GLFWwindow* w) {
     }
     else if (gameState == STATE_MULTI) {
         static bool tabPressed = false;
+        static bool modeSwitchPressed = false;
         bool tabNow = glfwGetKey(w, GLFW_KEY_TAB) == GLFW_PRESS;
+        bool modeSwitchNow = glfwGetKey(w, GLFW_KEY_T) == GLFW_PRESS;
         if (tabNow && !tabPressed) multiEditingNickname = !multiEditingNickname;
+        if (modeSwitchNow && !modeSwitchPressed) {
+            multiNetworkMode = (multiNetworkMode == 0) ? 1 : 0;
+            triggerMenuAdjustSound();
+        }
         tabPressed = tabNow;
+        modeSwitchPressed = modeSwitchNow;
 
         if (multiEditingNickname) {
             handleNicknameInput(w);
@@ -156,8 +163,15 @@ inline void menuInput(GLFWwindow* w) {
                 gameState = STATE_MULTI_JOIN; 
                 menuSel = 0; 
                 multiIPManualEdit = false;
-                lanDiscovery.startClient();
-                lanDiscovery.requestScan();
+                if (multiNetworkMode == 0) {
+                    lanDiscovery.startClient();
+                    lanDiscovery.requestScan();
+                    dedicatedDirectory.stop();
+                } else {
+                    dedicatedDirectory.start("127.0.0.1", backrooms::protocol::kDefaultMasterPort);
+                    dedicatedDirectory.requestScan();
+                    lanDiscovery.stop();
+                }
             }
             else { 
                 // Back
@@ -212,7 +226,8 @@ inline void menuInput(GLFWwindow* w) {
         if (down && !downPressed) { menuSel++; if (menuSel > 1) menuSel = 0; triggerMenuNavigateSound(); }
         if (esc && !escPressed) { 
             triggerMenuConfirmSound();
-            lanDiscovery.stop();
+            if (multiNetworkMode == 0) lanDiscovery.stop();
+            else dedicatedDirectory.stop();
             gameState = STATE_MULTI; 
             menuSel = 1;
         }
@@ -279,29 +294,51 @@ inline void menuInput(GLFWwindow* w) {
         static bool refreshPressed = false;
         bool refreshNow = glfwGetKey(w, GLFW_KEY_R) == GLFW_PRESS;
         if (refreshNow && !refreshPressed) {
-            lanDiscovery.requestScan();
+            if (multiNetworkMode == 0) lanDiscovery.requestScan();
+            else dedicatedDirectory.requestScan();
         }
         refreshPressed = refreshNow;
         
         static bool pickRoomPressed = false;
         bool pickRoomNow = glfwGetKey(w, GLFW_KEY_F) == GLFW_PRESS;
         if (pickRoomNow && !pickRoomPressed) {
-            lanDiscovery.selectNextRoom();
-            const LanRoomInfo* room = lanDiscovery.getSelectedRoom();
-            if (room) {
-                snprintf(multiJoinIP, sizeof(multiJoinIP), "%s", room->ip);
-                snprintf(multiJoinPort, sizeof(multiJoinPort), "%hu", room->gamePort);
-                multiIPManualEdit = false;
+            if (multiNetworkMode == 0) {
+                lanDiscovery.selectNextRoom();
+                const LanRoomInfo* room = lanDiscovery.getSelectedRoom();
+                if (room) {
+                    snprintf(multiJoinIP, sizeof(multiJoinIP), "%s", room->ip);
+                    snprintf(multiJoinPort, sizeof(multiJoinPort), "%hu", room->gamePort);
+                    multiIPManualEdit = false;
+                }
+            } else {
+                dedicatedDirectory.selectNextRoom();
+                const DedicatedRoomInfo* room = dedicatedDirectory.getSelectedRoom();
+                if (room) {
+                    snprintf(multiJoinIP, sizeof(multiJoinIP), "%s", room->ip);
+                    snprintf(multiJoinPort, sizeof(multiJoinPort), "%hu", room->gamePort);
+                    multiIPManualEdit = false;
+                }
             }
         }
         pickRoomPressed = pickRoomNow;
         
-        lanDiscovery.updateClient((float)glfwGetTime());
-        if (!multiIPManualEdit) {
-            const LanRoomInfo* room = lanDiscovery.getSelectedRoom();
-            if (room) {
-                snprintf(multiJoinIP, sizeof(multiJoinIP), "%s", room->ip);
-                snprintf(multiJoinPort, sizeof(multiJoinPort), "%hu", room->gamePort);
+        if (multiNetworkMode == 0) {
+            lanDiscovery.updateClient((float)glfwGetTime());
+            if (!multiIPManualEdit) {
+                const LanRoomInfo* room = lanDiscovery.getSelectedRoom();
+                if (room) {
+                    snprintf(multiJoinIP, sizeof(multiJoinIP), "%s", room->ip);
+                    snprintf(multiJoinPort, sizeof(multiJoinPort), "%hu", room->gamePort);
+                }
+            }
+        } else {
+            dedicatedDirectory.update((float)glfwGetTime());
+            if (!multiIPManualEdit) {
+                const DedicatedRoomInfo* room = dedicatedDirectory.getSelectedRoom();
+                if (room) {
+                    snprintf(multiJoinIP, sizeof(multiJoinIP), "%s", room->ip);
+                    snprintf(multiJoinPort, sizeof(multiJoinPort), "%hu", room->gamePort);
+                }
             }
         }
         
@@ -314,6 +351,7 @@ inline void menuInput(GLFWwindow* w) {
                 netMgr.init();
                 if (netMgr.joinGame(fullAddr, multiNickname)) {
                     lanDiscovery.stop();
+                    dedicatedDirectory.stop();
                     multiState = MULTI_CONNECTING;
                     gameState = STATE_MULTI_WAIT;  // Wait for host to start
                     menuSel = 0;
@@ -322,6 +360,7 @@ inline void menuInput(GLFWwindow* w) {
             else { 
                 // Back
                 lanDiscovery.stop();
+                dedicatedDirectory.stop();
                 gameState = STATE_MULTI;
                 menuSel = 1;
             }
@@ -333,6 +372,7 @@ inline void menuInput(GLFWwindow* w) {
             triggerMenuConfirmSound();
             netMgr.shutdown();
             lanDiscovery.stop();
+            dedicatedDirectory.stop();
             multiState = MULTI_NONE;
             gameState = STATE_MULTI;
             menuSel = 1;
