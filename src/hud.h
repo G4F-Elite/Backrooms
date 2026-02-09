@@ -1,4 +1,5 @@
 #pragma once
+#include "menu_hud.h"
 #include "coop.h"
 #include "perf_overlay.h"
 #include "progression.h"

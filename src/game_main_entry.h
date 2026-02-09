@@ -363,24 +363,18 @@ int main(){
         static GLint vhsSharpnessLoc=-1,vhsTexelXLoc=-1,vhsTexelYLoc=-1;
         static GLint vhsTaaHistLoc=-1,vhsTaaBlendLoc=-1,vhsTaaJitterLoc=-1,vhsTaaValidLoc=-1;
         static GLint vhsFrameGenLoc=-1,vhsFrameGenBlendLoc=-1;
-        static GLint vhsRtxLoc=-1,vhsDepthTexLoc=-1;
+        static GLint vhsRtxALoc=-1,vhsRtxGLoc=-1,vhsRtxRLoc=-1,vhsRtxBLoc=-1,vhsDepthTexLoc=-1;
         if(vhsTmLoc<0){
             glUniform1i(glGetUniformLocation(vhsShader,"tex"),0);
-            vhsTmLoc = glGetUniformLocation(vhsShader,"tm");
-            vhsIntenLoc = glGetUniformLocation(vhsShader,"inten");
-            vhsUpscalerLoc = glGetUniformLocation(vhsShader,"upscaler");
-            vhsAaModeLoc = glGetUniformLocation(vhsShader,"aaMode");
-            vhsSharpnessLoc = glGetUniformLocation(vhsShader,"sharpness");
-            vhsTexelXLoc = glGetUniformLocation(vhsShader,"texelX");
-            vhsTexelYLoc = glGetUniformLocation(vhsShader,"texelY");
-            vhsTaaHistLoc = glGetUniformLocation(vhsShader,"histTex");
-            vhsTaaBlendLoc = glGetUniformLocation(vhsShader,"taaBlend");
-            vhsTaaJitterLoc = glGetUniformLocation(vhsShader,"taaJitter");
-            vhsTaaValidLoc = glGetUniformLocation(vhsShader,"taaValid");
-            vhsFrameGenLoc = glGetUniformLocation(vhsShader,"frameGen");
-            vhsFrameGenBlendLoc = glGetUniformLocation(vhsShader,"frameGenBlend");
-            vhsRtxLoc = glGetUniformLocation(vhsShader,"rtxLevel");
-            vhsDepthTexLoc = glGetUniformLocation(vhsShader,"depthTex");
+            vhsTmLoc=glGetUniformLocation(vhsShader,"tm"); vhsIntenLoc=glGetUniformLocation(vhsShader,"inten");
+            vhsUpscalerLoc=glGetUniformLocation(vhsShader,"upscaler"); vhsAaModeLoc=glGetUniformLocation(vhsShader,"aaMode");
+            vhsSharpnessLoc=glGetUniformLocation(vhsShader,"sharpness"); vhsTexelXLoc=glGetUniformLocation(vhsShader,"texelX");
+            vhsTexelYLoc=glGetUniformLocation(vhsShader,"texelY"); vhsTaaHistLoc=glGetUniformLocation(vhsShader,"histTex");
+            vhsTaaBlendLoc=glGetUniformLocation(vhsShader,"taaBlend"); vhsTaaJitterLoc=glGetUniformLocation(vhsShader,"taaJitter");
+            vhsTaaValidLoc=glGetUniformLocation(vhsShader,"taaValid"); vhsFrameGenLoc=glGetUniformLocation(vhsShader,"frameGen");
+            vhsFrameGenBlendLoc=glGetUniformLocation(vhsShader,"frameGenBlend"); vhsDepthTexLoc=glGetUniformLocation(vhsShader,"depthTex");
+            vhsRtxALoc=glGetUniformLocation(vhsShader,"rtxA"); vhsRtxGLoc=glGetUniformLocation(vhsShader,"rtxG");
+            vhsRtxRLoc=glGetUniformLocation(vhsShader,"rtxR"); vhsRtxBLoc=glGetUniformLocation(vhsShader,"rtxB");
         }
         static int prevAaMode = -1;
         int aaMode = clampAaMode(settings.aaMode);
@@ -411,7 +405,7 @@ int main(){
             glActiveTexture(GL_TEXTURE0 + 2);
             glBindTexture(GL_TEXTURE_2D,fboDepthTex);
             glUniform1i(vhsDepthTexLoc,2);
-            glUniform1i(vhsRtxLoc,clampRtxQuality(settings.rtxQuality));
+            glUniform1i(vhsRtxALoc,clampSsao(settings.ssaoQuality)); glUniform1i(vhsRtxGLoc,clampGi(settings.giQuality)); glUniform1i(vhsRtxRLoc,settings.godRays?1:0); glUniform1i(vhsRtxBLoc,settings.bloom?1:0);
             glActiveTexture(GL_TEXTURE0);
             glUniform1f(vhsTmLoc,vhsTime);
             glUniform1f(vhsIntenLoc,vI);
@@ -457,7 +451,7 @@ int main(){
             glUniform1f(vhsTaaValidLoc,0.0f);
             glUniform1i(vhsFrameGenLoc,0);
             glUniform1f(vhsFrameGenBlendLoc,0.0f);
-            glUniform1i(vhsRtxLoc,0);
+            glUniform1i(vhsRtxALoc,0); glUniform1i(vhsRtxGLoc,0); glUniform1i(vhsRtxRLoc,0); glUniform1i(vhsRtxBLoc,0);
             glBindVertexArray(quadVAO);
             glDrawArrays(GL_TRIANGLES,0,6);
         }else{
@@ -471,7 +465,7 @@ int main(){
             glActiveTexture(GL_TEXTURE0 + 2);
             glBindTexture(GL_TEXTURE_2D,fboDepthTex);
             glUniform1i(vhsDepthTexLoc,2);
-            glUniform1i(vhsRtxLoc,clampRtxQuality(settings.rtxQuality));
+            glUniform1i(vhsRtxALoc,clampSsao(settings.ssaoQuality)); glUniform1i(vhsRtxGLoc,clampGi(settings.giQuality)); glUniform1i(vhsRtxRLoc,settings.godRays?1:0); glUniform1i(vhsRtxBLoc,settings.bloom?1:0);
             glActiveTexture(GL_TEXTURE0);
             glUniform1f(vhsTmLoc,vhsTime);
             glUniform1f(vhsIntenLoc,vI);

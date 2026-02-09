@@ -214,7 +214,7 @@ uniform vec3 taaJitter;
 uniform float taaValid;
 uniform int frameGen;
 uniform float frameGenBlend;
-uniform int rtxLevel;
+uniform int rtxA,rtxG,rtxR,rtxB;
 uniform sampler2D depthTex;
 
 float rnd(vec2 s){ return fract(sin(dot(s,vec2(12.9898,78.233)))*43758.5453); }
@@ -294,85 +294,76 @@ vec3 resolveSample(vec2 tc){
 
 float linZ(vec2 tc){
  float d = texture(depthTex, tc).r;
- float ndc = d * 2.0 - 1.0;
- return (20.0) / (100.1 - ndc * 99.9);
+ return 20.0 / (100.1 - (d * 2.0 - 1.0) * 99.9);
 }
-
-float rtxSSAO(vec2 tc, int samps){
+float rtxSSAO(vec2 tc, int ns){
  float z0 = linZ(tc);
- float rad = 0.025 * (1.0 + 3.0 / max(z0, 0.5));
+ float rad = 0.03 * (1.0 + 2.5 / max(z0, 0.5));
  float ao = 0.0;
- for(int i = 0; i < samps; i++){
-  float a = float(i) * 6.2832 / float(samps) + rnd(tc + float(i) * 0.17) * 1.5;
-  float r = rad * (0.3 + 0.7 * rnd(tc * float(i + 1) * 0.73));
+ float rot = rnd(tc * 7.13 + vec2(tm * 0.37, tm * 0.61)) * 6.283;
+ for(int i = 0; i < ns; i++){
+  float a = float(i) * 6.283 / float(ns) + rot;
+  float r = rad * (0.25 + 0.75 * rnd(tc * float(i+1) * 0.73 + vec2(tm * 0.53)));
   vec2 sc = tc + vec2(cos(a), sin(a)) * r;
-  float sz = linZ(sc);
-  float diff = z0 - sz;
-  if(diff > 0.03 && diff < 2.5) ao += (1.0 - diff / 2.5);
+  float diff = z0 - linZ(sc);
+  if(diff > 0.02 && diff < 2.0) ao += (1.0 - diff / 2.0);
  }
- return clamp(1.0 - ao / float(samps) * 3.5, 0.0, 1.0);
+ return clamp(1.0 - ao / float(ns) * 4.0, 0.0, 1.0);
 }
-
-vec3 rtxGI(vec2 tc, int samps){
+vec3 rtxGI(vec2 tc, int ns){
  float z0 = linZ(tc);
- float rad = 0.04 * (1.0 + 2.5 / max(z0, 0.5));
+ float rad = 0.04 * (1.0 + 2.0 / max(z0, 0.5));
  vec3 gi = vec3(0.0); float tw = 0.001;
- for(int i = 0; i < samps; i++){
-  float a = float(i) * 6.2832 / float(samps) + rnd(tc + float(i) * 0.31) * 1.0;
-  float r = rad * (0.35 + 0.65 * rnd(tc * float(i + 1) * 0.53));
+ float rot = rnd(tc * 11.3 + vec2(tm * 0.41)) * 6.283;
+ for(int i = 0; i < ns; i++){
+  float a = float(i) * 6.283 / float(ns) + rot;
+  float r = rad * (0.3 + 0.7 * rnd(tc * float(i+1) * 0.53 + vec2(tm * 0.29)));
   vec2 sc = tc + vec2(cos(a), sin(a)) * r;
-  vec3 sCol = texture(tex, sc).rgb;
-  float sz = linZ(sc);
-  float w = max(0.0, 1.0 - abs(z0 - sz) * 1.5);
-  float bright = dot(sCol, vec3(0.3, 0.59, 0.11));
-  w *= bright * 3.0;
-  gi += sCol * w; tw += w;
+  vec3 sC = texture(tex, sc).rgb;
+  float depthDiff = abs(z0 - linZ(sc));
+  float w = max(0.0, 1.0 - depthDiff * 3.0);
+  float br = min(dot(sC, vec3(0.3, 0.59, 0.11)), 0.5);
+  w *= br * 2.5;
+  gi += sC * w; tw += w;
  }
  return gi / tw;
 }
-
-vec3 rtxGodRays(vec2 tc, int samps){
+vec3 rtxRays(vec2 tc, int ns){
  vec3 rays = vec3(0.0);
- vec2 dir = (vec2(0.5) - tc) / float(samps);
- vec2 cur = tc; float decay = 1.0;
- for(int i = 0; i < samps; i++){
-  cur += dir;
-  vec3 s = texture(tex, clamp(cur, 0.001, 0.999)).rgb;
+ float rot = rnd(tc * 5.7 + vec2(tm * 0.17)) * 6.283;
+ for(int i = 0; i < ns; i++){
+  float a = float(i) * 6.283 / float(ns) + rot;
+  float r = 0.015 + 0.07 * float(i) / float(ns);
+  vec2 sc = clamp(tc + vec2(cos(a), sin(a)) * r, 0.001, 0.999);
+  vec3 s = texture(tex, sc).rgb;
   float lum = dot(s, vec3(0.3, 0.59, 0.11));
-  if(lum > 0.18){
-   float depth = linZ(clamp(cur, 0.001, 0.999));
-   float depthW = smoothstep(15.0, 2.0, depth);
-   rays += s * decay * (lum - 0.18) * 3.0 * depthW;
+  if(lum > 0.12){
+   float dw = smoothstep(12.0, 1.0, linZ(sc));
+   float decay = 1.0 - float(i) / float(ns);
+   rays += s * (lum - 0.12) * decay * dw * 2.5;
   }
-  decay *= 0.965;
  }
- return rays / float(samps);
+ return rays / float(ns);
 }
-
 vec3 rtxBloom(vec2 tc, int rad){
- vec3 bloom = vec3(0.0); float tw = 0.0;
+ vec3 bl = vec3(0.0); float tw = 0.0;
  float sx = texelX * 2.5, sy = texelY * 2.5;
  for(int x = -rad; x <= rad; x++) for(int y = -rad; y <= rad; y++){
-  vec2 off = vec2(float(x) * sx, float(y) * sy);
-  vec3 s = texture(tex, tc + off).rgb;
+  vec3 s = texture(tex, tc + vec2(float(x)*sx, float(y)*sy)).rgb;
   float lum = dot(s, vec3(0.3, 0.59, 0.11));
-  float w = smoothstep(0.18, 0.5, lum) * exp(-length(vec2(x, y)) * 0.35);
-  bloom += s * w; tw += 1.0;
+  float w = smoothstep(0.15, 0.45, lum) * exp(-length(vec2(x, y)) * 0.35);
+  bl += s * w; tw += 1.0;
  }
- return bloom / max(tw, 1.0);
+ return bl / max(tw, 1.0);
 }
 
 void main(){
  if(inten < 0.02) {
   vec3 c0 = resolveSample(uv);
-  if(rtxLevel >= 1){
-   int as = rtxLevel<=1?6:(rtxLevel<=2?10:(rtxLevel<=3?14:20));
-   c0 *= rtxSSAO(uv, as);
-   int br = rtxLevel<=1?2:(rtxLevel<=2?3:4);
-   c0 += rtxBloom(uv, br) * 0.5;
-   if(rtxLevel >= 2){ c0 += rtxGI(uv, as) * 0.2; }
-   if(rtxLevel >= 3){ c0 += rtxGodRays(uv, rtxLevel<=3?32:64) * 0.6; }
-  }
+  if(rtxA>0){ int n=rtxA<=1?6:(rtxA<=2?10:(rtxA<=3?14:20)); c0*=rtxSSAO(uv,n); }
+  if(rtxG>0){ int n=rtxG<=1?6:(rtxG<=2?10:16); c0+=rtxGI(uv,n)*0.18; }
+  if(rtxR>0){ c0+=rtxRays(uv,24)*0.45; }
+  if(rtxB>0){ c0+=rtxBloom(uv,3)*0.45; }
   F = vec4(c0, 1.0);
  return;
 }
@@ -416,15 +407,10 @@ vec3 c = vec3(r,g,b);
  // Warm tint
  c.g += 0.01 * inten;
 
- // RTX: SSAO + GI + God Rays + Bloom
- if(rtxLevel >= 1){
-  int as = rtxLevel<=1?6:(rtxLevel<=2?10:(rtxLevel<=3?14:20));
-  c *= rtxSSAO(uv, as);
-  int br = rtxLevel<=1?2:(rtxLevel<=2?3:4);
-  c += rtxBloom(uv, br) * 0.5;
-  if(rtxLevel >= 2){ c += rtxGI(uv, as) * 0.2; }
-  if(rtxLevel >= 3){ c += rtxGodRays(uv, rtxLevel<=3?32:64) * 0.6; }
- }
+ if(rtxA>0){ int n=rtxA<=1?6:(rtxA<=2?10:(rtxA<=3?14:20)); c*=rtxSSAO(uv,n); }
+ if(rtxG>0){ int n=rtxG<=1?6:(rtxG<=2?10:16); c+=rtxGI(uv,n)*0.18; }
+ if(rtxR>0){ c+=rtxRays(uv,24)*0.45; }
+ if(rtxB>0){ c+=rtxBloom(uv,3)*0.45; }
 
  F = vec4(c, 1);
 })";

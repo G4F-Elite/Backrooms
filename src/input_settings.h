@@ -11,8 +11,8 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
     static double nextAdjustTime = 0.0;
     const double adjustFirstDelay = 0.28;
     const double adjustRepeatInterval = 0.055;
-    auto switchTab = [&]() {
-        settingsTab = (settingsTab == SETTINGS_TAB_AUDIO) ? SETTINGS_TAB_VIDEO : SETTINGS_TAB_AUDIO;
+    auto switchTab = [&](int dir) {
+        settingsTab = (settingsTab + (dir > 0 ? 1 : 2)) % 3;
         menuSel = clampSettingsSelection(settingsTab, menuSel);
     };
 
@@ -37,64 +37,33 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
 
     auto videoAdjust = [&](int idx, int dir) {
         int vi = idx - 1;
-        if (vi == 0) {
-            settings.vhsIntensity += 0.05f * (float)dir;
-            if (settings.vhsIntensity < 0.0f) settings.vhsIntensity = 0.0f;
-            if (settings.vhsIntensity > 1.0f) settings.vhsIntensity = 1.0f;
-            return true;
-        }
-        if (vi == 1) {
-            settings.mouseSens += 0.0003f * (float)dir;
-            if (settings.mouseSens < 0.0005f) settings.mouseSens = 0.0005f;
-            if (settings.mouseSens > 0.006f) settings.mouseSens = 0.006f;
-            return true;
-        }
-        if (vi == 2) {
-            settings.upscalerMode = clampUpscalerMode(settings.upscalerMode + dir);
-            return true;
-        }
-        if (vi == 3) {
-            settings.renderScalePreset = stepRenderScalePreset(settings.renderScalePreset, dir);
-            return true;
-        }
-        if (vi == 4) {
-            settings.fsrSharpness = clampFsrSharpness(settings.fsrSharpness + 0.05f * (float)dir);
-            return true;
-        }
-        if (vi == 5) {
-            settings.aaMode = stepAaMode(settings.aaMode, dir);
-            return true;
-        }
-        if (vi == 6) {
-            settings.rtxQuality = stepRtxQuality(settings.rtxQuality, dir);
-            return true;
-        }
-        if (vi == 7) {
-            settings.fastMath = !settings.fastMath;
-            return true;
-        }
-        if (vi == 8) {
-            settings.frameGenMode = stepFrameGenMode(settings.frameGenMode, dir);
-            return true;
-        }
-        if (vi == 9) {
-            settings.vsync = !settings.vsync;
-            return true;
-        }
+        if(vi==0){ settings.vhsIntensity+=0.05f*(float)dir; if(settings.vhsIntensity<0)settings.vhsIntensity=0; if(settings.vhsIntensity>1)settings.vhsIntensity=1; return true; }
+        if(vi==1){ settings.mouseSens+=0.0003f*(float)dir; if(settings.mouseSens<0.0005f)settings.mouseSens=0.0005f; if(settings.mouseSens>0.006f)settings.mouseSens=0.006f; return true; }
+        if(vi==2){ settings.upscalerMode=clampUpscalerMode(settings.upscalerMode+dir); return true; }
+        if(vi==3){ settings.renderScalePreset=stepRenderScalePreset(settings.renderScalePreset,dir); return true; }
+        if(vi==4){ settings.fsrSharpness=clampFsrSharpness(settings.fsrSharpness+0.05f*(float)dir); return true; }
+        if(vi==5){ settings.aaMode=stepAaMode(settings.aaMode,dir); return true; }
+        if(vi==6){ settings.fastMath=!settings.fastMath; return true; }
+        if(vi==7){ settings.frameGenMode=stepFrameGenMode(settings.frameGenMode,dir); return true; }
+        if(vi==8){ settings.vsync=!settings.vsync; return true; }
+        return false;
+    };
+    auto effectsAdjust = [&](int idx, int dir) {
+        int vi = idx - 1;
+        if(vi==0){ settings.ssaoQuality=stepSsao(settings.ssaoQuality,dir); return true; }
+        if(vi==1){ settings.giQuality=stepGi(settings.giQuality,dir); return true; }
+        if(vi==2){ settings.godRays=!settings.godRays; return true; }
+        if(vi==3){ settings.bloom=!settings.bloom; return true; }
         return false;
     };
 
     auto applyAdjust = [&](int dir) {
         if (dir == 0) return;
         bool changed = false;
-        if (menuSel == 0) {
-            switchTab();
-            changed = true;
-        } else if (settingsTab == SETTINGS_TAB_AUDIO) {
-            changed = audioAdjust(menuSel, dir);
-        } else {
-            changed = videoAdjust(menuSel, dir);
-        }
+        if (menuSel == 0) { switchTab(dir); changed = true; }
+        else if (settingsTab == SETTINGS_TAB_AUDIO) changed = audioAdjust(menuSel, dir);
+        else if (settingsTab == SETTINGS_TAB_EFFECTS) changed = effectsAdjust(menuSel, dir);
+        else changed = videoAdjust(menuSel, dir);
         if (changed) triggerMenuAdjustSound();
     };
     
