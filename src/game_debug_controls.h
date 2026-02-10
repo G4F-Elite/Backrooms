@@ -58,6 +58,46 @@ void gameInput(GLFWwindow*w){
     }
     hudTogglePressed = hudToggleNow;
 
+    // === Viewmodel tuning hotkeys (debugMode only) ===
+    // Hold SHIFT for larger steps.
+    if(settings.debugMode){
+        static bool vmUpPressed=false, vmDownPressed=false, vmLeftPressed=false, vmRightPressed=false;
+        static bool vmFwdPressed=false, vmBackPressed=false, vmShakeUpPressed=false, vmShakeDownPressed=false;
+        bool shift = glfwGetKey(w, GLFW_KEY_LEFT_SHIFT)==GLFW_PRESS || glfwGetKey(w, GLFW_KEY_RIGHT_SHIFT)==GLFW_PRESS;
+        float step = shift ? 0.05f : 0.01f;
+        float stepShake = shift ? 0.10f : 0.02f;
+
+        bool num8 = glfwGetKey(w, GLFW_KEY_KP_8)==GLFW_PRESS;
+        bool num2 = glfwGetKey(w, GLFW_KEY_KP_2)==GLFW_PRESS;
+        bool num4 = glfwGetKey(w, GLFW_KEY_KP_4)==GLFW_PRESS;
+        bool num6 = glfwGetKey(w, GLFW_KEY_KP_6)==GLFW_PRESS;
+        bool num9 = glfwGetKey(w, GLFW_KEY_KP_9)==GLFW_PRESS;
+        bool num3 = glfwGetKey(w, GLFW_KEY_KP_3)==GLFW_PRESS;
+        bool numAdd = glfwGetKey(w, GLFW_KEY_KP_ADD)==GLFW_PRESS;
+        bool numSub = glfwGetKey(w, GLFW_KEY_KP_SUBTRACT)==GLFW_PRESS;
+
+        if(num8 && !vmUpPressed){ vmHandUp += step; }
+        if(num2 && !vmDownPressed){ vmHandUp -= step; }
+        if(num4 && !vmLeftPressed){ vmHandSide -= step; }
+        if(num6 && !vmRightPressed){ vmHandSide += step; }
+        if(num9 && !vmFwdPressed){ vmHandFwd += step; }
+        if(num3 && !vmBackPressed){ vmHandFwd -= step; }
+        if(numAdd && !vmShakeUpPressed){ vmShake += stepShake; if(vmShake>1.0f) vmShake=1.0f; }
+        if(numSub && !vmShakeDownPressed){ vmShake -= stepShake; if(vmShake<0.0f) vmShake=0.0f; }
+
+        vmUpPressed=num8; vmDownPressed=num2; vmLeftPressed=num4; vmRightPressed=num6;
+        vmFwdPressed=num9; vmBackPressed=num3; vmShakeUpPressed=numAdd; vmShakeDownPressed=numSub;
+
+        static float vmPrintTimer = 0.0f;
+        vmPrintTimer -= dTime;
+        if(vmPrintTimer <= 0.0f){
+            char buf[96];
+            snprintf(buf, sizeof(buf), "VM fwd=%.2f side=%.2f up=%.2f shake=%.2f", vmHandFwd, vmHandSide, vmHandUp, vmShake);
+            setTrapStatus(buf);
+            vmPrintTimer = 0.35f;
+        }
+    }
+
     // Close debug tools if debugMode was turned off
     if(!settings.debugMode && debugTools.open){
         debugTools.open = false;
@@ -383,6 +423,7 @@ void gameInput(GLFWwindow*w){
         if(flashlightBattery>100)flashlightBattery=100;
     }
 }
+
 
 
 

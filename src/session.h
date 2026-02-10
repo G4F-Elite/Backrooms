@@ -303,6 +303,17 @@ inline void setTrapStatus(const char* msg){
     trapStatusTimer = 4.0f;
 }
 
+// === Viewmodel tuning (runtime) ===
+// Allows adjusting first-person held item placement without rebuilding.
+inline float vmHandFwd = 0.60f;
+inline float vmHandSide = 0.33f;
+inline float vmHandUp = -0.52f;
+inline float vmFlashLensFwd = 0.52f;
+inline float vmFlashLensSide = 0.02f;
+inline float vmFlashLensUp = 0.09f;
+// 0..1: how much camera shake affects held items (0 = stable, 1 = full shake)
+inline float vmShake = 0.0f;
+
 inline void applyPlushToyUse(){
     if(invPlush <= 0) return;
     invPlush--;
