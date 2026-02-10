@@ -4,11 +4,42 @@
 #include "coop.h"
 #include "map_content.h"
 
-inline void buildDeviceModel(std::vector<float>& v){
-    mkBox(v, 0.0f, -0.06f, 0.0f, 0.18f, 0.08f, 0.10f);
-    mkBox(v, 0.0f, -0.02f, 0.10f, 0.10f, 0.14f, 0.10f);
-    mkBox(v, 0.0f, 0.10f, 0.24f, 0.22f, 0.12f, 0.32f);
-    mkBox(v, 0.0f, 0.03f, 0.42f, 0.14f, 0.08f, 0.18f);
+inline void buildFlashlightModel(std::vector<float>& v){
+    // Handle
+    mkBox(v, 0.0f, -0.08f, 0.06f, 0.10f, 0.22f, 0.10f);
+    // Body
+    mkBox(v, 0.0f, 0.08f, 0.20f, 0.12f, 0.12f, 0.34f);
+    // Head
+    mkBox(v, 0.0f, 0.10f, 0.40f, 0.18f, 0.16f, 0.22f);
+    // Small top switch
+    mkBox(v, 0.0f, 0.22f, 0.18f, 0.06f, 0.03f, 0.06f);
+}
+
+inline void buildScannerModel(std::vector<float>& v){
+    // Base slab
+    mkBox(v, 0.0f, -0.05f, 0.12f, 0.22f, 0.08f, 0.34f);
+    // Screen block
+    mkBox(v, 0.0f, 0.03f, 0.22f, 0.18f, 0.10f, 0.18f);
+    // Antenna
+    mkBox(v, 0.07f, 0.12f, 0.34f, 0.03f, 0.20f, 0.03f);
+    // Side grip
+    mkBox(v, -0.09f, -0.02f, 0.10f, 0.06f, 0.16f, 0.12f);
+}
+
+inline void buildPlushToyModel(std::vector<float>& v){
+    // Cute teddy-like silhouette (very low poly)
+    mkBox(v, 0.0f, -0.06f, 0.0f, 0.18f, 0.14f, 0.14f);      // body
+    mkBox(v, 0.0f, 0.08f, 0.02f, 0.14f, 0.14f, 0.14f);      // head
+    mkBox(v, -0.08f, 0.18f, 0.02f, 0.06f, 0.06f, 0.06f);    // ear L
+    mkBox(v, 0.08f, 0.18f, 0.02f, 0.06f, 0.06f, 0.06f);     // ear R
+    mkBox(v, -0.11f, 0.02f, 0.00f, 0.06f, 0.08f, 0.06f);    // arm L
+    mkBox(v, 0.11f, 0.02f, 0.00f, 0.06f, 0.08f, 0.06f);     // arm R
+}
+
+inline void buildBatteryModel(std::vector<float>& v){
+    // Simple battery cylinder approximation as stacked boxes
+    mkBox(v, 0.0f, -0.06f, 0.0f, 0.10f, 0.16f, 0.10f);
+    mkBox(v, 0.0f, 0.10f, 0.0f, 0.06f, 0.05f, 0.06f);
 }
 
 void buildGeom(){
@@ -191,10 +222,31 @@ void buildGeom(){
         if(l.on)mkLight(lv,l.pos,l.sizeX,l.sizeZ);
         else mkLight(lvOff,l.pos,l.sizeX,l.sizeZ);
     }
-    std::vector<float>dev;
-    buildDeviceModel(dev);
-    deviceVC=(int)dev.size()/8;
-    if(deviceVC>0)setupVAO(deviceVAO, deviceVBO, dev, true);
+    // First-person held items
+    {
+        std::vector<float> m;
+        buildFlashlightModel(m);
+        flashlightVC = (int)m.size()/8;
+        if(flashlightVC>0) setupVAO(flashlightVAO, flashlightVBO, m, true);
+    }
+    {
+        std::vector<float> m;
+        buildScannerModel(m);
+        scannerVC = (int)m.size()/8;
+        if(scannerVC>0) setupVAO(scannerVAO, scannerVBO, m, true);
+    }
+    {
+        std::vector<float> m;
+        buildPlushToyModel(m);
+        plushVC = (int)m.size()/8;
+        if(plushVC>0) setupVAO(plushVAO, plushVBO, m, true);
+    }
+    {
+        std::vector<float> m;
+        buildBatteryModel(m);
+        batteryVC = (int)m.size()/8;
+        if(batteryVC>0) setupVAO(batteryVAO, batteryVBO, m, true);
+    }
 
     wallVC=(int)wv.size()/8;floorVC=(int)fv.size()/8;ceilVC=(int)cv.size()/8;
     pillarVC=(int)pv.size()/8;decorVC=(int)dv.size()/8;lightVC=(int)lv.size()/5;lightOffVC=(int)lvOff.size()/5;
@@ -378,6 +430,7 @@ void teleportToExit(){
     updateMapContent(playerChunkX,playerChunkZ);
     buildGeom();
 }
+
 
 
 

@@ -22,7 +22,7 @@ out vec4 F; in vec2 uv; in vec3 fp,nm;
 in vec3 viewTS; in vec3 fragPosTS;
 uniform sampler2D tex; uniform vec3 vp; uniform float tm;
 uniform int nl; uniform vec3 lp[16]; uniform float danger;
-uniform int flashOn; uniform vec3 flashDir;
+uniform int flashOn; uniform vec3 flashDir; uniform vec3 flashPos;
 uniform int rfc; uniform vec3 rfp[4]; uniform vec3 rfd[4];
 float hash(vec3 p) {
  return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
@@ -88,9 +88,9 @@ void main(){
  }
  // FLASHLIGHT - white cone with red danger edge
  if(flashOn == 1) {
-  vec3 toFrag = normalize(fp - vp);
+  vec3 toFrag = normalize(fp - flashPos);
   float spotAngle = dot(toFrag, flashDir);
-  float dist = length(fp - vp);
+  float dist = length(fp - flashPos);
   if(spotAngle > 0.85 && dist < 15.0) {
    float spotAtt = smoothstep(0.85, 0.95, spotAngle);
    float distAtt = 1.0 - dist / 15.0;

@@ -14,10 +14,23 @@
 #include "trap_events.h"
 #include "debug_tools.h"
 
+// Provides GLuint for VAO/VBO handles used across the game.
+#include <glad/glad.h>
+
 GLuint noteVAO=0, noteVBO=0;
 int noteVC=0;
-GLuint deviceVAO=0, deviceVBO=0;
-int deviceVC=0;
+// First-person held items (separate models per slot/type)
+GLuint flashlightVAO=0, flashlightVBO=0;
+int flashlightVC=0;
+GLuint scannerVAO=0, scannerVBO=0;
+int scannerVC=0;
+GLuint plushVAO=0, plushVBO=0;
+int plushVC=0;
+GLuint batteryVAO=0, batteryVBO=0;
+int batteryVC=0;
+
+// Selected when activeDeviceSlot == 3
+int heldConsumableType = ITEM_PLUSH_TOY;
 bool playerModelsInit = false;
 
 void buildGeom();
@@ -92,7 +105,8 @@ float falseDoorTimer = 0.0f;
 Vec3 falseDoorPos(0,0,0);
 int invBattery = 0;
 int invPlush = 0;
-int activeDeviceSlot = 1; // 1 flashlight, 2 scanner, 3 battery
+// 0 = none, 1 = flashlight, 2 = scanner, 3 = held consumable (battery/plush)
+int activeDeviceSlot = 1;
 float scannerSignal = 0.0f;
 EchoSignal echoSignal = {};
 float echoSpawnTimer = 14.0f;
