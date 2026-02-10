@@ -176,16 +176,41 @@ void main(){
 })";
 const char* lightVS=R"(#version 330
 layout(location=0) in vec3 p; layout(location=1) in vec2 t;
-out vec2 uv; uniform mat4 M,V,P;
-void main(){ uv=t; gl_Position=P*V*M*vec4(p,1); })";
+out vec2 uv; out vec3 wpos; uniform mat4 M,V,P;
+void main(){
+ uv=t;
+ wpos = vec3(M*vec4(p,1));
+ gl_Position=P*V*M*vec4(p,1);
+})";
 const char* lightFS=R"(#version 330
-out vec4 F; in vec2 uv;
+out vec4 F; in vec2 uv; in vec3 wpos;
 uniform sampler2D tex; uniform float inten,tm,fade;
+uniform float danger;
 float hash(float n){ return fract(sin(n)*43758.5453); }
+float hash2(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
 void main(){
  vec3 c = texture(tex,uv).rgb * inten;
- float flick = 0.97 + sin(tm*25.0)*0.015 + hash(floor(tm*7.0))*0.015;
- // Apply fade for smooth light sprite transitions
+
+ // Stable per-light seed from position
+ float seed = hash2(floor(wpos.xz * 0.5));
+
+ // Base flicker: subtle CRT-ish shimmer
+ float flick = 0.97
+            + sin(tm*25.0 + seed*6.283)*0.015
+            + hash(floor(tm*7.0) + seed*19.0)*0.015;
+
+ // Panic flicker: becomes obvious with danger
+ float panicAmt = smoothstep(0.10, 0.60, danger);
+ flick += (sin(tm*(55.0 + seed*10.0) + seed*12.3) * 0.06
+        +  (hash(floor(tm*18.0) + seed*53.0) - 0.5) * 0.08) * panicAmt;
+
+ // Drop-outs (brief near-black blinks) when danger is high
+ float dropAmt = smoothstep(0.35, 0.95, danger);
+ float dropGate = hash(floor(tm*(2.0 + 10.0*danger)) + seed*101.0);
+ float drop = step(0.988, dropGate) * dropAmt;
+ flick *= (1.0 - drop * 0.85);
+
+ flick = clamp(flick, 0.15, 1.35);
  F = vec4(c * flick * fade, fade);
 })";
 const char* vhsVS=R"(#version 330

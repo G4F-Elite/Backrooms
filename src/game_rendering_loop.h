@@ -10,10 +10,10 @@ void renderScene(){
         GLint P, V, M, vp, tm, danger, flashOn, flashDir, rfc, rfp, rfd, nl, lp;
     };
     struct LightUniforms {
-        GLint P, V, M, inten, tm, fade;
+        GLint P, V, M, inten, tm, fade, danger;
     };
     static MainUniforms mu = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
-    static LightUniforms lu = {-1,-1,-1,-1,-1,-1};
+    static LightUniforms lu = {-1,-1,-1,-1,-1,-1,-1};
     if(mu.P < 0){
         mu.P = glGetUniformLocation(mainShader,"P");
         mu.V = glGetUniformLocation(mainShader,"V");
@@ -36,6 +36,7 @@ void renderScene(){
         lu.inten = glGetUniformLocation(lightShader,"inten");
         lu.tm = glGetUniformLocation(lightShader,"tm");
         lu.fade = glGetUniformLocation(lightShader,"fade");
+        lu.danger = glGetUniformLocation(lightShader,"danger");
     }
 
     glUseProgram(mainShader);
@@ -131,6 +132,7 @@ void renderScene(){
     glUniform1f(lu.inten,1.2f);
     glUniform1f(lu.tm,vhsTime);
     glUniform1f(lu.fade,1.0f); // Light sprites always full brightness when visible
+    glUniform1f(lu.danger, entityMgr.dangerLevel);
     glBindTexture(GL_TEXTURE_2D,lampTex);glBindVertexArray(lightVAO);glDrawArrays(GL_TRIANGLES,0,lightVC);
     if(lightOffVC>0){
         glUniform1f(lu.inten,0.15f);
@@ -218,6 +220,8 @@ inline void applyFramePacing(double frameStartTime, int targetFps){
     }
     while((glfwGetTime() - frameStartTime) < targetFrameSec){}
 }
+
+
 
 
 
