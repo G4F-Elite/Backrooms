@@ -85,7 +85,9 @@ void renderScene(){
                mSin(vmPitch),
                mCos(vmYaw)*mCos(vmPitch));
     Vec3 vmRight(mCos(vmYaw), 0.0f, -mSin(vmYaw));
-    Vec3 vmUp = vmRight.cross(vmFwd).norm();
+    // IMPORTANT: cross order matters. We want a proper camera up vector.
+    // For a right-handed basis: up = forward x right.
+    Vec3 vmUp = vmFwd.cross(vmRight).norm();
     bool flashVisualOn = flashlightOn;
     if(flashlightOn && flashlightShutdownBlinkActive){
         flashVisualOn = isFlashlightOnDuringShutdownBlink(flashlightShutdownBlinkTimer);
@@ -302,6 +304,7 @@ inline void applyFramePacing(double frameStartTime, int targetFps){
     }
     while((glfwGetTime() - frameStartTime) < targetFrameSec){}
 }
+
 
 
 
