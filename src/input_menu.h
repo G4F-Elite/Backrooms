@@ -290,13 +290,11 @@ inline void menuInput(GLFWwindow* w) {
         modeSwitchPressed = modeSwitchNow;
         
         // Number input for IP/Port
-        static bool numPressed[11] = {false};
-        int keys[] = {GLFW_KEY_0, GLFW_KEY_1, GLFW_KEY_2, GLFW_KEY_3, GLFW_KEY_4,
-                      GLFW_KEY_5, GLFW_KEY_6, GLFW_KEY_7, GLFW_KEY_8, GLFW_KEY_9,
-                      GLFW_KEY_PERIOD};
-        char chars[] = {'0','1','2','3','4','5','6','7','8','9','.'};
+        static bool numPressed[22] = {false};
+        int keys[] = {GLFW_KEY_0,GLFW_KEY_1,GLFW_KEY_2,GLFW_KEY_3,GLFW_KEY_4,GLFW_KEY_5,GLFW_KEY_6,GLFW_KEY_7,GLFW_KEY_8,GLFW_KEY_9,GLFW_KEY_PERIOD,GLFW_KEY_KP_0,GLFW_KEY_KP_1,GLFW_KEY_KP_2,GLFW_KEY_KP_3,GLFW_KEY_KP_4,GLFW_KEY_KP_5,GLFW_KEY_KP_6,GLFW_KEY_KP_7,GLFW_KEY_KP_8,GLFW_KEY_KP_9,GLFW_KEY_KP_DECIMAL};
+        char chars[] = {'0','1','2','3','4','5','6','7','8','9','.','0','1','2','3','4','5','6','7','8','9','.'};
         
-        for (int i = 0; i < 11; i++) {
+        for (int i = 0; i < 22; i++) {
             bool pressed = glfwGetKey(w, keys[i]) == GLFW_PRESS;
             if (pressed && !numPressed[i]) {
                 if (multiInputField == 0) {
@@ -304,7 +302,9 @@ inline void menuInput(GLFWwindow* w) {
                     char* targetIP = (multiNetworkMode == 0) ? multiJoinIP : multiMasterIP;
                     int len = (int)strlen(targetIP);
                     if (len < 15) {
-                        if (i < 10 || (i == 10 && len > 0 && targetIP[len-1] != '.')) {
+                        bool isDigit = chars[i] >= '0' && chars[i] <= '9';
+                        bool isDot = chars[i] == '.';
+                        if (isDigit || (isDot && len > 0 && targetIP[len-1] != '.')) {
                             targetIP[len] = chars[i];
                             targetIP[len + 1] = 0;
                             if (multiNetworkMode == 0) multiIPManualEdit = true;
@@ -313,7 +313,7 @@ inline void menuInput(GLFWwindow* w) {
                     }
                 } else {
                     // Port field - numbers only
-                    if (i < 10) {
+                    if (chars[i] >= '0' && chars[i] <= '9') {
                         char* targetPort = (multiNetworkMode == 0) ? multiJoinPort : multiMasterPort;
                         int len = (int)strlen(targetPort);
                         if (len < 5) {

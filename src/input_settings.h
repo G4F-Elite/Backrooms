@@ -51,7 +51,7 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
     bool down = glfwGetKey(w, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS;
     bool left = glfwGetKey(w, GLFW_KEY_LEFT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_A) == GLFW_PRESS;
     bool right = glfwGetKey(w, GLFW_KEY_RIGHT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_D) == GLFW_PRESS;
-    bool enter = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS;
+    bool enter = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_KP_ENTER) == GLFW_PRESS;
     const double now = glfwGetTime();
     static int adjustHoldDir = 0;
     static double nextAdjustTime = 0.0;

@@ -50,9 +50,10 @@ inline void drawMultiMenuScreen(float tm) {
     drawTextCentered(lanTab ? "[LAN]   SERVERS" : " LAN   [SERVERS]", 0.0f, -0.30f, 1.55f, 0.65f, 0.75f, 0.5f, 0.88f);
     drawTextCentered(lanTab ? "LAN MODE: USE RADMIN OR HAMACHI" : "SERVERS MODE: CENTRALIZED DIRECTORY", 0.0f, -0.40f, 1.3f, 0.55f, 0.62f, 0.46f, 0.74f);
     drawTextCentered("PORT: 27015 UDP", 0.0f, -0.48f, 1.35f, 0.5f, 0.5f, 0.4f, 0.6f);
-    char nickBuf[80];
-    snprintf(nickBuf, 80, "NICKNAME: [%s%s]", multiNickname, multiEditingNickname ? "_" : "");
-    drawTextCentered(nickBuf, 0.0f, -0.58f, 1.4f, 0.75f, 0.8f, 0.55f, 0.85f);
+    drawText("NICKNAME:", -0.30f, -0.58f, 1.4f, 0.75f, 0.8f, 0.55f, 0.85f);
+    char nickVal[64];
+    snprintf(nickVal, 64, "[%s%s]", multiNickname, multiEditingNickname ? "_" : "");
+    drawText(nickVal, -0.03f, -0.58f, 1.4f, 0.82f, 0.86f, 0.62f, 0.90f);
     drawTextCentered("TAB: EDIT NICKNAME   LEFT/RIGHT: SWITCH TAB", 0.0f, -0.68f, 1.1f, 0.55f, 0.6f, 0.45f, 0.7f);
     lanDiscovery.ensureLocalIP();
     char ipLine[96];
