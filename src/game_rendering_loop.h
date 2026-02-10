@@ -79,14 +79,16 @@ void renderScene(){
     Vec3 camRight(mCos(viewYaw), 0.0f, -mSin(viewYaw));
     Vec3 worldUp(0.0f, 1.0f, 0.0f);
 
-    // Viewmodel directions (reduced shake)
-    Vec3 vmFwd(mSin(vmYaw)*mCos(vmPitch),
-               mSin(vmPitch),
-               mCos(vmYaw)*mCos(vmPitch));
-    Vec3 vmRight(mCos(vmYaw), 0.0f, -mSin(vmYaw));
-    // IMPORTANT: cross order matters. We want a proper camera up vector.
-    // For a right-handed basis: up = forward x right.
-    Vec3 vmUp = vmFwd.cross(vmRight).norm();
+    // Viewmodel orientation follows pitch, but POSITION should not ride pitch.
+    // If we use full forward/up basis for position, looking up/down pushes the item into the face.
+    // So we split:
+    //  - vmFwdOri: orientation forward (uses pitch)
+    //  - vmFwdPos/vmRightPos/worldUp: placement basis (yaw-only + world up)
+    Vec3 vmFwdOri(mSin(vmYaw)*mCos(vmPitch),
+                  mSin(vmPitch),
+                  mCos(vmYaw)*mCos(vmPitch));
+    Vec3 vmFwdPos(mSin(vmYaw), 0.0f, mCos(vmYaw));
+    Vec3 vmRightPos(mCos(vmYaw), 0.0f, -mSin(vmYaw));
     bool flashVisualOn = flashlightOn;
     if(flashlightOn && flashlightShutdownBlinkActive){
         flashVisualOn = isFlashlightOnDuringShutdownBlink(flashlightShutdownBlinkTimer);
@@ -121,8 +123,8 @@ void renderScene(){
         float side = vmHandSide;
         float up = vmHandUp;
 
-        Vec3 base = cam.pos + vmFwd * fwd + vmRight * side + vmUp * up;
-        Vec3 lens = base + vmFwd * vmFlashLensFwd + vmRight * vmFlashLensSide + vmUp * vmFlashLensUp;
+        Vec3 base = cam.pos + vmFwdPos * fwd + vmRightPos * side + worldUp * up;
+        Vec3 lens = base + vmFwdPos * vmFlashLensFwd + vmRightPos * vmFlashLensSide + worldUp * vmFlashLensUp;
         glUniform3f(mu.flashPos, lens.x, lens.y, lens.z);
     }
     
@@ -191,7 +193,7 @@ void renderScene(){
     }
 
     if(heldVC>0 && deviceEquip > 0.02f){
-        Vec3 base = cam.pos + vmFwd * handFwd + vmRight * handSide + vmUp * handUp;
+        Vec3 base = cam.pos + vmFwdPos * handFwd + vmRightPos * handSide + worldUp * handUp;
 
         Vec3 drawScale = scale * (0.8f + 0.2f * deviceEquip);
         Mat4 heldModel = composeModelMatrix(base, vmYaw + yawAdd, vmPitch + pitchAdd, drawScale);
@@ -303,6 +305,7 @@ inline void applyFramePacing(double frameStartTime, int targetFps){
     }
     while((glfwGetTime() - frameStartTime) < targetFrameSec){}
 }
+
 
 
 
