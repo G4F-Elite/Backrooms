@@ -158,7 +158,7 @@ void gameInput(GLFWwindow*w){
     static bool perfTogglePressed = false;
     static bool hudTogglePressed = false;
     bool debugToggleNow = glfwGetKey(w,GLFW_KEY_F10)==GLFW_PRESS;
-    if(debugToggleNow && !debugTogglePressed){
+    if(settings.debugMode && debugToggleNow && !debugTogglePressed){
         debugTools.open = !debugTools.open;
         if(debugTools.open){
             glfwSetInputMode(w,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
@@ -170,17 +170,24 @@ void gameInput(GLFWwindow*w){
     }
     debugTogglePressed = debugToggleNow;
     bool perfToggleNow = glfwGetKey(w,GLFW_KEY_F3)==GLFW_PRESS;
-    if(perfToggleNow && !perfTogglePressed){
+    if(settings.debugMode && perfToggleNow && !perfTogglePressed){
         gPerfDebugOverlay = !gPerfDebugOverlay;
         triggerMenuConfirmSound();
     }
     perfTogglePressed = perfToggleNow;
     bool hudToggleNow = glfwGetKey(w,GLFW_KEY_F6)==GLFW_PRESS;
-    if(hudToggleNow && !hudTogglePressed){
+    if(settings.debugMode && hudToggleNow && !hudTogglePressed){
         gHudTelemetryVisible = !gHudTelemetryVisible;
         triggerMenuConfirmSound();
     }
     hudTogglePressed = hudToggleNow;
+
+    // Close debug tools if debugMode was turned off
+    if(!settings.debugMode && debugTools.open){
+        debugTools.open = false;
+        glfwSetInputMode(w,GLFW_CURSOR,GLFW_CURSOR_DISABLED);
+        firstMouse = true;
+    }
 
     if(debugTools.open){
         bool upNow = glfwGetKey(w,GLFW_KEY_UP)==GLFW_PRESS || glfwGetKey(w,GLFW_KEY_W)==GLFW_PRESS;
@@ -221,7 +228,7 @@ void gameInput(GLFWwindow*w){
     updateMinimapCheat(w);
     
     bool fNow=glfwGetKey(w,settings.binds.flashlight)==GLFW_PRESS;
-    if(fNow&&!flashlightPressed&&flashlightBattery>5.0f){
+    if(fNow&&!flashlightPressed&&flashlightBattery>5.0f && activeDeviceSlot == 1){
         flashlightOn=!flashlightOn;
         if(!flashlightOn){
             flashlightShutdownBlinkActive = false;
@@ -264,8 +271,6 @@ void gameInput(GLFWwindow*w){
                     if(!it.active||it.id!=nearbyWorldItemId) continue;
                     it.active=false;
                     if(it.type==0) invBattery++;
-                    else if(it.type==1) invMedkit++;
-                    else invBait++;
                     break;
                 }
             }else{
@@ -275,9 +280,7 @@ void gameInput(GLFWwindow*w){
             for(auto& it:worldItems){
                 if(!it.active||it.id!=nearbyWorldItemId) continue;
                 it.active=false;
-                if(it.type==0) invBattery++;
-                else if(it.type==1) invMedkit++;
-                else invBait++;
+                    if(it.type==0) invBattery++;
                 break;
             }
         }
@@ -289,14 +292,40 @@ void gameInput(GLFWwindow*w){
     }
     interactPressed=eNow;
     
-    static bool key1Pressed=false,key2Pressed=false,key3Pressed=false;
+    static bool key1Pressed=false,key2Pressed=false,key3Pressed=false,key4Pressed=false;
     bool k1=glfwGetKey(w,settings.binds.item1)==GLFW_PRESS;
     bool k2=glfwGetKey(w,settings.binds.item2)==GLFW_PRESS;
     bool k3=glfwGetKey(w,settings.binds.item3)==GLFW_PRESS;
-    if(k1&&!key1Pressed) applyItemUse(0);
-    if(k2&&!key2Pressed) applyItemUse(1);
-    if(k3&&!key3Pressed) applyItemUse(2);
-    key1Pressed=k1; key2Pressed=k2; key3Pressed=k3;
+    bool k4=glfwGetKey(w,settings.binds.item4)==GLFW_PRESS;
+    if(k1&&!key1Pressed){
+        if(activeDeviceSlot != 1){
+            activeDeviceSlot = 1;
+        }else{
+            activeDeviceSlot = 0;
+            flashlightOn = false;
+            flashlightShutdownBlinkActive = false;
+            flashlightShutdownBlinkTimer = 0.0f;
+            sndState.flashlightOn = 0.0f;
+        }
+    }
+    if(k2&&!key2Pressed){
+        if(activeDeviceSlot != 2){
+            activeDeviceSlot = 2;
+            if(flashlightOn){
+                flashlightOn = false;
+                flashlightShutdownBlinkActive = false;
+                flashlightShutdownBlinkTimer = 0.0f;
+                sndState.flashlightOn = 0.0f;
+            }
+        }else{
+            activeDeviceSlot = 0;
+        }
+    }
+    if(k3&&!key3Pressed) applyItemUse(0);
+    if(k4&&!key4Pressed){
+        applyItemUse(0);
+    }
+    key1Pressed=k1; key2Pressed=k2; key3Pressed=k3; key4Pressed=k4;
     
     // --- Falling physics ---
     if(playerFalling){
@@ -407,6 +436,40 @@ void gameInput(GLFWwindow*w){
         sndState.monsterMenace
     );
     
+    // Scanner signal strength & beeps (slot 2)
+    float targetSignal = 0.0f;
+    if(activeDeviceSlot == 2 && echoSignal.active && multiState!=MULTI_IN_GAME){
+        Vec3 toEcho = echoSignal.pos - cam.pos;
+        float dist = toEcho.len();
+        if(dist < 0.01f) dist = 0.01f;
+        Vec3 fwdScan(mSin(cam.yaw), 0.0f, mCos(cam.yaw));
+        Vec3 toEchoFlat = toEcho; toEchoFlat.y = 0.0f;
+        float dir = 0.0f;
+        float len = toEchoFlat.len();
+        if(len > 0.001f) dir = fwdScan.dot(toEchoFlat / len);
+        float facing = (dir + 1.0f) * 0.5f;
+        float proximity = 1.0f - (dist / 60.0f);
+        if(proximity < 0.0f) proximity = 0.0f;
+        if(proximity > 1.0f) proximity = 1.0f;
+        targetSignal = proximity * (0.25f + 0.75f * facing);
+    }
+    scannerSignal += (targetSignal - scannerSignal) * (0.8f * dTime * 3.0f);
+    if(scannerSignal < 0.0f) scannerSignal = 0.0f;
+    if(scannerSignal > 1.0f) scannerSignal = 1.0f;
+    static float scannerBeepTimer = 0.0f;
+    if(activeDeviceSlot == 2 && scannerSignal > 0.05f){
+        float rate = 0.25f + (1.0f - scannerSignal) * 0.9f;
+        scannerBeepTimer -= dTime;
+        if(scannerBeepTimer <= 0.0f){
+            sndState.scannerBeepPitch = 0.55f + scannerSignal * 1.0f;
+            sndState.scannerBeepVol = 0.35f + scannerSignal * 0.55f;
+            sndState.scannerBeepTrig = true;
+            scannerBeepTimer = rate;
+        }
+    }else{
+        scannerBeepTimer = 0.0f;
+    }
+    
     if(flashlightOn){
         if(!flashlightShutdownBlinkActive && shouldStartFlashlightShutdownBlink(flashlightBattery)){
             flashlightShutdownBlinkActive = true;
@@ -433,8 +496,14 @@ void gameInput(GLFWwindow*w){
     }else{
         flashlightShutdownBlinkActive = false;
         flashlightShutdownBlinkTimer = 0.0f;
-        flashlightBattery+=dTime*10.0f;
+        float rechargeRate = (activeDeviceSlot == 1) ? 10.0f : 6.0f;
+        flashlightBattery+=dTime*rechargeRate;
         if(flashlightBattery>100)flashlightBattery=100;
     }
 }
+
+
+
+
+
 

@@ -55,8 +55,7 @@ inline void hostUpdateItems(){
     if(itemSpawnTimer > 0) return;
     itemSpawnTimer = 10.0f + (rng()%10);
     if((int)worldItems.size() > 10) return;
-    int type = rng()%3;
-    hostSpawnItem(type, cam.pos);
+    hostSpawnItem(0, cam.pos);
 }
 
 inline void applyItemUse(int type){
@@ -64,13 +63,6 @@ inline void applyItemUse(int type){
         invBattery--;
         flashlightBattery += 35.0f;
         if(flashlightBattery>100.0f) flashlightBattery = 100.0f;
-    }else if(type==1 && invMedkit>0){
-        invMedkit--;
-        playerHealth += 40.0f;
-        if(playerHealth>100.0f) playerHealth = 100.0f;
-    }else if(type==2 && invBait>0){
-        invBait--;
-        baitEffectTimer = 12.0f;
     }
 }
 
@@ -86,9 +78,7 @@ inline void processHostInteractRequests(){
                 if(!it.active || it.id!=target) continue;
                 it.active = false;
                 if(pid>=0 && pid<MAX_PLAYERS){
-                    if(it.type==0) netMgr.inventoryBattery[pid]++;
-                    else if(it.type==1) netMgr.inventoryMedkit[pid]++;
-                    else netMgr.inventoryBait[pid]++;
+                    netMgr.inventoryBattery[pid]++;
                 }
                 break;
             }
@@ -123,8 +113,6 @@ inline void hostSyncFeatureState(){
     netMgr.sendItemSnapshot(entries, count);
     netMgr.sendObjectiveState(coop.switchOn[0], coop.switchOn[1], coop.doorOpen);
     netMgr.inventoryBattery[netMgr.myId] = invBattery;
-    netMgr.inventoryMedkit[netMgr.myId] = invMedkit;
-    netMgr.inventoryBait[netMgr.myId] = invBait;
     netMgr.sendInventorySync();
 }
 
@@ -144,8 +132,6 @@ inline void clientApplyFeatureState(){
     if(netMgr.inventorySyncReceived){
         netMgr.inventorySyncReceived = false;
         invBattery = netMgr.inventoryBattery[netMgr.myId];
-        invMedkit = netMgr.inventoryMedkit[netMgr.myId];
-        invBait = netMgr.inventoryBait[netMgr.myId];
     }
     syncCoopFromNetwork();
 }
@@ -170,8 +156,7 @@ inline void applyRoamEvent(int type, int a, int b, float duration){
     }else if(type==ROAM_SUPPLY_CACHE){
         int amount = 2 + ((a + b) % 2);
         for(int i=0;i<amount;i++){
-            int itemType = (int)(rng()%3);
-            hostSpawnItem(itemType, cam.pos);
+            hostSpawnItem(0, cam.pos);
         }
         setEchoStatus("SUPPLY CACHE SHIFTED NEARBY");
     }

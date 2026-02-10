@@ -44,6 +44,7 @@ struct Settings {
     float rtxDenoiseStrength=0.65f;
     int frameGenMode=FRAME_GEN_MODE_OFF;
     bool vsync=true;
+    bool debugMode=false;
     GameplayBinds binds = {};
 };
 inline Settings settings;
@@ -54,19 +55,9 @@ enum SettingsTab {
 };
 inline int settingsTab = SETTINGS_TAB_VIDEO;
 
-inline int settingsItemsForTab(int tab) {
-    if(tab==SETTINGS_TAB_AUDIO) return 7;
-    if(tab==SETTINGS_TAB_EFFECTS) return 8;
-    return 12;
-}
-inline int settingsBindsIndexForTab(int tab) {
-    return (tab == SETTINGS_TAB_VIDEO) ? 10 : -1;
-}
-inline int settingsBackIndexForTab(int tab) {
-    if(tab==SETTINGS_TAB_AUDIO) return 6;
-    if(tab==SETTINGS_TAB_EFFECTS) return 7;
-    return 11;
-}
+inline int settingsItemsForTab(int tab) { if(tab==SETTINGS_TAB_AUDIO) return 7; if(tab==SETTINGS_TAB_EFFECTS) return 8; return 13; }
+inline int settingsBindsIndexForTab(int tab) { return (tab == SETTINGS_TAB_VIDEO) ? 11 : -1; }
+inline int settingsBackIndexForTab(int tab) { if(tab==SETTINGS_TAB_AUDIO) return 6; if(tab==SETTINGS_TAB_EFFECTS) return 7; return 12; }
 
 inline int clampSettingsSelection(int tab, int idx) {
     int cnt = settingsItemsForTab(tab);
@@ -342,7 +333,7 @@ inline void drawSettings(bool fp) {
                 drawText(b,0.58f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }
         }else{
-            const char* lb[]={"VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","ANTI-ALIASING","FAST MATH","FRAME GEN","V-SYNC","KEY BINDS","BACK"};
+            const char* lb[]={"VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","ANTI-ALIASING","FAST MATH","FRAME GEN","V-SYNC","DEBUG MODE","KEY BINDS","BACK"};
             int vi = i - 1;
             drawText(lb[vi],-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             if(vi==0 || vi==1 || vi==4){
@@ -370,6 +361,8 @@ inline void drawSettings(bool fp) {
             }else if(vi==8){
                 drawTextCentered(settings.vsync?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==9){
+                drawTextCentered(settings.debugMode?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            }else if(vi==10){
                 drawTextCentered("OPEN",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }
         }

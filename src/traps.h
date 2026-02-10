@@ -235,8 +235,6 @@ inline void resolveEchoInteraction(){
         echoSignal.type,
         (int)rng(),
         invBattery,
-        invMedkit,
-        invBait,
         playerHealth,
         playerSanity,
         playerStamina,

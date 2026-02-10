@@ -38,23 +38,15 @@ inline int choosePoiLootType(int poiType, int roll) {
     int norm = roll % 100;
     if (norm < 0) norm += 100;
     if (poiType == MAP_POI_STORAGE) {
-        if (norm < 44) return 0; // battery
-        if (norm < 66) return 1; // medkit
-        return 2;                // bait
+        return 0; // battery
     }
     if (poiType == MAP_POI_SERVER) {
-        if (norm < 55) return 0;
-        if (norm < 72) return 1;
-        return 2;
+        return 0;
     }
     if (poiType == MAP_POI_OFFICE) {
-        if (norm < 30) return 0;
-        if (norm < 72) return 1;
-        return 2;
+        return 0;
     }
-    if (norm < 36) return 0;
-    if (norm < 84) return 1;
-    return 2;
+    return 0;
 }
 
 inline int choosePoiRiskRoamEvent(int poiType, int roll) {

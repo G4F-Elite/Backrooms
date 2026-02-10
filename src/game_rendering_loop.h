@@ -1,4 +1,6 @@
 #pragma once
+inline Mat4 composeModelMatrix(const Vec3& pos, float yaw, float pitch, const Vec3& scale);
+
 void renderScene(){
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
@@ -91,6 +93,32 @@ void renderScene(){
     glBindTexture(GL_TEXTURE_2D,ceilTex);glBindVertexArray(ceilVAO);glDrawArrays(GL_TRIANGLES,0,ceilVC);
     if(noteVC>0){glBindTexture(GL_TEXTURE_2D,lightTex);glBindVertexArray(noteVAO);glDrawArrays(GL_TRIANGLES,0,noteVC);}
     glEnable(GL_CULL_FACE);
+
+    static float deviceEquip = 0.0f;
+    float equipTarget = (activeDeviceSlot > 0) ? 1.0f : 0.0f;
+    float equipStep = dTime * 8.0f;
+    if(equipStep > 1.0f) equipStep = 1.0f;
+    deviceEquip += (equipTarget - deviceEquip) * equipStep;
+
+    if(deviceVC>0 && deviceEquip > 0.02f){
+        Vec3 fwd(mSin(cam.yaw), 0.0f, mCos(cam.yaw));
+        Vec3 right(mCos(cam.yaw), 0.0f, -mSin(cam.yaw));
+        Vec3 up(0.0f, 1.0f, 0.0f);
+        float bob = sinf(vhsTime * 8.0f) * 0.012f * (0.25f + sndState.moveIntensity);
+        float handSide = (activeDeviceSlot == 2) ? 0.19f : 0.24f;
+        float slide = (1.0f - deviceEquip);
+        Vec3 base = cam.pos + fwd * (0.30f + 0.18f * deviceEquip) + right * handSide + up * (-0.22f - 0.18f * slide + bob);
+        float yaw = cam.yaw + (activeDeviceSlot == 2 ? 0.12f : 0.18f);
+        float pitch = cam.pitch + (activeDeviceSlot == 2 ? -0.22f : -0.18f);
+        Vec3 scale = (activeDeviceSlot == 2) ? Vec3(1.1f, 1.0f, 1.25f) : Vec3(0.95f, 0.95f, 1.0f);
+        scale = scale * (0.8f + 0.2f * deviceEquip);
+        Mat4 deviceModel = composeModelMatrix(base, yaw, pitch, scale);
+        glUniformMatrix4fv(mu.M,1,GL_FALSE,deviceModel.m);
+        glBindTexture(GL_TEXTURE_2D,propTex);
+        glBindVertexArray(deviceVAO);
+        glDrawArrays(GL_TRIANGLES,0,deviceVC);
+        glUniformMatrix4fv(mu.M,1,GL_FALSE,model.m);
+    }
     
     if(multiState==MULTI_IN_GAME && playerModelsInit){
         renderPlayers(mainShader, proj, view, netMgr.myId);
@@ -151,6 +179,32 @@ inline int detectActiveRefreshRateHz(GLFWwindow* w){
     return vm->refreshRate;
 }
 
+inline Mat4 composeModelMatrix(const Vec3& pos, float yaw, float pitch, const Vec3& scale){
+    float cy = mCos(yaw), sy = mSin(yaw);
+    float cx = mCos(pitch), sx = mSin(pitch);
+    Mat4 r;
+    r.m[0] = cy * scale.x;
+    r.m[1] = sx * sy * scale.x;
+    r.m[2] = -cx * sy * scale.x;
+    r.m[3] = 0.0f;
+
+    r.m[4] = 0.0f;
+    r.m[5] = cx * scale.y;
+    r.m[6] = sx * scale.y;
+    r.m[7] = 0.0f;
+
+    r.m[8] = sy * scale.z;
+    r.m[9] = -sx * cy * scale.z;
+    r.m[10] = cx * cy * scale.z;
+    r.m[11] = 0.0f;
+
+    r.m[12] = pos.x;
+    r.m[13] = pos.y;
+    r.m[14] = pos.z;
+    r.m[15] = 1.0f;
+    return r;
+}
+
 inline void applyFramePacing(double frameStartTime, int targetFps){
     if(targetFps <= 0) return;
     double targetFrameSec = 1.0 / (double)targetFps;
@@ -164,4 +218,8 @@ inline void applyFramePacing(double frameStartTime, int targetFps){
     }
     while((glfwGetTime() - frameStartTime) < targetFrameSec){}
 }
+
+
+
+
 

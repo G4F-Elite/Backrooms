@@ -137,6 +137,7 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
         if(vi==6){ settings.fastMath=!settings.fastMath; return true; }
         if(vi==7){ settings.frameGenMode=stepFrameGenMode(settings.frameGenMode,dir); return true; }
         if(vi==8){ settings.vsync=!settings.vsync; return true; }
+        if(vi==9){ settings.debugMode=!settings.debugMode; return true; }
         return false;
     };
     auto effectsAdjust = [&](int idx, int dir) {

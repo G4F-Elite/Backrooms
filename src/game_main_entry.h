@@ -181,7 +181,6 @@ int main(){
                     }
                 }
                 if(falseDoorTimer>0) falseDoorTimer-=dTime;
-                if(baitEffectTimer>0) baitEffectTimer-=dTime;
                 updateEchoSignal();
                 updateTrapCorridor();
                 if(multiState!=MULTI_IN_GAME) updateSmileEvent();
@@ -240,9 +239,6 @@ int main(){
                     entitySpawnTimer = computeEntitySpawnDelay(survivalTime, (int)rng()) * levelSpawnDelayScale(gCurrentLevel);
                 }
                 entityMgr.update(dTime,cam.pos,cam.yaw,nullptr,0,0,CS);
-                if(baitEffectTimer>0){
-                    entityMgr.dangerLevel *= 0.45f;
-                }
                 float nearestMonster = 9999.0f;
                 float menace = 0.0f;
                 for(const auto& e:entityMgr.entities){

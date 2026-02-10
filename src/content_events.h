@@ -35,9 +35,8 @@ inline float nextNoteSpawnDelaySeconds(int roll) {
 }
 
 inline int chooseCacheItemType(int roll) {
-    int norm = roll % 3;
-    if (norm < 0) norm += 3;
-    return norm;
+    (void)roll;
+    return 0;
 }
 
 inline bool isEchoInRange(const Vec3& playerPos, const Vec3& echoPos, float range) {
@@ -59,8 +58,6 @@ inline void applyEchoOutcome(
     int echoType,
     int roll,
     int& invBattery,
-    int& invMedkit,
-    int& invBait,
     float& hp,
     float& sanity,
     float& stamina,
@@ -70,8 +67,6 @@ inline void applyEchoOutcome(
     if (echoType == ECHO_CACHE) {
         int item = chooseCacheItemType(roll);
         if (item == 0) invBattery++;
-        else if (item == 1) invMedkit++;
-        else invBait++;
         return;
     }
     if (echoType == ECHO_RESTORE) {

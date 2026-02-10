@@ -15,6 +15,8 @@
 
 GLuint noteVAO=0, noteVBO=0;
 int noteVC=0;
+GLuint deviceVAO=0, deviceVBO=0;
+int deviceVC=0;
 bool playerModelsInit = false;
 
 void buildGeom();
@@ -46,7 +48,7 @@ struct CoopObjectives {
 
 struct WorldItem {
     int id;
-    int type; // 0 battery, 1 medkit, 2 bait
+    int type; // 0 battery
     Vec3 pos;
     bool active;
 };
@@ -84,11 +86,12 @@ float fallVelocity = 0.0f;
 float fallTimer = 0.0f;
 int nextWorldItemId = 1;
 float itemSpawnTimer = 12.0f;
-float baitEffectTimer = 0.0f;
 float lightsOutTimer = 0.0f;
 float falseDoorTimer = 0.0f;
 Vec3 falseDoorPos(0,0,0);
-int invBattery = 0, invMedkit = 0, invBait = 0;
+int invBattery = 0;
+int activeDeviceSlot = 1; // 1 flashlight, 2 scanner, 3 battery
+float scannerSignal = 0.0f;
 EchoSignal echoSignal = {};
 float echoSpawnTimer = 14.0f;
 float echoStatusTimer = 0.0f;
@@ -119,7 +122,7 @@ struct SessionSnapshot {
     float camYaw, camPitch;
     float health, sanity, stamina, battery;
     float survival;
-    int invB, invM, invT;
+    int invB;
 };
 
 SessionSnapshot lastSession = {};
@@ -141,8 +144,6 @@ inline void captureSessionSnapshot(){
     lastSession.battery = flashlightBattery;
     lastSession.survival = survivalTime;
     lastSession.invB = invBattery;
-    lastSession.invM = invMedkit;
-    lastSession.invT = invBait;
 }
 
 inline void restoreSessionSnapshot(){
@@ -156,8 +157,6 @@ inline void restoreSessionSnapshot(){
     flashlightBattery = lastSession.battery;
     survivalTime = lastSession.survival;
     invBattery = lastSession.invB;
-    invMedkit = lastSession.invM;
-    invBait = lastSession.invT;
 }
 
 inline void initCoopObjectives(const Vec3& basePos){

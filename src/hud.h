@@ -46,136 +46,179 @@ void drawUI(){
         else{
             drawDamageOverlay(damageFlash,playerHealth);
             drawSurvivalTime(survivalTime);
-            char fpsBuf[48];
-            snprintf(fpsBuf,48,"FPS %.0f",gPerfFpsSmoothed);
-            char fgBuf[80];
-            formatFrameGenPipeline(fgBuf,80,gPerfRefreshHz,gPerfFrameGenBaseCap,settings.frameGenMode,settings.vsync);
-            char upBuf[96];
-            formatUpscalePipeline(upBuf,96,settings.upscalerMode,renderW,renderH,winW,winH);
-            if(gHudTelemetryVisible){
-                char pingBuf[48];
-                if(multiState==MULTI_IN_GAME) snprintf(pingBuf,48,"PING %.0fms",netMgr.rttMs);
-                else snprintf(pingBuf,48,"PING --");
-                char netBuf[40];
-                if(multiState==MULTI_IN_GAME) snprintf(netBuf,40,"NET %s",netMgr.connectionQualityLabel((float)glfwGetTime()));
-                else snprintf(netBuf,40,"NET --");
-                char perfRow[300];
-                snprintf(perfRow,300,"%s | %s | %s | %s | %s",fpsBuf,fgBuf,upBuf,pingBuf,netBuf);
-                drawHudText(perfRow,-0.95f,0.95f,1.20f,0.88f,0.93f,0.78f,0.98f);
-            }else{
-                drawHudText("HUD HIDDEN",-0.95f,0.95f,1.00f,0.80f,0.86f,0.74f,0.95f);
+
+            // === DEBUG MODE: FPS/telemetry overlay ===
+            if(settings.debugMode){
+                char fpsBuf[48];
+                snprintf(fpsBuf,48,"FPS %.0f",gPerfFpsSmoothed);
+                char fgBuf[80];
+                formatFrameGenPipeline(fgBuf,80,gPerfRefreshHz,gPerfFrameGenBaseCap,settings.frameGenMode,settings.vsync);
+                char upBuf[96];
+                formatUpscalePipeline(upBuf,96,settings.upscalerMode,renderW,renderH,winW,winH);
+                if(gHudTelemetryVisible){
+                    char pingBuf[48];
+                    if(multiState==MULTI_IN_GAME) snprintf(pingBuf,48,"PING %.0fms",netMgr.rttMs);
+                    else snprintf(pingBuf,48,"PING --");
+                    char netBuf[40];
+                    if(multiState==MULTI_IN_GAME) snprintf(netBuf,40,"NET %s",netMgr.connectionQualityLabel((float)glfwGetTime()));
+                    else snprintf(netBuf,40,"NET --");
+                    char perfRow[300];
+                    snprintf(perfRow,300,"%s | %s | %s | %s | %s",fpsBuf,fgBuf,upBuf,pingBuf,netBuf);
+                    drawHudText(perfRow,-0.95f,0.95f,1.20f,0.88f,0.93f,0.78f,0.98f);
+                }else{
+                    drawHudText("HUD HIDDEN",-0.95f,0.95f,1.00f,0.80f,0.86f,0.74f,0.95f);
+                }
             }
 
             if(playerHealth<100)drawHealthBar(playerHealth);
             if(playerSanity<100)drawSanityBar(playerSanity);
             drawStaminaBar(playerStamina);
             if(flashlightBattery<100)drawFlashlightBattery(flashlightBattery,flashlightOn);
-
-            float blockX = 0.44f;
-            float blockY = 0.90f;
-            const char* phaseNames[] = {"INTRO","EXPLORATION","SURVIVAL","DESPERATION"};
-            int phaseIdx = (int)storyMgr.getPhase();
-            if(phaseIdx < 0) phaseIdx = 0;
-            if(phaseIdx > 3) phaseIdx = 3;
-            drawHudText("OBJECTIVE",blockX,blockY,1.28f,0.90f,0.94f,0.72f,0.97f);
-            blockY -= 0.07f;
-            if(multiState==MULTI_IN_GAME){
-                int switchCount = (coop.switchOn[0]?1:0)+(coop.switchOn[1]?1:0);
-                char objProgress[64];
-                snprintf(objProgress,64,"SWITCHES %d/2",switchCount);
-                drawHudText(objProgress,blockX,blockY,1.18f,0.86f,0.90f,0.68f,0.95f);
-                blockY -= 0.06f;
-                drawHudText(coop.doorOpen?"DOOR OPEN":"DOOR LOCKED",blockX,blockY,1.16f,0.88f,0.84f,0.62f,0.95f);
-                blockY -= 0.06f;
-                if(!coop.doorOpen) drawHudText("ACTION HOLD 2 SWITCHES",blockX,blockY,1.02f,0.82f,0.86f,0.62f,0.90f);
-                blockY -= 0.06f;
-            }else{
-                const int notesRequired = storyNotesRequired();
-                bool exitReady = isStoryExitReady();
-                char notesLine[64];
-                snprintf(notesLine,64,"NOTES %d/%d",storyMgr.totalCollected,notesRequired);
-                drawHudText(notesLine,blockX,blockY,1.18f,0.86f,0.90f,0.68f,0.95f);
-                blockY -= 0.06f;
-                drawHudText(storyEchoAttuned?"ECHO ATTUNED":"ECHO NOT ATTUNED",blockX,blockY,1.08f,0.72f,0.86f,0.90f,0.93f);
-                blockY -= 0.06f;
-                drawHudText(exitReady?"EXIT DOOR READY":"EXIT DOOR LOCKED",blockX,blockY,1.16f,0.88f,0.84f,0.62f,0.95f);
-                blockY -= 0.06f;
-                drawHudText(exitReady?"ACTION GO TO DOOR AND PRESS E":"ACTION NOTES + ECHO REQUIRED",blockX,blockY,1.02f,0.82f,0.86f,0.62f,0.90f);
-                blockY -= 0.06f;
+            if(activeDeviceSlot == 2){
+                float y = -0.70f;
+                drawHudText("SCANNER",0.52f,y,1.15f,0.55f,0.82f,0.86f,0.92f);
+                float sig = scannerSignal;
+                if(sig < 0.0f) sig = 0.0f;
+                if(sig > 1.0f) sig = 1.0f;
+                drawSlider(0.66f,y,0.30f,sig,0.45f,0.85f,0.95f);
             }
-            char phaseBuf[64];
-            snprintf(phaseBuf,64,"PHASE %s",phaseNames[phaseIdx]);
-            drawHudText(phaseBuf,blockX,blockY,1.14f,0.86f,0.80f,0.56f,0.94f);
-            blockY -= 0.06f;
-            char levelBuf[48];
-            buildLevelLabel(gCurrentLevel, levelBuf, 48);
-            drawHudText(levelBuf,blockX,blockY,1.06f,0.80f,0.86f,0.66f,0.93f);
-            blockY -= 0.06f;
-            char invBuf[64];
-            snprintf(invBuf,64,"SUPPLIES B:%d M:%d T:%d",invBattery,invMedkit,invBait);
-            drawHudText(invBuf,blockX,blockY,1.06f,0.76f,0.86f,0.70f,0.93f);
-            blockY -= 0.06f;
-            if(falseDoorTimer>0) {
-                drawHudText("EVENT FALSE DOOR SHIFT",blockX,blockY,1.05f,0.95f,0.45f,0.36f,0.92f);
-                blockY -= 0.05f;
+
+            // === DEBUG MODE: full objective block (top-right) ===
+            if(settings.debugMode){
+                float blockX = 0.44f;
+                float blockY = 0.90f;
+                const char* phaseNames[] = {"INTRO","EXPLORATION","SURVIVAL","DESPERATION"};
+                int phaseIdx = (int)storyMgr.getPhase();
+                if(phaseIdx < 0) phaseIdx = 0;
+                if(phaseIdx > 3) phaseIdx = 3;
+                drawHudText("OBJECTIVE",blockX,blockY,1.28f,0.90f,0.94f,0.72f,0.97f);
+                blockY -= 0.07f;
+                if(multiState==MULTI_IN_GAME){
+                    int switchCount = (coop.switchOn[0]?1:0)+(coop.switchOn[1]?1:0);
+                    char objProgress[64];
+                    snprintf(objProgress,64,"SWITCHES %d/2",switchCount);
+                    drawHudText(objProgress,blockX,blockY,1.18f,0.86f,0.90f,0.68f,0.95f);
+                    blockY -= 0.06f;
+                    drawHudText(coop.doorOpen?"DOOR OPEN":"DOOR LOCKED",blockX,blockY,1.16f,0.88f,0.84f,0.62f,0.95f);
+                    blockY -= 0.06f;
+                    if(!coop.doorOpen) drawHudText("ACTION HOLD 2 SWITCHES",blockX,blockY,1.02f,0.82f,0.86f,0.62f,0.90f);
+                    blockY -= 0.06f;
+                }else{
+                    const int notesRequired = storyNotesRequired();
+                    bool exitReady = isStoryExitReady();
+                    char notesLine[64];
+                    snprintf(notesLine,64,"NOTES %d/%d",storyMgr.totalCollected,notesRequired);
+                    drawHudText(notesLine,blockX,blockY,1.18f,0.86f,0.90f,0.68f,0.95f);
+                    blockY -= 0.06f;
+                    drawHudText(storyEchoAttuned?"ECHO ATTUNED":"ECHO NOT ATTUNED",blockX,blockY,1.08f,0.72f,0.86f,0.90f,0.93f);
+                    blockY -= 0.06f;
+                    drawHudText(exitReady?"EXIT DOOR READY":"EXIT DOOR LOCKED",blockX,blockY,1.16f,0.88f,0.84f,0.62f,0.95f);
+                    blockY -= 0.06f;
+                    drawHudText(exitReady?"ACTION GO TO DOOR AND PRESS E":"ACTION NOTES + ECHO REQUIRED",blockX,blockY,1.02f,0.82f,0.86f,0.62f,0.90f);
+                    blockY -= 0.06f;
+                }
+                char phaseBuf[64];
+                snprintf(phaseBuf,64,"PHASE %s",phaseNames[phaseIdx]);
+                drawHudText(phaseBuf,blockX,blockY,1.14f,0.86f,0.80f,0.56f,0.94f);
+                blockY -= 0.06f;
+                char levelBuf[48];
+                buildLevelLabel(gCurrentLevel, levelBuf, 48);
+                drawHudText(levelBuf,blockX,blockY,1.06f,0.80f,0.86f,0.66f,0.93f);
+                blockY -= 0.06f;
+                char invBuf[64];
+                snprintf(invBuf,64,"SUPPLIES B:%d",invBattery);
+                drawHudText(invBuf,blockX,blockY,1.06f,0.76f,0.86f,0.70f,0.93f);
+                blockY -= 0.06f;
+                if(falseDoorTimer>0) {
+                    drawHudText("EVENT FALSE DOOR SHIFT",blockX,blockY,1.05f,0.95f,0.45f,0.36f,0.92f);
+                    blockY -= 0.05f;
+                }
             }
 
             if(multiState==MULTI_IN_GAME && !coop.doorOpen){
-                if(nearPoint2D(cam.pos, coop.switches[0], 2.6f)||nearPoint2D(cam.pos, coop.switches[1], 2.6f))
-                    drawHudTextCentered("HOLD SWITCH POSITION",0.0f,-0.35f,1.4f,0.75f,0.8f,0.55f,0.90f);
+                if(settings.debugMode){
+                    if(nearPoint2D(cam.pos, coop.switches[0], 2.6f)||nearPoint2D(cam.pos, coop.switches[1], 2.6f))
+                        drawHudTextCentered("HOLD SWITCH POSITION",0.0f,-0.35f,1.4f,0.75f,0.8f,0.55f,0.90f);
+                }
             }
             if(multiState!=MULTI_IN_GAME){
                 bool nearExit = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
-                if(nearExit){
+                if(nearExit && settings.debugMode){
                     if(isStoryExitReady()) drawHudTextCentered("[E] EXIT LEVEL",0.0f,-0.35f,1.4f,0.75f,0.88f,0.70f,0.95f);
                     else drawHudTextCentered("COLLECT NOTES + ATTUNE ECHO TO UNLOCK EXIT",0.0f,-0.35f,1.2f,0.88f,0.72f,0.58f,0.93f);
                 }
             }else{
                 bool nearExit = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
-                if(nearExit){
+                if(nearExit && settings.debugMode){
                     if(coop.doorOpen && storyMgr.totalCollected>=5) drawHudTextCentered("[E] EXIT LEVEL",0.0f,-0.35f,1.4f,0.75f,0.88f,0.70f,0.95f);
                     else drawHudTextCentered("OPEN DOOR + COLLECT 5 NOTES TO EXIT",0.0f,-0.35f,1.25f,0.88f,0.72f,0.58f,0.93f);
                 }
             }
-            if(storyMgr.totalCollected>0)drawNoteCounter(storyMgr.totalCollected);
-            if(nearNoteId>=0)drawInteractPrompt();
-            if(nearbyWorldItemId>=0){
+            drawNoteCounter(storyMgr.totalCollected);
+            if(nearNoteId>=0 && settings.debugMode) drawInteractPrompt();
+            if(nearbyWorldItemId>=0 && settings.debugMode){
                 if(nearbyWorldItemType==0) drawHudTextCentered("[E] PICK BATTERY",0.0f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.9f);
-                else if(nearbyWorldItemType==1) drawHudTextCentered("[E] PICK MEDKIT",0.0f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.9f);
-                else if(nearbyWorldItemType==2) drawHudTextCentered("[E] PICK BAIT",0.0f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.9f);
             }
+            // === ECHO SIGNAL: immersive pulsing indicator (always), debug shows distance ===
             if(multiState!=MULTI_IN_GAME && echoSignal.active){
                 Vec3 d = echoSignal.pos - cam.pos;
                 d.y = 0;
                 float dist = d.len();
-                char echoBuf[72];
-                snprintf(echoBuf,72,"ECHO SIGNAL %.0fm",dist);
-                drawHudText(echoBuf,-0.95f,0.50f,1.18f,0.62f,0.85f,0.86f,0.90f);
-                if(isEchoInRange(cam.pos, echoSignal.pos, 2.5f)){
-                    drawHudTextCentered("[E] ATTUNE ECHO",0.0f,-0.50f,1.35f,0.72f,0.88f,0.9f,0.90f);
+                if(settings.debugMode){
+                    char echoBuf[72];
+                    snprintf(echoBuf,72,"ECHO SIGNAL %.0fm",dist);
+                    drawHudText(echoBuf,-0.95f,0.50f,1.18f,0.62f,0.85f,0.86f,0.90f);
+                }else{
+                    // Immersive echo: faint, flickering beacon with a VHS-like pulse (no text)
+                    float proximity = 1.0f - (dist / 60.0f);
+                    if(proximity < 0.05f) proximity = 0.05f;
+                    if(proximity > 1.0f) proximity = 1.0f;
+                    float t = (float)glfwGetTime();
+                    float pulse = 0.32f + 0.68f * proximity;
+                    float flicker = 0.72f + 0.28f * sinf(t * (1.4f + proximity * 6.2f));
+                    float alpha = pulse * flicker;
+                    float driftX = 0.006f * sinf(t * 0.9f + dist * 0.04f);
+                    float driftY = 0.006f * cosf(t * 0.7f + dist * 0.03f);
+                    float baseX = -0.90f + driftX;
+                    float baseY = 0.50f + driftY;
+                    float core = 0.010f + 0.010f * proximity;
+                    float glow = core * 2.8f;
+                    drawOverlayRectNdc(baseX - glow, baseY - glow, baseX + glow, baseY + glow, 0.18f, 0.36f, 0.42f, alpha * 0.20f);
+                    drawOverlayRectNdc(baseX - core * 1.8f, baseY - core * 0.12f, baseX + core * 1.8f, baseY + core * 0.12f, 0.28f, 0.68f, 0.78f, alpha * 0.55f);
+                    drawOverlayRectNdc(baseX - core * 0.12f, baseY - core * 1.8f, baseX + core * 0.12f, baseY + core * 1.8f, 0.38f, 0.82f, 0.92f, alpha * 0.70f);
+                    float smearY = baseY - 0.035f + 0.01f * sinf(t * 1.25f + proximity);
+                    float smearW = 0.04f + 0.05f * proximity;
+                    drawOverlayRectNdc(baseX - smearW, smearY - 0.004f, baseX + smearW, smearY + 0.004f, 0.22f, 0.50f, 0.58f, alpha * 0.28f);
+                }
+                if(settings.debugMode && isEchoInRange(cam.pos, echoSignal.pos, 2.5f)){
+                    drawHudTextCentered("[E]",0.0f,-0.50f,1.6f,0.72f,0.88f,0.9f,0.90f);
                 }
             }
-            if(multiState!=MULTI_IN_GAME && echoStatusTimer>0.0f){
+            if(settings.debugMode && multiState!=MULTI_IN_GAME && echoStatusTimer>0.0f){
                 drawHudTextCentered(echoStatusText,0.0f,0.62f,1.18f,0.7f,0.86f,0.9f,0.92f);
             }
+            // === SMILE EVENT: red corridor overlay always, text hint only in debug ===
             if(smileEvent.corridorActive){
                 drawFullscreenOverlay(0.20f,0.02f,0.02f,0.18f);
-                drawHudTextCentered("RED CORRIDOR. MOVE TO THE END.",0.0f,0.70f,1.18f,0.92f,0.46f,0.40f,0.95f);
+                if(settings.debugMode) drawHudTextCentered("RED CORRIDOR. MOVE TO THE END.",0.0f,0.70f,1.18f,0.92f,0.46f,0.40f,0.95f);
             }else if(smileEvent.eyeActive){
-                float sx = 0.0f, sy = 0.0f;
-                if(projectToScreen(smileEvent.eyePos, sx, sy)){
-                    drawEyeMarker(sx, sy, 1.0f, 0.98f);
-                }else{
-                    Vec3 rightHint(mCos(cam.yaw), 0.0f, -mSin(cam.yaw));
-                    Vec3 eyeDir = smileEvent.eyePos - cam.pos;
-                    eyeDir.y = 0.0f;
-                    float side = rightHint.dot(eyeDir);
-                    if(side >= 0.0f){
-                        drawEyeMarker(0.88f, 0.31f, 0.82f, 0.96f);
-                        drawHudText(">>",0.80f,0.27f,1.20f,0.90f,0.42f,0.38f,0.95f);
+                // === DEBUG MODE: eye marker wallhack/ESP ===
+                if(settings.debugMode){
+                    float sx = 0.0f, sy = 0.0f;
+                    if(projectToScreen(smileEvent.eyePos, sx, sy)){
+                        drawEyeMarker(sx, sy, 1.0f, 0.98f);
                     }else{
-                        drawEyeMarker(-0.88f, 0.31f, 0.82f, 0.96f);
-                        drawHudText("<<",-0.95f,0.27f,1.20f,0.90f,0.42f,0.38f,0.95f);
+                        Vec3 rightHint(mCos(cam.yaw), 0.0f, -mSin(cam.yaw));
+                        Vec3 eyeDir = smileEvent.eyePos - cam.pos;
+                        eyeDir.y = 0.0f;
+                        float side = rightHint.dot(eyeDir);
+                        if(side >= 0.0f){
+                            drawEyeMarker(0.88f, 0.31f, 0.82f, 0.96f);
+                            drawHudText(">>",0.80f,0.27f,1.20f,0.90f,0.42f,0.38f,0.95f);
+                        }else{
+                            drawEyeMarker(-0.88f, 0.31f, 0.82f, 0.96f);
+                            drawHudText("<<",-0.95f,0.27f,1.20f,0.90f,0.42f,0.38f,0.95f);
+                        }
                     }
                 }
             }
@@ -197,53 +240,57 @@ void drawUI(){
                     drawHudText(nm, sx - xOff, sy, 1.1f, 0.85f, 0.9f, 0.7f, 0.90f);
                 }
             }
-            if(trapCorridor.active && trapStatusTimer > 0.0f){
-                drawHudTextCentered(trapStatusText,0.0f,0.55f,1.2f,0.82f,0.78f,0.9f,0.90f);
-            }
-            if(!floorHoles.empty()){
-                char holeBuf[64];
-                snprintf(holeBuf,64,"FLOOR HAZARDS: %d", (int)floorHoles.size());
-                drawHudText(holeBuf,-0.95f,0.44f,1.10f,0.92f,0.58f,0.38f,0.90f);
-            }
-            if(trapCorridor.locked){
-                float t = trapCorridor.stareProgress / 2.6f;
-                if(t < 0.0f) t = 0.0f;
-                if(t > 1.0f) t = 1.0f;
-                char anomBuf[64];
-                snprintf(anomBuf,64,"ANOMALY LOCK %.0f%%",t * 100.0f);
-                drawHudText(anomBuf,-0.95f,0.38f,1.0f,0.88f,0.78f,0.90f,0.92f);
-            }
-            const char* mmState = minimapEnabled ? "MINIMAP ON [M/F8]" : "MINIMAP OFF [M/F8]";
-            drawHudText(mmState,-0.95f,0.84f,0.95f,0.88f,0.93f,0.78f,0.95f);
-            if(gPerfDebugOverlay){
-                char graph[40];
-                buildFrameTimeGraph(
-                    gPerfFrameTimeHistory,
-                    PERF_GRAPH_SAMPLES,
-                    gPerfFrameTimeHead,
-                    32,
-                    graph,
-                    40
-                );
-                float avgMs = averageFrameTimeMs(gPerfFrameTimeHistory, PERF_GRAPH_SAMPLES);
-                float p95Ms = percentileFrameTimeMs(gPerfFrameTimeHistory, PERF_GRAPH_SAMPLES, 0.95f);
-                char dbgA[96];
-                char dbgB[96];
-                snprintf(dbgA,96,"DEBUG PERF [F3] FT %.2fms AVG %.2f P95 %.2f",gPerfFrameMs,avgMs,p95Ms);
-                snprintf(dbgB,96,"GRAPH %s",graph);
-                drawHudText(dbgA,0.12f,-0.74f,1.00f,0.70f,0.85f,0.92f,0.93f);
-                drawHudText(dbgB,0.12f,-0.80f,1.00f,0.72f,0.82f,0.88f,0.93f);
-            }
-            if(debugTools.flyMode){
-                drawHudText("DEBUG FLY: ON",0.52f,0.95f,1.10f,0.78f,0.95f,0.85f,0.98f);
-            }
-            if(debugTools.infiniteStamina){
-                drawHudText("DEBUG STAMINA: INF",0.52f,0.90f,1.02f,0.75f,0.92f,0.78f,0.96f);
+            // === DEBUG MODE: trap status text, floor hazards, anomaly lock, minimap state, perf graph ===
+            if(settings.debugMode){
+                if(trapCorridor.active && trapStatusTimer > 0.0f){
+                    drawHudTextCentered(trapStatusText,0.0f,0.55f,1.2f,0.82f,0.78f,0.9f,0.90f);
+                }
+                if(!floorHoles.empty()){
+                    char holeBuf[64];
+                    snprintf(holeBuf,64,"FLOOR HAZARDS: %d", (int)floorHoles.size());
+                    drawHudText(holeBuf,-0.95f,0.44f,1.10f,0.92f,0.58f,0.38f,0.90f);
+                }
+                if(trapCorridor.locked){
+                    float t = trapCorridor.stareProgress / 2.6f;
+                    if(t < 0.0f) t = 0.0f;
+                    if(t > 1.0f) t = 1.0f;
+                    char anomBuf[64];
+                    snprintf(anomBuf,64,"ANOMALY LOCK %.0f%%",t * 100.0f);
+                    drawHudText(anomBuf,-0.95f,0.38f,1.0f,0.88f,0.78f,0.90f,0.92f);
+                }
+                const char* mmState = minimapEnabled ? "MINIMAP ON [M/F8]" : "MINIMAP OFF [M/F8]";
+                drawHudText(mmState,-0.95f,0.84f,0.95f,0.88f,0.93f,0.78f,0.95f);
+                if(gPerfDebugOverlay){
+                    char graph[40];
+                    buildFrameTimeGraph(
+                        gPerfFrameTimeHistory,
+                        PERF_GRAPH_SAMPLES,
+                        gPerfFrameTimeHead,
+                        32,
+                        graph,
+                        40
+                    );
+                    float avgMs = averageFrameTimeMs(gPerfFrameTimeHistory, PERF_GRAPH_SAMPLES);
+                    float p95Ms = percentileFrameTimeMs(gPerfFrameTimeHistory, PERF_GRAPH_SAMPLES, 0.95f);
+                    char dbgA[96];
+                    char dbgB[96];
+                    snprintf(dbgA,96,"DEBUG PERF [F3] FT %.2fms AVG %.2f P95 %.2f",gPerfFrameMs,avgMs,p95Ms);
+                    snprintf(dbgB,96,"GRAPH %s",graph);
+                    drawHudText(dbgA,0.12f,-0.74f,1.00f,0.70f,0.85f,0.92f,0.93f);
+                    drawHudText(dbgB,0.12f,-0.80f,1.00f,0.72f,0.82f,0.88f,0.93f);
+                }
+                if(debugTools.flyMode){
+                    drawHudText("DEBUG FLY: ON",0.52f,0.95f,1.10f,0.78f,0.95f,0.85f,0.98f);
+                }
+                if(debugTools.infiniteStamina){
+                    drawHudText("DEBUG STAMINA: INF",0.52f,0.90f,1.02f,0.75f,0.92f,0.78f,0.96f);
+                }
             }
             if(multiState==MULTI_IN_GAME && netMgr.connectionUnstable((float)glfwGetTime())){
                 drawHudTextCentered("NETWORK UNSTABLE - RECONNECTING MAY OCCUR",0.0f,0.74f,1.12f,0.95f,0.64f,0.44f,0.95f);
             }
-            if(debugTools.open){
+            // === DEBUG MODE: debug tools panel (F10) ===
+            if(settings.debugMode && debugTools.open){
                 drawFullscreenOverlay(0.02f,0.03f,0.04f,0.62f);
                 drawHudText("DEBUG TOOLS",-0.28f,0.56f,1.8f,0.9f,0.95f,0.82f,0.98f);
                 for(int i=0;i<DEBUG_ACTION_COUNT;i++){

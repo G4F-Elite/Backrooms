@@ -14,16 +14,17 @@ struct GameplayBinds {
     int item1 = GLFW_KEY_1;
     int item2 = GLFW_KEY_2;
     int item3 = GLFW_KEY_3;
+    int item4 = GLFW_KEY_4;
 };
 
-inline constexpr int GAMEPLAY_BIND_COUNT = 12;
+inline constexpr int GAMEPLAY_BIND_COUNT = 13;
 inline constexpr int KEYBINDS_BACK_INDEX = GAMEPLAY_BIND_COUNT;
 
 inline const char* gameplayBindLabel(int idx) {
     static const char* labels[GAMEPLAY_BIND_COUNT] = {
         "MOVE FORWARD", "MOVE BACK", "MOVE LEFT", "MOVE RIGHT",
         "SPRINT", "CROUCH", "INTERACT", "FLASHLIGHT",
-        "PAUSE", "ITEM SLOT 1", "ITEM SLOT 2", "ITEM SLOT 3"
+        "PAUSE", "ITEM SLOT 1", "ITEM SLOT 2", "ITEM SLOT 3", "ITEM SLOT 4"
     };
     if (idx < 0 || idx >= GAMEPLAY_BIND_COUNT) return "";
     return labels[idx];
@@ -43,6 +44,7 @@ inline int* gameplayBindByIndex(GameplayBinds& binds, int idx) {
         case 9: return &binds.item1;
         case 10: return &binds.item2;
         case 11: return &binds.item3;
+        case 12: return &binds.item4;
         default: return nullptr;
     }
 }
@@ -102,4 +104,5 @@ inline const char* keyNameForUi(int key) {
     }
     return "KEY";
 }
+
 

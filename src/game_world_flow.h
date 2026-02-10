@@ -4,6 +4,13 @@
 #include "coop.h"
 #include "map_content.h"
 
+inline void buildDeviceModel(std::vector<float>& v){
+    mkBox(v, 0.0f, -0.06f, 0.0f, 0.18f, 0.08f, 0.10f);
+    mkBox(v, 0.0f, -0.02f, 0.10f, 0.10f, 0.14f, 0.10f);
+    mkBox(v, 0.0f, 0.10f, 0.24f, 0.22f, 0.12f, 0.32f);
+    mkBox(v, 0.0f, 0.03f, 0.42f, 0.14f, 0.08f, 0.18f);
+}
+
 void buildGeom(){
     std::vector<float>wv,fv,cv,pv,lv,lvOff,dv;
     int pcx=playerChunkX,pcz=playerChunkZ;
@@ -171,6 +178,11 @@ void buildGeom(){
         if(l.on)mkLight(lv,l.pos,l.sizeX,l.sizeZ);
         else mkLight(lvOff,l.pos,l.sizeX,l.sizeZ);
     }
+    std::vector<float>dev;
+    buildDeviceModel(dev);
+    deviceVC=(int)dev.size()/8;
+    if(deviceVC>0)setupVAO(deviceVAO, deviceVBO, dev, true);
+
     wallVC=(int)wv.size()/8;floorVC=(int)fv.size()/8;ceilVC=(int)cv.size()/8;
     pillarVC=(int)pv.size()/8;decorVC=(int)dv.size()/8;lightVC=(int)lv.size()/5;lightOffVC=(int)lvOff.size()/5;
     setupVAO(wallVAO,wallVBO,wv,true);setupVAO(floorVAO,floorVBO,fv,true);
@@ -294,7 +306,7 @@ void genWorld(){
     }
     worldItems.clear();
     nextWorldItemId = 1;
-    invBattery = invMedkit = invBait = 0;
+    invBattery = 0;
     clearEchoSignal();
     echoSpawnTimer = 7.0f + (float)(rng()%6);
     echoStatusTimer = 0.0f;
@@ -306,7 +318,6 @@ void genWorld(){
     smileEvent = {false, Vec3(0,0,0), 0.0f, 0.0f, 24.0f + (float)(rng()%16), false, Vec3(0,0,0), Vec3(0,0,0), 0.0f};
     anomalyBlur = 0.0f;
     lightsOutTimer = falseDoorTimer = 0.0f;
-    baitEffectTimer = 0.0f;
     itemSpawnTimer = 6.0f;
     playerHealth=playerSanity=100; playerStamina=125;
     flashlightBattery=100;flashlightOn=false;isPlayerDead=false;
@@ -353,4 +364,6 @@ void teleportToExit(){
     updateMapContent(playerChunkX,playerChunkZ);
     buildGeom();
 }
+
+
 

@@ -5,9 +5,7 @@
 #include <cmath>
 #include <cstring>
 #include "audio_dsp.h"
-
 const int SAMP_RATE=44100, BUF_COUNT=3, BUF_LEN=1024;
-
 struct SoundState {
     float humPhase=0;
     float humVol=0.15f;
@@ -35,6 +33,9 @@ struct SoundState {
     bool uiConfirmTrig=false;
     float uiMovePitch=1.0f;
     float uiAdjustPitch=1.0f;
+    bool scannerBeepTrig=false;
+    float scannerBeepPitch=1.0f;
+    float scannerBeepVol=0.5f;
     float moveIntensity=0.0f;
     float sprintIntensity=0.0f;
     float lowStamina=0.0f;
@@ -42,7 +43,6 @@ struct SoundState {
     float monsterMenace=0.0f;
     bool deathMode=false;
 };
-
 extern SoundState sndState;
 extern std::atomic<bool> audioRunning;
 extern HANDLE hEvent;
@@ -78,6 +78,7 @@ inline void fillAudio(short* buf, int len) {
     static int knockStage = 0;
     static float rustleTime = -1.0f, rustleNoise = 0.0f;
     static float ringTime = -1.0f, ringPitch = 410.0f;
+    static float scannerTime = -1.0f, scannerPitch = 1.0f, scannerVol = 0.5f;
     static float sceneClock = 0.0f;
     static float nextSceneEvent = 2.8f;
     static int lastSceneEvent = -1;
@@ -92,7 +93,6 @@ inline void fillAudio(short* buf, int len) {
     const float twoPi = 6.283185307f;
     for(int i=0;i<len;i++) {
         globalPhase += dt;
-        
         // Fluorescent hum - louder base
         float hum = sinf(sndState.humPhase)*0.25f;
         hum += sinf(sndState.humPhase*2.0f)*0.15f;
@@ -102,25 +102,21 @@ inline void fillAudio(short* buf, int len) {
         hum += safe.humNoise;
         sndState.humPhase += 0.0085f;
         if(sndState.humPhase>6.28318f) sndState.humPhase-=6.28318f;
-        
         // Ambient low drone - always present
         float amb = sinf(sndState.ambPhase)*0.04f;
         amb += sinf(sndState.ambPhase*0.7f)*0.02f;
         sndState.ambPhase += 0.00025f;
         if(sndState.ambPhase>6.28318f) sndState.ambPhase-=6.28318f;
-        
-        // Distant sounds - deep groans and creaks (slow, low-frequency)
+        // Distant sounds
         float distant = 0;
         if(rand()%80000 < 2) sndState.distantPhase = 0.8f;
         if(sndState.distantPhase > 0) {
-            // Low creaking groan that fades slowly
             float dFreq = 35.0f + sinf(sndState.distantPhase * 2.0f) * 8.0f;
             distant = sinf(sndState.distantPhase * dFreq) * expf(-sndState.distantPhase * 2.5f) * 0.18f;
             distant += sinf(sndState.distantPhase * dFreq * 0.5f) * expf(-sndState.distantPhase * 1.8f) * 0.08f;
             sndState.distantPhase -= 1.0f / SAMP_RATE;
         }
-
-        // Soft procedural spot SFX (no hard peaks)
+        // Soft procedural spot SFX
         float envDanger = sndState.dangerLevel;
         if(envDanger < 0.0f) envDanger = 0.0f;
         if(envDanger > 1.0f) envDanger = 1.0f;
@@ -137,12 +133,12 @@ inline void fillAudio(short* buf, int len) {
 
             int eventRoll = rand()%100;
             int eventType = 0;
-            if(eventRoll < 24) eventType = 0;         // pipe
-            else if(eventRoll < 45) eventType = 1;    // vent
-            else if(eventRoll < 60) eventType = 2;    // rustle
-            else if(eventRoll < 75) eventType = 3;    // knock
-            else if(eventRoll < 89) eventType = 4;    // buzz
-            else eventType = 5;                       // ring
+            if(eventRoll < 24) eventType = 0;
+            else if(eventRoll < 45) eventType = 1;
+            else if(eventRoll < 60) eventType = 2;
+            else if(eventRoll < 75) eventType = 3;
+            else if(eventRoll < 89) eventType = 4;
+            else eventType = 5;
             if(eventType == lastSceneEvent) eventType = (eventType + 1 + (rand()%2)) % 6;
             lastSceneEvent = eventType;
 
@@ -166,7 +162,6 @@ inline void fillAudio(short* buf, int len) {
                 ringPitch = 140.0f + (rand()%80);
             }
         }
-
         float pipeTone = 0.0f;
         if(pipeTime >= 0.0f){
             float t = pipeTime;
@@ -177,7 +172,6 @@ inline void fillAudio(short* buf, int len) {
             pipeTime += dt;
             if(pipeTime > 1.9f) pipeTime = -1.0f;
         }
-
         float ventRumble = 0.0f;
         if(ventTime >= 0.0f){
             float t = ventTime;
@@ -190,17 +184,14 @@ inline void fillAudio(short* buf, int len) {
             ventTime += dt;
             if(ventTime > 2.2f) ventTime = -1.0f;
         }
-
-        // Buzz - low electrical hum/crackle, not a high-pitched screech
+        // Buzz
         float buzzTick = 0.0f;
         if(buzzTime >= 0.0f){
             float t = buzzTime;
             float atk = (t < 0.02f) ? (t / 0.02f) : 1.0f;
             float env = atk * expf(-t * 4.5f);
             float f = buzzPitch + sinf(t * 8.0f) * 15.0f;
-            // Low rumbling buzz with subtle overtone
             buzzTick = (sinf(twoPi * f * t) * 0.35f + sinf(twoPi * (f * 2.0f) * t) * 0.08f) * env;
-            // Add filtered noise texture for electrical feel
             float nTarget = ((rand()%100) / 100.0f) * 2.0f - 1.0f;
             static float buzzNoise = 0.0f;
             buzzNoise = mixNoise(buzzNoise, nTarget, 0.015f);
@@ -208,8 +199,7 @@ inline void fillAudio(short* buf, int len) {
             buzzTime += dt;
             if(buzzTime > 0.8f) buzzTime = -1.0f;
         }
-
-        // Knock - distant muffled thuds, like something heavy behind walls
+        // Knock
         float knock = 0.0f;
         if(knockTime >= 0.0f){
             float tapStart = 0.0f;
@@ -219,10 +209,8 @@ inline void fillAudio(short* buf, int len) {
             if(localT >= 0.0f && localT < 0.25f){
                 float atk = (localT < 0.003f) ? (localT / 0.003f) : 1.0f;
                 float env = atk * expf(-localT * 18.0f);
-                // Low frequency thud - like distant door slam
                 float kf = 55.0f + 8.0f * knockStage;
                 knock += sinf(twoPi * kf * localT) * 0.5f * env;
-                // Body resonance
                 knock += sinf(twoPi * (kf * 1.7f) * localT) * 0.15f * expf(-localT * 25.0f);
             }
             if(knockStage == 0 && knockTime > 0.18f) knockStage = 1;
@@ -230,8 +218,7 @@ inline void fillAudio(short* buf, int len) {
             knockTime += dt;
             if(knockTime > 0.75f) knockTime = -1.0f;
         }
-
-        // Rustle - low scratching/shuffling, not high-pitched flutter
+        // Rustle
         float rustle = 0.0f;
         if(rustleTime >= 0.0f){
             float t = rustleTime;
@@ -239,29 +226,24 @@ inline void fillAudio(short* buf, int len) {
             float env = atk * expf(-t * 3.0f);
             float targetNoise = ((rand()%100) / 100.0f) * 2.0f - 1.0f;
             rustleNoise = mixNoise(rustleNoise, targetNoise, 0.04f);
-            // Low scratchy sound instead of high-pitched flutter
             float scrape = sinf(twoPi * (80.0f + 20.0f * sinf(t * 3.0f)) * t) * 0.15f;
             rustle = (rustleNoise * 0.25f + scrape) * env;
             rustleTime += dt;
             if(rustleTime > 1.5f) rustleTime = -1.0f;
         }
-
-        // Ring - deep metallic resonance, not a piercing tone
+        // Ring
         float ring = 0.0f;
         if(ringTime >= 0.0f){
             float t = ringTime;
             float atk = (t < 0.08f) ? (t / 0.08f) : 1.0f;
             float env = atk * expf(-t * 1.8f);
             float f = ringPitch + sinf(t * 1.5f) * 5.0f;
-            // Deep metallic drone with beating
             ring = (sinf(twoPi * f * t) * 0.3f + sinf(twoPi * (f * 1.005f) * t) * 0.25f) * env;
-            // Sub harmonic for depth
             ring += sinf(twoPi * (f * 0.5f) * t) * 0.1f * env;
             ringTime += dt;
             if(ringTime > 2.0f) ringTime = -1.0f;
         }
-        
-        // Footsteps - louder
+        // Footsteps
         float step=0;
         if(sndState.stepTrig) {
             float pitch = sndState.stepPitch;
@@ -272,8 +254,7 @@ inline void fillAudio(short* buf, int len) {
             sndState.footPhase += 1.0f / SAMP_RATE;
             if(sndState.footPhase > 0.2f) { sndState.stepTrig=false; sndState.footPhase=0; }
         }
-        
-        // Flashlight switch - mechanical click sound (low, tactile)
+        // Flashlight switch
         float flashlightSwitch = 0;
         static float lastFlash = 0;
         if(sndState.flashlightOn != lastFlash) {
@@ -281,11 +262,9 @@ inline void fillAudio(short* buf, int len) {
             lastFlash = sndState.flashlightOn;
         }
         if(safe.flashlightEnv > 0.0001f) {
-            // Low mechanical click - not a tone
             float clickPhase = (1.0f - safe.flashlightEnv);
             float swf = 160.0f + clickPhase * 60.0f;
             flashlightSwitch = sinf(twoPi * swf * globalPhase) * 0.18f * safe.flashlightEnv;
-            // Add a sharp transient for the "click" feel
             flashlightSwitch += sinf(twoPi * 90.0f * globalPhase) * 0.08f * safe.flashlightEnv * safe.flashlightEnv;
             safe.flashlightEnv *= 0.94f;
         }
@@ -295,7 +274,6 @@ inline void fillAudio(short* buf, int len) {
             flashlightLoop = (sinf(twoPi * fz * globalPhase) * 0.018f +
                               sinf(twoPi * fz * 2.0f * globalPhase) * 0.006f);
         }
-
         // Menu UI sounds
         if(sndState.uiMoveTrig){
             uiMoveTime = 0.0f;
@@ -309,7 +287,13 @@ inline void fillAudio(short* buf, int len) {
             uiConfirmTime = 0.0f;
             sndState.uiConfirmTrig = false;
         }
-        // UI Move - soft muted thud with low tone (not a high-pitched beep)
+        if(sndState.scannerBeepTrig){
+            scannerTime = 0.0f;
+            scannerPitch = sndState.scannerBeepPitch;
+            scannerVol = sndState.scannerBeepVol;
+            sndState.scannerBeepTrig = false;
+        }
+        // UI Move
         float uiMove = 0.0f;
         if(uiMoveTime >= 0.0f){
             float t = uiMoveTime;
@@ -318,17 +302,15 @@ inline void fillAudio(short* buf, int len) {
             float pitch = sndState.uiMovePitch;
             if(pitch < 0.8f) pitch = 0.8f;
             if(pitch > 1.2f) pitch = 1.2f;
-            // Low, soft tone - like a muffled click/tap
             float f1 = 220.0f * pitch;
             float f2 = 330.0f * pitch;
             uiMove = (sinf(twoPi * f1 * t) * 0.35f + sinf(twoPi * f2 * t) * 0.12f) * env;
-            // Add a soft thud texture
             uiMove += sinf(twoPi * 85.0f * pitch * t) * expf(-t * 30.0f) * 0.15f;
             uiMoveTime += dt;
             if(uiMoveTime > 0.12f) uiMoveTime = -1.0f;
         }
         float uiConfirm = 0.0f;
-        // UI Adjust - very subtle low tick
+        // UI Adjust
         float uiAdjust = 0.0f;
         if(uiAdjustTime >= 0.0f){
             float t = uiAdjustTime;
@@ -337,55 +319,51 @@ inline void fillAudio(short* buf, int len) {
             float pitch = sndState.uiAdjustPitch;
             if(pitch < 0.85f) pitch = 0.85f;
             if(pitch > 1.15f) pitch = 1.15f;
-            // Soft, muted tick - like a physical switch
             float f1 = 260.0f * pitch;
             uiAdjust = sinf(twoPi * f1 * t) * 0.28f * env;
             uiAdjust += sinf(twoPi * 120.0f * pitch * t) * expf(-t * 35.0f) * 0.12f;
             uiAdjustTime += dt;
             if(uiAdjustTime > 0.08f) uiAdjustTime = -1.0f;
         }
-        // UI Confirm - gentle low descending tone (not a harsh beep)
+        // UI Confirm
         if(uiConfirmTime >= 0.0f){
             float t = uiConfirmTime;
             float attack = (t < 0.008f) ? (t / 0.008f) : 1.0f;
             float env = attack * expf(-t * 10.0f);
             float lerpT = t / 0.25f;
             if(lerpT > 1.0f) lerpT = 1.0f;
-            // Descending warm tone
             float f1 = 340.0f + (240.0f - 340.0f) * lerpT;
             float f2 = f1 * 1.5f;
             uiConfirm = (sinf(twoPi * f1 * t) * 0.30f + sinf(twoPi * f2 * t) * 0.08f) * env;
-            // Add sub bass thud
             uiConfirm += sinf(twoPi * 65.0f * t) * expf(-t * 15.0f) * 0.18f;
             uiConfirmTime += dt;
             if(uiConfirmTime > 0.25f) uiConfirmTime = -1.0f;
         }
-        
-        // Danger sounds - progressive
+        float scannerBeep = 0.0f;
+        if(scannerTime >= 0.0f){
+            float t = scannerTime;
+            scannerBeep = scannerBeepSample(t, scannerPitch, scannerVol);
+            scannerTime += dt;
+            if(scannerTime > 0.22f) scannerTime = -1.0f;
+        }
+        // Danger sounds
         float creepy = 0;
         if(sndState.dangerLevel > 0.05f) {
-            // Low rumble
             creepy += sinf(sndState.creepyPhase * 0.4f) * 0.2f * sndState.dangerLevel;
-            // Dissonant tone
             creepy += sinf(sndState.creepyPhase * 2.1f) * 0.1f * sndState.dangerLevel;
-            // Soft static texture (smoothed to avoid sharp clicks)
             float staticTarget = (float)(rand()%100-50)/100.0f * 0.06f * sndState.dangerLevel;
             safe.staticNoise = mixNoise(safe.staticNoise, staticTarget, 0.025f);
             creepy += safe.staticNoise;
-            
-            // Heartbeat at high danger
             if(sndState.dangerLevel > 0.5f) {
                 sndState.heartPhase += 0.00015f * (1.0f + sndState.dangerLevel);
                 if(sndState.heartPhase > 6.28f) sndState.heartPhase -= 6.28f;
                 float hb = sinf(sndState.heartPhase);
                 if(hb > 0.8f) creepy += 0.35f * sndState.dangerLevel;
             }
-            
             sndState.creepyPhase += 0.002f;
             if(sndState.creepyPhase > 6.28318f) sndState.creepyPhase -= 6.28318f;
         }
-        
-        // Jump scare sound
+        // Jump scare
         float scare = 0;
         if(sndState.scareVol > 0) {
             scare = sinf(sndState.scareTimer * 200.0f) * sndState.scareVol;
@@ -394,7 +372,6 @@ inline void fillAudio(short* buf, int len) {
             sndState.scareVol *= 0.9998f;
             if(sndState.scareVol < 0.01f) sndState.scareVol = 0;
         }
-        
         // Insanity sounds
         float insane = 0;
         float insanity = 1.0f - sndState.sanityLevel;
@@ -413,7 +390,6 @@ inline void fillAudio(short* buf, int len) {
             sndState.whisperPhase += 0.0012f + insanity * 0.0015f;
             if(sndState.whisperPhase > 6.28318f) sndState.whisperPhase -= 6.28318f;
         }
-        
         float roomEventsAmb = pipeTone * (0.10f + envStress * 0.12f)
                             + ventRumble * 0.14f
                             + rustle * (0.08f + envInsanity * 0.08f)
@@ -426,7 +402,6 @@ inline void fillAudio(short* buf, int len) {
         float lowSt = clamp01Audio(sndState.lowStamina);
         float monsterProx = clamp01Audio(sndState.monsterProximity);
         float monsterMenace = clamp01Audio(sndState.monsterMenace);
-
         float runBed = 0.0f;
         if(move > 0.02f){
             float cadence = 5.4f + sprint * 4.6f;
@@ -438,7 +413,6 @@ inline void fillAudio(short* buf, int len) {
             float gait2 = sinf(twoPi * runPhase * 2.0f);
             runBed = (gait * 0.06f + gait2 * 0.03f + runNoise * 0.025f) * move * (0.55f + sprint * 0.65f);
         }
-
         float breath = 0.0f;
         float breathIntensity = lowSt * 0.82f + sprint * 0.35f + monsterProx * 0.22f;
         if(breathIntensity > 0.04f){
@@ -450,7 +424,6 @@ inline void fillAudio(short* buf, int len) {
             float exhale = (cyc < 0.0f) ? -cyc : 0.0f;
             breath = (inhale * 0.06f + exhale * 0.09f + airy * 0.025f) * breathIntensity;
         }
-
         float monsterTone = 0.0f;
         if(!sndState.deathMode && monsterProx > 0.03f){
             float freq = 34.0f + monsterMenace * 18.0f;
@@ -462,7 +435,6 @@ inline void fillAudio(short* buf, int len) {
             float pulse = 0.55f + 0.45f * sinf(twoPi * monsterPhase * 0.5f);
             monsterTone = (baseGrowl + overGrowl) * monsterProx * (0.5f + monsterMenace * 0.7f) * pulse;
         }
-
         float deathTone = 0.0f;
         if(sndState.deathMode){
             deathPhase += dt * 0.11f;
@@ -479,9 +451,8 @@ inline void fillAudio(short* buf, int len) {
             if(deathImpact > 1.2f) deathImpact = -1.0f;
         }
         lastDeathMode = sndState.deathMode;
-
         float ambienceMix = hum*sndState.humVol + amb + distant + roomEventsAmb;
-        float sfxMix = step + runBed + scare + flashlightSwitch + flashlightLoop + roomEventsSfx;
+        float sfxMix = step + runBed + scare + flashlightSwitch + flashlightLoop + roomEventsSfx + scannerBeep;
         float uiMix = (uiMove + uiAdjust + uiConfirm) * (0.45f + 0.55f * sndState.sfxVol);
         float voiceMix = insane + breath;
         float musicMix = sndState.deathMode ? deathTone : (creepy + monsterTone);
@@ -502,7 +473,6 @@ inline void fillAudio(short* buf, int len) {
         buf[i]=(short)(v*32767);
     }
 }
-
 inline void triggerScare() { sndState.scareVol = 0.8f; sndState.scareTimer = 0; }
 inline void triggerMenuNavigateSound() {
     static int noteStep = 0;
@@ -519,5 +489,4 @@ inline void triggerMenuAdjustSound() {
     sndState.uiAdjustTrig = true;
 }
 inline void triggerMenuConfirmSound() { sndState.uiConfirmTrig = true; }
-
 void audioThread();

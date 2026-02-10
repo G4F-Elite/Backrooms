@@ -339,3 +339,13 @@ inline float brownNoise(float& prev) {
     prev = (prev + 0.02f * white) * 0.99f; // Leaky integrator
     return prev * 3.5f; // Scale up
 }
+
+// ============================================================================
+// SCANNER BEEP HELPER
+// ============================================================================
+inline float scannerBeepSample(float t, float pitch, float vol) {
+    float atk = (t < 0.01f) ? (t / 0.01f) : 1.0f;
+    float env = atk * expf(-t * 10.5f);
+    float f = 260.0f + pitch * 220.0f;
+    return (sinf(MATH_TAU * f * t) * 0.26f + sinf(MATH_TAU * f * 2.0f * t) * 0.08f) * vol * env;
+}
