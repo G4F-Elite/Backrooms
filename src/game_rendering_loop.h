@@ -104,13 +104,13 @@ void renderScene(){
     // This ensures the shader uses flashlight origin, not camera origin.
     if(activeDeviceSlot == 1 && flashVisualOn && mu.flashPos >= 0){
         // Base position of the flashlight in view (tuned to sit below/side of crosshair)
-        float fwd = 0.50f;
-        float side = 0.28f;
-        float up = -0.34f;
+        float fwd = 0.52f;
+        float side = 0.30f;
+        float up = -0.58f;
         float bob = sinf(vhsTime * 8.0f) * 0.0025f * sndState.moveIntensity;
 
         Vec3 base = cam.pos + camFwd * fwd + camRight * side + camUp * (up + bob);
-        Vec3 lens = base + camFwd * 0.50f + camRight * 0.02f + camUp * 0.07f;
+        Vec3 lens = base + camFwd * 0.52f + camRight * 0.02f + camUp * 0.09f;
         glUniform3f(mu.flashPos, lens.x, lens.y, lens.z);
     }
     
@@ -132,27 +132,27 @@ void renderScene(){
     // Choose held item model
     GLuint heldVAO = 0;
     int heldVC = 0;
-    float handSide = 0.28f;
-    float handUp = -0.34f;
-    float handFwd = 0.50f;
+    float handSide = 0.30f;
+    float handUp = -0.58f;
+    float handFwd = 0.52f;
     float yawAdd = 0.16f;
     float pitchAdd = -0.14f;
     Vec3 scale = Vec3(0.95f, 0.95f, 1.0f);
     if(activeDeviceSlot == 1){
         heldVAO = flashlightVAO;
         heldVC = flashlightVC;
-        handSide = 0.28f;
-        handUp = -0.34f;
-        handFwd = 0.50f;
+        handSide = 0.30f;
+        handUp = -0.58f;
+        handFwd = 0.52f;
         yawAdd = 0.20f;
         pitchAdd = -0.20f;
         scale = Vec3(0.92f, 0.92f, 0.92f);
     }else if(activeDeviceSlot == 2){
         heldVAO = scannerVAO;
         heldVC = scannerVC;
-        handSide = 0.24f;
-        handUp = -0.36f;
-        handFwd = 0.48f;
+        handSide = 0.26f;
+        handUp = -0.60f;
+        handFwd = 0.50f;
         yawAdd = 0.12f;
         pitchAdd = -0.22f;
         scale = Vec3(1.05f, 1.0f, 1.25f);
@@ -160,18 +160,18 @@ void renderScene(){
         if(heldConsumableType == ITEM_BATTERY){
             heldVAO = batteryVAO;
             heldVC = batteryVC;
-            handSide = 0.24f;
-            handUp = -0.36f;
-            handFwd = 0.46f;
+            handSide = 0.26f;
+            handUp = -0.62f;
+            handFwd = 0.48f;
             yawAdd = 0.28f;
             pitchAdd = -0.32f;
             scale = Vec3(0.85f, 0.85f, 0.85f);
         }else{
             heldVAO = plushVAO;
             heldVC = plushVC;
-            handSide = 0.24f;
-            handUp = -0.36f;
-            handFwd = 0.46f;
+            handSide = 0.26f;
+            handUp = -0.62f;
+            handFwd = 0.48f;
             yawAdd = 0.22f;
             pitchAdd = -0.30f;
             scale = Vec3(0.95f, 0.95f, 0.95f);
@@ -292,6 +292,7 @@ inline void applyFramePacing(double frameStartTime, int targetFps){
     }
     while((glfwGetTime() - frameStartTime) < targetFrameSec){}
 }
+
 
 
 
