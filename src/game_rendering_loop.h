@@ -47,9 +47,15 @@ void renderScene(){
     float sprintSway = sndState.sprintIntensity * 0.004f;
     shX += sinf(vhsTime * (8.0f + sndState.sprintIntensity * 4.0f)) * (moveSway + sprintSway);
     shY += cosf(vhsTime * (12.5f + sndState.sprintIntensity * 5.0f)) * (moveSway * 0.75f + sprintSway);
-    // Use viewYaw/viewPitch everywhere so the held item doesn't appear to float during camera shake.
+    // Camera view (world rendering) uses full shake.
     float viewYaw = cam.yaw + shX;
     float viewPitch = cam.pitch + shY;
+
+    // Viewmodel (held item) should be less affected by shake, otherwise it looks like it is "on the hair".
+    // Keep some shake so flashlight beam/model still roughly match.
+    const float viewmodelShake = 0.35f;
+    float vmYaw = cam.yaw + shX * viewmodelShake;
+    float vmPitch = cam.pitch + shY * viewmodelShake;
     Vec3 la=cam.pos+Vec3(mSin(viewYaw)*mCos(viewPitch),mSin(viewPitch),
                          mCos(viewYaw)*mCos(viewPitch));
     Mat4 view=Mat4::look(cam.pos,la,Vec3(0,1,0)),model;
@@ -73,7 +79,13 @@ void renderScene(){
                 mCos(viewYaw)*mCos(viewPitch));
     Vec3 camRight(mCos(viewYaw), 0.0f, -mSin(viewYaw));
     Vec3 worldUp(0.0f, 1.0f, 0.0f);
-    Vec3 camUp = camRight.cross(camFwd).norm();
+
+    // Viewmodel directions (reduced shake)
+    Vec3 vmFwd(mSin(vmYaw)*mCos(vmPitch),
+               mSin(vmPitch),
+               mCos(vmYaw)*mCos(vmPitch));
+    Vec3 vmRight(mCos(vmYaw), 0.0f, -mSin(vmYaw));
+    Vec3 vmUp = vmRight.cross(vmFwd).norm();
     bool flashVisualOn = flashlightOn;
     if(flashlightOn && flashlightShutdownBlinkActive){
         flashVisualOn = isFlashlightOnDuringShutdownBlink(flashlightShutdownBlinkTimer);
@@ -109,8 +121,8 @@ void renderScene(){
         float up = -0.58f;
         float bob = sinf(vhsTime * 8.0f) * 0.0025f * sndState.moveIntensity;
 
-        Vec3 base = cam.pos + camFwd * fwd + camRight * side + camUp * (up + bob);
-        Vec3 lens = base + camFwd * 0.52f + camRight * 0.02f + camUp * 0.09f;
+        Vec3 base = cam.pos + vmFwd * fwd + vmRight * side + vmUp * (up + bob);
+        Vec3 lens = base + vmFwd * 0.52f + vmRight * 0.02f + vmUp * 0.09f;
         glUniform3f(mu.flashPos, lens.x, lens.y, lens.z);
     }
     
@@ -180,10 +192,10 @@ void renderScene(){
 
     if(heldVC>0 && deviceEquip > 0.02f){
         float bob = sinf(vhsTime * 8.0f) * 0.0025f * sndState.moveIntensity;
-        Vec3 base = cam.pos + camFwd * handFwd + camRight * handSide + camUp * (handUp + bob);
+        Vec3 base = cam.pos + vmFwd * handFwd + vmRight * handSide + vmUp * (handUp + bob);
 
         Vec3 drawScale = scale * (0.8f + 0.2f * deviceEquip);
-        Mat4 heldModel = composeModelMatrix(base, viewYaw + yawAdd, viewPitch + pitchAdd, drawScale);
+        Mat4 heldModel = composeModelMatrix(base, vmYaw + yawAdd, vmPitch + pitchAdd, drawScale);
         glUniformMatrix4fv(mu.M,1,GL_FALSE,heldModel.m);
         glBindTexture(GL_TEXTURE_2D,propTex);
         glBindVertexArray(heldVAO);
@@ -292,6 +304,8 @@ inline void applyFramePacing(double frameStartTime, int targetFps){
     }
     while((glfwGetTime() - frameStartTime) < targetFrameSec){}
 }
+
+
 
 
 
