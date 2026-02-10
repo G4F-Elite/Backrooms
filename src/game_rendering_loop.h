@@ -57,14 +57,30 @@ void renderScene(){
     glUniform3f(mu.vp,cam.pos.x,cam.pos.y,cam.pos.z);
     glUniform1f(mu.tm,vhsTime);
     glUniform1f(mu.danger,entityMgr.dangerLevel);
+
+    // === Equip / hold smoothing needs to be computed early so the flashlight origin can be set
+    // BEFORE world geometry draw.
+    static float deviceEquip = 0.0f;
+    static Vec3 heldPos = Vec3(0,0,0);
+    static float heldYaw = 0.0f;
+    static float heldPitch = 0.0f;
+    float equipTarget = (activeDeviceSlot > 0) ? 1.0f : 0.0f;
+    float equipStep = dTime * 8.0f;
+    if(equipStep > 1.0f) equipStep = 1.0f;
+    deviceEquip += (equipTarget - deviceEquip) * equipStep;
+
+    Vec3 camFwd(mSin(cam.yaw)*mCos(cam.pitch),
+                mSin(cam.pitch),
+                mCos(cam.yaw)*mCos(cam.pitch));
+    Vec3 camRight(mCos(cam.yaw), 0.0f, -mSin(cam.yaw));
+    Vec3 camUp = camRight.cross(camFwd).norm();
     bool flashVisualOn = flashlightOn;
     if(flashlightOn && flashlightShutdownBlinkActive){
         flashVisualOn = isFlashlightOnDuringShutdownBlink(flashlightShutdownBlinkTimer);
     }
     glUniform1i(mu.flashOn,flashVisualOn?1:0);
-    glUniform3f(mu.flashDir,mSin(cam.yaw)*mCos(cam.pitch),
-                mSin(cam.pitch),mCos(cam.yaw)*mCos(cam.pitch));
-    // NOTE: flashlight cone origin; will be overridden below when we have a held flashlight model.
+    glUniform3f(mu.flashDir, camFwd.x, camFwd.y, camFwd.z);
+    // Default flashlight cone origin is camera; if we render a held flashlight we override below.
     glUniform3f(mu.flashPos, cam.pos.x, cam.pos.y, cam.pos.z);
     float remoteFlashPos[12] = {0};
     float remoteFlashDir[12] = {0};
@@ -83,6 +99,25 @@ void renderScene(){
     int nl = gatherNearestSceneLights(lights, cam.pos, lpos);
     glUniform1i(mu.nl,nl);
     if(nl>0) glUniform3fv(mu.lp,nl,lpos);
+
+    // If we have a held flashlight, update flashPos BEFORE the world geometry draw.
+    // This ensures the shader uses flashlight origin, not camera origin.
+    if(activeDeviceSlot == 1 && flashVisualOn && mu.flashPos >= 0){
+        float bob = sinf(vhsTime * 8.0f) * 0.012f * (0.25f + sndState.moveIntensity);
+        float slide = (1.0f - deviceEquip);
+
+        // Match the first-person held flashlight position as close as possible.
+        float handSide = 0.24f;
+        Vec3 base = cam.pos + camFwd * (0.30f + 0.18f * deviceEquip)
+                          + camRight * handSide
+                          + camUp * (-0.22f - 0.18f * slide + bob);
+
+        // Lens is near the front of the flashlight model.
+        Vec3 lens = base + camFwd * (0.38f + 0.18f * deviceEquip)
+                         + camRight * 0.02f
+                         + camUp * 0.05f;
+        glUniform3f(mu.flashPos, lens.x, lens.y, lens.z);
+    }
     
     glBindTexture(GL_TEXTURE_2D,wallTex);glBindVertexArray(wallVAO);glDrawArrays(GL_TRIANGLES,0,wallVC);
     glBindVertexArray(pillarVAO);glDrawArrays(GL_TRIANGLES,0,pillarVC);
@@ -99,15 +134,6 @@ void renderScene(){
     glEnable(GL_CULL_FACE);
 
     // Held item smoothing (helps the "hand physics" feel)
-    static float deviceEquip = 0.0f;
-    static Vec3 heldPos = Vec3(0,0,0);
-    static float heldYaw = 0.0f;
-    static float heldPitch = 0.0f;
-    float equipTarget = (activeDeviceSlot > 0) ? 1.0f : 0.0f;
-    float equipStep = dTime * 8.0f;
-    if(equipStep > 1.0f) equipStep = 1.0f;
-    deviceEquip += (equipTarget - deviceEquip) * equipStep;
-
     // Choose held item model
     GLuint heldVAO = 0;
     int heldVC = 0;
@@ -115,11 +141,9 @@ void renderScene(){
     float yawAdd = 0.18f;
     float pitchAdd = -0.18f;
     Vec3 scale = Vec3(0.95f, 0.95f, 1.0f);
-    bool heldIsFlashlight = false;
     if(activeDeviceSlot == 1){
         heldVAO = flashlightVAO;
         heldVC = flashlightVC;
-        heldIsFlashlight = true;
         handSide = 0.24f;
         yawAdd = 0.20f;
         pitchAdd = -0.20f;
@@ -150,9 +174,9 @@ void renderScene(){
     }
 
     if(heldVC>0 && deviceEquip > 0.02f){
-        Vec3 fwd(mSin(cam.yaw), 0.0f, mCos(cam.yaw));
-        Vec3 right(mCos(cam.yaw), 0.0f, -mSin(cam.yaw));
-        Vec3 up(0.0f, 1.0f, 0.0f);
+        Vec3 fwd = camFwd;
+        Vec3 right = camRight;
+        Vec3 up = camUp;
         float bob = sinf(vhsTime * 8.0f) * 0.012f * (0.25f + sndState.moveIntensity);
         float slide = (1.0f - deviceEquip);
         Vec3 baseTarget = cam.pos + fwd * (0.30f + 0.18f * deviceEquip) + right * handSide + up * (-0.22f - 0.18f * slide + bob);
@@ -178,11 +202,7 @@ void renderScene(){
         glDrawArrays(GL_TRIANGLES,0,heldVC);
         glUniformMatrix4fv(mu.M,1,GL_FALSE,model.m);
 
-        // Update flashlight cone origin to match the held flashlight head.
-        if(heldIsFlashlight && mu.flashPos >= 0){
-            Vec3 lens = heldPos + fwd * (0.50f * deviceEquip) + right * (handSide * 0.15f) + up * (0.03f);
-            glUniform3f(mu.flashPos, lens.x, lens.y, lens.z);
-        }
+        // NOTE: flashPos is now set before world draw; we don't update it here.
     }
     
     if(multiState==MULTI_IN_GAME && playerModelsInit){
@@ -284,6 +304,8 @@ inline void applyFramePacing(double frameStartTime, int targetFps){
     }
     while((glfwGetTime() - frameStartTime) < targetFrameSec){}
 }
+
+
 
 
 
