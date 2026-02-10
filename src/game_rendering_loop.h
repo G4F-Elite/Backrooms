@@ -51,9 +51,9 @@ void renderScene(){
     float viewYaw = cam.yaw + shX;
     float viewPitch = cam.pitch + shY;
 
-    // Viewmodel (held item) should be less affected by shake, otherwise it looks like it is "on the hair".
-    // Keep some shake so flashlight beam/model still roughly match.
-    const float viewmodelShake = 0.35f;
+    // Viewmodel (held item) should be minimally affected by shake, otherwise it feels like it
+    // "jumps" near the face. Keep it stable; the world can shake independently.
+    const float viewmodelShake = 0.0f;
     float vmYaw = cam.yaw + shX * viewmodelShake;
     float vmPitch = cam.pitch + shY * viewmodelShake;
     Vec3 la=cam.pos+Vec3(mSin(viewYaw)*mCos(viewPitch),mSin(viewPitch),
@@ -116,12 +116,11 @@ void renderScene(){
     // This ensures the shader uses flashlight origin, not camera origin.
     if(activeDeviceSlot == 1 && flashVisualOn && mu.flashPos >= 0){
         // Base position of the flashlight in view (tuned to sit below/side of crosshair)
-        float fwd = 0.52f;
-        float side = 0.30f;
-        float up = -0.58f;
-        float bob = sinf(vhsTime * 8.0f) * 0.0025f * sndState.moveIntensity;
+        float fwd = 0.60f;
+        float side = 0.33f;
+        float up = -0.78f;
 
-        Vec3 base = cam.pos + vmFwd * fwd + vmRight * side + vmUp * (up + bob);
+        Vec3 base = cam.pos + vmFwd * fwd + vmRight * side + vmUp * up;
         Vec3 lens = base + vmFwd * 0.52f + vmRight * 0.02f + vmUp * 0.09f;
         glUniform3f(mu.flashPos, lens.x, lens.y, lens.z);
     }
@@ -144,27 +143,27 @@ void renderScene(){
     // Choose held item model
     GLuint heldVAO = 0;
     int heldVC = 0;
-    float handSide = 0.30f;
-    float handUp = -0.58f;
-    float handFwd = 0.52f;
+    float handSide = 0.33f;
+    float handUp = -0.78f;
+    float handFwd = 0.60f;
     float yawAdd = 0.16f;
     float pitchAdd = -0.14f;
     Vec3 scale = Vec3(0.95f, 0.95f, 1.0f);
     if(activeDeviceSlot == 1){
         heldVAO = flashlightVAO;
         heldVC = flashlightVC;
-        handSide = 0.30f;
-        handUp = -0.58f;
-        handFwd = 0.52f;
+        handSide = 0.33f;
+        handUp = -0.78f;
+        handFwd = 0.60f;
         yawAdd = 0.20f;
         pitchAdd = -0.20f;
         scale = Vec3(0.92f, 0.92f, 0.92f);
     }else if(activeDeviceSlot == 2){
         heldVAO = scannerVAO;
         heldVC = scannerVC;
-        handSide = 0.26f;
-        handUp = -0.60f;
-        handFwd = 0.50f;
+        handSide = 0.29f;
+        handUp = -0.80f;
+        handFwd = 0.58f;
         yawAdd = 0.12f;
         pitchAdd = -0.22f;
         scale = Vec3(1.05f, 1.0f, 1.25f);
@@ -172,18 +171,18 @@ void renderScene(){
         if(heldConsumableType == ITEM_BATTERY){
             heldVAO = batteryVAO;
             heldVC = batteryVC;
-            handSide = 0.26f;
-            handUp = -0.62f;
-            handFwd = 0.48f;
+            handSide = 0.29f;
+            handUp = -0.84f;
+            handFwd = 0.56f;
             yawAdd = 0.28f;
             pitchAdd = -0.32f;
             scale = Vec3(0.85f, 0.85f, 0.85f);
         }else{
             heldVAO = plushVAO;
             heldVC = plushVC;
-            handSide = 0.26f;
-            handUp = -0.62f;
-            handFwd = 0.48f;
+            handSide = 0.29f;
+            handUp = -0.84f;
+            handFwd = 0.56f;
             yawAdd = 0.22f;
             pitchAdd = -0.30f;
             scale = Vec3(0.95f, 0.95f, 0.95f);
@@ -191,8 +190,7 @@ void renderScene(){
     }
 
     if(heldVC>0 && deviceEquip > 0.02f){
-        float bob = sinf(vhsTime * 8.0f) * 0.0025f * sndState.moveIntensity;
-        Vec3 base = cam.pos + vmFwd * handFwd + vmRight * handSide + vmUp * (handUp + bob);
+        Vec3 base = cam.pos + vmFwd * handFwd + vmRight * handSide + vmUp * handUp;
 
         Vec3 drawScale = scale * (0.8f + 0.2f * deviceEquip);
         Mat4 heldModel = composeModelMatrix(base, vmYaw + yawAdd, vmPitch + pitchAdd, drawScale);
@@ -304,6 +302,7 @@ inline void applyFramePacing(double frameStartTime, int targetFps){
     }
     while((glfwGetTime() - frameStartTime) < targetFrameSec){}
 }
+
 
 
 
