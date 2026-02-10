@@ -37,10 +37,10 @@ inline void buildPlayerModel(std::vector<float>& v, int colorId) {
     float g = PLAYER_COLORS[colorId][1];
     float b = PLAYER_COLORS[colorId][2];
     addColorBox(v, 0, 1.0f, 0, 0.45f, 0.55f, 0.22f, r, g, b);
-    addColorBox(v, 0.27f, 0.78f, 0.06f, 0.16f, 0.05f, 0.05f, 0.07f, 0.07f, 0.08f);
-    addColorBox(v, 0.33f, 0.78f, 0.06f, 0.07f, 0.06f, 0.06f, 0.11f, 0.11f, 0.12f);
-    addColorBox(v, 0.37f, 0.78f, 0.06f, 0.02f, 0.04f, 0.04f, 0.85f, 0.88f, 0.75f);
-    addColorBox(v, 0.25f, 0.72f, 0.06f, 0.04f, 0.12f, 0.04f, 0.08f, 0.08f, 0.09f);
+    addColorBox(v, 0.41f, 0.80f, 0.16f, 0.20f, 0.06f, 0.06f, 0.08f, 0.08f, 0.09f);
+    addColorBox(v, 0.49f, 0.80f, 0.16f, 0.08f, 0.07f, 0.07f, 0.14f, 0.14f, 0.15f);
+    addColorBox(v, 0.54f, 0.80f, 0.16f, 0.03f, 0.05f, 0.05f, 0.92f, 0.92f, 0.78f);
+    addColorBox(v, 0.37f, 0.72f, 0.16f, 0.05f, 0.16f, 0.05f, 0.09f, 0.09f, 0.10f);
     addColorBox(v, 0, 1.5f, 0, 0.28f, 0.28f, 0.28f, 0.85f, 0.75f, 0.65f);
     addColorBox(v, 0, 1.67f, 0, 0.30f, 0.08f, 0.30f, 0.15f, 0.1f, 0.05f);
     addColorBox(v, -0.06f, 1.52f, 0.14f, 0.05f, 0.03f, 0.02f, 0.1f, 0.1f, 0.1f);
