@@ -9,6 +9,7 @@
 #include "minimap_bindings.h"
 #include "perf_tuning.h"
 #include "content_events.h"
+#include "item_types.h"
 #include "entity_ai.h"
 #include "trap_events.h"
 #include "debug_tools.h"
@@ -90,6 +91,7 @@ float lightsOutTimer = 0.0f;
 float falseDoorTimer = 0.0f;
 Vec3 falseDoorPos(0,0,0);
 int invBattery = 0;
+int invPlush = 0;
 int activeDeviceSlot = 1; // 1 flashlight, 2 scanner, 3 battery
 float scannerSignal = 0.0f;
 EchoSignal echoSignal = {};
@@ -285,6 +287,14 @@ inline void setEchoStatus(const char* msg){
 inline void setTrapStatus(const char* msg){
     snprintf(trapStatusText, sizeof(trapStatusText), "%s", msg);
     trapStatusTimer = 4.0f;
+}
+
+inline void applyPlushToyUse(){
+    if(invPlush <= 0) return;
+    invPlush--;
+    playerSanity += 28.0f;
+    if(playerSanity > 100.0f) playerSanity = 100.0f;
+    setEchoStatus("PLUSH TOY: YOUR MIND FEELS WHOLE AGAIN");
 }
 
 inline int storyNotesRequired(){

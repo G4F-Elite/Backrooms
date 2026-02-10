@@ -63,6 +63,7 @@ public:
     bool itemSnapshotReceived;
     
     int inventoryBattery[MAX_PLAYERS];
+    int inventoryPlush[MAX_PLAYERS];
     bool inventorySyncReceived;
     
     int roamEventType;
@@ -119,6 +120,7 @@ public:
             players[i].active = false;
             players[i].hasValidPos = false;
             players[i].flashlightOn = false;
+            inventoryPlush[i] = 0;
             inventoryBattery[i] = 0;
         }
         for (int i = 0; i < MAX_SYNC_ENTITIES; i++) entitySnapshot[i].active = false;
@@ -305,6 +307,7 @@ public:
             players[i] = NetPlayer();
             players[i].active = false;
             inventoryBattery[i] = 0;
+            inventoryPlush[i] = 0;
         }
         for (int i = 0; i < MAX_SYNC_ENTITIES; i++) entitySnapshot[i].active = false;
         for (int i = 0; i < MAX_SYNC_ITEMS; i++) itemSnapshot[i].active = false;

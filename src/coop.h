@@ -2,6 +2,7 @@
 #include "traps.h"
 #include "coop_rules.h"
 #include "map_content.h"
+#include "item_types.h"
 
 inline void updateCoopObjectiveHost(){
     if(!coop.initialized) return;
@@ -55,14 +56,19 @@ inline void hostUpdateItems(){
     if(itemSpawnTimer > 0) return;
     itemSpawnTimer = 10.0f + (rng()%10);
     if((int)worldItems.size() > 10) return;
-    hostSpawnItem(0, cam.pos);
+    hostSpawnItem(ITEM_BATTERY, cam.pos);
 }
 
 inline void applyItemUse(int type){
-    if(type==0 && invBattery>0){
+    if(type==ITEM_BATTERY && invBattery>0){
         invBattery--;
         flashlightBattery += 35.0f;
         if(flashlightBattery>100.0f) flashlightBattery = 100.0f;
+        setEchoStatus("BATTERY: FLASHLIGHT CHARGED");
+        return;
+    }
+    if(type==ITEM_PLUSH_TOY){
+        applyPlushToyUse();
     }
 }
 
@@ -78,7 +84,8 @@ inline void processHostInteractRequests(){
                 if(!it.active || it.id!=target) continue;
                 it.active = false;
                 if(pid>=0 && pid<MAX_PLAYERS){
-                    netMgr.inventoryBattery[pid]++;
+                    if(it.type==ITEM_BATTERY) netMgr.inventoryBattery[pid]++;
+                    else if(it.type==ITEM_PLUSH_TOY) netMgr.inventoryPlush[pid]++;
                 }
                 break;
             }
@@ -113,6 +120,7 @@ inline void hostSyncFeatureState(){
     netMgr.sendItemSnapshot(entries, count);
     netMgr.sendObjectiveState(coop.switchOn[0], coop.switchOn[1], coop.doorOpen);
     netMgr.inventoryBattery[netMgr.myId] = invBattery;
+    netMgr.inventoryPlush[netMgr.myId] = invPlush;
     netMgr.sendInventorySync();
 }
 
@@ -132,6 +140,7 @@ inline void clientApplyFeatureState(){
     if(netMgr.inventorySyncReceived){
         netMgr.inventorySyncReceived = false;
         invBattery = netMgr.inventoryBattery[netMgr.myId];
+        invPlush = netMgr.inventoryPlush[netMgr.myId];
     }
     syncCoopFromNetwork();
 }
@@ -156,7 +165,9 @@ inline void applyRoamEvent(int type, int a, int b, float duration){
     }else if(type==ROAM_SUPPLY_CACHE){
         int amount = 2 + ((a + b) % 2);
         for(int i=0;i<amount;i++){
-            hostSpawnItem(0, cam.pos);
+            // Mostly batteries with a chance to include plush toys.
+            int itemType = ((rng()%100) < 70) ? ITEM_BATTERY : ITEM_PLUSH_TOY;
+            hostSpawnItem(itemType, cam.pos);
         }
         setEchoStatus("SUPPLY CACHE SHIFTED NEARBY");
     }

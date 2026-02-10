@@ -1,4 +1,9 @@
 #pragma once
+// NOTE: included into main translation unit (game.cpp); relies on prior includes.
+
+struct GLFWwindow;
+#include "math.h"
+#include "item_types.h"
 inline Vec3 debugCursorSpawnPos(GLFWwindow* w){
     double cx = 0.0, cy = 0.0;
     glfwGetCursorPos(w, &cx, &cy);
@@ -270,7 +275,8 @@ void gameInput(GLFWwindow*w){
                 for(auto& it:worldItems){
                     if(!it.active||it.id!=nearbyWorldItemId) continue;
                     it.active=false;
-                    if(it.type==0) invBattery++;
+                    if(it.type==ITEM_BATTERY) invBattery++;
+                    else if(it.type==ITEM_PLUSH_TOY) invPlush++;
                     break;
                 }
             }else{
@@ -280,7 +286,8 @@ void gameInput(GLFWwindow*w){
             for(auto& it:worldItems){
                 if(!it.active||it.id!=nearbyWorldItemId) continue;
                 it.active=false;
-                    if(it.type==0) invBattery++;
+                if(it.type==ITEM_BATTERY) invBattery++;
+                else if(it.type==ITEM_PLUSH_TOY) invPlush++;
                 break;
             }
         }
@@ -321,9 +328,13 @@ void gameInput(GLFWwindow*w){
             activeDeviceSlot = 0;
         }
     }
-    if(k3&&!key3Pressed) applyItemUse(0);
+    if(k3&&!key3Pressed) {
+        if(invBattery > 0) applyItemUse(ITEM_BATTERY);
+        else if(invPlush > 0) applyItemUse(ITEM_PLUSH_TOY);
+    }
     if(k4&&!key4Pressed){
-        applyItemUse(0);
+        if(invPlush > 0) applyItemUse(ITEM_PLUSH_TOY);
+        else if(invBattery > 0) applyItemUse(ITEM_BATTERY);
     }
     key1Pressed=k1; key2Pressed=k2; key3Pressed=k3; key4Pressed=k4;
     
@@ -501,6 +512,13 @@ void gameInput(GLFWwindow*w){
         if(flashlightBattery>100)flashlightBattery=100;
     }
 }
+
+
+
+
+
+
+
 
 
 

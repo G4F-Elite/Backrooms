@@ -307,6 +307,7 @@ void genWorld(){
     worldItems.clear();
     nextWorldItemId = 1;
     invBattery = 0;
+    invPlush = 0;
     clearEchoSignal();
     echoSpawnTimer = 7.0f + (float)(rng()%6);
     echoStatusTimer = 0.0f;
@@ -364,6 +365,7 @@ void teleportToExit(){
     updateMapContent(playerChunkX,playerChunkZ);
     buildGeom();
 }
+
 
 
 

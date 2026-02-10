@@ -172,6 +172,7 @@ inline void NetworkManager::sendInventorySync() {
     for (int i = 0; i < MAX_PLAYERS; i++) {
         buf[off++] = (char)i;
         buf[off++] = (char)inventoryBattery[i];
+        buf[off++] = (char)inventoryPlush[i];
     }
     broadcast(buf, off);
 }
@@ -469,13 +470,15 @@ inline void NetworkManager::handleItemSnapshot(char* buf, int len) {
 }
 
 inline void NetworkManager::handleInventorySync(char* buf, int len) {
-    if (len < 1 + MAX_PLAYERS * 2) return;
+    if (len < 1 + MAX_PLAYERS * 3) return;
     int off = 1;
     for (int i = 0; i < MAX_PLAYERS; i++) {
         int pid = (unsigned char)buf[off++];
         int bat = (unsigned char)buf[off++];
+        int plush = (unsigned char)buf[off++];
         if (pid < 0 || pid >= MAX_PLAYERS) continue;
         inventoryBattery[pid] = bat;
+        inventoryPlush[pid] = plush;
     }
     inventorySyncReceived = true;
 }

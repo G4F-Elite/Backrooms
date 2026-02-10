@@ -1,6 +1,7 @@
 #pragma once
 
 #include "math.h"
+#include "item_types.h"
 
 enum EchoEventType {
     ECHO_CACHE = 0,
@@ -35,8 +36,11 @@ inline float nextNoteSpawnDelaySeconds(int roll) {
 }
 
 inline int chooseCacheItemType(int roll) {
-    (void)roll;
-    return 0;
+    int norm = roll % 100;
+    if (norm < 0) norm += 100;
+    // Cache skew: mostly batteries, sometimes a plush toy (sanity aid).
+    if (norm < 70) return ITEM_BATTERY;
+    return ITEM_PLUSH_TOY;
 }
 
 inline bool isEchoInRange(const Vec3& playerPos, const Vec3& echoPos, float range) {
@@ -58,6 +62,7 @@ inline void applyEchoOutcome(
     int echoType,
     int roll,
     int& invBattery,
+    int& invPlush,
     float& hp,
     float& sanity,
     float& stamina,
@@ -66,7 +71,8 @@ inline void applyEchoOutcome(
     breachTriggered = false;
     if (echoType == ECHO_CACHE) {
         int item = chooseCacheItemType(roll);
-        if (item == 0) invBattery++;
+        if (item == ITEM_BATTERY) invBattery++;
+        else if (item == ITEM_PLUSH_TOY) invPlush++;
         return;
     }
     if (echoType == ECHO_RESTORE) {

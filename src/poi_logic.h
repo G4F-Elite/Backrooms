@@ -1,6 +1,7 @@
 #pragma once
 
 #include "map_content.h"
+#include "item_types.h"
 
 enum PoiOutcomeType {
     POI_OUTCOME_LOOT = 0,
@@ -38,15 +39,19 @@ inline int choosePoiLootType(int poiType, int roll) {
     int norm = roll % 100;
     if (norm < 0) norm += 100;
     if (poiType == MAP_POI_STORAGE) {
-        return 0; // battery
+        if (norm < 70) return ITEM_BATTERY;
+        return ITEM_PLUSH_TOY;
     }
     if (poiType == MAP_POI_SERVER) {
-        return 0;
+        if (norm < 55) return ITEM_BATTERY;
+        return ITEM_PLUSH_TOY;
     }
     if (poiType == MAP_POI_OFFICE) {
-        return 0;
+        if (norm < 75) return ITEM_BATTERY;
+        return ITEM_PLUSH_TOY;
     }
-    return 0;
+    if (norm < 65) return ITEM_BATTERY;
+    return ITEM_PLUSH_TOY;
 }
 
 inline int choosePoiRiskRoamEvent(int poiType, int roll) {

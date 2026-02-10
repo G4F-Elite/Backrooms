@@ -1,5 +1,6 @@
 #pragma once
 #include "progression.h"
+#include "sanity_balance.h"
 int main(){
     std::random_device rd;rng.seed(rd());
     if(!glfwInit())return -1;
@@ -282,8 +283,10 @@ int main(){
                 }else if(reshuffleTimer<=0)reshuffleTimer=8.0f+(rng()%8);
                 
                 float levelDanger = levelDangerScale(gCurrentLevel);
-                if(entityMgr.dangerLevel>0.1f)playerSanity-=entityMgr.dangerLevel*(8.0f * levelDanger)*dTime;
-                else playerSanity+=2.0f*dTime;
+                // Sanity now decays even when "safe".
+                // To restore sanity, the player must interact with Echo/loot (e.g. plush toy).
+                playerSanity -= sanityPassiveDrainPerSec(levelDanger) * dTime;
+                if(entityMgr.dangerLevel>0.1f) playerSanity -= entityMgr.dangerLevel*(8.0f * levelDanger)*dTime;
                 playerSanity=playerSanity>100?100:(playerSanity<0?0:playerSanity);
                 int cellX = (int)floorf(cam.pos.x / CS);
                 int cellZ = (int)floorf(cam.pos.z / CS);

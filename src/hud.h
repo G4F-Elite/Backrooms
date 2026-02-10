@@ -4,6 +4,7 @@
 #include "perf_overlay.h"
 #include "progression.h"
 #include "smile_event.h"
+#include "item_types.h"
 
 inline void drawHudText(const char* s, float x, float y, float sc, float r, float g, float b, float a = 0.95f) {
     drawText(s, x - 0.002f, y - 0.002f, sc, 0.0f, 0.0f, 0.0f, a * 0.72f);
@@ -157,7 +158,7 @@ void drawUI(){
             drawNoteCounter(storyMgr.totalCollected);
             if(nearNoteId>=0 && settings.debugMode) drawInteractPrompt();
             if(nearbyWorldItemId>=0 && settings.debugMode){
-                if(nearbyWorldItemType==0) drawHudTextCentered("[E] PICK BATTERY",0.0f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.9f);
+                drawHudTextCentered(worldItemPickupPrompt(nearbyWorldItemType),0.0f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.9f);
             }
             // === ECHO SIGNAL: immersive pulsing indicator (always), debug shows distance ===
             if(multiState!=MULTI_IN_GAME && echoSignal.active){
