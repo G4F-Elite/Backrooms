@@ -61,18 +61,31 @@ void buildGeom(){
                         if(spawnDoorway && (corridorZ || corridorX)){
                             float cxCell = px + CS * 0.5f;
                             float czCell = pz + CS * 0.5f;
-                            float postH = WH * 0.80f;
-                            float postW = CS * 0.07f;
+                            float openingH = WH * 0.62f;
+                            float postH = openingH;
+                            float postW = CS * 0.06f;
                             float frameT = CS * 0.10f;
-                            float side = CS * 0.43f;
+                            float openingHalf = CS * 0.23f;
+                            float edgeHalf = CS * 0.49f;
+                            float sideFillW = (edgeHalf - openingHalf);
+                            float sideFillCenter = (edgeHalf + openingHalf) * 0.5f;
+                            float topFillH = WH - openingH;
+                            float topFillY = openingH + topFillH * 0.5f;
+                            float wallFillT = frameT * 0.92f;
                             if(corridorZ){
-                                mkBox(dv, cxCell - side, 0.0f, czCell, postW, postH, frameT);
-                                mkBox(dv, cxCell + side, 0.0f, czCell, postW, postH, frameT);
-                                mkBox(dv, cxCell, postH, czCell, CS * 0.98f, CS * 0.09f, frameT);
+                                mkBox(dv, cxCell - openingHalf, 0.0f, czCell, postW, postH, frameT);
+                                mkBox(dv, cxCell + openingHalf, 0.0f, czCell, postW, postH, frameT);
+                                mkBox(dv, cxCell, openingH, czCell, openingHalf * 2.0f + postW * 2.0f, CS * 0.08f, frameT);
+                                mkBox(dv, cxCell - sideFillCenter, 0.0f, czCell, sideFillW, WH, wallFillT);
+                                mkBox(dv, cxCell + sideFillCenter, 0.0f, czCell, sideFillW, WH, wallFillT);
+                                mkBox(dv, cxCell, topFillY, czCell, openingHalf * 2.0f, topFillH, wallFillT);
                             }else{
-                                mkBox(dv, cxCell, 0.0f, czCell - side, frameT, postH, postW);
-                                mkBox(dv, cxCell, 0.0f, czCell + side, frameT, postH, postW);
-                                mkBox(dv, cxCell, postH, czCell, frameT, CS * 0.09f, CS * 0.98f);
+                                mkBox(dv, cxCell, 0.0f, czCell - openingHalf, frameT, postH, postW);
+                                mkBox(dv, cxCell, 0.0f, czCell + openingHalf, frameT, postH, postW);
+                                mkBox(dv, cxCell, openingH, czCell, frameT, CS * 0.08f, openingHalf * 2.0f + postW * 2.0f);
+                                mkBox(dv, cxCell, 0.0f, czCell - sideFillCenter, wallFillT, WH, sideFillW);
+                                mkBox(dv, cxCell, 0.0f, czCell + sideFillCenter, wallFillT, WH, sideFillW);
+                                mkBox(dv, cxCell, topFillY, czCell, wallFillT, topFillH, openingHalf * 2.0f);
                             }
                         }
                     }
