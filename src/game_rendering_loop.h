@@ -47,8 +47,11 @@ void renderScene(){
     float sprintSway = sndState.sprintIntensity * 0.004f;
     shX += sinf(vhsTime * (8.0f + sndState.sprintIntensity * 4.0f)) * (moveSway + sprintSway);
     shY += cosf(vhsTime * (12.5f + sndState.sprintIntensity * 5.0f)) * (moveSway * 0.75f + sprintSway);
-    Vec3 la=cam.pos+Vec3(mSin(cam.yaw+shX)*mCos(cam.pitch+shY),mSin(cam.pitch+shY),
-                         mCos(cam.yaw+shX)*mCos(cam.pitch+shY));
+    // Use viewYaw/viewPitch everywhere so the held item doesn't appear to float during camera shake.
+    float viewYaw = cam.yaw + shX;
+    float viewPitch = cam.pitch + shY;
+    Vec3 la=cam.pos+Vec3(mSin(viewYaw)*mCos(viewPitch),mSin(viewPitch),
+                         mCos(viewYaw)*mCos(viewPitch));
     Mat4 view=Mat4::look(cam.pos,la,Vec3(0,1,0)),model;
     
     glUniformMatrix4fv(mu.P,1,GL_FALSE,proj.m);
@@ -70,14 +73,14 @@ void renderScene(){
     deviceEquip += (equipTarget - deviceEquip) * equipStep;
 
     // Camera directions
-    Vec3 camFwd(mSin(cam.yaw)*mCos(cam.pitch),
-                mSin(cam.pitch),
-                mCos(cam.yaw)*mCos(cam.pitch));
-    Vec3 camRight(mCos(cam.yaw), 0.0f, -mSin(cam.yaw));
+    Vec3 camFwd(mSin(viewYaw)*mCos(viewPitch),
+                mSin(viewPitch),
+                mCos(viewYaw)*mCos(viewPitch));
+    Vec3 camRight(mCos(viewYaw), 0.0f, -mSin(viewYaw));
     Vec3 worldUp(0.0f, 1.0f, 0.0f);
     // Viewmodel basis: keep the item stable relative to the screen.
     // Use yaw-only forward + worldUp so looking up/down doesn't pull the item into the face.
-    Vec3 vmFwd(mSin(cam.yaw), 0.0f, mCos(cam.yaw));
+    Vec3 vmFwd(mSin(viewYaw), 0.0f, mCos(viewYaw));
     Vec3 vmRight = camRight;
     Vec3 vmUp = worldUp;
     bool flashVisualOn = flashlightOn;
@@ -186,10 +189,11 @@ void renderScene(){
         float bob = sinf(vhsTime * 8.0f) * 0.012f * (0.25f + sndState.moveIntensity);
         float slide = (1.0f - deviceEquip);
         Vec3 baseTarget = cam.pos + fwd * (0.30f + 0.18f * deviceEquip) + right * handSide + up * (-0.32f - 0.22f * slide + bob);
-        float yawTarget = cam.yaw + yawAdd;
-        float pitchTarget = cam.pitch + pitchAdd;
+        float yawTarget = viewYaw + yawAdd;
+        float pitchTarget = viewPitch + pitchAdd;
 
-        float follow = clamp01(dTime * 26.0f);
+        // Keep the viewmodel snappy; too much lag looks like "bad physics".
+        float follow = clamp01(dTime * 60.0f);
         if(deviceEquip < 0.12f){
             heldPos = baseTarget;
             heldYaw = yawTarget;
@@ -315,6 +319,7 @@ inline void applyFramePacing(double frameStartTime, int targetFps){
     }
     while((glfwGetTime() - frameStartTime) < targetFrameSec){}
 }
+
 
 
 
