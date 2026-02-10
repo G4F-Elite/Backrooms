@@ -69,11 +69,17 @@ void renderScene(){
     if(equipStep > 1.0f) equipStep = 1.0f;
     deviceEquip += (equipTarget - deviceEquip) * equipStep;
 
+    // Camera directions
     Vec3 camFwd(mSin(cam.yaw)*mCos(cam.pitch),
                 mSin(cam.pitch),
                 mCos(cam.yaw)*mCos(cam.pitch));
     Vec3 camRight(mCos(cam.yaw), 0.0f, -mSin(cam.yaw));
-    Vec3 camUp = camRight.cross(camFwd).norm();
+    Vec3 worldUp(0.0f, 1.0f, 0.0f);
+    // Viewmodel basis: keep the item stable relative to the screen.
+    // Use yaw-only forward + worldUp so looking up/down doesn't pull the item into the face.
+    Vec3 vmFwd(mSin(cam.yaw), 0.0f, mCos(cam.yaw));
+    Vec3 vmRight = camRight;
+    Vec3 vmUp = worldUp;
     bool flashVisualOn = flashlightOn;
     if(flashlightOn && flashlightShutdownBlinkActive){
         flashVisualOn = isFlashlightOnDuringShutdownBlink(flashlightShutdownBlinkTimer);
@@ -108,14 +114,14 @@ void renderScene(){
 
         // Match the first-person held flashlight position as close as possible.
         float handSide = 0.24f;
-        Vec3 base = cam.pos + camFwd * (0.30f + 0.18f * deviceEquip)
-                          + camRight * handSide
-                          + camUp * (-0.22f - 0.18f * slide + bob);
+        Vec3 base = cam.pos + vmFwd * (0.30f + 0.18f * deviceEquip)
+                          + vmRight * handSide
+                          + vmUp * (-0.32f - 0.22f * slide + bob);
 
         // Lens is near the front of the flashlight model.
-        Vec3 lens = base + camFwd * (0.38f + 0.18f * deviceEquip)
-                         + camRight * 0.02f
-                         + camUp * 0.05f;
+        Vec3 lens = base + camFwd * (0.45f + 0.18f * deviceEquip)
+                         + vmRight * 0.02f
+                         + vmUp * 0.07f;
         glUniform3f(mu.flashPos, lens.x, lens.y, lens.z);
     }
     
@@ -174,22 +180,27 @@ void renderScene(){
     }
 
     if(heldVC>0 && deviceEquip > 0.02f){
-        Vec3 fwd = camFwd;
-        Vec3 right = camRight;
-        Vec3 up = camUp;
+        Vec3 fwd = vmFwd;
+        Vec3 right = vmRight;
+        Vec3 up = vmUp;
         float bob = sinf(vhsTime * 8.0f) * 0.012f * (0.25f + sndState.moveIntensity);
         float slide = (1.0f - deviceEquip);
-        Vec3 baseTarget = cam.pos + fwd * (0.30f + 0.18f * deviceEquip) + right * handSide + up * (-0.22f - 0.18f * slide + bob);
+        Vec3 baseTarget = cam.pos + fwd * (0.30f + 0.18f * deviceEquip) + right * handSide + up * (-0.32f - 0.22f * slide + bob);
         float yawTarget = cam.yaw + yawAdd;
         float pitchTarget = cam.pitch + pitchAdd;
 
-        float follow = clamp01(dTime * 18.0f);
+        float follow = clamp01(dTime * 26.0f);
         if(deviceEquip < 0.12f){
             heldPos = baseTarget;
             heldYaw = yawTarget;
             heldPitch = pitchTarget;
         }else{
-            heldPos = heldPos + (baseTarget - heldPos) * follow;
+            Vec3 dp = baseTarget - heldPos;
+            // Clamp to prevent large swings when quickly moving camera.
+            float maxStep = 0.25f;
+            float dplen = dp.len();
+            if(dplen > maxStep && dplen > 0.0001f) dp = dp * (maxStep / dplen);
+            heldPos = heldPos + dp * follow;
             heldYaw = lerpAngle(heldYaw, yawTarget, follow);
             heldPitch = lerpAngle(heldPitch, pitchTarget, follow);
         }
@@ -304,6 +315,7 @@ inline void applyFramePacing(double frameStartTime, int targetFps){
     }
     while((glfwGetTime() - frameStartTime) < targetFrameSec){}
 }
+
 
 
 
