@@ -120,7 +120,7 @@ void renderScene(){
         // Base position of the flashlight in view (tuned to sit below/side of crosshair)
         float fwd = 0.60f;
         float side = 0.33f;
-        float up = -0.78f;
+        float up = -0.52f;
 
         Vec3 base = cam.pos + vmFwd * fwd + vmRight * side + vmUp * up;
         Vec3 lens = base + vmFwd * 0.52f + vmRight * 0.02f + vmUp * 0.09f;
@@ -146,7 +146,7 @@ void renderScene(){
     GLuint heldVAO = 0;
     int heldVC = 0;
     float handSide = 0.33f;
-    float handUp = -0.78f;
+    float handUp = -0.52f;
     float handFwd = 0.60f;
     float yawAdd = 0.16f;
     float pitchAdd = -0.14f;
@@ -155,7 +155,7 @@ void renderScene(){
         heldVAO = flashlightVAO;
         heldVC = flashlightVC;
         handSide = 0.33f;
-        handUp = -0.78f;
+        handUp = -0.52f;
         handFwd = 0.60f;
         yawAdd = 0.20f;
         pitchAdd = -0.20f;
@@ -164,7 +164,7 @@ void renderScene(){
         heldVAO = scannerVAO;
         heldVC = scannerVC;
         handSide = 0.29f;
-        handUp = -0.80f;
+        handUp = -0.56f;
         handFwd = 0.58f;
         yawAdd = 0.12f;
         pitchAdd = -0.22f;
@@ -174,7 +174,7 @@ void renderScene(){
             heldVAO = batteryVAO;
             heldVC = batteryVC;
             handSide = 0.29f;
-            handUp = -0.84f;
+            handUp = -0.60f;
             handFwd = 0.56f;
             yawAdd = 0.28f;
             pitchAdd = -0.32f;
@@ -183,7 +183,7 @@ void renderScene(){
             heldVAO = plushVAO;
             heldVC = plushVC;
             handSide = 0.29f;
-            handUp = -0.84f;
+            handUp = -0.60f;
             handFwd = 0.56f;
             yawAdd = 0.22f;
             pitchAdd = -0.30f;
@@ -304,6 +304,7 @@ inline void applyFramePacing(double frameStartTime, int targetFps){
     }
     while((glfwGetTime() - frameStartTime) < targetFrameSec){}
 }
+
 
 
 
