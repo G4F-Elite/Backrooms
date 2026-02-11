@@ -16,6 +16,76 @@ inline void addAttention(float amount) {
     clampVoidShiftValues();
 }
 
+inline void awardArchivePoints(int amount, const char* reason) {
+    if (amount <= 0) return;
+    archivePoints += amount;
+    int newTier = archivePoints / 120;
+    if (newTier > archiveTier) {
+        archiveTier = newTier;
+        if (archiveTier >= 1) perkQuietSteps = true;
+        if (archiveTier >= 2) perkFastHands = true;
+        if (archiveTier >= 3) perkEchoBuffer = true;
+        setEchoStatus("ARCHIVE TIER UNLOCKED");
+    } else if (reason) {
+        setEchoStatus(reason);
+    }
+}
+
+inline const char* sideContractName(int type) {
+    if (type == SIDE_COLLECT_BADGES) return "COLLECT BADGES";
+    if (type == SIDE_SCAN_WALLS) return "SCAN WALL PATTERNS";
+    if (type == SIDE_STABILIZE_RIFTS) return "SEAL RESONANCE RIFTS";
+    if (type == SIDE_RESCUE_SURVIVOR) return "RESCUE LOST SURVIVOR";
+    if (type == SIDE_ENABLE_VENT) return "ENABLE PARKING VENT";
+    if (type == SIDE_RESTORE_CAMERAS) return "RESTORE CAMERAS";
+    if (type == SIDE_REPROGRAM_DRONE) return "REPROGRAM DRONE";
+    return "NO SIDE CONTRACT";
+}
+
+inline void initSideContractForLevel() {
+    sideContractProgress = 0;
+    sideContractCompleted = false;
+    if (isLevelZero(gCurrentLevel)) {
+        int roll = (int)(rng() % 3);
+        sideContractType = roll == 0 ? SIDE_COLLECT_BADGES : (roll == 1 ? SIDE_SCAN_WALLS : SIDE_STABILIZE_RIFTS);
+        sideContractTarget = sideContractType == SIDE_COLLECT_BADGES ? 6 : (sideContractType == SIDE_SCAN_WALLS ? 3 : 2);
+    } else {
+        int roll = (int)(rng() % 3);
+        sideContractType = roll == 0 ? SIDE_ENABLE_VENT : (roll == 1 ? SIDE_RESTORE_CAMERAS : SIDE_REPROGRAM_DRONE);
+        sideContractTarget = sideContractType == SIDE_ENABLE_VENT ? 1 : (sideContractType == SIDE_RESTORE_CAMERAS ? 1 : 1);
+    }
+}
+
+inline void progressSideContract(int amount, const char* statusMsg) {
+    if (sideContractType == SIDE_NONE || sideContractCompleted || amount <= 0) return;
+    sideContractProgress += amount;
+    if (sideContractProgress >= sideContractTarget) {
+        sideContractProgress = sideContractTarget;
+        sideContractCompleted = true;
+        awardArchivePoints(35, "SIDE CONTRACT COMPLETE");
+        addAttention(-8.0f);
+    } else if (statusMsg) {
+        setTrapStatus(statusMsg);
+    }
+}
+
+inline void initVoidShiftNpcSpots(const Vec3& spawnPos, const Vec3& exitDoorPos) {
+    npcCartographerPos = Vec3(spawnPos.x + CS * 1.0f, 0.0f, spawnPos.z + CS * 2.0f);
+    npcDispatcherPhonePos = Vec3(spawnPos.x - CS * 2.0f, 0.0f, spawnPos.z + CS * 3.0f);
+    npcLostSurvivorPos = Vec3(spawnPos.x + CS * 8.0f, 0.0f, spawnPos.z - CS * 3.0f);
+    if (!isLevelZero(gCurrentLevel)) {
+        npcCartographerPos = Vec3(spawnPos.x - CS * 2.0f, 0.0f, spawnPos.z + CS * 1.0f);
+        npcDispatcherPhonePos = Vec3(spawnPos.x + CS * 3.0f, 0.0f, spawnPos.z - CS * 2.0f);
+        npcLostSurvivorPos = Vec3(spawnPos.x - CS * 7.0f, 0.0f, spawnPos.z + CS * 5.0f);
+    }
+    npcCartographerActive = true;
+    npcDispatcherActive = true;
+    npcLostSurvivorActive = ((rng() % 100) < 45);
+    npcLostSurvivorEscorted = false;
+    dispatcherCallCooldown = 8.0f;
+    (void)exitDoorPos;
+}
+
 inline void resetVoidShiftState(const Vec3& spawnPos, const Vec3& exitDoorPos) {
     resonatorMode = RESONATOR_SCAN;
     resonatorBattery = 100.0f;
@@ -54,6 +124,9 @@ inline void resetVoidShiftState(const Vec3& spawnPos, const Vec3& exitDoorPos) {
     level2AccessNode = Vec3(spawnPos.x + CS * 1.0f, 0.0f, spawnPos.z - CS * 7.0f);
     level2VentNode = Vec3(spawnPos.x - CS * 7.0f, 0.0f, spawnPos.z + CS * 2.0f);
     level2LiftNode = exitDoorPos;
+
+    initSideContractForLevel();
+    initVoidShiftNpcSpots(spawnPos, exitDoorPos);
 }
 
 inline void startEchoRecordingTrack() {
@@ -87,6 +160,23 @@ inline void startEchoPlaybackTrack() {
     setEchoStatus("ECHO PLAYBACK START");
 }
 
+inline void notifyVoidShiftItemPickup(int itemType) {
+    if (sideContractCompleted) return;
+    if (sideContractType == SIDE_COLLECT_BADGES && itemType == ITEM_BATTERY) {
+        progressSideContract(1, "SIDE: BADGE CACHE FOUND");
+    }
+}
+
+inline void notifyVoidShiftPingUsed() {
+    if (sideContractCompleted) return;
+    if (sideContractType == SIDE_SCAN_WALLS) progressSideContract(1, "SIDE: WALL PATTERN LOGGED");
+}
+
+inline void notifyVoidShiftRiftSealed() {
+    if (sideContractCompleted) return;
+    if (sideContractType == SIDE_STABILIZE_RIFTS) progressSideContract(1, "SIDE: RIFT SEALED");
+}
+
 inline int level1DoneCount() {
     int done = 0;
     for (int i = 0; i < 3; i++) if (level1NodeDone[i]) done++;
@@ -99,6 +189,10 @@ inline bool isVoidShiftExitReady() {
 }
 
 inline bool getVoidShiftResonanceTarget(Vec3& outPos) {
+    if (npcLostSurvivorActive && !npcLostSurvivorEscorted) {
+        outPos = npcLostSurvivorPos;
+        return true;
+    }
     if (isLevelZero(gCurrentLevel)) {
         if (level1HoldActive || level1ContractComplete) {
             outPos = coop.doorPos;
@@ -136,6 +230,19 @@ inline bool getVoidShiftResonanceTarget(Vec3& outPos) {
 inline void buildVoidShiftInteractPrompt(const Vec3& playerPos, char* out, int outSize) {
     if (!out || outSize < 2) return;
     out[0] = '\0';
+
+    if (npcCartographerActive && nearPoint2D(playerPos, npcCartographerPos, 2.2f)) {
+        std::snprintf(out, outSize, "[E] TRADE WITH CARTOGRAPHER");
+        return;
+    }
+    if (npcDispatcherActive && nearPoint2D(playerPos, npcDispatcherPhonePos, 2.2f)) {
+        std::snprintf(out, outSize, "[E] ANSWER DISPATCH CALL");
+        return;
+    }
+    if (npcLostSurvivorActive && !npcLostSurvivorEscorted && nearPoint2D(playerPos, npcLostSurvivorPos, 2.2f)) {
+        std::snprintf(out, outSize, "[E] ESCORT LOST SURVIVOR");
+        return;
+    }
 
     if (isLevelZero(gCurrentLevel)) {
         for (int i = 0; i < 3; i++) {
@@ -202,7 +309,48 @@ inline void buildVoidShiftObjectiveLine(char* out, int outSize) {
     std::snprintf(out, outSize, level2VentDone ? "CONTRACT L2 COMPLETE: LIFT READY + VENT" : "CONTRACT L2 COMPLETE: LIFT READY");
 }
 
+inline void buildVoidShiftSupportLine(char* out, int outSize) {
+    if (!out || outSize < 2) return;
+    if (sideContractType != SIDE_NONE && !sideContractCompleted) {
+        std::snprintf(out, outSize, "SIDE: %s %d/%d", sideContractName(sideContractType), sideContractProgress, sideContractTarget);
+        return;
+    }
+    if (sideContractCompleted) {
+        std::snprintf(out, outSize, "SIDE COMPLETE: ARCHIVE +35");
+        return;
+    }
+    std::snprintf(out, outSize, "ARCHIVE %d  TIER %d", archivePoints, archiveTier);
+}
+
 inline bool tryHandleVoidShiftInteract(const Vec3& playerPos) {
+    if (npcCartographerActive && nearPoint2D(playerPos, npcCartographerPos, 2.2f)) {
+        awardArchivePoints(10, "CARTOGRAPHER TRADE COMPLETE");
+        if (isLevelZero(gCurrentLevel) && !sideContractCompleted && sideContractType == SIDE_SCAN_WALLS) {
+            progressSideContract(1, "SIDE: CARTOGRAPHER LOGGED A PATTERN");
+        }
+        return true;
+    }
+
+    if (npcDispatcherActive && nearPoint2D(playerPos, npcDispatcherPhonePos, 2.2f)) {
+        setTrapStatus("DISPATCHER: PRIORITY ROUTE MARKED");
+        addAttention(4.0f);
+        dispatcherCallCooldown = 25.0f;
+        if (!isLevelZero(gCurrentLevel) && sideContractType == SIDE_RESTORE_CAMERAS) {
+            progressSideContract(1, "SIDE: CAMERAS RESTORED");
+        }
+        return true;
+    }
+
+    if (npcLostSurvivorActive && !npcLostSurvivorEscorted && nearPoint2D(playerPos, npcLostSurvivorPos, 2.2f)) {
+        npcLostSurvivorEscorted = true;
+        npcLostSurvivorActive = false;
+        awardArchivePoints(30, "SURVIVOR EVACUATED");
+        if (sideContractType == SIDE_RESCUE_SURVIVOR) {
+            progressSideContract(sideContractTarget, "SIDE: SURVIVOR SAFE");
+        }
+        return true;
+    }
+
     if (isLevelZero(gCurrentLevel)) {
         if (level1ContractComplete) return false;
         for (int i = 0; i < 3; i++) {
@@ -211,6 +359,7 @@ inline bool tryHandleVoidShiftInteract(const Vec3& playerPos) {
             level1NodeDone[i] = true;
             addAttention(15.0f);
             setTrapStatus("NODE STABILIZED");
+            if (sideContractType == SIDE_STABILIZE_RIFTS) progressSideContract(1, "SIDE: RIFT SEALED");
             if (level1DoneCount() >= 3) {
                 level1HoldActive = true;
                 level1HoldTimer = 90.0f;
@@ -247,6 +396,7 @@ inline bool tryHandleVoidShiftInteract(const Vec3& playerPos) {
         ventilationOnline = true;
         addAttention(6.0f);
         setTrapStatus("VENTILATION ONLINE");
+        if (sideContractType == SIDE_ENABLE_VENT) progressSideContract(1, "SIDE: VENTILATION OBJECTIVE DONE");
         return true;
     }
     if (!level2HoldActive && !level2ContractComplete && level2BatteryInstalled && level2FuseCount >= 3 && level2AccessReady && nearPoint2D(playerPos, level2LiftNode, 2.6f)) {
@@ -254,6 +404,7 @@ inline bool tryHandleVoidShiftInteract(const Vec3& playerPos) {
         level2HoldTimer = 15.0f;
         addAttention(15.0f);
         setTrapStatus("LIFT HOLD STARTED");
+        if (sideContractType == SIDE_REPROGRAM_DRONE) progressSideContract(1, "SIDE: DRONE REPROGRAMMED");
         return true;
     }
     return false;
@@ -265,13 +416,16 @@ inline void updateVoidShiftSystems(float dt, bool sprinting, bool flashlightActi
         if (attentionEventCooldown < 0.0f) attentionEventCooldown = 0.0f;
     }
 
-    if (sprinting) addAttention(dt * 1.1f);
+    float sprintAttention = perkQuietSteps ? 0.75f : 1.1f;
+    if (sprinting) addAttention(dt * sprintAttention);
     if (flashlightActive) addAttention(dt * 0.35f);
     if (!echoPlayback) addAttention(-dt * 1.4f);
+    if (perkFastHands && !sprinting) addAttention(-dt * 0.3f);
 
     if (echoRecording) {
         echoRecordTimer += dt;
-        resonatorBattery -= dt * 1.5f;
+        float echoDrain = perkEchoBuffer ? 1.0f : 1.5f;
+        resonatorBattery -= dt * echoDrain;
         if ((int)echoTrack.size() == 0 || echoRecordTimer >= 0.10f) {
             echoTrack.push_back(cam.pos);
             echoRecordTimer = 0.0f;
@@ -303,6 +457,30 @@ inline void updateVoidShiftSystems(float dt, bool sprinting, bool flashlightActi
         coLevel = 0.0f;
     }
 
+    if (dispatcherCallCooldown > 0.0f) {
+        dispatcherCallCooldown -= dt;
+        if (dispatcherCallCooldown < 0.0f) dispatcherCallCooldown = 0.0f;
+    } else if (npcDispatcherActive && (rng() % 1000) < 3) {
+        setEchoStatus("DISPATCHER: CHECK PHONE NODE");
+        dispatcherCallCooldown = 16.0f;
+    }
+
+    if (npcLostSurvivorActive && !npcLostSurvivorEscorted) {
+        Vec3 toDoor = coop.doorPos - npcLostSurvivorPos;
+        toDoor.y = 0.0f;
+        float dist = toDoor.len();
+        if (dist > 0.3f) {
+            float inv = 1.0f / dist;
+            npcLostSurvivorPos.x += toDoor.x * inv * dt * 1.3f;
+            npcLostSurvivorPos.z += toDoor.z * inv * dt * 1.3f;
+        }
+        if (nearPoint2D(npcLostSurvivorPos, coop.doorPos, 2.3f)) {
+            npcLostSurvivorEscorted = true;
+            npcLostSurvivorActive = false;
+            awardArchivePoints(30, "SURVIVOR SAFE IN BREAKROOM");
+        }
+    }
+
     if (level1HoldActive && !level1ContractComplete) {
         level1HoldTimer -= dt;
         if (level1HoldTimer <= 0.0f) {
@@ -325,24 +503,24 @@ inline void updateVoidShiftSystems(float dt, bool sprinting, bool flashlightActi
 
     if (attentionEventCooldown <= 0.0f) {
         if (attentionLevel >= 90.0f) {
-            setTrapStatus("ATTENTION CRITICAL");
+            setTrapStatus(isLevelZero(gCurrentLevel) ? "CRITICAL: WANDERER HUNT ACTIVE" : "CRITICAL: TOWMAN TRACKING ACTIVE");
             if (multiState != MULTI_IN_GAME) {
                 Vec3 ep = findSpawnPos(cam.pos, 12.0f);
                 entityMgr.spawnEntity(ENTITY_SHADOW, ep, nullptr, 0, 0);
             }
             attentionEventCooldown = 12.0f;
         } else if (attentionLevel >= 75.0f) {
-            setTrapStatus("ATTENTION HIGH");
+            setTrapStatus(isLevelZero(gCurrentLevel) ? "HIGH: LAMP-HUSHER SWARM" : "HIGH: HEADLIGHT SWARM");
             if (multiState != MULTI_IN_GAME) {
                 Vec3 ep = findSpawnPos(cam.pos, 10.0f);
                 entityMgr.spawnEntity(ENTITY_CRAWLER, ep, nullptr, 0, 0);
             }
             attentionEventCooldown = 10.0f;
         } else if (attentionLevel >= 50.0f) {
-            setTrapStatus("ATTENTION RISING");
+            setTrapStatus(isLevelZero(gCurrentLevel) ? "ATTENTION RISING: PHONE MIMIC RISK" : "ATTENTION RISING: DRONE ALERT");
             attentionEventCooldown = 8.0f;
         } else if (attentionLevel >= 25.0f) {
-            setTrapStatus("ATTENTION DETECTED");
+            setTrapStatus(isLevelZero(gCurrentLevel) ? "ATTENTION: PAPERCLIP NOISE" : "ATTENTION: OIL TRACKS DETECTED");
             attentionEventCooldown = 6.0f;
         }
     }

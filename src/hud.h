@@ -79,13 +79,16 @@ void drawUI(){
                 char contractBuf[128];
                 buildVoidShiftObjectiveLine(contractBuf, 128);
                 drawHudText(contractBuf,-0.95f,0.88f,1.08f,0.88f,0.90f,0.72f,0.95f);
+                char supportBuf[128];
+                buildVoidShiftSupportLine(supportBuf, 128);
+                drawHudText(supportBuf,-0.95f,0.85f,0.98f,0.78f,0.88f,0.74f,0.90f);
                 char attBuf[96];
                 if(isParkingLevel(gCurrentLevel)){
                     snprintf(attBuf,96,"ATTENTION %.0f%%  CO %.0f%%  RESO %.0f%%",attentionLevel,coLevel,resonatorBattery);
                 }else{
                     snprintf(attBuf,96,"ATTENTION %.0f%%  RESO %.0f%%",attentionLevel,resonatorBattery);
                 }
-                drawHudText(attBuf,-0.95f,0.82f,1.02f,0.78f,0.86f,0.76f,0.92f);
+                drawHudText(attBuf,-0.95f,0.79f,1.02f,0.78f,0.86f,0.76f,0.92f);
             }
             if(activeDeviceSlot == 2){
                 float y = -0.70f;
@@ -130,6 +133,10 @@ void drawUI(){
                     char contractLine[96];
                     buildVoidShiftObjectiveLine(contractLine, 96);
                     drawHudText(contractLine,blockX,blockY,1.02f,0.86f,0.90f,0.68f,0.95f);
+                    blockY -= 0.06f;
+                    char sideLine[96];
+                    buildVoidShiftSupportLine(sideLine, 96);
+                    drawHudText(sideLine,blockX,blockY,0.98f,0.78f,0.88f,0.74f,0.91f);
                     blockY -= 0.06f;
                     drawHudText(isStoryExitReady()?"EXIT READY":"EXIT LOCKED",blockX,blockY,1.08f,0.72f,0.86f,0.90f,0.93f);
                     blockY -= 0.06f;

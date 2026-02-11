@@ -156,6 +156,7 @@ void gameInput(GLFWwindow*w){
                     if(it.type==ITEM_BATTERY) invBattery++;
                     else if(it.type==ITEM_PLUSH_TOY) invPlush++;
                     else if(it.type==ITEM_MED_SPRAY) applyItemUse(ITEM_MED_SPRAY);
+                    notifyVoidShiftItemPickup(it.type);
                     break;
                 }
             }else{
@@ -169,6 +170,7 @@ void gameInput(GLFWwindow*w){
                 else if(it.type==ITEM_PLUSH_TOY) invPlush++;
                 else if(it.type==ITEM_MED_SPRAY) applyItemUse(ITEM_MED_SPRAY);
                 addAttention(1.2f);
+                notifyVoidShiftItemPickup(it.type);
                 break;
             }
         }
@@ -229,6 +231,7 @@ void gameInput(GLFWwindow*w){
         netMgr.pingMarkTtl = 6.0f;
         netMgr.pingMarkReceived = true;
         addAttention(1.0f);
+        notifyVoidShiftPingUsed();
     }
 
     if(recordNow && !recordPressed){

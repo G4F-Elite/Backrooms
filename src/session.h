@@ -166,6 +166,38 @@ Vec3 level2AccessNode(0, 0, 0);
 Vec3 level2VentNode(0, 0, 0);
 bool level2VentDone = false;
 Vec3 level2LiftNode(0, 0, 0);
+
+int archivePoints = 0;
+int archiveTier = 0;
+bool perkQuietSteps = false;
+bool perkFastHands = false;
+bool perkEchoBuffer = false;
+
+enum SideContractType {
+    SIDE_NONE = 0,
+    SIDE_COLLECT_BADGES = 1,
+    SIDE_SCAN_WALLS = 2,
+    SIDE_STABILIZE_RIFTS = 3,
+    SIDE_RESCUE_SURVIVOR = 4,
+    SIDE_ENABLE_VENT = 5,
+    SIDE_RESTORE_CAMERAS = 6,
+    SIDE_REPROGRAM_DRONE = 7
+};
+
+int sideContractType = SIDE_NONE;
+int sideContractProgress = 0;
+int sideContractTarget = 0;
+bool sideContractCompleted = false;
+
+Vec3 npcCartographerPos(0, 0, 0);
+bool npcCartographerActive = false;
+Vec3 npcDispatcherPhonePos(0, 0, 0);
+bool npcDispatcherActive = false;
+Vec3 npcLostSurvivorPos(0, 0, 0);
+bool npcLostSurvivorActive = false;
+bool npcLostSurvivorEscorted = false;
+float dispatcherCallCooldown = 0.0f;
+
 TrapCorridorState trapCorridor = {};
 DebugToolsState debugTools = {};
 SmileEventState smileEvent = {false, Vec3(0,0,0), 0.0f, 0.0f, 28.0f, false, Vec3(0,0,0), Vec3(0,0,0), 0.0f};

@@ -4,6 +4,7 @@
 
 #include "math.h"
 #include "entity_types.h"
+#include "progression.h"
 
 // ============================================================================
 // ENTITY CAP AND SPAWN CALCULATIONS
@@ -83,9 +84,19 @@ inline float getDistanceToNearestEntity(const std::vector<Entity>& entities, con
 // ============================================================================
 
 inline EntityType chooseSpawnEntityType(float survivalTime, int rollA, int rollB) {
-    if (survivalTime > 220.0f && (rollA % 100) < 60) return ENTITY_SHADOW;
-    if (survivalTime > 120.0f && (rollA % 100) < 35) return ENTITY_SHADOW;
-    if (survivalTime > 140.0f && (rollB % 100) < 45) return ENTITY_CRAWLER;
+    int a = rollA % 100;
+    int b = rollB % 100;
+    if (a < 0) a += 100;
+    if (b < 0) b += 100;
+
+    if (isLevelZero(gCurrentLevel)) {
+        if (survivalTime > 240.0f && a < 48) return ENTITY_SHADOW;
+        if (survivalTime > 130.0f && b < 42) return ENTITY_CRAWLER;
+        return ENTITY_STALKER;
+    }
+
+    if (survivalTime > 180.0f && a < 55) return ENTITY_SHADOW;
+    if (survivalTime > 90.0f && b < 70) return ENTITY_CRAWLER;
     return ENTITY_STALKER;
 }
 

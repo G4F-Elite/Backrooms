@@ -303,7 +303,9 @@ inline void drawGuideScreen() {
     drawTextCentered("ATTENTION RISES FROM NOISE/LIGHT/ECHO. STAY IN CONTROL",0.0f,0.12f,1.30f,0.92f,0.66f,0.50f,0.94f);
     drawTextCentered("LEVEL 1: STABILIZE 3 NODES + HOLD 90s",0.0f,0.04f,1.28f,0.90f,0.72f,0.64f,0.92f);
     drawTextCentered("LEVEL 2: BATTERY + 3 FUSES + ACCESS + LIFT HOLD",0.0f,-0.06f,1.28f,0.82f,0.86f,0.64f,0.92f);
-    drawTextCentered("CONTROLS: WASD MOVE, SHIFT SPRINT, C CROUCH, E INTERACT",0.0f,-0.20f,1.24f,0.70f,0.76f,0.66f,0.90f); drawTextCentered("FLASHLIGHT F  DEVICES 1/2/3  R RECORD  P PLAYBACK  DEBUG F3/F10",0.0f,-0.30f,1.16f,0.68f,0.74f,0.64f,0.88f);
+    drawTextCentered("NPCS: CARTOGRAPHER / DISPATCHER / LOST SURVIVOR",0.0f,-0.16f,1.18f,0.78f,0.84f,0.70f,0.90f);
+    drawTextCentered("SIDE CONTRACTS GRANT ARCHIVE POINTS + PERKS",0.0f,-0.24f,1.14f,0.76f,0.84f,0.72f,0.90f);
+    drawTextCentered("CONTROLS: WASD MOVE, SHIFT SPRINT, C CROUCH, E INTERACT",0.0f,-0.32f,1.24f,0.70f,0.76f,0.66f,0.90f);
     drawTextCentered("ESC OR ENTER - BACK",0.0f,-0.70f,1.4f,0.56f,0.62f,0.50f,0.82f);
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
