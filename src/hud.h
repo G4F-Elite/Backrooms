@@ -75,6 +75,12 @@ void drawUI(){
             if(playerSanity<100)drawSanityBar(playerSanity);
             drawStaminaBar(playerStamina);
             if(flashlightBattery<100)drawFlashlightBattery(flashlightBattery,flashlightOn);
+            if(playerDowned){
+                char downBuf[64];
+                snprintf(downBuf,64,"DOWNED %.0fs",playerDownedTimer);
+                drawHudText(downBuf,-0.20f,-0.22f,1.45f,0.96f,0.52f,0.44f,0.95f);
+                drawHudTextCentered("[E] USE PLUSH TO SELF-REVIVE",0.0f,-0.30f,1.2f,0.90f,0.72f,0.62f,0.92f);
+            }
             {
                 char contractBuf[128];
                 buildVoidShiftObjectiveLine(contractBuf, 128);

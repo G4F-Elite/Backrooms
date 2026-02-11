@@ -96,6 +96,8 @@ int nearNoteId = -1, lastSpawnedNote = -1;
 float noteSpawnTimer = 0;
 bool firstMouse = true;
 bool escPressed, enterPressed, isPlayerDead;
+bool playerDowned = false;
+float playerDownedTimer = 0.0f;
 bool playerEscaped = false;
 char gDeathReason[80] = "CAUSE: INCIDENT UNCONFIRMED";
 bool upPressed, downPressed, leftPressed, rightPressed;

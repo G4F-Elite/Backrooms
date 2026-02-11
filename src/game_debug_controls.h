@@ -133,6 +133,7 @@ void gameInput(GLFWwindow*w){
     flashlightPressed=fNow;
     
     bool eNow=glfwGetKey(w,settings.binds.interact)==GLFW_PRESS;
+    if(playerDowned && eNow && !interactPressed && invPlush > 0){ invPlush--; playerDowned=false; playerDownedTimer=0.0f; playerHealth=45.0f; playerSanity+=20.0f; if(playerSanity>100.0f) playerSanity=100.0f; setEchoStatus("SELF-REVIVE SUCCESS"); }
     nearbyWorldItemId = -1;
     nearbyWorldItemType = -1;
     for(auto& it:worldItems){
@@ -144,9 +145,7 @@ void gameInput(GLFWwindow*w){
         }
     }
     bool nearExitDoor = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
-    bool exitReady = false;
-    if(multiState==MULTI_IN_GAME) exitReady = coop.doorOpen && isStoryExitReady();
-    else exitReady = isStoryExitReady();
+    bool exitReady = (multiState==MULTI_IN_GAME) ? (coop.doorOpen && isStoryExitReady()) : isStoryExitReady();
     if(eNow&&!interactPressed&&nearbyWorldItemId>=0){
         if(multiState==MULTI_IN_GAME){
             if(netMgr.isHost){
@@ -266,12 +265,13 @@ void gameInput(GLFWwindow*w){
     }
 
     float spd=4.0f*dTime;
-    bool sprinting=glfwGetKey(w,settings.binds.sprint)==GLFW_PRESS&&playerStamina>0&&staminaCooldown<=0;
+    bool sprinting=glfwGetKey(w,settings.binds.sprint)==GLFW_PRESS&&playerStamina>0&&staminaCooldown<=0&&!playerDowned;
     if(debugTools.infiniteStamina){
         sprinting = glfwGetKey(w,settings.binds.sprint)==GLFW_PRESS;
         playerStamina = 125.0f;
         staminaCooldown = 0.0f;
     }
+    if(playerDowned) spd *= 0.42f;
     if(sprinting){
         spd*=1.6f;
         if(!debugTools.infiniteStamina){

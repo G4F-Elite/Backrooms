@@ -281,7 +281,16 @@ int main(){
                 }
                 if(playerSanity<=0.0f && !isPlayerDead){
                     sanityCollapseTimer += dTime;
-                    if(sanityCollapseTimer>=2.3f){ isPlayerDead=true;playerHealth=0;snprintf(gDeathReason,sizeof(gDeathReason),"CAUSE: COGNITIVE OVERLOAD"); glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL); }
+                    if(sanityCollapseTimer>=2.3f){
+                        if(!playerDowned){
+                            playerDowned = true;
+                            playerDownedTimer = 60.0f;
+                            snprintf(gDeathReason,sizeof(gDeathReason),"DOWNED: COGNITIVE OVERLOAD");
+                            setEchoStatus("DOWNED: USE PLUSH TO STABILIZE");
+                        }else{
+                            isPlayerDead=true;playerHealth=0;snprintf(gDeathReason,sizeof(gDeathReason),"CAUSE: COGNITIVE OVERLOAD"); glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
+                        }
+                    }
                 }else if(!isPlayerDead){
                     sanityCollapseTimer -= dTime * 1.7f;
                     if(sanityCollapseTimer < 0.0f) sanityCollapseTimer = 0.0f;
@@ -296,7 +305,27 @@ int main(){
                         triggerScare();
                     }
                     if(playerHealth<=0){
-                        isPlayerDead=true;playerHealth=0;snprintf(gDeathReason,sizeof(gDeathReason),"CAUSE: HOSTILE CONTACT");
+                        if(!playerDowned){
+                            playerDowned = true;
+                            playerDownedTimer = 60.0f;
+                            playerHealth = 15.0f;
+                            snprintf(gDeathReason,sizeof(gDeathReason),"DOWNED: HOSTILE CONTACT");
+                            setEchoStatus("DOWNED: SELF-REVIVE WITH PLUSH");
+                        }else{
+                            isPlayerDead=true;playerHealth=0;snprintf(gDeathReason,sizeof(gDeathReason),"CAUSE: HOSTILE CONTACT");
+                            glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
+                        }
+                    }
+                }
+                if(playerDowned && !isPlayerDead){
+                    playerDownedTimer -= dTime;
+                    playerStamina -= dTime * 14.0f;
+                    if(playerStamina < 0.0f) playerStamina = 0.0f;
+                    if(playerDownedTimer <= 0.0f){
+                        playerDownedTimer = 0.0f;
+                        isPlayerDead = true;
+                        playerHealth = 0.0f;
+                        snprintf(gDeathReason,sizeof(gDeathReason),"CAUSE: BLEED OUT");
                         glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
                     }
                 }
