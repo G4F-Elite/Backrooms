@@ -18,6 +18,7 @@ int main(){
     if(!gladLoadGL())return -1;
     glEnable(GL_DEPTH_TEST);glEnable(GL_CULL_FACE);
     genWorld();
+    loadArchiveMetaProgress(archivePoints, archiveTier, perkQuietSteps, perkFastHands, perkEchoBuffer);
     wallTex=genTex(0);floorTex=genTex(1);ceilTex=genTex(2);lightTex=genTex(3);lampTex=genTex(4);propTex=genTex(5);
     deviceTex=genTex(6);
     plushTex=genTex(7);
