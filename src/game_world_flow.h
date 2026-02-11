@@ -5,14 +5,14 @@
 #include "map_content.h"
 
 inline void buildFlashlightModel(std::vector<float>& v){
-    // Handle
-    mkBox(v, 0.0f, -0.08f, 0.06f, 0.10f, 0.22f, 0.10f);
-    // Body
-    mkBox(v, 0.0f, 0.08f, 0.20f, 0.12f, 0.12f, 0.34f);
-    // Head
-    mkBox(v, 0.0f, 0.10f, 0.40f, 0.18f, 0.16f, 0.22f);
-    // Small top switch
-    mkBox(v, 0.0f, 0.22f, 0.18f, 0.06f, 0.03f, 0.06f);
+    // Rear battery tube
+    mkBox(v, 0.0f, 0.00f, 0.04f, 0.10f, 0.07f, 0.16f);
+    // Main body
+    mkBox(v, 0.0f, 0.02f, 0.22f, 0.12f, 0.08f, 0.36f);
+    // Front head
+    mkBox(v, 0.0f, 0.03f, 0.44f, 0.18f, 0.10f, 0.20f);
+    // Top switch
+    mkBox(v, 0.0f, 0.09f, 0.16f, 0.05f, 0.02f, 0.07f);
 }
 
 inline void buildScannerModel(std::vector<float>& v){

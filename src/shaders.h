@@ -20,7 +20,7 @@ void main(){
 const char* mainFS=R"(#version 330
 out vec4 F; in vec2 uv; in vec3 fp,nm;
 in vec3 viewTS; in vec3 fragPosTS;
-uniform sampler2D tex; uniform vec3 vp; uniform float tm;
+uniform sampler2D tex; uniform vec3 vp; uniform float tm; uniform vec3 modelTint;
 uniform int nl; uniform vec3 lp[16]; uniform float danger;
 uniform int flashOn; uniform vec3 flashDir; uniform vec3 flashPos;
 uniform int rfc; uniform vec3 rfp[4]; uniform vec3 rfd[4];
@@ -44,7 +44,7 @@ void main(){
  // Apply parallax offset to UV
  vec3 V = normalize(viewTS);
  vec2 texCoord = parallaxOffset(uv, V);
- vec3 tc = texture(tex, texCoord).rgb;
+ vec3 tc = texture(tex, texCoord).rgb * modelTint;
  vec3 N = normalize(nm);
  bool isCeil = N.y < -0.5;
  bool isFloor = N.y > 0.5;
@@ -433,33 +433,34 @@ void main(){
   F = vec4(c0, 1.0);
  return;
 }
-// Chromatic aberration - asymmetric for realistic lens feel
-float ab = 0.0018 * inten;
-float abV = 0.0008 * inten; // slight vertical component
-float r = resolveSample(uv + vec2(ab, abV * 0.5)).r;
-float g = resolveSample(uv).g;
-float b = resolveSample(uv - vec2(ab, abV * 0.3)).b;
+// Chromatic aberration + line jitter for stronger VHS breakup
+float lineJitter = (rnd(vec2(floor(uv.y * 320.0), floor(tm * 30.0))) - 0.5) * 0.0035 * inten;
+float ab = 0.0042 * inten;
+float abV = 0.0018 * inten;
+float r = resolveSample(uv + vec2(ab + lineJitter, abV * 0.6)).r;
+float g = resolveSample(uv + vec2(lineJitter * 0.45, 0.0)).g;
+float b = resolveSample(uv + vec2(-ab + lineJitter, -abV * 0.35)).b;
 vec3 c = vec3(r,g,b);
  if(frameGen == 1 && taaValid > 0.5){
   vec3 prev = texture(histTex, uv).rgb;
   c = mix(c, prev, clamp(frameGenBlend, 0.0, 0.6));
  }
- // Film grain - organic noise instead of sharp static
+ // Film grain - intentionally visible in gameplay
  float grainTime = tm * 0.7;
  float grain1 = rnd(uv * 0.8 + vec2(grainTime, grainTime * 0.73));
  float grain2 = rnd(uv * 1.3 + vec2(grainTime * 1.1, grainTime * 0.5));
- float filmGrain = (grain1 * 0.6 + grain2 * 0.4 - 0.5) * 0.028 * inten;
+ float filmGrain = (grain1 * 0.6 + grain2 * 0.4 - 0.5) * 0.060 * inten;
  // Film grain is stronger in darker areas (like real film)
  float pixelLum = dot(c, vec3(0.3, 0.6, 0.1));
- float grainStrength = mix(1.5, 0.5, smoothstep(0.0, 0.4, pixelLum));
+ float grainStrength = mix(2.0, 0.7, smoothstep(0.0, 0.45, pixelLum));
  c += vec3(filmGrain) * grainStrength;
- // Subtle scanlines - less aggressive, more like CRT phosphor
- float scanline = sin(uv.y * 400.0 + tm * 3.0) * 0.5 + 0.5;
- scanline = pow(scanline, 3.0) * 0.012 * inten;
+ // Scanlines - stronger and moving to avoid static look
+ float scanline = sin(uv.y * 520.0 + tm * 5.5) * 0.5 + 0.5;
+ scanline = pow(scanline, 2.2) * 0.026 * inten;
  c -= vec3(scanline);
- // Horizontal distortion glitch (very rare, subtle)
- if(inten > 0.45 && rnd(vec2(tm * 0.06, floor(uv.y * 40))) > 0.992) {
-  float of = (rnd(vec2(tm, floor(uv.y * 40))) - 0.5) * 0.012 * inten;
+ // Horizontal distortion glitch (noticeable but controlled)
+ if(inten > 0.28 && rnd(vec2(tm * 0.11, floor(uv.y * 85))) > 0.985) {
+  float of = (rnd(vec2(tm * 1.9, floor(uv.y * 85))) - 0.5) * 0.024 * inten;
   c = resolveSample(uv + vec2(of, 0));
  }
  // Vignette - natural camera lens falloff
@@ -476,9 +477,9 @@ vec3 c = vec3(r,g,b);
  float leak = sin(leakAngle * 1.5 + tm * 0.05) * 0.5 + 0.5;
  float leakMask = smoothstep(0.35, 0.55, length(vigUV)) * leak * 0.015 * inten;
  c += vec3(leakMask * 1.2, leakMask * 0.9, leakMask * 0.4);
- // Ghost frame (very subtle double image with slight color shift)
+ // Ghost frame (visible double image at higher intensity)
  vec3 ghost = resolveSample(uv - vec2(0.003, 0.0015));
- c = mix(c, ghost * vec3(1.02, 0.98, 0.96), 0.025 * inten);
+ c = mix(c, ghost * vec3(1.03, 0.98, 0.95), 0.080 * inten);
  // Cinematic color grading - warm midtones, cool shadows
  float lumC = dot(c, vec3(0.3, 0.6, 0.1));
  // Lift shadows slightly warm

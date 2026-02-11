@@ -244,9 +244,34 @@ inline void drawSlider(float x,float y,float w,float val,float r,float g,float b
     drawText("|",knobX,y,1.55f,0.98f,0.96f,0.88f,0.98f);
 }
 
+inline void drawMenuAtmosphere(float tm) {
+    // Soft moving haze bands to break up blocky motion artifacts.
+    for(int i = 0; i < 6; i++) {
+        float fi = (float)i;
+        float phase = tm * (0.09f + fi * 0.015f) + fi * 1.73f;
+        float yCenter = -0.78f + fi * 0.30f + sinf(phase) * 0.08f;
+        float halfH = 0.09f + 0.02f * sinf(tm * 0.23f + fi * 0.7f);
+        float alpha = 0.032f + 0.02f * (0.5f + 0.5f * sinf(phase * 1.37f));
+        drawOverlayRectNdc(-1.0f, yCenter - halfH, 1.0f, yCenter + halfH, 0.20f, 0.16f, 0.11f, alpha);
+    }
+
+    // Slow horizontal light sweep for a more intentional menu look.
+    float sweep = sinf(tm * 0.24f) * 0.78f;
+    float sweepW = 0.16f;
+    drawOverlayRectNdc(sweep - sweepW, -1.0f, sweep + sweepW, 1.0f, 0.76f, 0.66f, 0.42f, 0.055f);
+
+    // Thin scan strips - cinematic motion instead of chunky blocks.
+    for(int i = 0; i < 8; i++) {
+        float fi = (float)i;
+        float y = -0.95f + fi * 0.27f + fmodf(tm * (0.03f + fi * 0.002f), 0.24f);
+        drawOverlayRectNdc(-1.0f, y, 1.0f, y + 0.012f, 0.10f, 0.09f, 0.07f, 0.05f);
+    }
+}
+
 inline void drawMenu(float tm) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     drawMainMenuBackdrop(tm);
+    drawMenuAtmosphere(tm);
     // Lighter overlays so background stays readable
     drawFullscreenOverlay(0.02f,0.02f,0.02f,0.28f);
     drawFullscreenOverlay(0.17f,0.13f,0.08f,0.10f);

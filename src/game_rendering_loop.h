@@ -7,12 +7,12 @@ void renderScene(){
     glEnable(GL_CULL_FACE);
 
     struct MainUniforms {
-        GLint P, V, M, vp, tm, danger, flashOn, flashDir, flashPos, rfc, rfp, rfd, nl, lp;
+        GLint P, V, M, vp, tm, danger, flashOn, flashDir, flashPos, rfc, rfp, rfd, nl, lp, tint;
     };
     struct LightUniforms {
         GLint P, V, M, inten, tm, fade, danger;
     };
-    static MainUniforms mu = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
+    static MainUniforms mu = {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
     static LightUniforms lu = {-1,-1,-1,-1,-1,-1,-1};
     if(mu.P < 0){
         mu.P = glGetUniformLocation(mainShader,"P");
@@ -29,6 +29,7 @@ void renderScene(){
         mu.rfd = glGetUniformLocation(mainShader,"rfd");
         mu.nl = glGetUniformLocation(mainShader,"nl");
         mu.lp = glGetUniformLocation(mainShader,"lp");
+        mu.tint = glGetUniformLocation(mainShader,"modelTint");
     }
     if(lu.P < 0){
         lu.P = glGetUniformLocation(lightShader,"P");
@@ -65,6 +66,7 @@ void renderScene(){
     glUniform3f(mu.vp,cam.pos.x,cam.pos.y,cam.pos.z);
     glUniform1f(mu.tm,vhsTime);
     glUniform1f(mu.danger,entityMgr.dangerLevel);
+    if(mu.tint >= 0) glUniform3f(mu.tint,1.0f,1.0f,1.0f);
 
     // === Viewmodel (held item) state ===
     // Keep it deterministic and camera-relative (no spring physics) to avoid jitter/"floating".
@@ -152,6 +154,7 @@ void renderScene(){
     float yawAdd = 0.16f;
     float pitchAdd = -0.14f;
     Vec3 scale = Vec3(0.95f, 0.95f, 1.0f);
+    Vec3 heldTint(1.0f, 1.0f, 1.0f);
     if(activeDeviceSlot == 1){
         heldVAO = flashlightVAO;
         heldVC = flashlightVC;
@@ -161,6 +164,7 @@ void renderScene(){
         yawAdd = 0.20f;
         pitchAdd = -0.20f;
         scale = Vec3(0.92f, 0.92f, 0.92f);
+        heldTint = Vec3(0.60f, 0.62f, 0.65f);
     }else if(activeDeviceSlot == 2){
         heldVAO = scannerVAO;
         heldVC = scannerVC;
@@ -198,10 +202,12 @@ void renderScene(){
         Vec3 drawScale = scale * (0.8f + 0.2f * deviceEquip);
         Mat4 heldModel = composeModelMatrix(base, vmYaw + yawAdd, vmPitch + pitchAdd, drawScale);
         glUniformMatrix4fv(mu.M,1,GL_FALSE,heldModel.m);
+        if(mu.tint >= 0) glUniform3f(mu.tint,heldTint.x,heldTint.y,heldTint.z);
         glBindTexture(GL_TEXTURE_2D,propTex);
         glBindVertexArray(heldVAO);
         glDrawArrays(GL_TRIANGLES,0,heldVC);
         glUniformMatrix4fv(mu.M,1,GL_FALSE,model.m);
+        if(mu.tint >= 0) glUniform3f(mu.tint,1.0f,1.0f,1.0f);
 
         // NOTE: flashPos is now set before world draw; we don't update it here.
     }
@@ -267,22 +273,32 @@ inline int detectActiveRefreshRateHz(GLFWwindow* w){
 }
 
 inline Mat4 composeModelMatrix(const Vec3& pos, float yaw, float pitch, const Vec3& scale){
-    float cy = mCos(yaw), sy = mSin(yaw);
-    float cx = mCos(pitch), sx = mSin(pitch);
+    Vec3 forward(mSin(yaw) * mCos(pitch), mSin(pitch), mCos(yaw) * mCos(pitch));
+    forward.normalize();
+
+    Vec3 worldUp(0.0f, 1.0f, 0.0f);
+    Vec3 right = worldUp.cross(forward);
+    if(right.lenSq() < 0.0001f){
+        right = Vec3(mCos(yaw), 0.0f, -mSin(yaw));
+    }else{
+        right.normalize();
+    }
+    Vec3 up = forward.cross(right).norm();
+
     Mat4 r;
-    r.m[0] = cy * scale.x;
-    r.m[1] = sx * sy * scale.x;
-    r.m[2] = -cx * sy * scale.x;
+    r.m[0] = right.x * scale.x;
+    r.m[1] = right.y * scale.x;
+    r.m[2] = right.z * scale.x;
     r.m[3] = 0.0f;
 
-    r.m[4] = 0.0f;
-    r.m[5] = cx * scale.y;
-    r.m[6] = sx * scale.y;
+    r.m[4] = up.x * scale.y;
+    r.m[5] = up.y * scale.y;
+    r.m[6] = up.z * scale.y;
     r.m[7] = 0.0f;
 
-    r.m[8] = sy * scale.z;
-    r.m[9] = -sx * cy * scale.z;
-    r.m[10] = cx * cy * scale.z;
+    r.m[8] = forward.x * scale.z;
+    r.m[9] = forward.y * scale.z;
+    r.m[10] = forward.z * scale.z;
     r.m[11] = 0.0f;
 
     r.m[12] = pos.x;

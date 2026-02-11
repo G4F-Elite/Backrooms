@@ -350,7 +350,7 @@ int main(){
         bool vhsGameplay=(gameState==STATE_GAME||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_KEYBINDS_PAUSE||gameState==STATE_NOTE||gameState==STATE_INTRO);
         float vI=0.0f;
         if(vhsMenu){
-            vI=0.22f+settings.vhsIntensity*0.58f;
+            vI=0.18f+settings.vhsIntensity*0.52f;
         }else if(vhsGameplay){
             float sanityLoss=1.0f-(playerSanity/100.0f);
             if(sanityLoss<0.0f) sanityLoss=0.0f;
@@ -358,7 +358,9 @@ int main(){
             float stress=entityMgr.dangerLevel*0.65f+sanityLoss*0.35f;
             if(stress<0.0f) stress=0.0f;
             if(stress>1.0f) stress=1.0f;
-            vI=settings.vhsIntensity*(0.26f+0.44f*stress);
+            float panicBoost = sanityLoss * 0.20f + entityMgr.dangerLevel * 0.15f;
+            vI=settings.vhsIntensity*(0.62f+0.78f*stress)+panicBoost;
+            if(vI>1.35f) vI=1.35f;
         }
         static GLint vhsTmLoc=-1,vhsIntenLoc=-1,vhsUpscalerLoc=-1,vhsAaModeLoc=-1;
         static GLint vhsSharpnessLoc=-1,vhsTexelXLoc=-1,vhsTexelYLoc=-1;
