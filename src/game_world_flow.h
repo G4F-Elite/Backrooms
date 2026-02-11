@@ -1,8 +1,8 @@
 #pragma once
-#pragma once
 
 #include "coop.h"
 #include "map_content.h"
+#include "device_models.h"
 
 inline void mkClosedBox(std::vector<float>& v, float cx, float y0, float cz, float sx, float sy, float sz) {
     float hx = sx * 0.5f;
@@ -58,44 +58,6 @@ inline void mkClosedBox(std::vector<float>& v, float cx, float y0, float cz, flo
         Vec3(cx + hx, y0, cz + hz), Vec3(cx - hx, y0, cz + hz),
         Vec3(0, -1, 0), uvX, uvZ
     );
-}
-
-inline void buildFlashlightModel(std::vector<float>& v){
-    // Rear battery tube
-    mkClosedBox(v, 0.0f, 0.00f, 0.04f, 0.10f, 0.07f, 0.16f);
-    // Main body
-    mkClosedBox(v, 0.0f, 0.02f, 0.22f, 0.12f, 0.08f, 0.36f);
-    // Front head
-    mkClosedBox(v, 0.0f, 0.03f, 0.44f, 0.18f, 0.10f, 0.20f);
-    // Top switch
-    mkClosedBox(v, 0.0f, 0.09f, 0.16f, 0.05f, 0.02f, 0.07f);
-}
-
-inline void buildScannerModel(std::vector<float>& v){
-    // Base slab
-    mkBox(v, 0.0f, -0.05f, 0.12f, 0.22f, 0.08f, 0.34f);
-    // Screen block
-    mkBox(v, 0.0f, 0.03f, 0.22f, 0.18f, 0.10f, 0.18f);
-    // Antenna
-    mkBox(v, 0.07f, 0.12f, 0.34f, 0.03f, 0.20f, 0.03f);
-    // Side grip
-    mkBox(v, -0.09f, -0.02f, 0.10f, 0.06f, 0.16f, 0.12f);
-}
-
-inline void buildPlushToyModel(std::vector<float>& v){
-    // Cute teddy-like silhouette (very low poly)
-    mkBox(v, 0.0f, -0.06f, 0.0f, 0.18f, 0.14f, 0.14f);      // body
-    mkBox(v, 0.0f, 0.08f, 0.02f, 0.14f, 0.14f, 0.14f);      // head
-    mkBox(v, -0.08f, 0.18f, 0.02f, 0.06f, 0.06f, 0.06f);    // ear L
-    mkBox(v, 0.08f, 0.18f, 0.02f, 0.06f, 0.06f, 0.06f);     // ear R
-    mkBox(v, -0.11f, 0.02f, 0.00f, 0.06f, 0.08f, 0.06f);    // arm L
-    mkBox(v, 0.11f, 0.02f, 0.00f, 0.06f, 0.08f, 0.06f);     // arm R
-}
-
-inline void buildBatteryModel(std::vector<float>& v){
-    // Simple battery cylinder approximation as stacked boxes
-    mkBox(v, 0.0f, -0.06f, 0.0f, 0.10f, 0.16f, 0.10f);
-    mkBox(v, 0.0f, 0.10f, 0.0f, 0.06f, 0.05f, 0.06f);
 }
 
 void buildGeom(){
@@ -485,6 +447,7 @@ void teleportToExit(){
     updateMapContent(playerChunkX,playerChunkZ);
     buildGeom();
 }
+
 
 
 

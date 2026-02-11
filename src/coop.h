@@ -31,7 +31,9 @@ inline bool collideCoopDoor(float x, float z, float r){
     }else{
         if(!coop.initialized || isStoryExitReady()) return false;
     }
-    return fabsf(x - coop.doorPos.x) < (CS * 0.6f + r) && fabsf(z - coop.doorPos.z) < (CS * 0.2f + r);
+    // Match visual geometry in game_world_flow.h: frame thickness is 0.36 (half 0.18),
+    // so use the same Z half-extent + player radius.
+    return fabsf(x - coop.doorPos.x) < (CS * 0.6f + r) && fabsf(z - coop.doorPos.z) < (0.18f + r);
 }
 
 inline void syncCoopFromNetwork(){

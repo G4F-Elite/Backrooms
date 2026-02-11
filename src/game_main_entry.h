@@ -19,6 +19,7 @@ int main(){
     genWorld();
     wallTex=genTex(0);floorTex=genTex(1);ceilTex=genTex(2);lightTex=genTex(3);lampTex=genTex(4);propTex=genTex(5);
     deviceTex=genTex(6); // device-specific texture (flashlight/scanner)
+    playerTex=propTex; // players use a stable texture so held-item textures don't bleed
     mainShader=mkShader(mainVS,mainFS);lightShader=mkShader(lightVS,lightFS);vhsShader=mkShader(vhsVS,vhsFS);
     buildGeom();
     computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), renderW, renderH);
@@ -349,7 +350,7 @@ int main(){
         bool vhsGameplay=(gameState==STATE_GAME||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_KEYBINDS_PAUSE||gameState==STATE_NOTE||gameState==STATE_INTRO);
         float vI=0.0f;
         if(vhsMenu){
-            // Disable VHS post-processing on main menu to avoid moving bright bands/stripes.
+            // Disable VHS on menu to remove crawling bright bands.
             vI=0.0f;
         }else if(vhsGameplay){
             float sanityLoss=1.0f-(playerSanity/100.0f);

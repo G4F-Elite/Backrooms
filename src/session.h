@@ -19,6 +19,7 @@
 
 // Textures are created in game_main_entry.h (declared in game.cpp)
 extern GLuint deviceTex;
+extern GLuint playerTex;
 
 GLuint noteVAO=0, noteVBO=0;
 int noteVC=0;

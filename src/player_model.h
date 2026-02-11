@@ -1,8 +1,14 @@
 #pragma once
 // Player model for multiplayer - animated humanoid with flashlight and interpolation
 #include <vector>
+#include <glad/glad.h>
 #include "math.h"
 #include "interpolation.h"
+#include "net_types.h"
+
+// Multiplayer player models are drawn with the main shader, so we must ensure
+// the correct texture is bound (otherwise the last-held item texture bleeds onto players).
+extern GLuint playerTex;
 
 const float PLAYER_COLORS[4][3] = {
     {0.1f, 0.9f, 0.2f},
@@ -149,9 +155,16 @@ inline void renderPlayers(GLuint shader, Mat4& proj, Mat4& view, int myId) {
     glUseProgram(shader);
     glUniformMatrix4fv(glGetUniformLocation(shader, "P"), 1, GL_FALSE, proj.m);
     glUniformMatrix4fv(glGetUniformLocation(shader, "V"), 1, GL_FALSE, view.m);
+
+    // Ensure a stable texture for players.
+    glBindTexture(GL_TEXTURE_2D, playerTex);
+    GLint tintLoc = glGetUniformLocation(shader, "modelTint");
+
     for (int i = 0; i < MAX_PLAYERS; i++) {
         if (i == myId || !netMgr.players[i].active || !netMgr.players[i].hasValidPos) continue;
         if (!playerInterpReady[i]) continue;
+
+        if(tintLoc >= 0) glUniform3f(tintLoc, PLAYER_COLORS[i][0], PLAYER_COLORS[i][1], PLAYER_COLORS[i][2]);
         Vec3 pos = playerRenderPos[i];
         float yaw = playerRenderYaw[i];
         Vec3 delta = pos - playerLastPos[i];
@@ -174,4 +187,7 @@ inline void renderPlayers(GLuint shader, Mat4& proj, Mat4& view, int myId) {
         glBindVertexArray(playerVAOs[i]);
         glDrawArrays(GL_TRIANGLES, 0, playerVCs[i]);
     }
+
+    // Restore default tint for subsequent draws.
+    if(tintLoc >= 0) glUniform3f(tintLoc, 1.0f, 1.0f, 1.0f);
 }
