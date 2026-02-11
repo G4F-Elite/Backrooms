@@ -339,8 +339,15 @@ inline bool tryHandleVoidShiftInteract(const Vec3& playerPos) {
     }
 
     if (npcDispatcherActive && nearPoint2D(playerPos, npcDispatcherPhonePos, 2.2f)) {
-        setTrapStatus("DISPATCHER: PRIORITY ROUTE MARKED");
-        addAttention(4.0f);
+        if ((rng() % 100) < 28) {
+            setTrapStatus("CALL MIMIC: FALSE ROUTE BROADCAST");
+            addAttention(12.0f);
+            playerSanity -= 6.0f;
+            if (playerSanity < 0.0f) playerSanity = 0.0f;
+        } else {
+            setTrapStatus("DISPATCHER: PRIORITY ROUTE MARKED");
+            addAttention(4.0f);
+        }
         dispatcherCallCooldown = 25.0f;
         if (!isLevelZero(gCurrentLevel) && sideContractType == SIDE_RESTORE_CAMERAS) {
             progressSideContract(1, "SIDE: CAMERAS RESTORED");
