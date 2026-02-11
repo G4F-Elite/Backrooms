@@ -8,7 +8,7 @@ int main(){
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3);
     glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
-    gWin=glfwCreateWindow(winW,winH,"Backrooms - Complex",NULL,NULL);
+    gWin=glfwCreateWindow(winW,winH,"Backrooms: Void Shift",NULL,NULL);
     if(!gWin){glfwTerminate();return -1;}
     glfwMakeContextCurrent(gWin);
     int appliedSwapInterval = settings.vsync ? 1 : 0;

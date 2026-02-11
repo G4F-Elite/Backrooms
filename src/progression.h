@@ -33,9 +33,13 @@ inline float levelDangerScale(int level) {
 inline void buildLevelLabel(int level, char* out, int outSize) {
     if (!out || outSize < 2) return;
     if (level < 0) level = 0;
-    if (isParkingLevel(level)) {
-        std::snprintf(out, outSize, "LEVEL %d - PARKING", level);
+    if (level == 0) {
+        std::snprintf(out, outSize, "LEVEL 1 - YELLOW ROOMS");
         return;
     }
-    std::snprintf(out, outSize, "LEVEL %d - COMPLEX", level);
+    if (level == 1) {
+        std::snprintf(out, outSize, "LEVEL 2 - PARKING");
+        return;
+    }
+    std::snprintf(out, outSize, "LEVEL %d - VOID SHIFT", level + 1);
 }

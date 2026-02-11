@@ -275,11 +275,11 @@ inline void drawMenu(float tm) {
     drawFullscreenOverlay(0.17f,0.13f,0.08f,0.10f);
     float p=0.82f+0.06f*sinf(tm*2.0f);
     float gl = sinf(tm * 0.7f) * 0.0016f;
-    drawTextCentered("THE BACKROOMS",0.0f+gl,0.5f,4.0f,0.9f,0.85f,0.4f,p);
+    drawTextCentered("BACKROOMS: VOID SHIFT",0.0f+gl,0.5f,3.4f,0.9f,0.85f,0.4f,p);
     char levelBuf[32];
     buildLevelLabel(gCurrentLevel, levelBuf, 32);
     drawTextCentered(levelBuf,0.0f,0.35f,2.5f,0.7f,0.65f,0.3f,0.8f);
-    const char* it[]={"START GAME","MULTIPLAYER","SETTINGS","GUIDE","QUIT"};
+    const char* it[]={"START CONTRACT","MULTIPLAYER","SETTINGS","GDD BRIEF","QUIT"};
     for(int i=0;i<5;i++){
         float s=(menuSel==i)?1.0f:0.5f; float y=0.10f-i*0.11f;
         float baseX = -measureTextWidthNdc(it[i], 2.0f) * 0.5f;
@@ -287,6 +287,7 @@ inline void drawMenu(float tm) {
         drawText(it[i], baseX, y, 2.0f,0.9f*s,0.85f*s,0.4f*s);
     }
     drawTextCentered("UP/DOWN - SELECT    ENTER - CONFIRM",0.0f,-0.6f,1.5f,0.5f,0.5f,0.4f,0.6f);
+    drawTextCentered("v1.0.0",0.0f,-0.72f,1.2f,0.64f,0.62f,0.54f,0.75f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 
@@ -295,14 +296,14 @@ inline void drawGuideScreen() {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     drawFullscreenOverlay(0.02f,0.02f,0.03f,0.80f);
-    drawTextCentered("GUIDE",0.0f,0.58f,2.8f,0.9f,0.85f,0.4f,0.96f);
-    drawTextCentered("GOAL: COLLECT NOTES, ATTUNE AN ECHO, THEN REACH EXIT",0.0f,0.40f,1.42f,0.82f,0.86f,0.64f,0.94f);
-    drawTextCentered("ECHO SIGNAL: APPROACH AND PRESS E TO ATTUNE",0.0f,0.30f,1.38f,0.72f,0.84f,0.86f,0.92f);
-    drawTextCentered("ECHO CAN HEAL, GIVE SUPPLIES OR TRIGGER BREACH",0.0f,0.22f,1.32f,0.76f,0.74f,0.86f,0.92f);
-    drawTextCentered("FLOOR HOLES KILL ON FALL. AVOID DARK OPEN CELLS",0.0f,0.12f,1.34f,0.92f,0.66f,0.50f,0.94f);
-    drawTextCentered("LOW SANITY INCREASES DANGER",0.0f,0.04f,1.34f,0.90f,0.72f,0.64f,0.92f);
-    drawTextCentered("COOP: HOLD 2 SWITCHES TO OPEN EXIT DOOR",0.0f,-0.06f,1.34f,0.82f,0.86f,0.64f,0.92f);
-    drawTextCentered("CONTROLS: WASD MOVE, SHIFT SPRINT, C CROUCH, E INTERACT",0.0f,-0.20f,1.24f,0.70f,0.76f,0.66f,0.90f); drawTextCentered("FLASHLIGHT F  ITEMS 1/2/3  HUD F6  MINIMAP F8  DEBUG F3/F10",0.0f,-0.30f,1.20f,0.68f,0.74f,0.64f,0.88f);
+    drawTextCentered("VOID SHIFT BRIEF",0.0f,0.58f,2.8f,0.9f,0.85f,0.4f,0.96f);
+    drawTextCentered("GOAL: COMPLETE CONTRACTS, STABILIZE REALITY, THEN EXTRACT",0.0f,0.40f,1.42f,0.82f,0.86f,0.64f,0.94f);
+    drawTextCentered("RESONATOR MODES: SCAN / RECORD / PLAYBACK / PING",0.0f,0.30f,1.32f,0.72f,0.84f,0.86f,0.92f);
+    drawTextCentered("ECHO RECORDING: HOLD R TO RECORD, RELEASE TO SAVE, P TO PLAY",0.0f,0.22f,1.26f,0.76f,0.74f,0.86f,0.92f);
+    drawTextCentered("ATTENTION RISES FROM NOISE/LIGHT/ECHO. STAY IN CONTROL",0.0f,0.12f,1.30f,0.92f,0.66f,0.50f,0.94f);
+    drawTextCentered("LEVEL 1: STABILIZE 3 NODES + HOLD 90s",0.0f,0.04f,1.28f,0.90f,0.72f,0.64f,0.92f);
+    drawTextCentered("LEVEL 2: BATTERY + 3 FUSES + ACCESS + LIFT HOLD",0.0f,-0.06f,1.28f,0.82f,0.86f,0.64f,0.92f);
+    drawTextCentered("CONTROLS: WASD MOVE, SHIFT SPRINT, C CROUCH, E INTERACT",0.0f,-0.20f,1.24f,0.70f,0.76f,0.66f,0.90f); drawTextCentered("FLASHLIGHT F  DEVICES 1/2/3  R RECORD  P PLAYBACK  DEBUG F3/F10",0.0f,-0.30f,1.16f,0.68f,0.74f,0.64f,0.88f);
     drawTextCentered("ESC OR ENTER - BACK",0.0f,-0.70f,1.4f,0.56f,0.62f,0.50f,0.82f);
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);

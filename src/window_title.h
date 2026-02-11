@@ -6,7 +6,7 @@ inline void updateWindowTitleForLevel(){
     char levelTitle[96];
     char levelName[48];
     buildLevelLabel(gCurrentLevel, levelName, 48);
-    std::snprintf(levelTitle, 96, "Backrooms - %s", levelName);
+    std::snprintf(levelTitle, 96, "Backrooms: Void Shift - %s", levelName);
     glfwSetWindowTitle(gWin, levelTitle);
     lastTitleLevel = gCurrentLevel;
 }
