@@ -232,6 +232,9 @@ Vec3 npcLostSurvivorPos(0, 0, 0);
 bool npcLostSurvivorActive = false;
 bool npcLostSurvivorEscorted = false;
 float dispatcherCallCooldown = 0.0f;
+float cartographerTrust = 65.0f;
+float dispatcherTrust = 60.0f;
+int dispatcherCodeword = 0;
 
 TrapCorridorState trapCorridor = {};
 DebugToolsState debugTools = {};
@@ -460,6 +463,10 @@ inline void triggerCorridorShiftSetpiece(float duration);
 inline void triggerBlackoutSetpiece(float duration);
 inline void updateVoidShiftSetpieces(float dt);
 inline void updateVoidShiftHoldPhases(float dt);
+inline void initNpcTrustState();
+inline void updateNpcTrustState(float dt);
+inline void applyCartographerInteractionOutcome();
+inline void applyDispatcherInteractionOutcome();
 inline void unlockMetaRewardsFromTier();
 inline void tryCraftNoiseLure();
 inline void tryCraftBeacon();
@@ -472,6 +479,7 @@ inline void tryCraftFixator();
 #include "void_shift_side_tech_ext.h"
 #include "void_shift_setpieces_ext.h"
 #include "void_shift_crafting_ext.h"
+#include "void_shift_npc_trust_ext.h"
 
 inline int storyNotesRequired(){
     if (isParkingLevel(gCurrentLevel)) return 3;

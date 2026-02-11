@@ -140,6 +140,7 @@ inline void resetVoidShiftState(const Vec3& spawnPos, const Vec3& exitDoorPos) {
 
     initVoidShiftNpcSpots(spawnPos, exitDoorPos);
     initSideContractForLevel(); initLevel2PuzzleStages(); initVoidShiftSetpieces();
+    initNpcTrustState();
 }
 
 inline void startEchoRecordingTrack() {
@@ -331,10 +332,10 @@ inline void buildVoidShiftSupportLine(char* out, int outSize) {
         return;
     }
     if (sideContractCompleted) {
-        std::snprintf(out, outSize, "SIDE COMPLETE: +35  CRAFT F%d/X%d", craftedFlashLamp, craftedButtonFixator);
+        std::snprintf(out, outSize, "SIDE +35 CRAFT F%d/X%d TRUST C%.0f D%.0f", craftedFlashLamp, craftedButtonFixator, cartographerTrust, dispatcherTrust);
         return;
     }
-    std::snprintf(out, outSize, "ARCHIVE %d TIER %d CRAFT N%d B%d F%d X%d", archivePoints, archiveTier, craftedNoiseLure, craftedBeacon, craftedFlashLamp, craftedButtonFixator);
+    std::snprintf(out, outSize, "ARCH %d T%d CRAFT N%d B%d F%d X%d TR %.0f/%.0f", archivePoints, archiveTier, craftedNoiseLure, craftedBeacon, craftedFlashLamp, craftedButtonFixator, cartographerTrust, dispatcherTrust);
 }
 
 inline bool tryHandleVoidShiftInteract(const Vec3& playerPos) {
@@ -342,6 +343,7 @@ inline bool tryHandleVoidShiftInteract(const Vec3& playerPos) {
         awardArchivePoints(10, "CARTOGRAPHER TRADE COMPLETE");
         if (isParkingLevel(gCurrentLevel)) { craftedButtonFixator++; craftedFlashLamp++; }
         else { craftedNoiseLure++; craftedBeacon++; }
+        applyCartographerInteractionOutcome();
         if (isLevelZero(gCurrentLevel) && !sideContractCompleted && sideContractType == SIDE_SCAN_WALLS) {
             progressSideContract(1, "SIDE: CARTOGRAPHER LOGGED A PATTERN");
         }
@@ -349,14 +351,7 @@ inline bool tryHandleVoidShiftInteract(const Vec3& playerPos) {
     }
 
     if (npcDispatcherActive && nearPoint2D(playerPos, npcDispatcherPhonePos, 2.2f)) {
-        if ((rng() % 100) < 28) {
-            setTrapStatus("CALL MIMIC: FALSE ROUTE BROADCAST");
-            addAttention(12.0f);
-            playerSanity -= 6.0f; if (playerSanity < 0.0f) playerSanity = 0.0f;
-        } else {
-            setTrapStatus("DISPATCHER: PRIORITY ROUTE MARKED");
-            addAttention(4.0f);
-        }
+        applyDispatcherInteractionOutcome();
         dispatcherCallCooldown = 25.0f;
         if (!isLevelZero(gCurrentLevel) && sideContractType == SIDE_RESTORE_CAMERAS) {
             progressSideContract(1, "SIDE: CAMERAS RESTORED");
@@ -480,6 +475,8 @@ inline void updateVoidShiftSystems(float dt, bool sprinting, bool flashlightActi
     } else {
         coLevel = 0.0f;
     }
+
+    updateNpcTrustState(dt);
 
     updateLevel2DroneAssist(dt);
 
