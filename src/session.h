@@ -128,6 +128,11 @@ bool storyEchoAttuned = false;
 int storyEchoAttunedCount = 0;
 float squadCalloutTimer = 0.0f;
 char squadCalloutText[96] = {};
+float conferenceCallTimer = 0.0f;
+float conferenceCallPulse = 0.0f;
+float corridorShiftTimer = 0.0f;
+bool corridorShiftArmed = false;
+float blackoutSectorTimer = 0.0f;
 
 inline void setSquadCallout(const char* txt) {
     if (!txt) return;
@@ -429,10 +434,16 @@ inline void updateLevel1SyncSwitchProgress(float dt);
 inline void initLevel2PuzzleStages();
 inline bool processLevel2Step(const Vec3& playerPos);
 inline bool buildLevel2ActionPrompt(const Vec3& playerPos, char* out, int outSize);
+inline void initVoidShiftSetpieces();
+inline void triggerConferenceCallSetpiece(float duration);
+inline void triggerCorridorShiftSetpiece(float duration);
+inline void triggerBlackoutSetpiece(float duration);
+inline void updateVoidShiftSetpieces(float dt);
 
 #include "void_shift_runtime.h"
 #include "void_shift_puzzles_ext.h"
 #include "void_shift_level2_ext.h"
+#include "void_shift_setpieces_ext.h"
 
 inline int storyNotesRequired(){
     if (isParkingLevel(gCurrentLevel)) return 3;
