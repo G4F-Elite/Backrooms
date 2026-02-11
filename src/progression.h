@@ -5,6 +5,14 @@
 inline int gCurrentLevel = 0;
 inline int gCompletedLevels = 0;
 
+inline bool isLevelZero(int level) {
+    return level <= 0;
+}
+
+inline bool isParkingLevel(int level) {
+    return level >= 1;
+}
+
 inline int levelEntityCapBonus(int level) {
     if (level <= 0) return 0;
     return level / 2;
@@ -25,5 +33,9 @@ inline float levelDangerScale(int level) {
 inline void buildLevelLabel(int level, char* out, int outSize) {
     if (!out || outSize < 2) return;
     if (level < 0) level = 0;
-    std::snprintf(out, outSize, "LEVEL %d", level);
+    if (isParkingLevel(level)) {
+        std::snprintf(out, outSize, "LEVEL %d - PARKING", level);
+        return;
+    }
+    std::snprintf(out, outSize, "LEVEL %d - COMPLEX", level);
 }

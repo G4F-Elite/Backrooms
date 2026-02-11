@@ -1,13 +1,14 @@
 #pragma once
 #include "progression.h"
 #include "sanity_balance.h"
+#include "window_title.h"
 int main(){
     std::random_device rd;rng.seed(rd());
     if(!glfwInit())return -1;
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3);
     glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
-    gWin=glfwCreateWindow(winW,winH,"Backrooms - Level 0",NULL,NULL);
+    gWin=glfwCreateWindow(winW,winH,"Backrooms - Complex",NULL,NULL);
     if(!gWin){glfwTerminate();return -1;}
     glfwMakeContextCurrent(gWin);
     int appliedSwapInterval = settings.vsync ? 1 : 0;
@@ -18,7 +19,8 @@ int main(){
     glEnable(GL_DEPTH_TEST);glEnable(GL_CULL_FACE);
     genWorld();
     wallTex=genTex(0);floorTex=genTex(1);ceilTex=genTex(2);lightTex=genTex(3);lampTex=genTex(4);propTex=genTex(5);
-    deviceTex=genTex(6); scannerTex=genTex(7); plushTex=genTex(8); // device/scanner/plush atlas textures
+    deviceTex=genTex(6);
+    plushTex=genTex(7);
     playerTex=propTex; // players use a stable texture so held-item textures don't bleed
     mainShader=mkShader(mainVS,mainFS);lightShader=mkShader(lightVS,lightFS);vhsShader=mkShader(vhsVS,vhsFS);
     buildGeom();
@@ -42,6 +44,7 @@ int main(){
         dTime = rawDt;
         lastFrame = now;
         vhsTime = now;
+        updateWindowTitleForLevel();
         gPerfFrameMs = dTime * 1000.0f;
         pushFrameTimeSample(gPerfFrameTimeHistory, PERF_GRAPH_SAMPLES, gPerfFrameTimeHead, gPerfFrameMs);
         float fpsNow = 1.0f / dTime;
@@ -76,7 +79,6 @@ int main(){
 
         netMgr.updatePingMarkTtl(dTime);
 
-        // Backlog: entity hearing uses player noise derived from audio locomotion state.
         gPlayerNoise = fastClamp01(sndState.moveIntensity * 0.45f + sndState.sprintIntensity * 0.85f);
         if(isSmileSilenceActive()){ sndState.musicVol*=0.08f; sndState.ambienceVol*=0.02f; sndState.voiceVol*=0.12f; }
         sndState.sanityLevel=playerSanity/100.0f;currentWinW=winW;currentWinH=winH;
@@ -284,15 +286,13 @@ int main(){
                 }else if(reshuffleTimer<=0)reshuffleTimer=8.0f+(rng()%8);
                 
                 float levelDanger = levelDangerScale(gCurrentLevel);
-                // Plush comfort: holding the toy (slot 3) VERY slowly restores sanity instead of passive drain.
-                if(activeDeviceSlot==3 && heldConsumableType==ITEM_PLUSH_TOY) playerSanity += 0.75f*dTime;
+                if(activeDeviceSlot==3 && heldConsumableType==ITEM_PLUSH_TOY) playerSanity += 3.8f*dTime;
                 else playerSanity -= sanityPassiveDrainPerSec(levelDanger) * dTime;
                 if(entityMgr.dangerLevel>0.1f) playerSanity -= entityMgr.dangerLevel*(8.0f * levelDanger)*dTime;
                 playerSanity=playerSanity>100?100:(playerSanity<0?0:playerSanity);
                 int cellX = (int)floorf(cam.pos.x / CS);
                 int cellZ = (int)floorf(cam.pos.z / CS);
                 if(!playerFalling && isFallCell(cellX, cellZ)){
-                    // Check player is well inside the hole, not just at the edge
                     float cellCenterX = (cellX + 0.5f) * CS;
                     float cellCenterZ = (cellZ + 0.5f) * CS;
                     float dx = cam.pos.x - cellCenterX;
@@ -331,12 +331,10 @@ int main(){
                 updateMultiplayer();
             }
         }
-        
         glBindFramebuffer(GL_FRAMEBUFFER,fbo);
         glViewport(0,0,renderW,renderH);
         glClearColor(0.02f,0.02f,0.02f,1);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-        
         if((gameState==STATE_GAME&&!isPlayerDead)||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_KEYBINDS_PAUSE||gameState==STATE_NOTE)
             renderScene();
         
@@ -361,13 +359,16 @@ int main(){
             if(stress>1.0f) stress=1.0f;
             float panicBoost = sanityLoss * 0.20f + entityMgr.dangerLevel * 0.15f;
             vI=settings.vhsIntensity*(0.62f+0.78f*stress)+panicBoost;
+            static float deathFx = 0.0f; deathFx += isPlayerDead ? dTime * 0.95f : -dTime * 1.4f;
+            if(deathFx < 0.0f) deathFx = 0.0f; if(deathFx > 1.0f) deathFx = 1.0f;
+            if(isPlayerDead) vI += deathFx * (0.52f + (0.55f + 0.45f * sinf(vhsTime * 5.8f)) * 0.44f);
             if(vI>1.35f) vI=1.35f;
         }
         static GLint vhsTmLoc=-1,vhsIntenLoc=-1,vhsUpscalerLoc=-1,vhsAaModeLoc=-1;
         static GLint vhsSharpnessLoc=-1,vhsTexelXLoc=-1,vhsTexelYLoc=-1;
         static GLint vhsTaaHistLoc=-1,vhsTaaBlendLoc=-1,vhsTaaJitterLoc=-1,vhsTaaValidLoc=-1;
         static GLint vhsFrameGenLoc=-1,vhsFrameGenBlendLoc=-1;
-        static GLint vhsRtxALoc=-1,vhsRtxGLoc=-1,vhsRtxRLoc=-1,vhsRtxBLoc=-1,vhsRtxDenoiseOnLoc=-1,vhsRtxDenoiseStrengthLoc=-1,vhsDepthTexLoc=-1;
+        static GLint vhsRtxALoc=-1,vhsRtxGLoc=-1,vhsRtxRLoc=-1,vhsRtxBLoc=-1,vhsRtxDenoiseOnLoc=-1,vhsRtxDenoiseStrengthLoc=-1,vhsDepthTexLoc=-1,vhsDeathFxLoc=-1;
         if(vhsTmLoc<0){
             glUniform1i(glGetUniformLocation(vhsShader,"tex"),0);
             vhsTmLoc=glGetUniformLocation(vhsShader,"tm"); vhsIntenLoc=glGetUniformLocation(vhsShader,"inten");
@@ -380,7 +381,9 @@ int main(){
             vhsRtxALoc=glGetUniformLocation(vhsShader,"rtxA"); vhsRtxGLoc=glGetUniformLocation(vhsShader,"rtxG");
             vhsRtxRLoc=glGetUniformLocation(vhsShader,"rtxR"); vhsRtxBLoc=glGetUniformLocation(vhsShader,"rtxB");
             vhsRtxDenoiseOnLoc=glGetUniformLocation(vhsShader,"rtxDenoiseOn"); vhsRtxDenoiseStrengthLoc=glGetUniformLocation(vhsShader,"rtxDenoiseStrength");
+            vhsDeathFxLoc=glGetUniformLocation(vhsShader,"deathFx");
         }
+        float deathFxUniform = (gameState==STATE_GAME || gameState==STATE_PAUSE || gameState==STATE_NOTE) ? (isPlayerDead ? (0.55f + 0.45f * sinf(vhsTime * 2.9f)) : 0.0f) : (isPlayerDead ? 1.0f : 0.0f);
         static int prevAaMode = -1;
         int aaMode = clampAaMode(settings.aaMode);
         if(aaMode != prevAaMode){
@@ -425,6 +428,7 @@ int main(){
             glUniform1f(vhsTaaValidLoc,taaHistoryValid?1.0f:0.0f);
             glUniform1i(vhsFrameGenLoc,isFrameGenEnabled(settings.frameGenMode)?1:0);
             glUniform1f(vhsFrameGenBlendLoc,frameGenBlendStrength(settings.frameGenMode));
+            glUniform1f(vhsDeathFxLoc,deathFxUniform);
             glBindVertexArray(quadVAO);
             glDrawArrays(GL_TRIANGLES,0,6);
 
@@ -457,6 +461,7 @@ int main(){
             glUniform1f(vhsTaaValidLoc,0.0f);
             glUniform1i(vhsFrameGenLoc,0);
             glUniform1f(vhsFrameGenBlendLoc,0.0f);
+            glUniform1f(vhsDeathFxLoc,0.0f);
             glUniform1i(vhsRtxALoc,0); glUniform1i(vhsRtxGLoc,0); glUniform1i(vhsRtxRLoc,0); glUniform1i(vhsRtxBLoc,0);
             glBindVertexArray(quadVAO);
             glDrawArrays(GL_TRIANGLES,0,6);
@@ -486,16 +491,15 @@ int main(){
             glUniform1f(vhsTaaValidLoc,0.0f);
             glUniform1i(vhsFrameGenLoc,0);
             glUniform1f(vhsFrameGenBlendLoc,0.0f);
+            glUniform1f(vhsDeathFxLoc,deathFxUniform);
             glBindVertexArray(quadVAO);
             glDrawArrays(GL_TRIANGLES,0,6);
         }
         glEnable(GL_DEPTH_TEST);
-        
         drawUI();
         glDisable(GL_BLEND);
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
-        
         int frameGenBaseCap = frameGenBaseFpsCap(cachedRefreshRateHz, settings.frameGenMode, settings.vsync);
         gPerfFrameGenBaseCap = frameGenBaseCap;
         glfwSwapBuffers(gWin);glfwPollEvents();

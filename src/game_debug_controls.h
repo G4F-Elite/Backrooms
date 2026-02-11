@@ -1,30 +1,10 @@
 #pragma once
-// NOTE: included into main translation unit (game.cpp); relies on prior includes.
-
 struct GLFWwindow;
 #include "math.h"
 #include "item_types.h"
 #include "consumable_slot.h"
-
-// Debug actions moved into a separate header to keep this file under 500 lines.
 #include "debug_actions.h"
-
-void mouse(GLFWwindow*,double xp,double yp){
-    if(gameState!=STATE_GAME&&gameState!=STATE_INTRO)return;
-    if(debugTools.open) {
-        lastX = (float)xp;
-        lastY = (float)yp;
-        firstMouse = true;
-        return;
-    }
-    if(isPlayerDead || playerEscaped || playerFalling) return;
-    if(firstMouse){lastX=(float)xp;lastY=(float)yp;firstMouse=false;}
-    cam.yaw-=((float)xp-lastX)*settings.mouseSens;
-    cam.pitch+=(lastY-(float)yp)*settings.mouseSens;
-    cam.pitch=cam.pitch>1.4f?1.4f:(cam.pitch<-1.4f?-1.4f:cam.pitch);
-    lastX=(float)xp;lastY=(float)yp;
-}
-
+#include "game_mouse_input.h"
 void gameInput(GLFWwindow*w){
     static bool debugTogglePressed = false;
     static bool debugUpPressed = false;
@@ -58,8 +38,6 @@ void gameInput(GLFWwindow*w){
     }
     hudTogglePressed = hudToggleNow;
 
-    // === Viewmodel tuning hotkeys (debugMode only) ===
-    // Hold SHIFT for larger steps.
     if(settings.debugMode){
         static bool vmUpPressed=false, vmDownPressed=false, vmLeftPressed=false, vmRightPressed=false;
         static bool vmFwdPressed=false, vmBackPressed=false, vmShakeUpPressed=false, vmShakeDownPressed=false;
@@ -98,7 +76,6 @@ void gameInput(GLFWwindow*w){
         }
     }
 
-    // Close debug tools if debugMode was turned off
     if(!settings.debugMode && debugTools.open){
         debugTools.open = false;
         glfwSetInputMode(w,GLFW_CURSOR,GLFW_CURSOR_DISABLED);
@@ -252,7 +229,6 @@ void gameInput(GLFWwindow*w){
         else if(invBattery > 0) applyItemUse(ITEM_BATTERY);
     }
 
-    // Coop ping marker
     if(multiState==MULTI_IN_GAME && pingNow && !pingPressed){
         netMgr.sendPingMark(cam.pos);
         netMgr.pingMarkFrom = netMgr.myId;
@@ -264,16 +240,12 @@ void gameInput(GLFWwindow*w){
     key1Pressed=k1; key2Pressed=k2; key3Pressed=k3; key4Pressed=k4;
     pingPressed = pingNow;
     
-    // --- Falling physics ---
     if(playerFalling){
         fallTimer += dTime;
         fallVelocity += 12.0f * dTime;
         cam.pos.y -= fallVelocity * dTime;
-        // Camera shake while falling
         camShake = 0.08f + fallTimer * 0.04f;
-        // Tilt camera slightly downward
         if(cam.pitch > -1.0f) cam.pitch -= 0.5f * dTime;
-        // Kill after falling deep enough or timeout
         if(cam.pos.y < -25.0f || fallTimer > 3.0f){
             playerHealth = 0.0f;
             isPlayerDead = true;
@@ -373,9 +345,9 @@ void gameInput(GLFWwindow*w){
         sndState.monsterMenace
     );
     
-    // Scanner signal strength & beeps (slot 2)
-    float targetSignal = 0.0f;
-    if(activeDeviceSlot == 2 && echoSignal.active && multiState!=MULTI_IN_GAME){
+    float rawSignal = 0.0f;
+    bool scannerHasTarget = (activeDeviceSlot == 2 && echoSignal.active && multiState!=MULTI_IN_GAME);
+    if(scannerHasTarget){
         Vec3 toEcho = echoSignal.pos - cam.pos;
         float dist = toEcho.len();
         if(dist < 0.01f) dist = 0.01f;
@@ -385,45 +357,68 @@ void gameInput(GLFWwindow*w){
         float len = toEchoFlat.len();
         if(len > 0.001f) dir = fwdScan.dot(toEchoFlat / len);
         float facing = (dir + 1.0f) * 0.5f;
-        float proximity = 1.0f - (dist / 60.0f);
+        float proximity = 1.0f - (dist / 70.0f);
         if(proximity < 0.0f) proximity = 0.0f;
         if(proximity > 1.0f) proximity = 1.0f;
-        targetSignal = proximity * (0.25f + 0.75f * facing);
+        rawSignal = proximity * (0.38f + 0.62f * facing);
     }
 
-    // === BACKLOG: scanner overheating + false peaks ===
-    // Heat builds up while scanner is held, cools down otherwise.
-    // When overheated: signal becomes noisy/weak and beeps are heavily reduced.
-    // Tuned: make overheat reachable in a normal scan session and noticeably punish the scanner.
-    const float heatUpPerSec = 0.34f;
-    const float heatDownPerSec = 0.22f;
-    if(activeDeviceSlot == 2 && !scannerOverheated) scannerHeat += heatUpPerSec * dTime;
+    static bool scannerLock = false;
+    static float scannerEnterTimer = 0.0f;
+    static float scannerExitTimer = 0.0f;
+    const float lockEnterThreshold = 0.58f;
+    const float lockExitThreshold = 0.44f;
+    const float lockEnterHold = 0.10f;
+    const float lockExitHold = 0.18f;
+    if(!scannerLock){
+        if(rawSignal >= lockEnterThreshold) scannerEnterTimer += dTime;
+        else scannerEnterTimer = 0.0f;
+        scannerExitTimer = 0.0f;
+        if(scannerEnterTimer >= lockEnterHold){
+            scannerLock = true;
+            scannerEnterTimer = 0.0f;
+        }
+    }else{
+        if(rawSignal <= lockExitThreshold) scannerExitTimer += dTime;
+        else scannerExitTimer = 0.0f;
+        scannerEnterTimer = 0.0f;
+        if(scannerExitTimer >= lockExitHold){
+            scannerLock = false;
+            scannerExitTimer = 0.0f;
+        }
+    }
+    float targetSignal = scannerLock ? rawSignal : rawSignal * 0.12f;
+
+    const float heatUpPerSec = 0.12f;
+    const float heatDownPerSec = 0.10f;
+    if(activeDeviceSlot == 2 && scannerLock && !scannerOverheated) scannerHeat += heatUpPerSec * dTime;
     else scannerHeat -= heatDownPerSec * dTime;
     if(scannerHeat < 0.0f) scannerHeat = 0.0f;
     if(scannerHeat > 1.0f) scannerHeat = 1.0f;
-    if(!scannerOverheated && scannerHeat >= 0.90f){
+    if(!scannerOverheated && scannerHeat >= 0.98f){
         scannerOverheated = true;
-        scannerOverheatTimer = 3.2f;
+        scannerOverheatTimer = 2.8f;
         setTrapStatus("SCANNER OVERHEAT");
     }
     if(scannerOverheated){
         scannerOverheatTimer -= dTime;
-        scannerHeat -= heatDownPerSec * 0.6f * dTime;
-        if(scannerOverheatTimer <= 0.0f && scannerHeat <= 0.55f){
+        if(scannerOverheatTimer <= 0.0f && scannerHeat <= 0.34f){
             scannerOverheated = false;
             scannerOverheatTimer = 0.0f;
         }
     }
 
-    // Trigger short "phantom" interval more often when sanity is low.
     if(activeDeviceSlot == 2 && !scannerOverheated && scannerPhantomTimer <= 0.0f){
         float sanityLoss = 1.0f - (playerSanity / 100.0f);
         if(sanityLoss < 0.0f) sanityLoss = 0.0f;
         if(sanityLoss > 1.0f) sanityLoss = 1.0f;
-        float p = sanityLoss * 0.06f; // ~6% per second at 0 sanity
+        float lateInsanity = (sanityLoss - 0.72f) / 0.28f;
+        if(lateInsanity < 0.0f) lateInsanity = 0.0f;
+        if(lateInsanity > 1.0f) lateInsanity = 1.0f;
+        float p = lateInsanity * 0.020f;
         if(((float)(rng()%10000) / 10000.0f) < p * dTime){
-            scannerPhantomTimer = 2.0f + (float)(rng()%200) / 100.0f; // 2..4s
-            scannerPhantomBias = ((float)(rng()%1000) / 1000.0f) * 0.7f - 0.35f;
+            scannerPhantomTimer = 0.9f + (float)(rng()%90) / 100.0f;
+            scannerPhantomBias = ((float)(rng()%1000) / 1000.0f) * 0.24f - 0.12f;
         }
     }
     if(scannerPhantomTimer > 0.0f){
@@ -434,36 +429,43 @@ void gameInput(GLFWwindow*w){
         }
     }
 
-    // Apply false peak bias + overheat degradation.
     float biasedTarget = targetSignal;
     if(scannerPhantomTimer > 0.0f) biasedTarget += scannerPhantomBias;
-    float overheatPenalty = scannerOverheated ? 1.0f : (scannerHeat > 0.65f ? (scannerHeat - 0.65f) * 2.2f : 0.0f);
-    if(overheatPenalty < 0.0f) overheatPenalty = 0.0f;
-    if(overheatPenalty > 1.0f) overheatPenalty = 1.0f;
-    biasedTarget *= (1.0f - overheatPenalty);
-    // When overheated: scanner becomes basically useless (heavy noise + random flicker).
+    float heatWarn = (scannerHeat - 0.76f) / 0.24f;
+    if(heatWarn < 0.0f) heatWarn = 0.0f;
+    if(heatWarn > 1.0f) heatWarn = 1.0f;
+    biasedTarget *= (1.0f - heatWarn * 0.72f);
     if(scannerOverheated){
         float n = ((float)(rng()%1000) / 1000.0f) * 2.0f - 1.0f;
-        biasedTarget = n * 0.32f;
+        biasedTarget = n * 0.16f;
     }
-    scannerSignal += (biasedTarget - scannerSignal) * (0.8f * dTime * 3.0f);
+
+    float moveK = moveIntensity;
+    if(moveK < 0.0f) moveK = 0.0f;
+    if(moveK > 1.0f) moveK = 1.0f;
+    float tau = 0.13f + (0.06f - 0.13f) * moveK;
+    if(tau < 0.03f) tau = 0.03f;
+    float alpha = 1.0f - expf(-dTime / tau);
+    scannerSignal += (biasedTarget - scannerSignal) * alpha;
     if(scannerSignal < 0.0f) scannerSignal = 0.0f;
     if(scannerSignal > 1.0f) scannerSignal = 1.0f;
     static float scannerBeepTimer = 0.0f;
     if(activeDeviceSlot == 2){
         scannerBeepTimer -= dTime;
         if(scannerOverheated){
-            // Misleading/weak beeps while overheated.
             if(scannerBeepTimer <= 0.0f){
                 float r = (float)(rng()%1000) / 1000.0f;
-                sndState.scannerBeepPitch = 0.35f + r * 1.35f;
-                sndState.scannerBeepVol = 0.10f + r * 0.08f;
+                sndState.scannerBeepPitch = 0.40f + r * 0.95f;
+                sndState.scannerBeepVol = 0.08f + r * 0.06f;
                 sndState.scannerBeepTrig = true;
-                scannerBeepTimer = 0.18f + r * 0.16f;
+                scannerBeepTimer = 0.22f + r * 0.22f;
             }
         }else if(scannerSignal > 0.05f){
-            float heatMuffle = 1.0f - fastClamp01(scannerHeat * 0.55f);
-            float rate = 0.25f + (1.0f - scannerSignal) * 0.9f;
+            float heatMuffle = 1.0f - fastClamp01(scannerHeat * 0.48f);
+            float rel = 1.0f - scannerSignal;
+            if(rel < 0.0f) rel = 0.0f;
+            if(rel > 1.0f) rel = 1.0f;
+            float rate = 0.18f + 0.85f * (rel * rel);
             if(scannerBeepTimer <= 0.0f){
                 sndState.scannerBeepPitch = 0.55f + scannerSignal * 1.0f;
                 sndState.scannerBeepVol = (0.35f + scannerSignal * 0.55f) * heatMuffle;
@@ -476,13 +478,11 @@ void gameInput(GLFWwindow*w){
     }else{
         scannerBeepTimer = 0.0f;
     }
-    
     if(flashlightOn){
         if(!flashlightShutdownBlinkActive && shouldStartFlashlightShutdownBlink(flashlightBattery)){
             flashlightShutdownBlinkActive = true;
             flashlightShutdownBlinkTimer = 0.0f;
         }
-
         if(flashlightShutdownBlinkActive){
             flashlightShutdownBlinkTimer += dTime;
             sndState.flashlightOn = isFlashlightOnDuringShutdownBlink(flashlightShutdownBlinkTimer) ? 1.0f : 0.0f;
@@ -508,24 +508,3 @@ void gameInput(GLFWwindow*w){
         if(flashlightBattery>100)flashlightBattery=100;
     }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

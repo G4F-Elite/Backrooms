@@ -46,6 +46,7 @@ function Get-LineStats {
     $veryLongLines = 0
 
     $inRawString = $false
+    $rawStringLines = 0
 
     foreach($l in $Lines){
         $len = $l.Length
@@ -53,13 +54,15 @@ function Get-LineStats {
         $totalLen += $len
 
         # Track raw string literal blocks (e.g. GLSL shaders). Content lines inside raw strings
-        # must not affect minify heuristics.
+        # must not affect significant-line counting or minify heuristics.
         if($inRawString){
+            $rawStringLines++
             if($l -match '\)"'){ $inRawString = $false }
             continue
         }
         if($l -match 'R"\('){
-            # Start of raw string. If it also ends on the same line, don't enter block mode.
+            # Start of raw string. If it also ends on the same line, count it as 1 raw-string line.
+            $rawStringLines++
             if(-not ($l -match '\)"')){ $inRawString = $true }
             continue
         }
@@ -81,7 +84,7 @@ function Get-LineStats {
     }
 
     $physical = $Lines.Count
-    $significant = $physical - $blank - $commentOnly
+    $significant = $physical - $blank - $commentOnly - $rawStringLines
     if($significant -lt 0) { $significant = 0 }
 
     $avgLen = 0
@@ -92,6 +95,7 @@ function Get-LineStats {
         Significant = $significant
         Blank = $blank
         CommentOnly = $commentOnly
+        RawStringLines = $rawStringLines
         MaxLenAll = $maxLenAll
         MaxLenCode = $maxLenCode
         AvgLen = $avgLen

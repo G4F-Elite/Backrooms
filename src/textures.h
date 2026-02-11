@@ -1,6 +1,7 @@
 #pragma once
 #include <glad/glad.h>
 #include <cmath>
+#include "progression.h"
 
 inline float noise2d(float x, float y) {
     int n=(int)x+(int)y*57; n=(n<<13)^n;
@@ -30,7 +31,20 @@ inline GLuint genTex(int type) {
     unsigned char* d=new unsigned char[sz*sz*4]; // RGBA for height map
     for(int y=0;y<sz;y++) for(int x=0;x<sz;x++) {
         float r=128,g=128,b=128,h=128; // h = height for parallax
-        if(type==0) { // wall - vintage yellow wallpaper with damask pattern
+        if(type==0 && isParkingLevel(gCurrentLevel)) { // parking walls: concrete + lower caution stripe
+            float u = (float)x / (float)sz;
+            float v = (float)y / (float)sz;
+            float rough = perlin(x * 0.10f, y * 0.10f, 4) * 20.0f;
+            float speck = perlin(x * 0.42f + 3.0f, y * 0.42f + 7.0f, 2) * 10.0f;
+            float seam = (fabsf(fmodf(u * 6.0f, 1.0f) - 0.5f) < 0.02f) ? 12.0f : 0.0f;
+            float stripeBand = (v > 0.08f && v < 0.22f) ? 1.0f : 0.0f;
+            float stripePattern = (fmodf((u + v * 0.8f) * 14.0f, 1.0f) < 0.5f) ? 1.0f : 0.0f;
+            float cautionY = stripeBand * (stripePattern > 0.5f ? 75.0f : -18.0f);
+            r = 118.0f + rough * 0.7f + speck * 0.4f + seam + cautionY;
+            g = 120.0f + rough * 0.7f + speck * 0.4f + seam + cautionY * 0.84f;
+            b = 124.0f + rough * 0.8f + speck * 0.5f + seam - cautionY * 0.65f;
+            h = 128.0f + rough * 0.35f + seam * 0.8f;
+        } else if(type==0) { // wall - vintage yellow wallpaper with damask pattern
             // Normalized UV for resolution-independent pattern scaling
             float u = (float)x / (float)sz;
             float v = (float)y / (float)sz;
@@ -107,6 +121,15 @@ inline GLuint genTex(int type) {
                 h -= peelAmount * 0.8f;
             }
             
+        } else if(type==1 && isParkingLevel(gCurrentLevel)) { // parking floor - painted concrete
+            float rough = perlin(x * 0.08f, y * 0.08f, 4) * 24.0f;
+            float crack = perlin(x * 0.025f + 9.0f, y * 0.025f + 2.0f, 4);
+            float crackMask = crack > 0.62f ? (crack - 0.62f) * 85.0f : 0.0f;
+            float strip = (fabsf(fmodf((float)x, 192.0f) - 96.0f) < 6.0f) ? 42.0f : 0.0f;
+            r = 102.0f + rough * 0.8f - crackMask * 0.45f + strip * 1.25f;
+            g = 103.0f + rough * 0.82f - crackMask * 0.4f + strip * 1.2f;
+            b = 106.0f + rough * 0.90f - crackMask * 0.35f + strip * 0.25f;
+            h = 128.0f + rough * 0.4f - crackMask * 0.2f;
         } else if(type==1) { // floor - detailed industrial carpet
             // Base carpet color - worn brown/tan
             float baseR = 130, baseG = 110, baseB = 70;
@@ -144,6 +167,16 @@ inline GLuint genTex(int type) {
             // Height for parallax - fiber texture
             h = 128.0f + loopPattern * 1.5f + fiberHighlight * 0.5f - dirtAmount * 0.3f;
             
+        } else if(type==2 && isParkingLevel(gCurrentLevel)) { // parking ceiling - flat concrete slabs
+            float slabX = fmodf((float)x, 192.0f);
+            float slabY = fmodf((float)y, 192.0f);
+            float joint = (slabX < 4.0f || slabY < 4.0f) ? 16.0f : 0.0f;
+            float rough = perlin(x * 0.09f, y * 0.09f, 4) * 17.0f;
+            float drip = perlin(x * 0.03f + 5.0f, y * 0.03f + 1.0f, 3) * 8.0f;
+            r = 132.0f + rough - joint - drip * 0.4f;
+            g = 133.0f + rough - joint - drip * 0.45f;
+            b = 136.0f + rough - joint - drip * 0.3f;
+            h = 128.0f + rough * 0.35f - joint * 0.8f;
         } else if(type==2) { // ceiling - acoustic drop ceiling tiles with detailed texture
             int tileSize = 128;
             float lx = (float)(x % tileSize);
@@ -331,6 +364,20 @@ inline GLuint genTex(int type) {
 
             // Height: seams and edge wear slightly raised
             h = 128.0f + seams * 0.6f + wear * 0.25f + speck * 0.25f;
+        } else if(type==7) { // plush toy texture (fabric/fur)
+            float u = (float)x / (float)sz;
+            float v = (float)y / (float)sz;
+            float fur = perlin(x * 0.42f, y * 0.42f, 4) * 16.0f;
+            float weave = perlin(x * 0.18f + 5.0f, y * 0.18f + 3.0f, 3) * 9.0f;
+            float patch = perlin(x * 0.035f + 9.0f, y * 0.035f + 11.0f, 4);
+            float patchMask = patch > 0.62f ? (patch - 0.62f) * 45.0f : 0.0f;
+            float seamV = (fabsf(fmodf(u * 4.0f, 1.0f) - 0.5f) < 0.025f) ? 12.0f : 0.0f;
+            float seamH = (fabsf(fmodf(v * 5.0f, 1.0f) - 0.5f) < 0.025f) ? 9.0f : 0.0f;
+            float warmth = perlin(x * 0.06f + 1.0f, y * 0.06f + 4.0f, 3) * 10.0f;
+            r = 156.0f + fur + weave * 0.8f + warmth - patchMask * 0.3f;
+            g = 122.0f + fur * 0.86f + weave * 0.6f + warmth * 0.6f - patchMask * 0.2f;
+            b = 96.0f + fur * 0.70f + weave * 0.45f + warmth * 0.35f - patchMask * 0.1f;
+            h = 128.0f + fur * 0.4f + seamV + seamH;
         }
         
         // Clamp and store RGBA

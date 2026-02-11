@@ -207,18 +207,15 @@ void renderScene(){
 
         Vec3 drawScale = scale * (0.8f + 0.2f * deviceEquip);
         float heldPitch = vmPitch + pitchAdd;
-        if(activeDeviceSlot == 1) heldPitch = -vmPitch + pitchAdd;
         Mat4 heldModel = composeModelMatrix(baseSmoothed, vmYaw + yawAdd, heldPitch, drawScale);
         glUniformMatrix4fv(mu.M,1,GL_FALSE,heldModel.m);
         if(mu.tint >= 0) glUniform3f(mu.tint,heldTint.x,heldTint.y,heldTint.z);
 
         // Use dedicated textures for handheld devices/consumables.
+        // (flashlight/scanner share the same atlas texture)
         GLuint heldTex = propTex;
-        if(activeDeviceSlot == 1){
+        if(activeDeviceSlot == 1 || activeDeviceSlot == 2){
             if(deviceTex != 0) heldTex = deviceTex;
-        }else if(activeDeviceSlot == 2){
-            if(scannerTex != 0) heldTex = scannerTex;
-            else if(deviceTex != 0) heldTex = deviceTex;
         }else if(activeDeviceSlot == 3 && heldConsumableType == ITEM_PLUSH_TOY){
             if(plushTex != 0) heldTex = plushTex;
         }
@@ -339,6 +336,7 @@ inline void applyFramePacing(double frameStartTime, int targetFps){
     }
     while((glfwGetTime() - frameStartTime) < targetFrameSec){}
 }
+
 
 
 

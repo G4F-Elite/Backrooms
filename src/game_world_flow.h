@@ -3,7 +3,6 @@
 #include "coop.h"
 #include "map_content.h"
 #include "device_models.h"
-
 inline void mkClosedBox(std::vector<float>& v, float cx, float y0, float cz, float sx, float sy, float sz) {
     float hx = sx * 0.5f;
     float hz = sz * 0.5f;
@@ -15,7 +14,6 @@ inline void mkClosedBox(std::vector<float>& v, float cx, float y0, float cz, flo
     if (uvX < 0.6f) uvX = 0.6f;
     if (uvY < 0.6f) uvY = 0.6f;
     if (uvZ < 0.6f) uvZ = 0.6f;
-
     auto pushQuad = [&](Vec3 a, Vec3 b, Vec3 c, Vec3 d, Vec3 n, float uMax, float vMax) {
         float vv[] = {
             a.x, a.y, a.z, 0, 0, n.x, n.y, n.z,
@@ -27,7 +25,6 @@ inline void mkClosedBox(std::vector<float>& v, float cx, float y0, float cz, flo
         };
         v.insert(v.end(), vv, vv + 48);
     };
-
     pushQuad(
         Vec3(cx - hx, y0, cz + hz), Vec3(cx + hx, y0, cz + hz),
         Vec3(cx + hx, y1, cz + hz), Vec3(cx - hx, y1, cz + hz),
@@ -72,8 +69,8 @@ void buildGeom(){
                     int wx=(pcx+dcx)*CHUNK_SIZE+lx,wz=(pcz+dcz)*CHUNK_SIZE+lz;
                     if(it->second.cells[lx][lz]!=0)continue;
                     float px=wx*CS,pz=wz*CS;
-                    const float uvFloor = 2.2f;
-                    const float uvCeil = 0.78f;
+                    const float uvFloor = 1.0f;
+                    const float uvCeil = 1.0f;
                     bool hasHole = isFloorHoleCell(wx,wz) || isAbyssCell(wx,wz);
                     if(!hasHole){
                         float fl[]={px,0,pz,0,0,0,1,0,px,0,pz+CS,0,uvFloor,0,1,0,px+CS,0,pz+CS,uvFloor,uvFloor,0,1,0,
@@ -105,11 +102,11 @@ void buildGeom(){
                     if(!hasHole){
                         bool corridorZ = wallL && wallR && !wallB && !wallF;
                         bool corridorX = wallB && wallF && !wallL && !wallR;
+                        float cxCell = px + CS * 0.5f;
+                        float czCell = pz + CS * 0.5f;
                         unsigned int doorHash = (unsigned int)(wx * 73856093u) ^ (unsigned int)(wz * 19349663u) ^ (worldSeed * 83492791u);
                         bool spawnDoorway = (doorHash % 100u) < 7u;
                         if(spawnDoorway && (corridorZ || corridorX)){
-                            float cxCell = px + CS * 0.5f;
-                            float czCell = pz + CS * 0.5f;
                             float openingH = WH * 0.62f;
                             float postH = openingH;
                             float postW = CS * 0.06f;
@@ -136,12 +133,34 @@ void buildGeom(){
                                 mkBox(dv, cxCell, openingH, czCell, wallFillT, topFillH, openingHalf * 2.0f);
                             }
                         }
+
+                        if(isLevelZero(gCurrentLevel) && (corridorZ || corridorX) && (doorHash % 100u) < 3u){
+                            float rampY0 = 0.0f;
+                            float segW = CS * 0.18f;
+                            for(int step = 0; step < 5; step++){
+                                float sy = rampY0 + (float)step * 0.24f;
+                                if(corridorZ){
+                                    float sx = px + CS * (0.16f + (float)step * 0.17f);
+                                    mkBox(dv, sx, sy, czCell, segW, 0.10f, CS * 0.86f);
+                                }else{
+                                    float sz = pz + CS * (0.16f + (float)step * 0.17f);
+                                    mkBox(dv, cxCell, sy, sz, CS * 0.86f, 0.10f, segW);
+                                }
+                            }
+                        }
                     }
                 }
             }
         }
     }
-    for(auto&p:pillars)mkPillar(pv,p.x,p.z,0.6f,WH);
+    for(auto&p:pillars){
+        mkPillar(pv,p.x,p.z,0.6f,WH);
+        if(isParkingLevel(gCurrentLevel)){
+            mkBox(dv, p.x, 0.0f, p.z, 0.90f, 0.10f, 0.90f);
+            mkBox(dv, p.x, 0.32f, p.z, 0.78f, 0.08f, 0.78f);
+            mkBox(dv, p.x, 0.62f, p.z, 0.66f, 0.08f, 0.66f);
+        }
+    }
     for(auto&pr:mapProps){
         if(pr.type==MAP_PROP_CRATE_STACK){
             float b = 1.05f * pr.scale;
@@ -215,6 +234,22 @@ void buildGeom(){
             mkBox(dv, poi.pos.x, 0.20f, poi.pos.z, 0.54f, 0.12f, 0.54f);
         }
     }
+    if(isParkingLevel(gCurrentLevel)){
+        for(int dcx=-VIEW_CHUNKS;dcx<=VIEW_CHUNKS;dcx++){
+            for(int dcz=-VIEW_CHUNKS;dcz<=VIEW_CHUNKS;dcz++){
+                int bx = (pcx+dcx) * CHUNK_SIZE;
+                int bz = (pcz+dcz) * CHUNK_SIZE;
+                for(int row=2; row<CHUNK_SIZE-2; row+=3){
+                    float lineZ = ((float)bz + (float)row + 0.5f) * CS;
+                    float x0 = ((float)bx + 1.5f) * CS;
+                    float x1 = ((float)bx + (float)CHUNK_SIZE - 1.5f) * CS;
+                    float cx = (x0 + x1) * 0.5f;
+                    float sx = x1 - x0;
+                    mkFloorDecal(dv, cx, 0.018f, lineZ, sx, 0.36f);
+                }
+            }
+        }
+    }
     if(coop.initialized){
         for(int s=0;s<2;s++){
             const Vec3 sp = coop.switches[s];
@@ -239,7 +274,6 @@ void buildGeom(){
         if(l.on)mkLight(lv,l.pos,l.sizeX,l.sizeZ);
         else mkLight(lvOff,l.pos,l.sizeX,l.sizeZ);
     }
-    // First-person held items
     {
         std::vector<float> m;
         buildFlashlightModel(m);
@@ -264,7 +298,6 @@ void buildGeom(){
         batteryVC = (int)m.size()/8;
         if(batteryVC>0) setupVAO(batteryVAO, batteryVBO, m, true);
     }
-
     wallVC=(int)wv.size()/8;floorVC=(int)fv.size()/8;ceilVC=(int)cv.size()/8;
     pillarVC=(int)pv.size()/8;decorVC=(int)dv.size()/8;lightVC=(int)lv.size()/5;lightOffVC=(int)lvOff.size()/5;
     setupVAO(wallVAO,wallVBO,wv,true);setupVAO(floorVAO,floorVBO,fv,true);
@@ -274,7 +307,6 @@ void buildGeom(){
     if(!lvOff.empty())setupVAO(lightOffVAO,lightOffVBO,lvOff,false);
     initQuad(quadVAO,quadVBO);lastBuildChunkX=pcx;lastBuildChunkZ=pcz;
 }
-
 void buildNotes(float tm){
     std::vector<float>nv;
     for(auto&n:storyMgr.notes){
@@ -284,7 +316,6 @@ void buildNotes(float tm){
     noteVC=(int)nv.size()/8;
     if(noteVC>0)setupVAO(noteVAO,noteVBO,nv,true);
 }
-
 void trySpawnNote(int noteId){
     if(noteId>=12||storyMgr.notesCollected[noteId])return;
     if(multiState==MULTI_IN_GAME && !netMgr.isHost) return;
@@ -296,7 +327,6 @@ void trySpawnNote(int noteId){
         if(multiState==MULTI_IN_GAME) netMgr.sendNoteSpawn(noteId, sp);
     }
 }
-
 void cleanupFarNotes(){
     for(auto&n:storyMgr.notes){
         if(!n.active||n.collected)continue;
@@ -309,6 +339,20 @@ void cleanupFarNotes(){
 }
 
 void genWorld(){
+    static int lastTextureLevel = -999;
+    if(lastTextureLevel != gCurrentLevel){
+        if(wallTex) glDeleteTextures(1, &wallTex);
+        if(floorTex) glDeleteTextures(1, &floorTex);
+        if(ceilTex) glDeleteTextures(1, &ceilTex);
+        if(lampTex) glDeleteTextures(1, &lampTex);
+        if(propTex) glDeleteTextures(1, &propTex);
+        if(deviceTex) glDeleteTextures(1, &deviceTex);
+        if(plushTex) glDeleteTextures(1, &plushTex);
+        wallTex=genTex(0); floorTex=genTex(1); ceilTex=genTex(2); lampTex=genTex(4); propTex=genTex(5);
+        deviceTex=genTex(6); plushTex=genTex(7);
+        lastTextureLevel = gCurrentLevel;
+    }
+
     if(multiState==MULTI_IN_GAME && !netMgr.isHost){
         worldSeed=netMgr.worldSeed;
     }else{
@@ -317,7 +361,7 @@ void genWorld(){
     }
     
     chunks.clear();lights.clear();pillars.clear();mapProps.clear();mapPois.clear();
-    g_lightStates.clear(); // Reset light temporal states on world gen
+    g_lightStates.clear();
     updateVisibleChunks(0,0);
     updateLightsAndPillars(0,0);
     updateMapContent(0,0);
@@ -418,38 +462,4 @@ void genWorld(){
     lastSpawnedNote=-1;noteSpawnTimer=8.0f;
 }
 
-void teleportToPlayer(){
-    if(multiState!=MULTI_IN_GAME)return;
-    static int lastTeleportTarget = -1;
-    int chosen = -1;
-    for(int step=1; step<=MAX_PLAYERS; step++){
-        int idx = (lastTeleportTarget + step) % MAX_PLAYERS;
-        if(idx == netMgr.myId) continue;
-        if(!netMgr.players[idx].active || !netMgr.players[idx].hasValidPos) continue;
-        chosen = idx;
-        break;
-    }
-    if(chosen < 0) return;
-    lastTeleportTarget = chosen;
-    Vec3 tp = netMgr.players[chosen].pos;
-    cam.pos=Vec3(tp.x+1.0f,PH,tp.z);
-    updateVisibleChunks(cam.pos.x,cam.pos.z);
-    updateLightsAndPillars(playerChunkX,playerChunkZ);
-    updateMapContent(playerChunkX,playerChunkZ);
-    buildGeom();
-}
-
-void teleportToExit(){
-    if(!coop.initialized) return;
-    cam.pos=Vec3(coop.doorPos.x,PH,coop.doorPos.z-2.0f);
-    updateVisibleChunks(cam.pos.x,cam.pos.z);
-    updateLightsAndPillars(playerChunkX,playerChunkZ);
-    updateMapContent(playerChunkX,playerChunkZ);
-    buildGeom();
-}
-
-
-
-
-
-
+#include "teleport_helpers.h"

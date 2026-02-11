@@ -19,7 +19,6 @@
 
 // Textures are created in game_main_entry.h (declared in game.cpp)
 extern GLuint deviceTex;
-extern GLuint scannerTex;
 extern GLuint plushTex;
 extern GLuint playerTex;
 
@@ -336,6 +335,7 @@ inline void applyPlushToyUse(){
 }
 
 inline int storyNotesRequired(){
+    if (isParkingLevel(gCurrentLevel)) return 7;
     return 5;
 }
 

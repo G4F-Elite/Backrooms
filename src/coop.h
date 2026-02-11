@@ -19,7 +19,7 @@ inline void updateCoopObjectiveHost(){
 
 inline bool collideCoopDoor(float x, float z, float r){
     if(multiState==MULTI_IN_GAME){
-        const int notesRequired = 5;
+        const int notesRequired = storyNotesRequired();
         if(!shouldBlockStoryDoor(
             coop.initialized,
             coop.doorOpen,

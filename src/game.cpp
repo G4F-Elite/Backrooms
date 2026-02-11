@@ -111,7 +111,6 @@ int gPerfFrameTimeHead = PERF_GRAPH_SAMPLES - 1;
 GLuint wallTex, floorTex, ceilTex, lightTex, lampTex, propTex;
 // Dedicated texture for handheld devices (flashlight/scanner) so they don't use wood-like propTex.
 GLuint deviceTex = 0;
-GLuint scannerTex = 0;
 GLuint plushTex = 0;
 // Dedicated texture for player models so they don't inherit whatever was bound last.
 GLuint playerTex = 0;
