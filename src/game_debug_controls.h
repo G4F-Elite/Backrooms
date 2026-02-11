@@ -143,7 +143,6 @@ void gameInput(GLFWwindow*w){
             break;
         }
     }
-    bool nearEchoSignal = echoSignal.active && isEchoInRange(cam.pos, echoSignal.pos, 2.5f);
     bool nearExitDoor = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
     bool exitReady = false;
     if(multiState==MULTI_IN_GAME) exitReady = coop.doorOpen && isStoryExitReady();
@@ -157,6 +156,7 @@ void gameInput(GLFWwindow*w){
             playerSanity-=8.0f;
             if(playerSanity<0)playerSanity=0;
             if(multiState==MULTI_IN_GAME) netMgr.sendNoteCollect(nearNoteId);
+            addAttention(2.0f);
         }
     }else if(eNow&&!interactPressed&&nearbyWorldItemId>=0){
         if(multiState==MULTI_IN_GAME){
@@ -179,11 +179,10 @@ void gameInput(GLFWwindow*w){
                 if(it.type==ITEM_BATTERY) invBattery++;
                 else if(it.type==ITEM_PLUSH_TOY) invPlush++;
                 else if(it.type==ITEM_MED_SPRAY) applyItemUse(ITEM_MED_SPRAY);
+                addAttention(1.2f);
                 break;
             }
         }
-    }else if(eNow&&!interactPressed&&nearEchoSignal){
-        resolveEchoInteraction();
     }else if(eNow&&!interactPressed&&tryHandleVoidShiftInteract(cam.pos)){
         // Contract interaction handled.
     }else if(eNow&&!interactPressed&&nearExitDoor&&exitReady){
@@ -240,6 +239,7 @@ void gameInput(GLFWwindow*w){
         netMgr.pingMarkPos = cam.pos;
         netMgr.pingMarkTtl = 6.0f;
         netMgr.pingMarkReceived = true;
+        addAttention(1.0f);
     }
 
     if(recordNow && !recordPressed){

@@ -187,11 +187,6 @@ int main(){
                     }
                 }
                 if(falseDoorTimer>0) falseDoorTimer-=dTime;
-                updateEchoSignal();
-                updateTrapCorridor();
-                if(multiState!=MULTI_IN_GAME) updateSmileEvent();
-                updatePoiRuntime();
-                if(multiState!=MULTI_IN_GAME) updateRoamEventsHost();
                 updateFloorHoles();
                 gameInput(gWin);
                 int holeCountNow = (int)floorHoles.size();
