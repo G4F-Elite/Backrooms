@@ -107,6 +107,11 @@ inline void executeDebugAction(int action){
         }
         return;
     }
+    if(action==DEBUG_ACT_EQUIP_SCANNER){
+        activeDeviceSlot = 2;
+        setEchoStatus("DEBUG: SCANNER EQUIPPED");
+        return;
+    }
     if(!canMutateWorld){
         setTrapStatus("DEBUG ACTION: HOST ONLY");
         return;
@@ -133,6 +138,12 @@ inline void executeDebugAction(int action){
     }
     if(action==DEBUG_ACT_FORCE_SUPPLY){
         applyRoamEvent(ROAM_SUPPLY_CACHE, playerChunkX, playerChunkZ, 10.0f);
+        return;
+    }
+    if(action==DEBUG_ACT_SPAWN_MED_SPRAY){
+        Vec3 sp = debugCursorSpawnPos(gWin);
+        hostSpawnItem(ITEM_MED_SPRAY, sp);
+        setEchoStatus("DEBUG: MED SPRAY SPAWNED");
         return;
     }
 }

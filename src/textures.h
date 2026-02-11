@@ -305,12 +305,12 @@ inline GLuint genTex(int type) {
             h = 124.0f + ridges * 0.45f + grains * 0.18f + woodBands * 0.24f + knotMask * 0.32f;
         } else if(type==6) { // handheld device texture (flashlight/scanner) - painted plastic/metal
             // Purpose: avoid using the generic prop wood texture for devices.
-            // Palette: dark graphite plastic with subtle speckle + edge wear.
+            // Palette: neutral matte gray plastic with subtle speckle + edge wear.
             float u = (float)x / (float)sz;
             float v = (float)y / (float)sz;
 
-            // Base graphite
-            float base = 62.0f;
+            // Base neutral gray
+            float base = 124.0f;
             float speck = perlin(x * 0.35f, y * 0.35f, 3) * 10.0f;
             float micro = perlin(x * 1.2f + 3.0f, y * 1.2f + 7.0f, 2) * 4.0f;
 
@@ -325,16 +325,9 @@ inline GLuint genTex(int type) {
             float wearNoise = perlin(x * 0.06f + 10.0f, y * 0.06f + 2.0f, 4) * 10.0f;
             wear = wear * (0.7f + 0.3f * (wearNoise / 10.0f));
 
-            // Small warning stripe accent
-            float stripe = 0.0f;
-            if(v > 0.78f && v < 0.84f) {
-                float band = fmodf(u * 18.0f, 1.0f);
-                if(band < 0.5f) stripe = 32.0f;
-            }
-
-            r = base + speck + micro + seams + wear + stripe * 0.9f;
-            g = base + speck * 0.95f + micro + seams * 0.9f + wear * 0.9f + stripe * 0.55f;
-            b = base + speck * 0.90f + micro * 0.9f + seams * 0.85f + wear * 0.8f;
+            r = base + speck + micro + seams * 0.95f + wear * 0.90f;
+            g = base + speck * 0.98f + micro + seams * 0.93f + wear * 0.90f;
+            b = base + speck * 0.96f + micro * 0.92f + seams * 0.90f + wear * 0.88f;
 
             // Height: seams and edge wear slightly raised
             h = 128.0f + seams * 0.6f + wear * 0.25f + speck * 0.25f;
