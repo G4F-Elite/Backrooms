@@ -283,8 +283,8 @@ int main(){
                 }else if(reshuffleTimer<=0)reshuffleTimer=8.0f+(rng()%8);
                 
                 float levelDanger = levelDangerScale(gCurrentLevel);
-                // Plush comfort: holding the toy (slot 3) slowly restores sanity instead of passive drain.
-                if(activeDeviceSlot==3 && heldConsumableType==ITEM_PLUSH_TOY) playerSanity += 2.0f*dTime;
+                // Plush comfort: holding the toy (slot 3) VERY slowly restores sanity instead of passive drain.
+                if(activeDeviceSlot==3 && heldConsumableType==ITEM_PLUSH_TOY) playerSanity += 0.75f*dTime;
                 else playerSanity -= sanityPassiveDrainPerSec(levelDanger) * dTime;
                 if(entityMgr.dangerLevel>0.1f) playerSanity -= entityMgr.dangerLevel*(8.0f * levelDanger)*dTime;
                 playerSanity=playerSanity>100?100:(playerSanity<0?0:playerSanity);
