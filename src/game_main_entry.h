@@ -349,7 +349,8 @@ int main(){
         bool vhsGameplay=(gameState==STATE_GAME||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_KEYBINDS_PAUSE||gameState==STATE_NOTE||gameState==STATE_INTRO);
         float vI=0.0f;
         if(vhsMenu){
-            vI=0.18f+settings.vhsIntensity*0.52f;
+            // Disable VHS post-processing on main menu to avoid moving bright bands/stripes.
+            vI=0.0f;
         }else if(vhsGameplay){
             float sanityLoss=1.0f-(playerSanity/100.0f);
             if(sanityLoss<0.0f) sanityLoss=0.0f;
