@@ -183,6 +183,8 @@ int main(){
                 if(falseDoorTimer>0) falseDoorTimer-=dTime;
                 updateFloorHoles();
                 gameInput(gWin);
+                updatePoiRuntime();
+                if(multiState!=MULTI_IN_GAME) updateRoamEventsHost();
                 int holeCountNow = (int)floorHoles.size();
                 if(holeCountNow != lastHoleCount){
                     buildGeom();
