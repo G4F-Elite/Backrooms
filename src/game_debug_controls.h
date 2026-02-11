@@ -186,6 +186,7 @@ void gameInput(GLFWwindow*w){
     bool k2=glfwGetKey(w,settings.binds.item2)==GLFW_PRESS;
     bool k3=glfwGetKey(w,settings.binds.item3)==GLFW_PRESS;
     bool k4=glfwGetKey(w,settings.binds.item4)==GLFW_PRESS;
+    bool callHere = glfwGetKey(w, GLFW_KEY_T)==GLFW_PRESS, callDanger = glfwGetKey(w, GLFW_KEY_Y)==GLFW_PRESS, callBattery = glfwGetKey(w, GLFW_KEY_U)==GLFW_PRESS, callCode = glfwGetKey(w, GLFW_KEY_I)==GLFW_PRESS, callDoor = glfwGetKey(w, GLFW_KEY_O)==GLFW_PRESS;
     bool recordNow = glfwGetKey(w, GLFW_KEY_R) == GLFW_PRESS, playbackNow = glfwGetKey(w, GLFW_KEY_P) == GLFW_PRESS;
     static bool pingPressed=false;
     bool pingNow = glfwGetKey(w, GLFW_KEY_G) == GLFW_PRESS;
@@ -232,6 +233,7 @@ void gameInput(GLFWwindow*w){
         addAttention(1.0f);
         notifyVoidShiftPingUsed();
     }
+    if((callHere||callDanger||callBattery||callCode||callDoor) && !pingPressed){ if(callHere) setSquadCallout("CALLOUT: MOVE HERE"); else if(callDanger) setSquadCallout("CALLOUT: DANGER"); else if(callBattery) setSquadCallout("CALLOUT: NEED BATTERY"); else if(callCode) setSquadCallout("CALLOUT: CODE FOUND"); else if(callDoor) setSquadCallout("CALLOUT: HOLDING DOOR"); }
 
     if(recordNow && !recordPressed){
         resonatorMode = RESONATOR_RECORD;
@@ -285,6 +287,7 @@ void gameInput(GLFWwindow*w){
         }
     }
     if(staminaCooldown>0)staminaCooldown-=dTime;
+    if(squadCalloutTimer>0.0f){ squadCalloutTimer-=dTime; if(squadCalloutTimer<0.0f) squadCalloutTimer=0.0f; }
     updateVoidShiftSystems(dTime, sprinting, flashlightOn);
 
     if(debugTools.flyMode){

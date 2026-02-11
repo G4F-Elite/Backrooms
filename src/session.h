@@ -126,6 +126,14 @@ float echoStatusTimer = 0.0f;
 char echoStatusText[96] = {};
 bool storyEchoAttuned = false;
 int storyEchoAttunedCount = 0;
+float squadCalloutTimer = 0.0f;
+char squadCalloutText[96] = {};
+
+inline void setSquadCallout(const char* txt) {
+    if (!txt) return;
+    std::snprintf(squadCalloutText, sizeof(squadCalloutText), "%s", txt);
+    squadCalloutTimer = 3.5f;
+}
 enum ResonatorMode {
     RESONATOR_SCAN = 0,
     RESONATOR_RECORD = 1,

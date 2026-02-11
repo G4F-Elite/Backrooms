@@ -227,6 +227,7 @@ void drawUI(){
             if(minimapEnabled) drawMinimapOverlay();
             if(storyMgr.hasHallucinations())drawHallucinationEffect((50.0f-playerSanity)/50.0f);
             if(multiState==MULTI_IN_GAME)drawMultiHUD(netMgr.getPlayerCount(),netMgr.isHost);
+            if(squadCalloutTimer > 0.0f) drawHudTextCentered(squadCalloutText,0.0f,-0.52f,1.08f,0.88f,0.84f,0.62f,0.92f);
             if(multiState==MULTI_IN_GAME){
                 for(int i=0;i<MAX_PLAYERS;i++){
                     if(i==netMgr.myId || !netMgr.players[i].active || !netMgr.players[i].hasValidPos) continue;
