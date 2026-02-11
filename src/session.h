@@ -326,7 +326,8 @@ inline float vmShake = 0.0f;
 inline void applyPlushToyUse(){
     if(invPlush <= 0) return;
     invPlush--;
-    playerSanity += 28.0f;
+    // Slot 3 plush toy should be a strong sanity recovery tool.
+    playerSanity += 40.0f;
     if(playerSanity > 100.0f) playerSanity = 100.0f;
     setEchoStatus("PLUSH TOY: YOUR MIND FEELS WHOLE AGAIN");
 }

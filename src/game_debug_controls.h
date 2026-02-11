@@ -394,15 +394,16 @@ void gameInput(GLFWwindow*w){
     // === BACKLOG: scanner overheating + false peaks ===
     // Heat builds up while scanner is held, cools down otherwise.
     // When overheated: signal becomes noisy/weak and beeps are heavily reduced.
-    const float heatUpPerSec = 0.20f;
-    const float heatDownPerSec = 0.30f;
+    // Tuned: make overheat reachable in a normal scan session and noticeably punish the scanner.
+    const float heatUpPerSec = 0.34f;
+    const float heatDownPerSec = 0.22f;
     if(activeDeviceSlot == 2 && !scannerOverheated) scannerHeat += heatUpPerSec * dTime;
     else scannerHeat -= heatDownPerSec * dTime;
     if(scannerHeat < 0.0f) scannerHeat = 0.0f;
     if(scannerHeat > 1.0f) scannerHeat = 1.0f;
-    if(!scannerOverheated && scannerHeat >= 0.98f){
+    if(!scannerOverheated && scannerHeat >= 0.90f){
         scannerOverheated = true;
-        scannerOverheatTimer = 2.5f;
+        scannerOverheatTimer = 3.2f;
         setTrapStatus("SCANNER OVERHEAT");
     }
     if(scannerOverheated){
@@ -436,25 +437,41 @@ void gameInput(GLFWwindow*w){
     // Apply false peak bias + overheat degradation.
     float biasedTarget = targetSignal;
     if(scannerPhantomTimer > 0.0f) biasedTarget += scannerPhantomBias;
-    float overheatPenalty = scannerOverheated ? 0.65f : (scannerHeat > 0.75f ? (scannerHeat - 0.75f) * 1.6f : 0.0f);
+    float overheatPenalty = scannerOverheated ? 1.0f : (scannerHeat > 0.65f ? (scannerHeat - 0.65f) * 2.2f : 0.0f);
+    if(overheatPenalty < 0.0f) overheatPenalty = 0.0f;
+    if(overheatPenalty > 1.0f) overheatPenalty = 1.0f;
     biasedTarget *= (1.0f - overheatPenalty);
-    // Add noise when overheated.
+    // When overheated: scanner becomes basically useless (heavy noise + random flicker).
     if(scannerOverheated){
         float n = ((float)(rng()%1000) / 1000.0f) * 2.0f - 1.0f;
-        biasedTarget += n * 0.10f;
+        biasedTarget = n * 0.32f;
     }
     scannerSignal += (biasedTarget - scannerSignal) * (0.8f * dTime * 3.0f);
     if(scannerSignal < 0.0f) scannerSignal = 0.0f;
     if(scannerSignal > 1.0f) scannerSignal = 1.0f;
     static float scannerBeepTimer = 0.0f;
-    if(activeDeviceSlot == 2 && !scannerOverheated && scannerSignal > 0.05f){
-        float rate = 0.25f + (1.0f - scannerSignal) * 0.9f;
+    if(activeDeviceSlot == 2){
         scannerBeepTimer -= dTime;
-        if(scannerBeepTimer <= 0.0f){
-            sndState.scannerBeepPitch = 0.55f + scannerSignal * 1.0f;
-            sndState.scannerBeepVol = 0.35f + scannerSignal * 0.55f;
-            sndState.scannerBeepTrig = true;
-            scannerBeepTimer = rate;
+        if(scannerOverheated){
+            // Misleading/weak beeps while overheated.
+            if(scannerBeepTimer <= 0.0f){
+                float r = (float)(rng()%1000) / 1000.0f;
+                sndState.scannerBeepPitch = 0.35f + r * 1.35f;
+                sndState.scannerBeepVol = 0.10f + r * 0.08f;
+                sndState.scannerBeepTrig = true;
+                scannerBeepTimer = 0.18f + r * 0.16f;
+            }
+        }else if(scannerSignal > 0.05f){
+            float heatMuffle = 1.0f - fastClamp01(scannerHeat * 0.55f);
+            float rate = 0.25f + (1.0f - scannerSignal) * 0.9f;
+            if(scannerBeepTimer <= 0.0f){
+                sndState.scannerBeepPitch = 0.55f + scannerSignal * 1.0f;
+                sndState.scannerBeepVol = (0.35f + scannerSignal * 0.55f) * heatMuffle;
+                sndState.scannerBeepTrig = true;
+                scannerBeepTimer = rate;
+            }
+        }else{
+            scannerBeepTimer = 0.0f;
         }
     }else{
         scannerBeepTimer = 0.0f;
@@ -491,6 +508,7 @@ void gameInput(GLFWwindow*w){
         if(flashlightBattery>100)flashlightBattery=100;
     }
 }
+
 
 
 
