@@ -249,6 +249,7 @@ void gameInput(GLFWwindow*w){
         if(cam.pos.y < -25.0f || fallTimer > 3.0f){
             playerHealth = 0.0f;
             isPlayerDead = true;
+            snprintf(gDeathReason,sizeof(gDeathReason),"CAUSE: FELL INTO THE VOID");
             playerFalling = false;
             glfwSetInputMode(w,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
         }

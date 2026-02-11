@@ -107,11 +107,6 @@ inline void executeDebugAction(int action){
         }
         return;
     }
-    if(action==DEBUG_ACT_EQUIP_SCANNER){
-        activeDeviceSlot = 2;
-        setEchoStatus("DEBUG: SCANNER EQUIPPED");
-        return;
-    }
     if(!canMutateWorld){
         setTrapStatus("DEBUG ACTION: HOST ONLY");
         return;
@@ -142,7 +137,13 @@ inline void executeDebugAction(int action){
     }
     if(action==DEBUG_ACT_SPAWN_MED_SPRAY){
         Vec3 sp = debugCursorSpawnPos(gWin);
-        hostSpawnItem(ITEM_MED_SPRAY, sp);
+        if(collideWorld(sp.x, sp.z, PR)) sp = findSpawnPos(cam.pos, 2.0f);
+        WorldItem it;
+        it.id = nextWorldItemId++ % 250;
+        it.type = ITEM_MED_SPRAY;
+        it.pos = Vec3(sp.x, 0.0f, sp.z);
+        it.active = true;
+        worldItems.push_back(it);
         setEchoStatus("DEBUG: MED SPRAY SPAWNED");
         return;
     }

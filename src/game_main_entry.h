@@ -34,6 +34,7 @@ int main(){
     int cachedRefreshRateHz = detectActiveRefreshRateHz(gWin);
     gPerfRefreshHz = cachedRefreshRateHz;
     double nextRefreshProbeTime = 0.0;
+    float sanityCollapseTimer = 0.0f;
     initFrameTimeHistory(gPerfFrameTimeHistory, PERF_GRAPH_SAMPLES, 16.6f);
     gPerfFrameTimeHead = PERF_GRAPH_SAMPLES - 1;
     while(!glfwWindowShouldClose(gWin)){
@@ -308,9 +309,12 @@ int main(){
                             setTrapStatus("FLOOR COLLAPSE. YOU FELL.");
                     }
                 }
-                if(playerSanity<=0&&rng()%1000<5){
-                    isPlayerDead=true;playerHealth=0;
-                    glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
+                if(playerSanity<=0.0f && !isPlayerDead){
+                    sanityCollapseTimer += dTime;
+                    if(sanityCollapseTimer>=2.3f){ isPlayerDead=true;playerHealth=0;snprintf(gDeathReason,sizeof(gDeathReason),"CAUSE: SANITY COLLAPSE"); glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL); }
+                }else if(!isPlayerDead){
+                    sanityCollapseTimer -= dTime * 1.7f;
+                    if(sanityCollapseTimer < 0.0f) sanityCollapseTimer = 0.0f;
                 }
                 if(entityMgr.checkPlayerAttack(cam.pos)){
                     playerHealth-=35.0f*dTime;playerSanity-=15.0f*dTime;
@@ -322,7 +326,7 @@ int main(){
                         triggerScare();
                     }
                     if(playerHealth<=0){
-                        isPlayerDead=true;playerHealth=0;
+                        isPlayerDead=true;playerHealth=0;snprintf(gDeathReason,sizeof(gDeathReason),"CAUSE: MAULED BY ENTITY");
                         glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
                     }
                 }
@@ -344,13 +348,8 @@ int main(){
         glDisable(GL_DEPTH_TEST);
 
         glUseProgram(vhsShader);
-        bool vhsMenu=(gameState==STATE_MENU||gameState==STATE_GUIDE||gameState==STATE_MULTI||gameState==STATE_MULTI_HOST||gameState==STATE_MULTI_JOIN||gameState==STATE_MULTI_WAIT);
-        bool vhsGameplay=(gameState==STATE_GAME||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_KEYBINDS_PAUSE||gameState==STATE_NOTE||gameState==STATE_INTRO);
-        float vI=0.0f;
-        if(vhsMenu){
-            // Disable VHS on menu to remove crawling bright bands.
-            vI=0.0f;
-        }else if(vhsGameplay){
+        bool vhsMenu=(gameState==STATE_MENU||gameState==STATE_GUIDE||gameState==STATE_MULTI||gameState==STATE_MULTI_HOST||gameState==STATE_MULTI_JOIN||gameState==STATE_MULTI_WAIT),vhsGameplay=(gameState==STATE_GAME||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_KEYBINDS_PAUSE||gameState==STATE_NOTE||gameState==STATE_INTRO); float vI=0.0f;
+        if(vhsMenu) vI=0.0f; else if(vhsGameplay){
             float sanityLoss=1.0f-(playerSanity/100.0f);
             if(sanityLoss<0.0f) sanityLoss=0.0f;
             if(sanityLoss>1.0f) sanityLoss=1.0f;
@@ -383,14 +382,11 @@ int main(){
             vhsRtxDenoiseOnLoc=glGetUniformLocation(vhsShader,"rtxDenoiseOn"); vhsRtxDenoiseStrengthLoc=glGetUniformLocation(vhsShader,"rtxDenoiseStrength");
             vhsDeathFxLoc=glGetUniformLocation(vhsShader,"deathFx");
         }
-        float deathFxUniform = (gameState==STATE_GAME || gameState==STATE_PAUSE || gameState==STATE_NOTE) ? (isPlayerDead ? (0.55f + 0.45f * sinf(vhsTime * 2.9f)) : 0.0f) : (isPlayerDead ? 1.0f : 0.0f);
+        float preDeathFx = sanityCollapseTimer / 2.3f; if(preDeathFx < 0.0f) preDeathFx = 0.0f; if(preDeathFx > 1.0f) preDeathFx = 1.0f;
+        float deathFxUniform = (gameState==STATE_GAME || gameState==STATE_PAUSE || gameState==STATE_NOTE) ? (isPlayerDead ? (0.55f + 0.45f * sinf(vhsTime * 2.9f)) : preDeathFx) : (isPlayerDead ? 1.0f : 0.0f);
         static int prevAaMode = -1;
         int aaMode = clampAaMode(settings.aaMode);
-        if(aaMode != prevAaMode){
-            prevAaMode = aaMode;
-            taaHistoryValid = false;
-            taaFrameIndex = 0;
-        }
+        if(aaMode != prevAaMode){ prevAaMode = aaMode; taaHistoryValid = false; taaFrameIndex = 0; }
         float jitterX = 0.0f;
         float jitterY = 0.0f;
         if(aaMode == AA_MODE_TAA){

@@ -26,6 +26,7 @@ inline GLuint overlayShader=0, overlayVAO=0, overlayVBO=0;
 inline GLuint menuBgShader=0;
 // Textures are created in game_main_entry.h (declared in game.cpp)
 extern GLuint wallTex, floorTex, ceilTex, lampTex;
+extern char gDeathReason[80];
 struct Settings {
     float masterVol=0.7f;
     float musicVol=0.55f;
@@ -245,26 +246,24 @@ inline void drawSlider(float x,float y,float w,float val,float r,float g,float b
 }
 
 inline void drawMenuAtmosphere(float tm) {
-    // Soft moving haze bands to break up blocky motion artifacts.
-    for(int i = 0; i < 6; i++) {
+    for(int i = 0; i < 7; i++) {
         float fi = (float)i;
-        float phase = tm * (0.09f + fi * 0.015f) + fi * 1.73f;
-        float yCenter = -0.78f + fi * 0.30f + sinf(phase) * 0.08f;
-        float halfH = 0.09f + 0.02f * sinf(tm * 0.23f + fi * 0.7f);
-        float alpha = 0.032f + 0.02f * (0.5f + 0.5f * sinf(phase * 1.37f));
-        drawOverlayRectNdc(-1.0f, yCenter - halfH, 1.0f, yCenter + halfH, 0.20f, 0.16f, 0.11f, alpha);
+        float yCenter = -0.90f + fi * 0.30f;
+        float drift = sinf(tm * (0.18f + fi * 0.02f) + fi * 0.8f) * 0.04f;
+        float w = 0.15f + 0.03f * sinf(tm * 0.28f + fi * 0.5f);
+        float alpha = 0.018f + 0.012f * (0.5f + 0.5f * sinf(tm * 0.36f + fi * 0.6f));
+        drawOverlayRectNdc(-1.0f, yCenter - w + drift, 1.0f, yCenter + w + drift, 0.16f, 0.14f, 0.11f, alpha);
     }
-
-    // Slow horizontal light sweep for a more intentional menu look.
-    float sweep = sinf(tm * 0.24f) * 0.78f;
-    float sweepW = 0.16f;
-    drawOverlayRectNdc(sweep - sweepW, -1.0f, sweep + sweepW, 1.0f, 0.76f, 0.66f, 0.42f, 0.055f);
-
-    // Soft vignette-like framing panels instead of pixel strips.
-    drawOverlayRectNdc(-1.0f, -1.0f, -0.72f, 1.0f, 0.08f, 0.08f, 0.07f, 0.12f);
-    drawOverlayRectNdc(0.72f, -1.0f, 1.0f, 1.0f, 0.08f, 0.08f, 0.07f, 0.12f);
-    drawOverlayRectNdc(-1.0f, -1.0f, 1.0f, -0.72f, 0.07f, 0.07f, 0.06f, 0.10f);
-    drawOverlayRectNdc(-1.0f, 0.72f, 1.0f, 1.0f, 0.07f, 0.07f, 0.06f, 0.10f);
+    for(int i = 0; i < 5; i++) {
+        float fi = (float)i;
+        float x = -0.95f + fi * 0.48f + sinf(tm * 0.22f + fi * 1.4f) * 0.06f;
+        float glow = 0.018f + 0.010f * (0.5f + 0.5f * sinf(tm * 0.45f + fi));
+        drawOverlayRectNdc(x - 0.055f, -1.0f, x + 0.055f, 1.0f, 0.82f, 0.70f, 0.40f, glow);
+    }
+    drawOverlayRectNdc(-1.0f, -1.0f, -0.78f, 1.0f, 0.04f, 0.04f, 0.04f, 0.15f);
+    drawOverlayRectNdc(0.78f, -1.0f, 1.0f, 1.0f, 0.04f, 0.04f, 0.04f, 0.15f);
+    drawOverlayRectNdc(-1.0f, -1.0f, 1.0f, -0.80f, 0.03f, 0.03f, 0.03f, 0.12f);
+    drawOverlayRectNdc(-1.0f, 0.80f, 1.0f, 1.0f, 0.03f, 0.03f, 0.03f, 0.12f);
 }
 
 inline void drawMenu(float tm) {
@@ -426,7 +425,7 @@ inline void drawDeath(float tm) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     float fl=(rand()%100<28)?0.25f:1.0f, p=0.68f+0.22f*sinf(tm*4.2f);
     float deathPulse = 0.5f + 0.5f * sinf(tm * 2.8f);
-    float ch = 0.004f + deathPulse * 0.012f;
+    float ch = 0.0015f + deathPulse * 0.0045f;
     drawFullscreenOverlay(0.01f,0.0f,0.0f,0.88f);
     drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.86f,0.32f,0.02f,0.02f,0.55f);
     drawOverlayRectNdc(-1.0f,0.86f,1.0f,1.0f,0.32f,0.02f,0.02f,0.55f);
@@ -435,9 +434,10 @@ inline void drawDeath(float tm) {
     drawTextCentered("YOU DIED",ch,0.2f,4.2f,0.22f*fl,0.12f*fl,0.88f*fl,p*0.72f);
     drawTextCentered("YOU DIED",0.0f,0.2f,4.2f,0.9f*fl,0.08f*fl,0.08f*fl,p);
     drawTextCentered("IT GOT YOU...",0.0f,0.01f,2.1f,0.72f,0.12f,0.12f,0.76f);
+    drawTextCentered(gDeathReason,0.0f,-0.05f,1.55f,0.78f,0.62f,0.52f,0.82f);
     int m=(int)(gSurvivalTime/60),s=(int)gSurvivalTime%60;
     char tb[32]; snprintf(tb,32,"SURVIVED: %d:%02d",m,s);
-    drawTextCentered(tb,0.0f,-0.12f,2.0f,0.7f,0.6f,0.3f,0.8f);
+    drawTextCentered(tb,0.0f,-0.16f,2.0f,0.7f,0.6f,0.3f,0.8f);
     drawTextCentered("PRESS ENTER TO RESTART",0.0f,-0.35f,1.8f,0.5f,0.4f,0.35f,0.6f);
     drawTextCentered("PRESS ESC FOR MAIN MENU",0.0f,-0.47f,1.8f,0.5f,0.4f,0.35f,0.6f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
@@ -451,7 +451,7 @@ inline void drawEscape(float tm) {
     int m=(int)(gSurvivalTime/60),s=(int)gSurvivalTime%60;
     char tb[32]; snprintf(tb,32,"SURVIVED: %d:%02d",m,s);
     drawTextCentered(tb,0.0f,-0.12f,2.0f,0.7f,0.8f,0.68f,0.86f);
-    drawTextCentered("PRESS ENTER TO PLAY AGAIN",0.0f,-0.35f,1.8f,0.55f,0.64f,0.54f,0.7f);
+    drawTextCentered("PRESS ENTER TO CONTINUE",0.0f,-0.35f,1.8f,0.55f,0.64f,0.54f,0.7f);
     drawTextCentered("PRESS ESC FOR MAIN MENU",0.0f,-0.47f,1.8f,0.55f,0.64f,0.54f,0.7f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }

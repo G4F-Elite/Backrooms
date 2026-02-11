@@ -196,7 +196,10 @@ void renderScene(){
     }
 
     if(heldVC>0 && deviceEquip > 0.02f){
-        Vec3 baseTarget = cam.pos + vmFwdPos * handFwd + vmRightPos * handSide + worldUp * handUp;
+        float pitchLift = cam.pitch * 0.26f;
+        if(pitchLift < -0.22f) pitchLift = -0.22f;
+        if(pitchLift > 0.26f) pitchLift = 0.26f;
+        Vec3 baseTarget = cam.pos + vmFwdPos * handFwd + vmRightPos * handSide + worldUp * (handUp + pitchLift);
 
         // "In-hand physics": smooth held item position slightly for weight.
         static Vec3 baseSmoothed(0.0f, 0.0f, 0.0f);
@@ -206,7 +209,7 @@ void renderScene(){
         baseSmoothed = baseSmoothed + (baseTarget - baseSmoothed) * a;
 
         Vec3 drawScale = scale * (0.8f + 0.2f * deviceEquip);
-        float heldPitch = vmPitch + pitchAdd;
+        float heldPitch = pitchAdd;
         Mat4 heldModel = composeModelMatrix(baseSmoothed, vmYaw + yawAdd, heldPitch, drawScale);
         glUniformMatrix4fv(mu.M,1,GL_FALSE,heldModel.m);
         if(mu.tint >= 0) glUniform3f(mu.tint,heldTint.x,heldTint.y,heldTint.z);

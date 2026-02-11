@@ -448,6 +448,7 @@ void genWorld(){
     itemSpawnTimer = 6.0f;
     playerHealth=playerSanity=100; playerStamina=125;
     flashlightBattery=100;flashlightOn=false;isPlayerDead=false;
+    snprintf(gDeathReason,sizeof(gDeathReason),"CAUSE: UNKNOWN");
     playerEscaped=false;
     flashlightShutdownBlinkActive = false;
     flashlightShutdownBlinkTimer = 0.0f;
