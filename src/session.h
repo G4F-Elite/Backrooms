@@ -159,6 +159,8 @@ Vec3 level1Nodes[3];
 bool level1NodeDone[3] = {false, false, false};
 int level1NodeStage[3] = {0, 0, 0};
 int level1NodeGoal[3] = {2, 2, 2};
+Vec3 level1SyncSwitches[2];
+float level1SyncTimer = 0.0f;
 bool level1HoldActive = false;
 float level1HoldTimer = 90.0f;
 bool level1ContractComplete = false;
@@ -423,6 +425,7 @@ inline void applyPlushToyUse(){
 inline void initLevel1PuzzleStages();
 inline bool processLevel1NodeStage(int nodeIndex);
 inline void buildLevel1NodeActionPrompt(int nodeIndex, char* out, int outSize);
+inline void updateLevel1SyncSwitchProgress(float dt);
 inline void initLevel2PuzzleStages();
 inline bool processLevel2Step(const Vec3& playerPos);
 inline bool buildLevel2ActionPrompt(const Vec3& playerPos, char* out, int outSize);

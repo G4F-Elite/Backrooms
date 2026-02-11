@@ -132,8 +132,7 @@ inline void resetVoidShiftState(const Vec3& spawnPos, const Vec3& exitDoorPos) {
     level2PowerNode = Vec3(spawnPos.x + CS * 5.0f, 0.0f, spawnPos.z + CS * 1.0f);
 
     initVoidShiftNpcSpots(spawnPos, exitDoorPos);
-    initSideContractForLevel();
-    initLevel2PuzzleStages();
+    initSideContractForLevel(); initLevel2PuzzleStages();
 }
 
 inline void startEchoRecordingTrack() {
@@ -457,6 +456,8 @@ inline void updateVoidShiftSystems(float dt, bool sprinting, bool flashlightActi
             setEchoStatus("ECHO PLAYBACK COMPLETE");
         }
     }
+
+    updateLevel1SyncSwitchProgress(dt);
 
     if (isParkingLevel(gCurrentLevel)) {
         coLevel += dt * (ventilationOnline ? -3.2f : 2.6f);
