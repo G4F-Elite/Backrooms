@@ -495,25 +495,7 @@ inline void updateVoidShiftSystems(float dt, bool sprinting, bool flashlightActi
         }
     }
 
-    if (level1HoldActive && !level1ContractComplete) {
-        level1HoldTimer -= dt;
-        if (level1HoldTimer <= 0.0f) {
-            level1HoldTimer = 0.0f;
-            level1HoldActive = false;
-            level1ContractComplete = true;
-            setTrapStatus("LEVEL 1 CONTRACT COMPLETE");
-        }
-    }
-
-    if (level2HoldActive && !level2ContractComplete) {
-        level2HoldTimer -= dt;
-        if (level2HoldTimer <= 0.0f) {
-            level2HoldTimer = 0.0f;
-            level2HoldActive = false;
-            level2ContractComplete = true;
-            setTrapStatus("LEVEL 2 CONTRACT COMPLETE");
-        }
-    }
+    updateVoidShiftHoldPhases(dt);
 
     if (attentionEventCooldown <= 0.0f) {
         if (attentionLevel >= 90.0f) {

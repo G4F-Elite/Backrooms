@@ -53,3 +53,19 @@ inline void updateVoidShiftSetpieces(float dt) {
         if (lightsOutTimer < 1.6f) lightsOutTimer = 1.6f;
     }
 }
+
+inline void updateVoidShiftHoldPhases(float dt) {
+    if (level1HoldActive && !level1ContractComplete) {
+        if (isLevel1HoldMaintained()) level1HoldTimer -= dt;
+        else level1HoldTimer += dt * 0.45f;
+        if (level1HoldTimer > 90.0f) level1HoldTimer = 90.0f;
+        if (level1HoldTimer <= 0.0f) { level1HoldTimer = 0.0f; level1HoldActive = false; level1ContractComplete = true; setTrapStatus("LEVEL 1 CONTRACT COMPLETE"); }
+    }
+
+    if (level2HoldActive && !level2ContractComplete) {
+        if (isLevel2HoldMaintained()) level2HoldTimer -= dt;
+        else level2HoldTimer += dt * 0.75f;
+        if (level2HoldTimer > 15.0f) level2HoldTimer = 15.0f;
+        if (level2HoldTimer <= 0.0f) { level2HoldTimer = 0.0f; level2HoldActive = false; level2ContractComplete = true; setTrapStatus("LEVEL 2 CONTRACT COMPLETE"); }
+    }
+}

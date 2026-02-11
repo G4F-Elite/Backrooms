@@ -43,6 +43,19 @@ inline void updateLevel1SyncSwitchProgress(float dt) {
     }
 }
 
+inline bool isLevel1HoldMaintained() {
+    Vec3 anchor = level1Nodes[0];
+    if (nearPoint2D(cam.pos, anchor, 5.5f)) return true;
+    if (echoPlayback && nearPoint2D(echoGhostPos, anchor, 5.5f)) return true;
+    if (multiState == MULTI_IN_GAME) {
+        for (int p = 0; p < MAX_PLAYERS; p++) {
+            if (p == netMgr.myId || !netMgr.players[p].active || !netMgr.players[p].hasValidPos) continue;
+            if (nearPoint2D(netMgr.players[p].pos, anchor, 5.5f)) return true;
+        }
+    }
+    return false;
+}
+
 inline bool processLevel1NodeStage(int nodeIndex) {
     if (nodeIndex < 0 || nodeIndex > 2 || level1NodeDone[nodeIndex]) return false;
 

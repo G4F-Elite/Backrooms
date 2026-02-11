@@ -63,3 +63,15 @@ inline bool buildLevel2ActionPrompt(const Vec3& playerPos, char* out, int outSiz
     }
     return false;
 }
+
+inline bool isLevel2HoldMaintained() {
+    if (nearPoint2D(cam.pos, level2LiftNode, 3.2f)) return true;
+    if (echoPlayback && nearPoint2D(echoGhostPos, level2LiftNode, 3.2f)) return true;
+    if (multiState == MULTI_IN_GAME) {
+        for (int p = 0; p < MAX_PLAYERS; p++) {
+            if (p == netMgr.myId || !netMgr.players[p].active || !netMgr.players[p].hasValidPos) continue;
+            if (nearPoint2D(netMgr.players[p].pos, level2LiftNode, 3.2f)) return true;
+        }
+    }
+    return false;
+}

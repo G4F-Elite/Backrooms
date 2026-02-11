@@ -431,14 +431,17 @@ inline void initLevel1PuzzleStages();
 inline bool processLevel1NodeStage(int nodeIndex);
 inline void buildLevel1NodeActionPrompt(int nodeIndex, char* out, int outSize);
 inline void updateLevel1SyncSwitchProgress(float dt);
+inline bool isLevel1HoldMaintained();
 inline void initLevel2PuzzleStages();
 inline bool processLevel2Step(const Vec3& playerPos);
 inline bool buildLevel2ActionPrompt(const Vec3& playerPos, char* out, int outSize);
+inline bool isLevel2HoldMaintained();
 inline void initVoidShiftSetpieces();
 inline void triggerConferenceCallSetpiece(float duration);
 inline void triggerCorridorShiftSetpiece(float duration);
 inline void triggerBlackoutSetpiece(float duration);
 inline void updateVoidShiftSetpieces(float dt);
+inline void updateVoidShiftHoldPhases(float dt);
 
 #include "void_shift_runtime.h"
 #include "void_shift_puzzles_ext.h"
