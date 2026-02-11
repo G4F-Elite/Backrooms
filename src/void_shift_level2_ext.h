@@ -2,6 +2,15 @@
 
 #include <cstdio>
 
+inline bool hasLevel2BatteryAssistNearby() {
+    if (multiState != MULTI_IN_GAME) return false;
+    for (int p = 0; p < MAX_PLAYERS; p++) {
+        if (p == netMgr.myId || !netMgr.players[p].active || !netMgr.players[p].hasValidPos) continue;
+        if (nearPoint2D(netMgr.players[p].pos, level2BatteryNode, 2.8f)) return true;
+    }
+    return false;
+}
+
 inline void initLevel2PuzzleStages() {
     level2BatteryStage = 0;
     level2FusePanelPowered = false;
@@ -16,7 +25,7 @@ inline bool processLevel2Step(const Vec3& playerPos) {
             return true;
         }
         if (level2BatteryStage == 1) {
-            if (!echoPlayback) {
+            if (!(echoPlayback || hasLevel2BatteryAssistNearby())) {
                 setTrapStatus("BATTERY: NEED SECOND HAND OR ECHO");
                 return true;
             }

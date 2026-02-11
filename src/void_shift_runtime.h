@@ -47,9 +47,10 @@ inline void initSideContractForLevel() {
     sideContractProgress = 0;
     sideContractCompleted = false;
     if (isLevelZero(gCurrentLevel)) {
-        int roll = (int)(rng() % 3);
-        sideContractType = roll == 0 ? SIDE_COLLECT_BADGES : (roll == 1 ? SIDE_SCAN_WALLS : SIDE_STABILIZE_RIFTS);
-        sideContractTarget = sideContractType == SIDE_COLLECT_BADGES ? 6 : (sideContractType == SIDE_SCAN_WALLS ? 3 : 2);
+        int roll = (int)(rng() % 4);
+        sideContractType = roll == 0 ? SIDE_COLLECT_BADGES : (roll == 1 ? SIDE_SCAN_WALLS : (roll == 2 ? SIDE_STABILIZE_RIFTS : SIDE_RESCUE_SURVIVOR));
+        if (sideContractType == SIDE_RESCUE_SURVIVOR && !npcLostSurvivorActive) sideContractType = SIDE_SCAN_WALLS;
+        sideContractTarget = sideContractType == SIDE_COLLECT_BADGES ? 6 : (sideContractType == SIDE_SCAN_WALLS ? 3 : (sideContractType == SIDE_STABILIZE_RIFTS ? 2 : 1));
     } else {
         int roll = (int)(rng() % 3);
         sideContractType = roll == 0 ? SIDE_ENABLE_VENT : (roll == 1 ? SIDE_RESTORE_CAMERAS : SIDE_REPROGRAM_DRONE);
@@ -130,8 +131,8 @@ inline void resetVoidShiftState(const Vec3& spawnPos, const Vec3& exitDoorPos) {
     level2LiftNode = exitDoorPos;
     level2PowerNode = Vec3(spawnPos.x + CS * 5.0f, 0.0f, spawnPos.z + CS * 1.0f);
 
-    initSideContractForLevel();
     initVoidShiftNpcSpots(spawnPos, exitDoorPos);
+    initSideContractForLevel();
     initLevel2PuzzleStages();
 }
 
@@ -342,8 +343,7 @@ inline bool tryHandleVoidShiftInteract(const Vec3& playerPos) {
         if ((rng() % 100) < 28) {
             setTrapStatus("CALL MIMIC: FALSE ROUTE BROADCAST");
             addAttention(12.0f);
-            playerSanity -= 6.0f;
-            if (playerSanity < 0.0f) playerSanity = 0.0f;
+            playerSanity -= 6.0f; if (playerSanity < 0.0f) playerSanity = 0.0f;
         } else {
             setTrapStatus("DISPATCHER: PRIORITY ROUTE MARKED");
             addAttention(4.0f);
