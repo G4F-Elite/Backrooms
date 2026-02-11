@@ -8,6 +8,7 @@
 #include "entity_types.h"
 #include "entity_model.h"
 #include "world.h"
+#include "progression.h"
 
 // Backlog: "hearing" support for entities (crawler reacts to loud footsteps/sprinting)
 // Values are set from gameplay/audio (see game_main_entry.h loop).
@@ -67,6 +68,16 @@ public:
         if(type==ENTITY_STALKER) { e.speed=1.7f; e.detectionRange=22.0f; e.attackRange=1.15f; }
         else if(type==ENTITY_CRAWLER) { e.speed=3.4f; e.detectionRange=17.0f; e.attackRange=1.35f; e.pos.y=-0.8f; }
         else if(type==ENTITY_SHADOW) { e.speed=1.15f; e.detectionRange=12.0f; e.attackRange=1.8f; }
+
+        if(isParkingLevel(gCurrentLevel)){
+            if(type==ENTITY_STALKER){ e.speed *= 0.92f; e.detectionRange += 4.0f; }
+            if(type==ENTITY_CRAWLER){ e.speed *= 1.18f; e.detectionRange += 2.5f; }
+            if(type==ENTITY_SHADOW){ e.attackRange += 0.4f; e.detectionRange += 1.2f; }
+        }else{
+            if(type==ENTITY_STALKER){ e.attackRange += 0.2f; }
+            if(type==ENTITY_CRAWLER){ e.speed *= 1.06f; }
+            if(type==ENTITY_SHADOW){ e.speed *= 0.92f; }
+        }
         e.behaviorMode = BEHAVIOR_DEFAULT;
         e.behaviorTimer = 0.8f + (float)(rand()%120) * 0.01f;
         e.stateTimer = 0.0f;
@@ -127,6 +138,13 @@ public:
             if(e.type == ENTITY_STALKER) updateStalker(e, dt, pPos, dist, looking, maze, mzw, mzh, cs);
             else if(e.type == ENTITY_CRAWLER) updateCrawler(e, dt, pPos, dist, effectiveDetect, maze, mzw, mzh, cs);
             else if(e.type == ENTITY_SHADOW) updateShadow(e, dt, pPos, dist, looking, pYaw);
+
+            if(isParkingLevel(gCurrentLevel) && e.type == ENTITY_CRAWLER && dist < 10.0f && (rand()%1000) < 18){
+                e.behaviorMode = BEHAVIOR_RUSH;
+            }
+            if(isLevelZero(gCurrentLevel) && e.type == ENTITY_SHADOW && looking && dist < 13.0f && (rand()%1000) < 14){
+                e.behaviorMode = BEHAVIOR_FLANK;
+            }
             // Check for attacking state for shadow/crawler
             if(e.type == ENTITY_SHADOW && dist < e.attackRange && !looking) e.state = ENT_ATTACKING;
             if(e.type == ENTITY_CRAWLER && dist < e.attackRange) e.state = ENT_ATTACKING;
