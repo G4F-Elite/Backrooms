@@ -271,6 +271,57 @@ inline void updateVisibleChunks(float px, float pz) {
     playerChunkX = pcx; playerChunkZ = pcz;
 }
 
+inline bool circleOverlapsAabb2D(float x, float z, float r, float minX, float maxX, float minZ, float maxZ) {
+    float clx = x < minX ? minX : (x > maxX ? maxX : x);
+    float clz = z < minZ ? minZ : (z > maxZ ? maxZ : z);
+    float dx = x - clx;
+    float dz = z - clz;
+    return dx * dx + dz * dz < r * r;
+}
+
+inline bool collideDoorFrameAtCell(float x, float z, float r, int wx, int wz) {
+    if (getCellWorld(wx, wz) != 0) return false;
+
+    bool wallL = getCellWorld(wx - 1, wz) == 1;
+    bool wallR = getCellWorld(wx + 1, wz) == 1;
+    bool wallB = getCellWorld(wx, wz - 1) == 1;
+    bool wallF = getCellWorld(wx, wz + 1) == 1;
+    bool corridorZ = wallL && wallR && !wallB && !wallF;
+    bool corridorX = wallB && wallF && !wallL && !wallR;
+    if (!corridorZ && !corridorX) return false;
+
+    unsigned int doorHash = (unsigned int)(wx * 73856093u) ^ (unsigned int)(wz * 19349663u) ^ (worldSeed * 83492791u);
+    if ((doorHash % 100u) >= 7u) return false;
+
+    float px = wx * CS;
+    float pz = wz * CS;
+    float cxCell = px + CS * 0.5f;
+    float czCell = pz + CS * 0.5f;
+    float openingHalf = CS * 0.23f;
+    float postW = CS * 0.06f;
+    float frameT = CS * 0.10f;
+    float postHalfW = postW * 0.5f;
+    float frameHalfT = frameT * 0.5f;
+
+    if (corridorZ) {
+        if (circleOverlapsAabb2D(x, z, r,
+            cxCell - openingHalf - postHalfW, cxCell - openingHalf + postHalfW,
+            czCell - frameHalfT, czCell + frameHalfT)) return true;
+        if (circleOverlapsAabb2D(x, z, r,
+            cxCell + openingHalf - postHalfW, cxCell + openingHalf + postHalfW,
+            czCell - frameHalfT, czCell + frameHalfT)) return true;
+        return false;
+    }
+
+    if (circleOverlapsAabb2D(x, z, r,
+        cxCell - frameHalfT, cxCell + frameHalfT,
+        czCell - openingHalf - postHalfW, czCell - openingHalf + postHalfW)) return true;
+    if (circleOverlapsAabb2D(x, z, r,
+        cxCell - frameHalfT, cxCell + frameHalfT,
+        czCell + openingHalf - postHalfW, czCell + openingHalf + postHalfW)) return true;
+    return false;
+}
+
 inline bool collideWorld(float x, float z, float PR) {
     int wx = (int)floorf(x/CS), wz = (int)floorf(z/CS);
     float PR2 = PR * PR; // Squared radius for comparison without sqrt
@@ -280,6 +331,10 @@ inline bool collideWorld(float x, float z, float PR) {
             float clx = x<wx0?wx0:(x>wx1?wx1:x), clz = z<wz0?wz0:(z>wz1?wz1:z);
             float dx = x-clx, dz = z-clz;
             if (dx*dx+dz*dz < PR2) return true; }}
+    for (int ddx = -1; ddx <= 1; ddx++) for (int ddz = -1; ddz <= 1; ddz++) {
+        int chkx = wx + ddx, chkz = wz + ddz;
+        if (collideDoorFrameAtCell(x, z, PR, chkx, chkz)) return true;
+    }
     for (const auto& p : pillars) if (fabsf(x-p.x) < 0.5f+PR && fabsf(z-p.z) < 0.5f+PR) return true;
     return false;
 }

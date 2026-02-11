@@ -161,7 +161,7 @@ void renderScene(){
         yawAdd = 0.20f;
         pitchAdd = -0.20f;
         scale = Vec3(0.92f, 0.92f, 0.92f);
-        heldTint = Vec3(0.60f, 0.62f, 0.65f);
+        heldTint = Vec3(0.74f, 0.74f, 0.75f);
     }else if(activeDeviceSlot == 2){
         heldVAO = scannerVAO;
         heldVC = scannerVC;
@@ -206,7 +206,9 @@ void renderScene(){
         baseSmoothed = baseSmoothed + (baseTarget - baseSmoothed) * a;
 
         Vec3 drawScale = scale * (0.8f + 0.2f * deviceEquip);
-        Mat4 heldModel = composeModelMatrix(baseSmoothed, vmYaw + yawAdd, vmPitch + pitchAdd, drawScale);
+        float heldPitch = vmPitch + pitchAdd;
+        if(activeDeviceSlot == 1) heldPitch = -vmPitch + pitchAdd;
+        Mat4 heldModel = composeModelMatrix(baseSmoothed, vmYaw + yawAdd, heldPitch, drawScale);
         glUniformMatrix4fv(mu.M,1,GL_FALSE,heldModel.m);
         if(mu.tint >= 0) glUniform3f(mu.tint,heldTint.x,heldTint.y,heldTint.z);
 

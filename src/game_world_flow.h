@@ -4,15 +4,71 @@
 #include "coop.h"
 #include "map_content.h"
 
+inline void mkClosedBox(std::vector<float>& v, float cx, float y0, float cz, float sx, float sy, float sz) {
+    float hx = sx * 0.5f;
+    float hz = sz * 0.5f;
+    float y1 = y0 + sy;
+    const float tile = 2.4f;
+    float uvX = sx / tile;
+    float uvY = sy / tile;
+    float uvZ = sz / tile;
+    if (uvX < 0.6f) uvX = 0.6f;
+    if (uvY < 0.6f) uvY = 0.6f;
+    if (uvZ < 0.6f) uvZ = 0.6f;
+
+    auto pushQuad = [&](Vec3 a, Vec3 b, Vec3 c, Vec3 d, Vec3 n, float uMax, float vMax) {
+        float vv[] = {
+            a.x, a.y, a.z, 0, 0, n.x, n.y, n.z,
+            b.x, b.y, b.z, uMax, 0, n.x, n.y, n.z,
+            c.x, c.y, c.z, uMax, vMax, n.x, n.y, n.z,
+            a.x, a.y, a.z, 0, 0, n.x, n.y, n.z,
+            c.x, c.y, c.z, uMax, vMax, n.x, n.y, n.z,
+            d.x, d.y, d.z, 0, vMax, n.x, n.y, n.z
+        };
+        v.insert(v.end(), vv, vv + 48);
+    };
+
+    pushQuad(
+        Vec3(cx - hx, y0, cz + hz), Vec3(cx + hx, y0, cz + hz),
+        Vec3(cx + hx, y1, cz + hz), Vec3(cx - hx, y1, cz + hz),
+        Vec3(0, 0, 1), uvX, uvY
+    );
+    pushQuad(
+        Vec3(cx + hx, y0, cz - hz), Vec3(cx - hx, y0, cz - hz),
+        Vec3(cx - hx, y1, cz - hz), Vec3(cx + hx, y1, cz - hz),
+        Vec3(0, 0, -1), uvX, uvY
+    );
+    pushQuad(
+        Vec3(cx + hx, y0, cz + hz), Vec3(cx + hx, y0, cz - hz),
+        Vec3(cx + hx, y1, cz - hz), Vec3(cx + hx, y1, cz + hz),
+        Vec3(1, 0, 0), uvZ, uvY
+    );
+    pushQuad(
+        Vec3(cx - hx, y0, cz - hz), Vec3(cx - hx, y0, cz + hz),
+        Vec3(cx - hx, y1, cz + hz), Vec3(cx - hx, y1, cz - hz),
+        Vec3(-1, 0, 0), uvZ, uvY
+    );
+    pushQuad(
+        Vec3(cx - hx, y1, cz + hz), Vec3(cx + hx, y1, cz + hz),
+        Vec3(cx + hx, y1, cz - hz), Vec3(cx - hx, y1, cz - hz),
+        Vec3(0, 1, 0), uvX, uvZ
+    );
+    pushQuad(
+        Vec3(cx - hx, y0, cz - hz), Vec3(cx + hx, y0, cz - hz),
+        Vec3(cx + hx, y0, cz + hz), Vec3(cx - hx, y0, cz + hz),
+        Vec3(0, -1, 0), uvX, uvZ
+    );
+}
+
 inline void buildFlashlightModel(std::vector<float>& v){
     // Rear battery tube
-    mkBox(v, 0.0f, 0.00f, 0.04f, 0.10f, 0.07f, 0.16f);
+    mkClosedBox(v, 0.0f, 0.00f, 0.04f, 0.10f, 0.07f, 0.16f);
     // Main body
-    mkBox(v, 0.0f, 0.02f, 0.22f, 0.12f, 0.08f, 0.36f);
+    mkClosedBox(v, 0.0f, 0.02f, 0.22f, 0.12f, 0.08f, 0.36f);
     // Front head
-    mkBox(v, 0.0f, 0.03f, 0.44f, 0.18f, 0.10f, 0.20f);
+    mkClosedBox(v, 0.0f, 0.03f, 0.44f, 0.18f, 0.10f, 0.20f);
     // Top switch
-    mkBox(v, 0.0f, 0.09f, 0.16f, 0.05f, 0.02f, 0.07f);
+    mkClosedBox(v, 0.0f, 0.09f, 0.16f, 0.05f, 0.02f, 0.07f);
 }
 
 inline void buildScannerModel(std::vector<float>& v){
