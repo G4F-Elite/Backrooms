@@ -112,8 +112,10 @@ inline void resetVoidShiftState(const Vec3& spawnPos, const Vec3& exitDoorPos) {
     level1Nodes[2] = Vec3(spawnPos.x + CS * 2.0f, 0.0f, spawnPos.z - CS * 4.0f);
 
     level2BatteryInstalled = false;
+    level2BatteryStage = 0;
     level2FuseCount = 0;
     level2AccessReady = false;
+    level2FusePanelPowered = false;
     level2HoldActive = false;
     level2HoldTimer = 15.0f;
     level2ContractComplete = false;
@@ -126,9 +128,11 @@ inline void resetVoidShiftState(const Vec3& spawnPos, const Vec3& exitDoorPos) {
     level2AccessNode = Vec3(spawnPos.x + CS * 1.0f, 0.0f, spawnPos.z - CS * 7.0f);
     level2VentNode = Vec3(spawnPos.x - CS * 7.0f, 0.0f, spawnPos.z + CS * 2.0f);
     level2LiftNode = exitDoorPos;
+    level2PowerNode = Vec3(spawnPos.x + CS * 5.0f, 0.0f, spawnPos.z + CS * 1.0f);
 
     initSideContractForLevel();
     initVoidShiftNpcSpots(spawnPos, exitDoorPos);
+    initLevel2PuzzleStages();
 }
 
 inline void startEchoRecordingTrack() {
@@ -261,13 +265,14 @@ inline void buildVoidShiftInteractPrompt(const Vec3& playerPos, char* out, int o
         return;
     }
 
-    if (!level2BatteryInstalled && nearPoint2D(playerPos, level2BatteryNode, 2.4f)) {
-        std::snprintf(out, outSize, "[E] INSTALL TRACTION BATTERY");
-        return;
-    }
+    if (buildLevel2ActionPrompt(playerPos, out, outSize)) return;
     for (int i = 0; i < 3; i++) {
         if (level2FuseDone[i]) continue;
         if (nearPoint2D(playerPos, level2FuseNodes[i], 2.4f)) {
+            if (!level2FusePanelPowered) {
+                std::snprintf(out, outSize, "[E] FUSE LOCKED: POWER PANEL FIRST");
+                return;
+            }
             std::snprintf(out, outSize, "[E] INSTALL LIFT FUSE");
             return;
         }
@@ -301,7 +306,7 @@ inline void buildVoidShiftObjectiveLine(char* out, int outSize) {
     }
 
     if (!level2BatteryInstalled || level2FuseCount < 3 || !level2AccessReady) {
-        std::snprintf(out, outSize, "CONTRACT L2: BAT %d FUSE %d/3 ACCESS %d", level2BatteryInstalled ? 1 : 0, level2FuseCount, level2AccessReady ? 1 : 0);
+        std::snprintf(out, outSize, "CONTRACT L2: BAT %d(%d) FUSE %d/3 PWR %d ACCESS %d", level2BatteryInstalled ? 1 : 0, level2BatteryStage, level2FuseCount, level2FusePanelPowered ? 1 : 0, level2AccessReady ? 1 : 0);
         return;
     }
     if (level2HoldActive) {
@@ -372,15 +377,14 @@ inline bool tryHandleVoidShiftInteract(const Vec3& playerPos) {
         return false;
     }
 
-    if (!level2BatteryInstalled && nearPoint2D(playerPos, level2BatteryNode, 2.4f)) {
-        level2BatteryInstalled = true;
-        addAttention(12.0f);
-        setTrapStatus("TRACTION BATTERY INSTALLED");
-        return true;
-    }
+    if (processLevel2Step(playerPos)) return true;
     for (int i = 0; i < 3; i++) {
         if (level2FuseDone[i]) continue;
         if (!nearPoint2D(playerPos, level2FuseNodes[i], 2.4f)) continue;
+        if (!level2FusePanelPowered) {
+            setTrapStatus("FUSE PANEL UNPOWERED");
+            return true;
+        }
         level2FuseDone[i] = true;
         level2FuseCount++;
         addAttention(8.0f);

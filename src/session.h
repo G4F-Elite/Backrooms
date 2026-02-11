@@ -156,8 +156,10 @@ float level1HoldTimer = 90.0f;
 bool level1ContractComplete = false;
 
 bool level2BatteryInstalled = false;
+int level2BatteryStage = 0;
 int level2FuseCount = 0;
 bool level2AccessReady = false;
+bool level2FusePanelPowered = false;
 bool level2HoldActive = false;
 float level2HoldTimer = 15.0f;
 bool level2ContractComplete = false;
@@ -168,6 +170,7 @@ Vec3 level2AccessNode(0, 0, 0);
 Vec3 level2VentNode(0, 0, 0);
 bool level2VentDone = false;
 Vec3 level2LiftNode(0, 0, 0);
+Vec3 level2PowerNode(0, 0, 0);
 
 int archivePoints = 0;
 int archiveTier = 0;
@@ -412,9 +415,13 @@ inline void applyPlushToyUse(){
 inline void initLevel1PuzzleStages();
 inline bool processLevel1NodeStage(int nodeIndex);
 inline void buildLevel1NodeActionPrompt(int nodeIndex, char* out, int outSize);
+inline void initLevel2PuzzleStages();
+inline bool processLevel2Step(const Vec3& playerPos);
+inline bool buildLevel2ActionPrompt(const Vec3& playerPos, char* out, int outSize);
 
 #include "void_shift_runtime.h"
 #include "void_shift_puzzles_ext.h"
+#include "void_shift_level2_ext.h"
 
 inline int storyNotesRequired(){
     if (isParkingLevel(gCurrentLevel)) return 3;
