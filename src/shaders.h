@@ -234,6 +234,7 @@ uniform int rtxA,rtxG,rtxR,rtxB;
 uniform int rtxDenoiseOn;
 uniform float rtxDenoiseStrength;
 uniform sampler2D depthTex;
+uniform float deathFx;
 float rnd(vec2 s){ return fract(sin(dot(s,vec2(12.9898,78.233)))*43758.5453); }
 float noise(vec2 p) {
  vec2 i = floor(p);
@@ -419,6 +420,14 @@ vec3 rtxDenoise(vec2 tc, vec3 orig, vec3 mod_c){
  }
  return outC;
 }
+vec3 deathPost(vec2 tc, vec3 base){
+ float d = clamp(deathFx, 0.0, 1.0); if(d <= 0.001) return base;
+ vec2 dir = tc - 0.5; float len2 = dot(dir, dir); vec2 nDir = len2 > 0.000001 ? normalize(dir) : vec2(1.0, 0.0);
+ float blur = (0.002 + sqrt(len2) * 0.010) * d;
+ vec3 b0 = resolveSample(tc + nDir * blur) * 0.24 + resolveSample(tc - nDir * blur) * 0.24 + resolveSample(tc + nDir * blur * 2.2) * 0.11 + resolveSample(tc - nDir * blur * 2.2) * 0.11 + base * 0.30;
+ float ca = (0.001 + sqrt(len2) * 0.006) * d; vec3 caC = vec3(resolveSample(tc + nDir * ca).r, b0.g, resolveSample(tc - nDir * ca).b);
+ float fog = smoothstep(0.15, 0.9, sqrt(len2)) * d * 0.45; return mix(mix(base, caC, 0.75 * d), vec3(dot(caC, vec3(0.299,0.587,0.114))), 0.22 * d) * (1.0 - fog);
+}
 void main(){
  if(inten < 0.02) {
   vec3 c0 = resolveSample(uv); vec3 orig0 = c0;
@@ -430,10 +439,11 @@ void main(){
    vec3 dn = rtxDenoise(uv,orig0,c0);
    c0 = mix(c0, dn, clamp(rtxDenoiseStrength, 0.0, 1.0));
   }
+  c0 = deathPost(uv, c0);
   F = vec4(c0, 1.0);
  return;
-}
-// Chromatic aberration + line jitter for stronger VHS breakup
+ }
+
 float lineJitter = (rnd(vec2(floor(uv.y * 320.0), floor(tm * 30.0))) - 0.5) * 0.0035 * inten;
 float ab = 0.0042 * inten;
 float abV = 0.0018 * inten;
@@ -445,59 +455,60 @@ vec3 c = vec3(r,g,b);
   vec3 prev = texture(histTex, uv).rgb;
   c = mix(c, prev, clamp(frameGenBlend, 0.0, 0.6));
  }
- // Film grain - intentionally visible in gameplay
+
  float grainTime = tm * 0.7;
  float grain1 = rnd(uv * 0.8 + vec2(grainTime, grainTime * 0.73));
  float grain2 = rnd(uv * 1.3 + vec2(grainTime * 1.1, grainTime * 0.5));
  float filmGrain = (grain1 * 0.6 + grain2 * 0.4 - 0.5) * 0.060 * inten;
- // Film grain is stronger in darker areas (like real film)
+
  float pixelLum = dot(c, vec3(0.3, 0.6, 0.1));
  float grainStrength = mix(2.0, 0.7, smoothstep(0.0, 0.45, pixelLum));
  c += vec3(filmGrain) * grainStrength;
- // Scanlines - stronger and moving to avoid static look
+
  float scanline = sin(uv.y * 520.0 + tm * 5.5) * 0.5 + 0.5;
  scanline = pow(scanline, 2.2) * 0.026 * inten;
  c -= vec3(scanline);
- // Horizontal distortion glitch (noticeable but controlled)
+
  if(inten > 0.28 && rnd(vec2(tm * 0.11, floor(uv.y * 85))) > 0.985) {
   float of = (rnd(vec2(tm * 1.9, floor(uv.y * 85))) - 0.5) * 0.024 * inten;
   c = resolveSample(uv + vec2(of, 0));
  }
- // Vignette - natural camera lens falloff
+
  vec2 vigUV = uv - 0.5;
- float vigDist = dot(vigUV, vigUV); // squared distance for natural falloff
+  float vigDist = dot(vigUV, vigUV);
  float vig = 1.0 - vigDist * 0.8;
  vig = smoothstep(0.15, 1.0, vig);
- // Slightly warm the vignette edges
+
  c.r *= mix(vig, 1.0, 0.05);
  c.g *= vig;
  c.b *= mix(vig, 1.0, -0.03);
- // Subtle warm light leak from edge (like old camera)
+
  float leakAngle = atan(vigUV.y, vigUV.x);
  float leak = sin(leakAngle * 1.5 + tm * 0.05) * 0.5 + 0.5;
  float leakMask = smoothstep(0.35, 0.55, length(vigUV)) * leak * 0.015 * inten;
  c += vec3(leakMask * 1.2, leakMask * 0.9, leakMask * 0.4);
- // Ghost frame (visible double image at higher intensity)
+
  vec3 ghost = resolveSample(uv - vec2(0.003, 0.0015));
  c = mix(c, ghost * vec3(1.03, 0.98, 0.95), 0.080 * inten);
- // Cinematic color grading - warm midtones, cool shadows
+
  float lumC = dot(c, vec3(0.3, 0.6, 0.1));
- // Lift shadows slightly warm
+
  c += vec3(0.012, 0.008, 0.002) * (1.0 - smoothstep(0.0, 0.2, lumC)) * inten;
- // Warm midtones
+
  c.r += 0.008 * smoothstep(0.1, 0.3, lumC) * (1.0 - smoothstep(0.3, 0.6, lumC)) * inten;
- // Slight green in highlights (fluorescent light feel)
+
  c.g += 0.005 * smoothstep(0.4, 0.8, lumC) * inten;
- // Subtle contrast enhancement
+
  c = mix(vec3(lumC), c, 1.05);
  vec3 preRtx = c;
  if(rtxA>0){ int n=rtxA<=1?20:(rtxA<=2?34:(rtxA<=3?52:84)); c*=rtxSSAO(uv,n); }
  if(rtxG>0){ int n=rtxG<=1?20:(rtxG<=2?34:56); c+=rtxGI(uv,n)*0.42; }
  if(rtxR>0){ int n=rtxA>=4?96:64; c+=rtxRays(uv,n)*0.82; }
  if(rtxB>0){ c+=rtxBloom(uv,5)*0.58; }
- if((rtxA>0||rtxG>0||rtxR>0||rtxB>0) && rtxDenoiseOn>0){
-  vec3 dn = rtxDenoise(uv,preRtx,c);
-  c = mix(c, dn, clamp(rtxDenoiseStrength, 0.0, 1.0));
- }
- F = vec4(c, 1);
+  if((rtxA>0||rtxG>0||rtxR>0||rtxB>0) && rtxDenoiseOn>0){
+   vec3 dn = rtxDenoise(uv,preRtx,c);
+   c = mix(c, dn, clamp(rtxDenoiseStrength, 0.0, 1.0));
+  }
+  c = deathPost(uv, c);
+  F = vec4(c, 1);
 })";

@@ -330,12 +330,10 @@ int main(){
                 updateMultiplayer();
             }
         }
-        
         glBindFramebuffer(GL_FRAMEBUFFER,fbo);
         glViewport(0,0,renderW,renderH);
         glClearColor(0.02f,0.02f,0.02f,1);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-        
         if((gameState==STATE_GAME&&!isPlayerDead)||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_KEYBINDS_PAUSE||gameState==STATE_NOTE)
             renderScene();
         
@@ -359,13 +357,16 @@ int main(){
             if(stress>1.0f) stress=1.0f;
             float panicBoost = sanityLoss * 0.20f + entityMgr.dangerLevel * 0.15f;
             vI=settings.vhsIntensity*(0.62f+0.78f*stress)+panicBoost;
+            static float deathFx = 0.0f; deathFx += isPlayerDead ? dTime * 0.95f : -dTime * 1.4f;
+            if(deathFx < 0.0f) deathFx = 0.0f; if(deathFx > 1.0f) deathFx = 1.0f;
+            if(isPlayerDead) vI += deathFx * (0.52f + (0.55f + 0.45f * sinf(vhsTime * 5.8f)) * 0.44f);
             if(vI>1.35f) vI=1.35f;
         }
         static GLint vhsTmLoc=-1,vhsIntenLoc=-1,vhsUpscalerLoc=-1,vhsAaModeLoc=-1;
         static GLint vhsSharpnessLoc=-1,vhsTexelXLoc=-1,vhsTexelYLoc=-1;
         static GLint vhsTaaHistLoc=-1,vhsTaaBlendLoc=-1,vhsTaaJitterLoc=-1,vhsTaaValidLoc=-1;
         static GLint vhsFrameGenLoc=-1,vhsFrameGenBlendLoc=-1;
-        static GLint vhsRtxALoc=-1,vhsRtxGLoc=-1,vhsRtxRLoc=-1,vhsRtxBLoc=-1,vhsRtxDenoiseOnLoc=-1,vhsRtxDenoiseStrengthLoc=-1,vhsDepthTexLoc=-1;
+        static GLint vhsRtxALoc=-1,vhsRtxGLoc=-1,vhsRtxRLoc=-1,vhsRtxBLoc=-1,vhsRtxDenoiseOnLoc=-1,vhsRtxDenoiseStrengthLoc=-1,vhsDepthTexLoc=-1,vhsDeathFxLoc=-1;
         if(vhsTmLoc<0){
             glUniform1i(glGetUniformLocation(vhsShader,"tex"),0);
             vhsTmLoc=glGetUniformLocation(vhsShader,"tm"); vhsIntenLoc=glGetUniformLocation(vhsShader,"inten");
@@ -378,7 +379,9 @@ int main(){
             vhsRtxALoc=glGetUniformLocation(vhsShader,"rtxA"); vhsRtxGLoc=glGetUniformLocation(vhsShader,"rtxG");
             vhsRtxRLoc=glGetUniformLocation(vhsShader,"rtxR"); vhsRtxBLoc=glGetUniformLocation(vhsShader,"rtxB");
             vhsRtxDenoiseOnLoc=glGetUniformLocation(vhsShader,"rtxDenoiseOn"); vhsRtxDenoiseStrengthLoc=glGetUniformLocation(vhsShader,"rtxDenoiseStrength");
+            vhsDeathFxLoc=glGetUniformLocation(vhsShader,"deathFx");
         }
+        float deathFxUniform = (gameState==STATE_GAME || gameState==STATE_PAUSE || gameState==STATE_NOTE) ? (isPlayerDead ? (0.55f + 0.45f * sinf(vhsTime * 2.9f)) : 0.0f) : (isPlayerDead ? 1.0f : 0.0f);
         static int prevAaMode = -1;
         int aaMode = clampAaMode(settings.aaMode);
         if(aaMode != prevAaMode){
@@ -423,6 +426,7 @@ int main(){
             glUniform1f(vhsTaaValidLoc,taaHistoryValid?1.0f:0.0f);
             glUniform1i(vhsFrameGenLoc,isFrameGenEnabled(settings.frameGenMode)?1:0);
             glUniform1f(vhsFrameGenBlendLoc,frameGenBlendStrength(settings.frameGenMode));
+            glUniform1f(vhsDeathFxLoc,deathFxUniform);
             glBindVertexArray(quadVAO);
             glDrawArrays(GL_TRIANGLES,0,6);
 
@@ -455,6 +459,7 @@ int main(){
             glUniform1f(vhsTaaValidLoc,0.0f);
             glUniform1i(vhsFrameGenLoc,0);
             glUniform1f(vhsFrameGenBlendLoc,0.0f);
+            glUniform1f(vhsDeathFxLoc,0.0f);
             glUniform1i(vhsRtxALoc,0); glUniform1i(vhsRtxGLoc,0); glUniform1i(vhsRtxRLoc,0); glUniform1i(vhsRtxBLoc,0);
             glBindVertexArray(quadVAO);
             glDrawArrays(GL_TRIANGLES,0,6);
@@ -484,6 +489,7 @@ int main(){
             glUniform1f(vhsTaaValidLoc,0.0f);
             glUniform1i(vhsFrameGenLoc,0);
             glUniform1f(vhsFrameGenBlendLoc,0.0f);
+            glUniform1f(vhsDeathFxLoc,deathFxUniform);
             glBindVertexArray(quadVAO);
             glDrawArrays(GL_TRIANGLES,0,6);
         }
