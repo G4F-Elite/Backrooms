@@ -4,10 +4,11 @@
 #include <algorithm>
 #include <unordered_map>
 #include "math.h"
+#include "progression.h"
 
 extern const float CS, WH;
 extern std::mt19937 rng;
-extern unsigned int worldSeed;  // Seed based on time
+extern unsigned int worldSeed;
 
 const int CHUNK_SIZE = 16;
 const int VIEW_CHUNKS = 2;
@@ -52,7 +53,6 @@ inline int countOpenCells(const Chunk& c) {
     return open;
 }
 
-// Count walls around a cell (for dead-end detection)
 inline int countWallsAround(const Chunk& c, int x, int z) {
     int walls = 0;
     if (x <= 0 || c.cells[x-1][z] == 1) walls++;
@@ -62,7 +62,6 @@ inline int countWallsAround(const Chunk& c, int x, int z) {
     return walls;
 }
 
-// Remove dead-ends by opening passages
 inline void removeDeadEnds(Chunk& c, std::mt19937& cr) {
     bool changed = true;
     int iterations = 0;
@@ -71,13 +70,11 @@ inline void removeDeadEnds(Chunk& c, std::mt19937& cr) {
         iterations++;
         for (int x = 1; x < CHUNK_SIZE - 1; x++) {
             for (int z = 1; z < CHUNK_SIZE - 1; z++) {
-                if (c.cells[x][z] != 0) continue;  // Only check open cells
+                if (c.cells[x][z] != 0) continue;
                 
                 int walls = countWallsAround(c, x, z);
-                if (walls >= 3) {  // Dead-end detected (3 walls = only 1 exit)
-                    // Higher chance to remove dead-ends for better flow.
+                if (walls >= 3) {
                     if (cr() % 100 < 88) {
-                        // Find a wall to remove
                         std::vector<std::pair<int,int>> wallDirs;
                         if (x > 1 && c.cells[x-1][z] == 1) wallDirs.push_back({x-1, z});
                         if (x < CHUNK_SIZE-2 && c.cells[x+1][z] == 1) wallDirs.push_back({x+1, z});
@@ -96,19 +93,17 @@ inline void removeDeadEnds(Chunk& c, std::mt19937& cr) {
     }
 }
 
-// Add extra connections to reduce isolation
 inline void addExtraConnections(Chunk& c, std::mt19937& cr) {
-    int connections = 2 + cr() % 3;  // Add 2-4 extra connections
+    int connections = 2 + cr() % 3;
     for (int i = 0; i < connections; i++) {
         int x = 2 + cr() % (CHUNK_SIZE - 4);
         int z = 2 + cr() % (CHUNK_SIZE - 4);
         
-        // Find a wall that separates two open areas
         if (c.cells[x][z] == 1) {
             bool hasOpenH = (x > 0 && c.cells[x-1][z] == 0) && (x < CHUNK_SIZE-1 && c.cells[x+1][z] == 0);
             bool hasOpenV = (z > 0 && c.cells[x][z-1] == 0) && (z < CHUNK_SIZE-1 && c.cells[x][z+1] == 0);
             if (hasOpenH || hasOpenV) {
-                c.cells[x][z] = 0;  // Create shortcut
+                c.cells[x][z] = 0;
             }
         }
     }
@@ -157,13 +152,11 @@ inline void applyServicePattern(Chunk& c, std::mt19937& cr) {
         c.cells[laneA][z] = 1;
         c.cells[laneB][z] = 1;
     }
-    // More gates for better connectivity
     for (int i = 0; i < 6; i++) {
         int gate = 2 + (int)(cr() % (CHUNK_SIZE - 4));
         c.cells[laneA][gate] = 0;
         c.cells[laneB][gate] = 0;
     }
-    // Fewer blocking boxes
     for (int i = 0; i < 3; i++) {
         int bx = 2 + (int)(cr() % (CHUNK_SIZE - 4));
         int bz = 2 + (int)(cr() % (CHUNK_SIZE - 4));
@@ -171,11 +164,23 @@ inline void applyServicePattern(Chunk& c, std::mt19937& cr) {
     }
 }
 
+inline void applyRampRoutePattern(Chunk& c, std::mt19937& cr);
+inline void applyParkingPattern(Chunk& c, std::mt19937& cr);
+
 inline void applyChunkArchitecturePattern(Chunk& c, std::mt19937& cr) {
     int p = (int)(cr() % 100);
-    if (p < 18) applyAtriumPattern(c, cr);
-    else if (p < 34) applyOfficePattern(c, cr);
-    else if (p < 49) applyServicePattern(c, cr);
+    if (isLevelZero(gCurrentLevel)) {
+        if (p < 20) applyAtriumPattern(c, cr);
+        else if (p < 40) applyOfficePattern(c, cr);
+        else if (p < 58) applyServicePattern(c, cr);
+        else if (p < 78) applyRampRoutePattern(c, cr);
+        else applyAtriumPattern(c, cr);
+        return;
+    }
+    if (p < 56) applyParkingPattern(c, cr);
+    else if (p < 78) applyServicePattern(c, cr);
+    else if (p < 93) applyOfficePattern(c, cr);
+    else applyParkingPattern(c, cr);
 }
 
 inline int getCellWorld(int wx, int wz) {
@@ -198,12 +203,10 @@ inline void generateChunk(int cx, int cz) {
     long long key = chunkKey(cx, cz);
     if (chunks.find(key) != chunks.end()) return;
     Chunk c; c.cx = cx; c.cz = cz; c.gen = true;
-    // Use world seed + position for randomness
     unsigned int seed = worldSeed ^ (unsigned)(cx * 73856093) ^ (unsigned)(cz * 19349663);
     std::mt19937 cr(seed);
     for (int x = 0; x < CHUNK_SIZE; x++) for (int z = 0; z < CHUNK_SIZE; z++) c.cells[x][z] = 1;
     
-    // Generate base maze with DFS
     std::vector<std::pair<int,int>> stk;
     int sx = 1 + cr() % (CHUNK_SIZE-2), sz = 1 + cr() % (CHUNK_SIZE-2);
     c.cells[sx][sz] = 0; stk.push_back({sx, sz});
@@ -225,31 +228,25 @@ inline void generateChunk(int cx, int cz) {
         }
     }
     
-    // Apply architecture patterns
     applyChunkArchitecturePattern(c, cr);
     
-    // Add random rooms (3-4) to avoid too many giant open zones.
     for (int i = 0; i < 3 + cr() % 2; i++) { 
         int rx = 1+cr()%(CHUNK_SIZE-4), rz = 1+cr()%(CHUNK_SIZE-4);
-        int rw = 2+cr()%3, rh = 2+cr()%3;  // Slightly larger rooms
+        int rw = 2+cr()%3, rh = 2+cr()%3;
         for (int x = rx; x < rx+rw && x < CHUNK_SIZE-1; x++) 
             for (int z = rz; z < rz+rh && z < CHUNK_SIZE-1; z++) 
                 c.cells[x][z] = 0; 
     }
     
-    // Controlled wall removal to keep layout readable and less over-open.
     for (int x = 1; x < CHUNK_SIZE-1; x++) 
         for (int z = 1; z < CHUNK_SIZE-1; z++) 
             if (c.cells[x][z] == 1 && cr()%100 < 14) 
                 c.cells[x][z] = 0;
     
-    // Remove dead-ends
     removeDeadEnds(c, cr);
     
-    // Add extra connections for better flow
     addExtraConnections(c, cr);
     
-    // Chunk border passages (more passages)
     for (int i = 1; i < CHUNK_SIZE-1; i += 2) { 
         c.cells[0][i] = 0; 
         c.cells[CHUNK_SIZE-1][i] = 0; 
@@ -257,7 +254,6 @@ inline void generateChunk(int cx, int cz) {
         c.cells[i][CHUNK_SIZE-1] = 0; 
     }
     
-    // Ensure minimum open space
     if (countOpenCells(c) < 50) carveRect(c, 2, 2, CHUNK_SIZE - 4, CHUNK_SIZE - 4);
     
     chunks[key] = c;
@@ -269,6 +265,50 @@ inline void updateVisibleChunks(float px, float pz) {
     std::vector<long long> rm; for (auto& p : chunks) { int d = abs(p.second.cx-pcx) > abs(p.second.cz-pcz) ? abs(p.second.cx-pcx) : abs(p.second.cz-pcz); if (d > VIEW_CHUNKS+1) rm.push_back(p.first); }
     for (auto k : rm) chunks.erase(k);
     playerChunkX = pcx; playerChunkZ = pcz;
+}
+
+inline void applyRampRoutePattern(Chunk& c, std::mt19937& cr) {
+    carveRect(c, 1, 1, CHUNK_SIZE - 2, CHUNK_SIZE - 2);
+    int laneA = 3 + (int)(cr() % 2);
+    int laneB = CHUNK_SIZE - 4 - (int)(cr() % 2);
+    for (int x = 2; x < CHUNK_SIZE - 2; x++) {
+        c.cells[x][laneA] = 0;
+        c.cells[x][laneB] = 0;
+    }
+    int r0 = 3 + (int)(cr() % 5);
+    int r1 = r0 + 3;
+    for (int x = 2; x < CHUNK_SIZE - 2; x++) {
+        if ((x % 4) < 2) {
+            c.cells[x][r0] = 0;
+            c.cells[x][r1] = 0;
+        }
+    }
+    for (int z = 2; z < CHUNK_SIZE - 2; z++) {
+        if ((z % 5) == 0) {
+            c.cells[3][z] = 0;
+            c.cells[CHUNK_SIZE - 4][z] = 0;
+        }
+    }
+}
+
+inline void applyParkingPattern(Chunk& c, std::mt19937& cr) {
+    carveRect(c, 1, 1, CHUNK_SIZE - 2, CHUNK_SIZE - 2);
+    int laneL = 4 + (int)(cr() % 2);
+    int laneR = CHUNK_SIZE - 5 - (int)(cr() % 2);
+    for (int z = 2; z < CHUNK_SIZE - 2; z++) {
+        c.cells[laneL][z] = 1;
+        c.cells[laneR][z] = 1;
+    }
+    for (int z = 3; z < CHUNK_SIZE - 3; z += 2) {
+        c.cells[laneL][z] = 0;
+        c.cells[laneR][z] = 0;
+    }
+    for (int x = 2; x < CHUNK_SIZE - 2; x++) {
+        if ((x % 3) == 0) {
+            c.cells[x][2] = 1;
+            c.cells[x][CHUNK_SIZE - 3] = 1;
+        }
+    }
 }
 
 inline bool circleOverlapsAabb2D(float x, float z, float r, float minX, float maxX, float minZ, float maxZ) {
@@ -298,12 +338,22 @@ inline bool collideDoorFrameAtCell(float x, float z, float r, int wx, int wz) {
     float cxCell = px + CS * 0.5f;
     float czCell = pz + CS * 0.5f;
     float openingHalf = CS * 0.23f;
+    float edgeHalf = CS * 0.49f;
+    float sideFillW = edgeHalf - openingHalf;
+    float sideFillCenter = (edgeHalf + openingHalf) * 0.5f;
     float postW = CS * 0.06f;
     float frameT = CS * 0.10f;
+    float wallFillT = frameT * 0.92f;
     float postHalfW = postW * 0.5f;
     float frameHalfT = frameT * 0.5f;
 
     if (corridorZ) {
+        if (circleOverlapsAabb2D(x, z, r,
+            cxCell - sideFillCenter - sideFillW * 0.5f, cxCell - sideFillCenter + sideFillW * 0.5f,
+            czCell - wallFillT * 0.5f, czCell + wallFillT * 0.5f)) return true;
+        if (circleOverlapsAabb2D(x, z, r,
+            cxCell + sideFillCenter - sideFillW * 0.5f, cxCell + sideFillCenter + sideFillW * 0.5f,
+            czCell - wallFillT * 0.5f, czCell + wallFillT * 0.5f)) return true;
         if (circleOverlapsAabb2D(x, z, r,
             cxCell - openingHalf - postHalfW, cxCell - openingHalf + postHalfW,
             czCell - frameHalfT, czCell + frameHalfT)) return true;
@@ -312,6 +362,13 @@ inline bool collideDoorFrameAtCell(float x, float z, float r, int wx, int wz) {
             czCell - frameHalfT, czCell + frameHalfT)) return true;
         return false;
     }
+
+    if (circleOverlapsAabb2D(x, z, r,
+        cxCell - wallFillT * 0.5f, cxCell + wallFillT * 0.5f,
+        czCell - sideFillCenter - sideFillW * 0.5f, czCell - sideFillCenter + sideFillW * 0.5f)) return true;
+    if (circleOverlapsAabb2D(x, z, r,
+        cxCell - wallFillT * 0.5f, cxCell + wallFillT * 0.5f,
+        czCell + sideFillCenter - sideFillW * 0.5f, czCell + sideFillCenter + sideFillW * 0.5f)) return true;
 
     if (circleOverlapsAabb2D(x, z, r,
         cxCell - frameHalfT, cxCell + frameHalfT,
@@ -324,7 +381,7 @@ inline bool collideDoorFrameAtCell(float x, float z, float r, int wx, int wz) {
 
 inline bool collideWorld(float x, float z, float PR) {
     int wx = (int)floorf(x/CS), wz = (int)floorf(z/CS);
-    float PR2 = PR * PR; // Squared radius for comparison without sqrt
+    float PR2 = PR * PR;
     for (int ddx = -1; ddx <= 1; ddx++) for (int ddz = -1; ddz <= 1; ddz++) {
         int chkx = wx+ddx, chkz = wz+ddz;
         if (getCellWorld(chkx, chkz) == 1) { float wx0 = chkx*CS, wx1 = (chkx+1)*CS, wz0 = chkz*CS, wz1 = (chkz+1)*CS;
@@ -380,34 +437,27 @@ inline bool reshuffleBehind(float camX, float camZ, float camYaw) {
     return true;
 }
 
-// Check if cell is a corridor (walls on opposite sides - would block passage if pillar placed)
 inline bool isCorridor(const Chunk& chunk, int lx, int lz) {
     bool wallLeft = (lx > 0) ? chunk.cells[lx-1][lz] == 1 : true;
     bool wallRight = (lx < CHUNK_SIZE-1) ? chunk.cells[lx+1][lz] == 1 : true;
     bool wallUp = (lz > 0) ? chunk.cells[lx][lz-1] == 1 : true;
     bool wallDown = (lz < CHUNK_SIZE-1) ? chunk.cells[lx][lz+1] == 1 : true;
     
-    // Horizontal corridor (walls above and below)
     if (wallUp && wallDown) return true;
-    // Vertical corridor (walls left and right)
     if (wallLeft && wallRight) return true;
     
     return false;
 }
 
-// Check if placing pillar would block a narrow passage
 inline bool wouldBlockPassage(const Chunk& chunk, int lx, int lz) {
-    // Don't place in corridors
     if (isCorridor(chunk, lx, lz)) return true;
-    
-    // Count open neighbors - need at least 3 open sides for pillar placement
+
     int openSides = 0;
     if (lx > 0 && chunk.cells[lx-1][lz] == 0) openSides++;
     if (lx < CHUNK_SIZE-1 && chunk.cells[lx+1][lz] == 0) openSides++;
     if (lz > 0 && chunk.cells[lx][lz-1] == 0) openSides++;
     if (lz < CHUNK_SIZE-1 && chunk.cells[lx][lz+1] == 0) openSides++;
     
-    // Only place pillar if at least 3 sides are open (corner placement OK)
     if (openSides < 3) return true;
     
     return false;
@@ -426,7 +476,10 @@ inline void updateLightsAndPillars(int pcx, int pcz) {
         auto it = chunks.find(chunkKey(pcx+dcx, pcz+dcz)); if (it==chunks.end()) continue;
         unsigned int seed = worldSeed ^ (unsigned)((pcx+dcx)*12345+(pcz+dcz)*67890);
         std::mt19937 lr(seed);
-        for (int lx=1; lx<CHUNK_SIZE-1; lx+=2) for (int lz=1; lz<CHUNK_SIZE-1; lz+=2) {
+        for (int lx=1; lx<CHUNK_SIZE-1; lx++) for (int lz=1; lz<CHUNK_SIZE-1; lz++) {
+            int gwx = (pcx + dcx) * CHUNK_SIZE + lx;
+            int gwz = (pcz + dcz) * CHUNK_SIZE + lz;
+            if ((gwx & 1) != 0 || (gwz & 1) != 0) continue;
             if (it->second.cells[lx][lz]!=0) continue;
             float wx = ((pcx+dcx)*CHUNK_SIZE+lx+0.5f)*CS, wz = ((pcz+dcz)*CHUNK_SIZE+lz+0.5f)*CS;
             bool ex=false; for(auto&l:lights)if(fabsf(l.pos.x-wx)<0.1f&&fabsf(l.pos.z-wz)<0.1f){ex=true;break;}
@@ -442,7 +495,6 @@ inline void updateLightsAndPillars(int pcx, int pcz) {
         for (int lx=2; lx<CHUNK_SIZE-2; lx++) for (int lz=2; lz<CHUNK_SIZE-2; lz++) {
             if (it->second.cells[lx][lz]!=0) continue;
             
-            // NEW: Skip if this would block a passage
             if (wouldBlockPassage(it->second, lx, lz)) continue;
             
             int wallAdj = 0;
@@ -460,61 +512,4 @@ inline void updateLightsAndPillars(int pcx, int pcz) {
     }
 }
 
-// Find safe spawn position near a light
-inline Vec3 findSafeSpawn() {
-    // First ensure spawn chunk is generated
-    generateChunk(0, 0);
-    updateLightsAndPillars(0, 0);
-    
-    // Try to spawn near a light
-    for (auto& l : lights) {
-        if (!l.on) continue;
-        int wx = (int)floorf(l.pos.x / CS), wz = (int)floorf(l.pos.z / CS);
-        // Check cell and neighbors
-        if (getCellWorld(wx, wz) == 0) {
-            float sx = (wx + 0.5f) * CS, sz = (wz + 0.5f) * CS;
-            if (!collideWorld(sx, sz, 0.4f)) return Vec3(sx, 0, sz);
-        }
-    }
-    
-    // Fallback: find any open cell
-    for (int r = 1; r < 10; r++) {
-        for (int dx = -r; dx <= r; dx++) for (int dz = -r; dz <= r; dz++) {
-            int wx = 8 + dx, wz = 8 + dz;
-            if (getCellWorld(wx, wz) == 0) {
-                float sx = (wx + 0.5f) * CS, sz = (wz + 0.5f) * CS;
-                if (!collideWorld(sx, sz, 0.4f)) return Vec3(sx, 0, sz);
-            }
-        }
-    }
-    return Vec3(8 * CS, 0, 8 * CS);  // Absolute fallback
-}
-
-inline Vec3 findSpawnPos(Vec3 pPos, float minD) {
-    const float spawnRadius = 0.42f;
-    float minD2 = minD * minD; // Squared distance for comparison without sqrt
-    for(int a=0;a<80;a++){
-        int dx=(rng()%34)-17, dz=(rng()%34)-17;
-        int wx=(int)floorf(pPos.x/CS)+dx, wz=(int)floorf(pPos.z/CS)+dz;
-        if(getCellWorld(wx,wz)!=0) continue;
-        Vec3 p((wx+0.5f)*CS,0,(wz+0.5f)*CS);
-        float ddx = p.x-pPos.x, ddz = p.z-pPos.z;
-        if(ddx*ddx+ddz*ddz<minD2) continue;
-        if(collideWorld(p.x,p.z,spawnRadius)) continue;
-        return p;
-    }
-    // Fallback: search in expanding rings
-    for(int r=5; r<20; r++){
-        for(int a=0;a<16;a++){
-            float ang = (float)a * 0.3926991f;
-            float fx = pPos.x + sinf(ang) * (float)r * CS * 0.5f;
-            float fz = pPos.z + cosf(ang) * (float)r * CS * 0.5f;
-            int wx=(int)floorf(fx/CS), wz=(int)floorf(fz/CS);
-            if(getCellWorld(wx,wz)!=0) continue;
-            Vec3 p((wx+0.5f)*CS,0,(wz+0.5f)*CS);
-            if(collideWorld(p.x,p.z,spawnRadius)) continue;
-            return p;
-        }
-    }
-    return Vec3(pPos.x+20,0,pPos.z+20);
-}
+#include "world_spawn.h"

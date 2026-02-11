@@ -32,14 +32,14 @@ struct Settings {
     float ambienceVol=0.75f;
     float sfxVol=0.7f;
     float voiceVol=0.65f;
-    float vhsIntensity=0.65f;
+    float vhsIntensity=0.58f;
     float mouseSens=0.002f;
-    int upscalerMode=UPSCALER_MODE_OFF;
+    int upscalerMode=UPSCALER_MODE_FSR10;
     int renderScalePreset=RENDER_SCALE_PRESET_DEFAULT;
     float fsrSharpness=0.35f;
-    int aaMode=AA_MODE_FXAA;
+    int aaMode=AA_MODE_TAA;
     bool fastMath=false;
-    int ssaoQuality=0; int giQuality=0; bool godRays=false; bool bloom=false;
+    int ssaoQuality=2; int giQuality=1; bool godRays=true; bool bloom=true;
     bool rtxDenoise=true;
     float rtxDenoiseStrength=0.65f;
     int frameGenMode=FRAME_GEN_MODE_OFF;
@@ -260,12 +260,11 @@ inline void drawMenuAtmosphere(float tm) {
     float sweepW = 0.16f;
     drawOverlayRectNdc(sweep - sweepW, -1.0f, sweep + sweepW, 1.0f, 0.76f, 0.66f, 0.42f, 0.055f);
 
-    // Thin scan strips - cinematic motion instead of chunky blocks.
-    for(int i = 0; i < 8; i++) {
-        float fi = (float)i;
-        float y = -0.95f + fi * 0.27f + fmodf(tm * (0.03f + fi * 0.002f), 0.24f);
-        drawOverlayRectNdc(-1.0f, y, 1.0f, y + 0.012f, 0.10f, 0.09f, 0.07f, 0.05f);
-    }
+    // Soft vignette-like framing panels instead of pixel strips.
+    drawOverlayRectNdc(-1.0f, -1.0f, -0.72f, 1.0f, 0.08f, 0.08f, 0.07f, 0.12f);
+    drawOverlayRectNdc(0.72f, -1.0f, 1.0f, 1.0f, 0.08f, 0.08f, 0.07f, 0.12f);
+    drawOverlayRectNdc(-1.0f, -1.0f, 1.0f, -0.72f, 0.07f, 0.07f, 0.06f, 0.10f);
+    drawOverlayRectNdc(-1.0f, 0.72f, 1.0f, 1.0f, 0.07f, 0.07f, 0.06f, 0.10f);
 }
 
 inline void drawMenu(float tm) {
@@ -275,7 +274,8 @@ inline void drawMenu(float tm) {
     // Lighter overlays so background stays readable
     drawFullscreenOverlay(0.02f,0.02f,0.02f,0.28f);
     drawFullscreenOverlay(0.17f,0.13f,0.08f,0.10f);
-    float p=0.8f+0.05f*sinf(tm*2.0f), gl=(rand()%100<3)?(rand()%10-5)*0.003f:0;
+    float p=0.82f+0.06f*sinf(tm*2.0f);
+    float gl = sinf(tm * 0.7f) * 0.0016f;
     drawTextCentered("THE BACKROOMS",0.0f+gl,0.5f,4.0f,0.9f,0.85f,0.4f,p);
     char levelBuf[32];
     buildLevelLabel(gCurrentLevel, levelBuf, 32);
@@ -425,9 +425,14 @@ inline void drawPause() {
 inline void drawDeath(float tm) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     float fl=(rand()%100<28)?0.25f:1.0f, p=0.68f+0.22f*sinf(tm*4.2f);
+    float deathPulse = 0.5f + 0.5f * sinf(tm * 2.8f);
+    float ch = 0.004f + deathPulse * 0.012f;
     drawFullscreenOverlay(0.01f,0.0f,0.0f,0.88f);
     drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.86f,0.32f,0.02f,0.02f,0.55f);
     drawOverlayRectNdc(-1.0f,0.86f,1.0f,1.0f,0.32f,0.02f,0.02f,0.55f);
+    drawOverlayRectNdc(-1.0f,-1.0f,1.0f,1.0f,0.18f,0.02f,0.02f,0.06f + deathPulse * 0.08f);
+    drawTextCentered("YOU DIED",-ch,0.2f,4.2f,0.88f*fl,0.10f*fl,0.10f*fl,p*0.82f);
+    drawTextCentered("YOU DIED",ch,0.2f,4.2f,0.22f*fl,0.12f*fl,0.88f*fl,p*0.72f);
     drawTextCentered("YOU DIED",0.0f,0.2f,4.2f,0.9f*fl,0.08f*fl,0.08f*fl,p);
     drawTextCentered("IT GOT YOU...",0.0f,0.01f,2.1f,0.72f,0.12f,0.12f,0.76f);
     int m=(int)(gSurvivalTime/60),s=(int)gSurvivalTime%60;

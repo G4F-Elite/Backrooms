@@ -375,14 +375,17 @@ inline void fillAudio(short* buf, int len) {
         // Insanity sounds
         float insane = 0;
         float insanity = 1.0f - sndState.sanityLevel;
-        if(insanity > 0.2f) {
+        float insanityLate = (insanity - 0.72f) / 0.28f;
+        if(insanityLate < 0.0f) insanityLate = 0.0f;
+        if(insanityLate > 1.0f) insanityLate = 1.0f;
+        if(insanityLate > 0.001f) {
             float whisper = sinf(sndState.whisperPhase * 15.0f) * sinf(sndState.whisperPhase * 0.5f);
-            float whisperTarget = (float)(rand()%100)/100.0f * 0.12f * insanity;
+            float whisperTarget = (float)(rand()%100)/100.0f * 0.12f * insanityLate;
             safe.whisperNoise = mixNoise(safe.whisperNoise, whisperTarget, 0.05f);
             whisper *= safe.whisperNoise;
             insane += whisper;
-            insane += sinf(sndState.whisperPhase * 9.5f) * 0.05f * insanity;
-            if(rand()%800 < (int)(insanity * 12)) {
+            insane += sinf(sndState.whisperPhase * 9.5f) * 0.05f * insanityLate;
+            if(rand()%800 < (int)(insanityLate * 12)) {
                 safe.insaneBurst = ((float)(rand()%100-50)/100.0f) * 0.18f;
             }
             safe.insaneBurst *= 0.993f;

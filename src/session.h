@@ -333,6 +333,7 @@ inline void applyPlushToyUse(){
 }
 
 inline int storyNotesRequired(){
+    if (isParkingLevel(gCurrentLevel)) return 7;
     return 5;
 }
 

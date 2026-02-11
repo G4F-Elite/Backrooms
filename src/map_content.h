@@ -5,6 +5,7 @@
 #include <algorithm>
 
 #include "world.h"
+#include "progression.h"
 
 enum MapPropType {
     MAP_PROP_CRATE_STACK = 0,
@@ -228,7 +229,7 @@ inline void pushMapPropUnique(int cx, int cz, int lx, int lz, int type, float sc
 
 inline void spawnChunkProps(const Chunk& c) {
     std::mt19937 cr(chunkMapContentSeed(c.cx, c.cz, 0xA18F331u));
-    int baseCount = 1 + (int)(cr() % 2);
+    int baseCount = isParkingLevel(gCurrentLevel) ? (2 + (int)(cr() % 3)) : (2 + (int)(cr() % 2));
     int maxAttempts = 44;
 
     for (int i = 0; i < baseCount && maxAttempts > 0; i++) {
@@ -239,21 +240,32 @@ inline void spawnChunkProps(const Chunk& c) {
             continue;
         }
         int wallsNear = countWallNeighbors(c, lx, lz);
-        if (wallsNear < 2 && (cr() % 100) < 90) {
+        int wallRejectChance = isParkingLevel(gCurrentLevel) ? 90 : 68;
+        if (wallsNear < 2 && (cr() % 100) < wallRejectChance) {
             maxAttempts--;
             continue;
         }
         int weighted = (int)(cr() % 100);
         int type = MAP_PROP_CRATE_STACK;
-        if (weighted < 36) type = MAP_PROP_CRATE_STACK;
-        else if (weighted < 60) type = MAP_PROP_BOX_PALLET;
-        else if (weighted < 70) type = MAP_PROP_BARRIER;
-        else if (weighted < 80) type = MAP_PROP_CABLE_REEL;
-        else if (weighted < 87) type = MAP_PROP_DRUM_STACK;
-        else if (weighted < 93) type = MAP_PROP_DEBRIS;
-        else if (weighted < 97) type = MAP_PROP_LOCKER_BANK;
-        else if (weighted < 99) type = MAP_PROP_CABINET;
-        else type = MAP_PROP_PUDDLE;
+        if (isParkingLevel(gCurrentLevel)) {
+            if (weighted < 24) type = MAP_PROP_BARRIER;
+            else if (weighted < 43) type = MAP_PROP_CONE_CLUSTER;
+            else if (weighted < 62) type = MAP_PROP_DRUM_STACK;
+            else if (weighted < 76) type = MAP_PROP_CABLE_REEL;
+            else if (weighted < 88) type = MAP_PROP_LOCKER_BANK;
+            else if (weighted < 96) type = MAP_PROP_DEBRIS;
+            else type = MAP_PROP_PUDDLE;
+        } else {
+            if (weighted < 36) type = MAP_PROP_CRATE_STACK;
+            else if (weighted < 60) type = MAP_PROP_BOX_PALLET;
+            else if (weighted < 70) type = MAP_PROP_BARRIER;
+            else if (weighted < 80) type = MAP_PROP_CABLE_REEL;
+            else if (weighted < 87) type = MAP_PROP_DRUM_STACK;
+            else if (weighted < 93) type = MAP_PROP_DEBRIS;
+            else if (weighted < 97) type = MAP_PROP_LOCKER_BANK;
+            else if (weighted < 99) type = MAP_PROP_CABINET;
+            else type = MAP_PROP_PUDDLE;
+        }
         float scale = 0.78f + ((float)(cr() % 45) / 100.0f);
         float yaw = ((float)(cr() % 628) / 100.0f);
         pushMapPropUnique(c.cx, c.cz, lx, lz, type, scale, yaw);
@@ -302,6 +314,7 @@ inline bool isLikelyOfficeChunk(const Chunk& c) {
 }
 
 inline void spawnOfficeFurniture(const Chunk& c) {
+    if (isParkingLevel(gCurrentLevel)) return;
     if (!isLikelyOfficeChunk(c)) return;
     std::mt19937 cr(chunkMapContentSeed(c.cx, c.cz, 0xB44231u));
     int rows = 3 + (int)(cr() % 4);
@@ -407,7 +420,7 @@ inline void updateMapContent(int pcx, int pcz) {
         std::remove_if(
             mapProps.begin(),
             mapProps.end(),
-            [&](const MapProp& p) { return isMapPropTooFar(p, cx, cz, md) || isMapPropOnWall(p) || isMapPropEmbeddedInWall(p); }
+            [&](const MapProp& p) { return isMapPropTooFar(p, cx, cz, md) || isMapPropOnWall(p); }
         ),
         mapProps.end()
     );
@@ -430,6 +443,33 @@ inline void updateMapContent(int pcx, int pcz) {
             auto it = chunks.find(chunkKey(pcx + dcx, pcz + dcz));
             if (it == chunks.end()) continue;
             rebuildChunkMapContent(it->second);
+        }
+    }
+
+    if (!isParkingLevel(gCurrentLevel) && mapProps.size() < 8) {
+        std::mt19937 fillRng(worldSeed ^ (unsigned)(pcx * 911382323) ^ (unsigned)(pcz * 972663749));
+        int tries = 180;
+        while (mapProps.size() < 8 && tries-- > 0) {
+            int dcx = (int)(fillRng() % (VIEW_CHUNKS * 2 + 1)) - VIEW_CHUNKS;
+            int dcz = (int)(fillRng() % (VIEW_CHUNKS * 2 + 1)) - VIEW_CHUNKS;
+            auto it = chunks.find(chunkKey(pcx + dcx, pcz + dcz));
+            if (it == chunks.end()) continue;
+            int lx = 2 + (int)(fillRng() % (CHUNK_SIZE - 4));
+            int lz = 2 + (int)(fillRng() % (CHUNK_SIZE - 4));
+            if (!isMapPropCellValid(it->second, lx, lz)) continue;
+            int weighted = (int)(fillRng() % 100);
+            int type = MAP_PROP_CRATE_STACK;
+            if (weighted < 24) type = MAP_PROP_BOX_PALLET;
+            else if (weighted < 38) type = MAP_PROP_CABLE_REEL;
+            else if (weighted < 50) type = MAP_PROP_DRUM_STACK;
+            else if (weighted < 61) type = MAP_PROP_DEBRIS;
+            else if (weighted < 72) type = MAP_PROP_CABINET;
+            else if (weighted < 82) type = MAP_PROP_LOCKER_BANK;
+            else if (weighted < 91) type = MAP_PROP_BARRIER;
+            else type = MAP_PROP_PUDDLE;
+            float scale = 0.82f + ((float)(fillRng() % 34) / 100.0f);
+            float yaw = ((float)(fillRng() % 628) / 100.0f);
+            pushMapPropUnique(it->second.cx, it->second.cz, lx, lz, type, scale, yaw);
         }
     }
 }

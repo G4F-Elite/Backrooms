@@ -77,6 +77,8 @@ void drawUI(){
             if(flashlightBattery<100)drawFlashlightBattery(flashlightBattery,flashlightOn);
             if(activeDeviceSlot == 2){
                 float y = -0.70f;
+                drawOverlayRectNdc(0.48f, y - 0.14f, 0.95f, y + 0.07f, 0.04f, 0.09f, 0.10f, 0.42f);
+                drawOverlayRectNdc(0.49f, y - 0.13f, 0.94f, y + 0.06f, 0.08f, 0.18f, 0.20f, 0.18f);
                 drawHudText("SCANNER",0.52f,y,1.15f,0.55f,0.82f,0.86f,0.92f);
                 if(scannerOverheated){
                     drawHudText("OVERHEAT",0.52f,y-0.06f,1.05f,0.92f,0.44f,0.30f,0.92f);
@@ -159,8 +161,8 @@ void drawUI(){
             }else{
                 bool nearExit = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
                 if(nearExit && settings.debugMode){
-                    if(coop.doorOpen && storyMgr.totalCollected>=5) drawHudTextCentered("[E] EXIT LEVEL",0.0f,-0.35f,1.4f,0.75f,0.88f,0.70f,0.95f);
-                    else drawHudTextCentered("OPEN DOOR + COLLECT 5 NOTES TO EXIT",0.0f,-0.35f,1.25f,0.88f,0.72f,0.58f,0.93f);
+                    if(coop.doorOpen && storyMgr.totalCollected>=storyNotesRequired()) drawHudTextCentered("[E] EXIT LEVEL",0.0f,-0.35f,1.4f,0.75f,0.88f,0.70f,0.95f);
+                    else drawHudTextCentered("OPEN DOOR + COLLECT NOTES TO EXIT",0.0f,-0.35f,1.25f,0.88f,0.72f,0.58f,0.93f);
                 }
             }
             drawNoteCounter(storyMgr.totalCollected);
@@ -245,8 +247,7 @@ void drawUI(){
                     float dist = dd.len();
                     if(dist > 40.0f) continue;
                     const char* nm = netMgr.players[i].name[0] ? netMgr.players[i].name : "Player";
-                    float xOff = (float)strlen(nm) * 0.012f;
-                    drawHudText(nm, sx - xOff, sy, 1.1f, 0.85f, 0.9f, 0.7f, 0.90f);
+                    drawHudTextCentered(nm, sx, sy, 1.1f, 0.85f, 0.9f, 0.7f, 0.90f);
                 }
             }
             // === DEBUG MODE: trap status text, floor hazards, anomaly lock, minimap state, perf graph ===

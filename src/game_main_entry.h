@@ -1,13 +1,14 @@
 #pragma once
 #include "progression.h"
 #include "sanity_balance.h"
+#include "window_title.h"
 int main(){
     std::random_device rd;rng.seed(rd());
     if(!glfwInit())return -1;
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3);
     glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
-    gWin=glfwCreateWindow(winW,winH,"Backrooms - Level 0",NULL,NULL);
+    gWin=glfwCreateWindow(winW,winH,"Backrooms - Complex",NULL,NULL);
     if(!gWin){glfwTerminate();return -1;}
     glfwMakeContextCurrent(gWin);
     int appliedSwapInterval = settings.vsync ? 1 : 0;
@@ -18,7 +19,8 @@ int main(){
     glEnable(GL_DEPTH_TEST);glEnable(GL_CULL_FACE);
     genWorld();
     wallTex=genTex(0);floorTex=genTex(1);ceilTex=genTex(2);lightTex=genTex(3);lampTex=genTex(4);propTex=genTex(5);
-    deviceTex=genTex(6); // device-specific texture (flashlight/scanner)
+    plushTex=genTex(7);
+    deviceTex=genTex(6);
     mainShader=mkShader(mainVS,mainFS);lightShader=mkShader(lightVS,lightFS);vhsShader=mkShader(vhsVS,vhsFS);
     buildGeom();
     computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), renderW, renderH);
@@ -41,6 +43,7 @@ int main(){
         dTime = rawDt;
         lastFrame = now;
         vhsTime = now;
+        updateWindowTitleForLevel();
         gPerfFrameMs = dTime * 1000.0f;
         pushFrameTimeSample(gPerfFrameTimeHistory, PERF_GRAPH_SAMPLES, gPerfFrameTimeHead, gPerfFrameMs);
         float fpsNow = 1.0f / dTime;
@@ -75,7 +78,6 @@ int main(){
 
         netMgr.updatePingMarkTtl(dTime);
 
-        // Backlog: entity hearing uses player noise derived from audio locomotion state.
         gPlayerNoise = fastClamp01(sndState.moveIntensity * 0.45f + sndState.sprintIntensity * 0.85f);
         if(isSmileSilenceActive()){ sndState.musicVol*=0.08f; sndState.ambienceVol*=0.02f; sndState.voiceVol*=0.12f; }
         sndState.sanityLevel=playerSanity/100.0f;currentWinW=winW;currentWinH=winH;
@@ -283,15 +285,13 @@ int main(){
                 }else if(reshuffleTimer<=0)reshuffleTimer=8.0f+(rng()%8);
                 
                 float levelDanger = levelDangerScale(gCurrentLevel);
-                // Plush comfort: holding the toy (slot 3) VERY slowly restores sanity instead of passive drain.
-                if(activeDeviceSlot==3 && heldConsumableType==ITEM_PLUSH_TOY) playerSanity += 0.75f*dTime;
+                if(activeDeviceSlot==3 && heldConsumableType==ITEM_PLUSH_TOY) playerSanity += 3.8f*dTime;
                 else playerSanity -= sanityPassiveDrainPerSec(levelDanger) * dTime;
                 if(entityMgr.dangerLevel>0.1f) playerSanity -= entityMgr.dangerLevel*(8.0f * levelDanger)*dTime;
                 playerSanity=playerSanity>100?100:(playerSanity<0?0:playerSanity);
                 int cellX = (int)floorf(cam.pos.x / CS);
                 int cellZ = (int)floorf(cam.pos.z / CS);
                 if(!playerFalling && isFallCell(cellX, cellZ)){
-                    // Check player is well inside the hole, not just at the edge
                     float cellCenterX = (cellX + 0.5f) * CS;
                     float cellCenterZ = (cellZ + 0.5f) * CS;
                     float dx = cam.pos.x - cellCenterX;
@@ -488,12 +488,10 @@ int main(){
             glDrawArrays(GL_TRIANGLES,0,6);
         }
         glEnable(GL_DEPTH_TEST);
-        
         drawUI();
         glDisable(GL_BLEND);
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
-        
         int frameGenBaseCap = frameGenBaseFpsCap(cachedRefreshRateHz, settings.frameGenMode, settings.vsync);
         gPerfFrameGenBaseCap = frameGenBaseCap;
         glfwSwapBuffers(gWin);glfwPollEvents();
