@@ -102,6 +102,7 @@ inline void resetVoidShiftState(const Vec3& spawnPos, const Vec3& exitDoorPos) {
     echoGhostActive = false;
 
     for (int i = 0; i < 3; i++) level1NodeDone[i] = false;
+    initLevel1PuzzleStages();
     level1HoldActive = false;
     level1HoldTimer = 90.0f;
     level1ContractComplete = false;
@@ -248,7 +249,7 @@ inline void buildVoidShiftInteractPrompt(const Vec3& playerPos, char* out, int o
         for (int i = 0; i < 3; i++) {
             if (level1NodeDone[i]) continue;
             if (nearPoint2D(playerPos, level1Nodes[i], 2.3f)) {
-                std::snprintf(out, outSize, "[E] CALIBRATE STABILIZER NODE");
+                buildLevel1NodeActionPrompt(i, out, outSize);
                 return;
             }
         }
@@ -356,9 +357,9 @@ inline bool tryHandleVoidShiftInteract(const Vec3& playerPos) {
         for (int i = 0; i < 3; i++) {
             if (level1NodeDone[i]) continue;
             if (!nearPoint2D(playerPos, level1Nodes[i], 2.3f)) continue;
-            level1NodeDone[i] = true;
+            if (!processLevel1NodeStage(i)) return false;
+            if (!level1NodeDone[i]) return true;
             addAttention(15.0f);
-            setTrapStatus("NODE STABILIZED");
             if (sideContractType == SIDE_STABILIZE_RIFTS) progressSideContract(1, "SIDE: RIFT SEALED");
             if (level1DoneCount() >= 3) {
                 level1HoldActive = true;

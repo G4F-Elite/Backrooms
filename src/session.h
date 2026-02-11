@@ -149,6 +149,8 @@ bool echoGhostActive = false;
 
 Vec3 level1Nodes[3];
 bool level1NodeDone[3] = {false, false, false};
+int level1NodeStage[3] = {0, 0, 0};
+int level1NodeGoal[3] = {2, 2, 2};
 bool level1HoldActive = false;
 float level1HoldTimer = 90.0f;
 bool level1ContractComplete = false;
@@ -407,7 +409,12 @@ inline void applyPlushToyUse(){
     setEchoStatus("PLUSH TOY: YOUR MIND FEELS WHOLE AGAIN");
 }
 
+inline void initLevel1PuzzleStages();
+inline bool processLevel1NodeStage(int nodeIndex);
+inline void buildLevel1NodeActionPrompt(int nodeIndex, char* out, int outSize);
+
 #include "void_shift_runtime.h"
+#include "void_shift_puzzles_ext.h"
 
 inline int storyNotesRequired(){
     if (isParkingLevel(gCurrentLevel)) return 3;
