@@ -18,7 +18,7 @@ int main(){
     glEnable(GL_DEPTH_TEST);glEnable(GL_CULL_FACE);
     genWorld();
     wallTex=genTex(0);floorTex=genTex(1);ceilTex=genTex(2);lightTex=genTex(3);lampTex=genTex(4);propTex=genTex(5);
-    deviceTex=genTex(6); // device-specific texture (flashlight/scanner)
+    deviceTex=genTex(6); scannerTex=genTex(7); plushTex=genTex(8); // device/scanner/plush atlas textures
     playerTex=propTex; // players use a stable texture so held-item textures don't bleed
     mainShader=mkShader(mainVS,mainFS);lightShader=mkShader(lightVS,lightFS);vhsShader=mkShader(vhsVS,vhsFS);
     buildGeom();

@@ -212,10 +212,15 @@ void renderScene(){
         glUniformMatrix4fv(mu.M,1,GL_FALSE,heldModel.m);
         if(mu.tint >= 0) glUniform3f(mu.tint,heldTint.x,heldTint.y,heldTint.z);
 
-        // Use a dedicated texture for handheld devices so they don't look like wood.
+        // Use dedicated textures for handheld devices/consumables.
         GLuint heldTex = propTex;
-        if(activeDeviceSlot == 1 || activeDeviceSlot == 2){
+        if(activeDeviceSlot == 1){
             if(deviceTex != 0) heldTex = deviceTex;
+        }else if(activeDeviceSlot == 2){
+            if(scannerTex != 0) heldTex = scannerTex;
+            else if(deviceTex != 0) heldTex = deviceTex;
+        }else if(activeDeviceSlot == 3 && heldConsumableType == ITEM_PLUSH_TOY){
+            if(plushTex != 0) heldTex = plushTex;
         }
         glBindTexture(GL_TEXTURE_2D,heldTex);
         glBindVertexArray(heldVAO);
@@ -334,6 +339,7 @@ inline void applyFramePacing(double frameStartTime, int targetFps){
     }
     while((glfwGetTime() - frameStartTime) < targetFrameSec){}
 }
+
 
 
 
