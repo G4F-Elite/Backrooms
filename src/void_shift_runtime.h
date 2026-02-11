@@ -29,7 +29,9 @@ inline void awardArchivePoints(int amount, const char* reason) {
     } else if (reason) {
         setEchoStatus(reason);
     }
-    saveArchiveMetaProgress(archivePoints, archiveTier, perkQuietSteps, perkFastHands, perkEchoBuffer);
+    unlockMetaRewardsFromTier();
+    saveArchiveMetaProgress(archivePoints, archiveTier, perkQuietSteps, perkFastHands, perkEchoBuffer,
+                            recipeNoiseLureUnlocked, recipeBeaconUnlocked, recipeFlashLampUnlocked, recipeFixatorUnlocked, markerStyleIndex);
 }
 
 inline const char* sideContractName(int type) {

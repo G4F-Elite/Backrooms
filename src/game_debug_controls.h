@@ -186,6 +186,7 @@ void gameInput(GLFWwindow*w){
     bool k2=glfwGetKey(w,settings.binds.item2)==GLFW_PRESS;
     bool k3=glfwGetKey(w,settings.binds.item3)==GLFW_PRESS;
     bool k4=glfwGetKey(w,settings.binds.item4)==GLFW_PRESS;
+    bool craftN = glfwGetKey(w, GLFW_KEY_J)==GLFW_PRESS, craftB = glfwGetKey(w, GLFW_KEY_K)==GLFW_PRESS, craftF = glfwGetKey(w, GLFW_KEY_L)==GLFW_PRESS, craftX = glfwGetKey(w, GLFW_KEY_H)==GLFW_PRESS;
     bool callHere = glfwGetKey(w, GLFW_KEY_T)==GLFW_PRESS, callDanger = glfwGetKey(w, GLFW_KEY_Y)==GLFW_PRESS, callBattery = glfwGetKey(w, GLFW_KEY_U)==GLFW_PRESS, callCode = glfwGetKey(w, GLFW_KEY_I)==GLFW_PRESS, callDoor = glfwGetKey(w, GLFW_KEY_O)==GLFW_PRESS;
     bool recordNow = glfwGetKey(w, GLFW_KEY_R) == GLFW_PRESS, playbackNow = glfwGetKey(w, GLFW_KEY_P) == GLFW_PRESS;
     static bool pingPressed=false;
@@ -234,6 +235,7 @@ void gameInput(GLFWwindow*w){
         notifyVoidShiftPingUsed();
     }
     if((callHere||callDanger||callBattery||callCode||callDoor) && !pingPressed){ if(callHere) setSquadCallout("CALLOUT: MOVE HERE"); else if(callDanger) setSquadCallout("CALLOUT: DANGER"); else if(callBattery) setSquadCallout("CALLOUT: NEED BATTERY"); else if(callCode) setSquadCallout("CALLOUT: CODE FOUND"); else if(callDoor) setSquadCallout("CALLOUT: HOLDING DOOR"); }
+    if((craftN||craftB||craftF||craftX) && !pingPressed){ if(craftN) tryCraftNoiseLure(); else if(craftB) tryCraftBeacon(); else if(craftF) tryCraftFlashLamp(); else if(craftX) tryCraftFixator(); }
 
     if(recordNow && !recordPressed){
         resonatorMode = RESONATOR_RECORD;

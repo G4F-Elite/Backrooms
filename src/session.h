@@ -138,6 +138,11 @@ int craftedBeacon = 0;
 int craftedFlashLamp = 0;
 int craftedButtonFixator = 0;
 float craftedFixatorTimer = 0.0f;
+bool recipeNoiseLureUnlocked = false;
+bool recipeBeaconUnlocked = false;
+bool recipeFlashLampUnlocked = false;
+bool recipeFixatorUnlocked = false;
+int markerStyleIndex = 0;
 
 inline void setSquadCallout(const char* txt) {
     if (!txt) return;
@@ -455,12 +460,18 @@ inline void triggerCorridorShiftSetpiece(float duration);
 inline void triggerBlackoutSetpiece(float duration);
 inline void updateVoidShiftSetpieces(float dt);
 inline void updateVoidShiftHoldPhases(float dt);
+inline void unlockMetaRewardsFromTier();
+inline void tryCraftNoiseLure();
+inline void tryCraftBeacon();
+inline void tryCraftFlashLamp();
+inline void tryCraftFixator();
 
 #include "void_shift_runtime.h"
 #include "void_shift_puzzles_ext.h"
 #include "void_shift_level2_ext.h"
 #include "void_shift_side_tech_ext.h"
 #include "void_shift_setpieces_ext.h"
+#include "void_shift_crafting_ext.h"
 
 inline int storyNotesRequired(){
     if (isParkingLevel(gCurrentLevel)) return 3;
