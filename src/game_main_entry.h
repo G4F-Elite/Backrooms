@@ -102,15 +102,6 @@ int main(){
                 glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_DISABLED);
                 firstMouse=true;
             }
-        }else if(gameState==STATE_NOTE){
-            static bool wasKeyDown=true;
-            bool anyKey=glfwGetKey(gWin,GLFW_KEY_SPACE)==GLFW_PRESS||
-                        glfwGetKey(gWin,GLFW_KEY_E)==GLFW_PRESS||
-                        glfwGetKey(gWin,GLFW_KEY_ESCAPE)==GLFW_PRESS;
-            if(!anyKey)wasKeyDown=false;
-            if(anyKey&&!wasKeyDown&&storyMgr.readingNote){
-                storyMgr.closeNote();gameState=STATE_GAME;wasKeyDown=true;
-            }
         }else if(gameState==STATE_SETTINGS) settingsInput(gWin,false);
         else if(gameState==STATE_SETTINGS_PAUSE) settingsInput(gWin,true);
         else if(gameState==STATE_KEYBINDS) keybindsInput(gWin,false);
@@ -208,20 +199,7 @@ int main(){
                 if(tryTriggerRandomScare(scareState, dTime, storyMgr.getPhase(), playerSanity, (int)(rng()%100))){
                     triggerLocalScare(0.26f, 0.14f, 3.0f);
                 }
-                for(auto&n:storyMgr.notes)if(n.active&&!n.collected)n.bobPhase+=dTime*3.0f;
-                buildNotes(vhsTime);
                 nearNoteId=-1;
-                for(auto&n:storyMgr.notes){
-                    if(!n.active||n.collected)continue;
-                    Vec3 d=n.pos-cam.pos;d.y=0;
-                    if(sqrtf(d.x*d.x+d.z*d.z)<4.0f){nearNoteId=n.id;break;}
-                }
-                cleanupFarNotes();
-                noteSpawnTimer-=dTime;
-                if(noteSpawnTimer<=0&&lastSpawnedNote<11){
-                    int nn=lastSpawnedNote+1;trySpawnNote(nn);
-                    noteSpawnTimer=nextNoteSpawnDelaySeconds((int)rng());
-                }
                 bool canSpawnEnt = (multiState!=MULTI_IN_GAME || netMgr.isHost);
                 entitySpawnTimer-=dTime;
                 int maxEnt = computeEntityCap(survivalTime);
@@ -303,7 +281,7 @@ int main(){
                 }
                 if(playerSanity<=0.0f && !isPlayerDead){
                     sanityCollapseTimer += dTime;
-                    if(sanityCollapseTimer>=2.3f){ isPlayerDead=true;playerHealth=0;snprintf(gDeathReason,sizeof(gDeathReason),"CAUSE: SANITY COLLAPSE"); glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL); }
+                    if(sanityCollapseTimer>=2.3f){ isPlayerDead=true;playerHealth=0;snprintf(gDeathReason,sizeof(gDeathReason),"CAUSE: COGNITIVE OVERLOAD"); glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL); }
                 }else if(!isPlayerDead){
                     sanityCollapseTimer -= dTime * 1.7f;
                     if(sanityCollapseTimer < 0.0f) sanityCollapseTimer = 0.0f;
@@ -318,7 +296,7 @@ int main(){
                         triggerScare();
                     }
                     if(playerHealth<=0){
-                        isPlayerDead=true;playerHealth=0;snprintf(gDeathReason,sizeof(gDeathReason),"CAUSE: MAULED BY ENTITY");
+                        isPlayerDead=true;playerHealth=0;snprintf(gDeathReason,sizeof(gDeathReason),"CAUSE: HOSTILE CONTACT");
                         glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
                     }
                 }
@@ -340,7 +318,7 @@ int main(){
         glDisable(GL_DEPTH_TEST);
 
         glUseProgram(vhsShader);
-        bool vhsMenu=(gameState==STATE_MENU||gameState==STATE_GUIDE||gameState==STATE_MULTI||gameState==STATE_MULTI_HOST||gameState==STATE_MULTI_JOIN||gameState==STATE_MULTI_WAIT),vhsGameplay=(gameState==STATE_GAME||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_KEYBINDS_PAUSE||gameState==STATE_NOTE||gameState==STATE_INTRO); float vI=0.0f;
+        bool vhsMenu=(gameState==STATE_MENU||gameState==STATE_GUIDE||gameState==STATE_MULTI||gameState==STATE_MULTI_HOST||gameState==STATE_MULTI_JOIN||gameState==STATE_MULTI_WAIT),vhsGameplay=(gameState==STATE_GAME||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_KEYBINDS_PAUSE||gameState==STATE_INTRO); float vI=0.0f;
         if(vhsMenu) vI=0.0f; else if(vhsGameplay){
             float sanityLoss=1.0f-(playerSanity/100.0f);
             if(sanityLoss<0.0f) sanityLoss=0.0f;
@@ -375,7 +353,7 @@ int main(){
             vhsDeathFxLoc=glGetUniformLocation(vhsShader,"deathFx");
         }
         float preDeathFx = sanityCollapseTimer / 2.3f; if(preDeathFx < 0.0f) preDeathFx = 0.0f; if(preDeathFx > 1.0f) preDeathFx = 1.0f;
-        float deathFxUniform = (gameState==STATE_GAME || gameState==STATE_PAUSE || gameState==STATE_NOTE) ? (isPlayerDead ? (0.55f + 0.45f * sinf(vhsTime * 2.9f)) : preDeathFx) : (isPlayerDead ? 1.0f : 0.0f);
+        float deathFxUniform = (gameState==STATE_GAME || gameState==STATE_PAUSE) ? (isPlayerDead ? (0.55f + 0.45f * sinf(vhsTime * 2.9f)) : preDeathFx) : (isPlayerDead ? 1.0f : 0.0f);
         static int prevAaMode = -1;
         int aaMode = clampAaMode(settings.aaMode);
         if(aaMode != prevAaMode){ prevAaMode = aaMode; taaHistoryValid = false; taaFrameIndex = 0; }

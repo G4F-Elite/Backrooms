@@ -41,9 +41,9 @@ inline void drawFlashlightBattery(float battery, bool isOn) {
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 
-inline void drawNoteCounter(int count) {
+inline void drawContractCounter(int count) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    char b[16]; snprintf(b,16,"NOTES: %d/5",count);
+    char b[20]; snprintf(b,20,"CONTRACT: %d/3",count);
     drawText(b,-0.95f,-0.66f,1.5f,0.72f,0.68f,0.46f,0.84f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
@@ -60,7 +60,7 @@ inline void drawPhaseIndicator(int phase) {
 
 inline void drawInteractPrompt() {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    drawText("[E] READ NOTE",-0.15f,-0.4f,1.8f,0.8f,0.75f,0.5f,0.8f);
+    drawText("[E] INTERACT",-0.15f,-0.4f,1.8f,0.8f,0.75f,0.5f,0.8f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 

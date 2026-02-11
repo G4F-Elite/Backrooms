@@ -449,13 +449,12 @@ void genWorld(){
     itemSpawnTimer = 6.0f;
     playerHealth=playerSanity=100; playerStamina=125;
     flashlightBattery=100;flashlightOn=false;isPlayerDead=false;
-    snprintf(gDeathReason,sizeof(gDeathReason),"CAUSE: UNKNOWN");
+    snprintf(gDeathReason,sizeof(gDeathReason),"CAUSE: INCIDENT UNCONFIRMED");
     playerEscaped=false;
     flashlightShutdownBlinkActive = false;
     flashlightShutdownBlinkTimer = 0.0f;
     resetScareSystemState(scareState);
     entitySpawnTimer=30;survivalTime=0;reshuffleTimer=15;
-    resetPoiRuntime();
     floorHoles.clear();
     playerFalling = false;
     fallVelocity = 0.0f;

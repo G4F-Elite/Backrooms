@@ -147,18 +147,7 @@ void gameInput(GLFWwindow*w){
     bool exitReady = false;
     if(multiState==MULTI_IN_GAME) exitReady = coop.doorOpen && isStoryExitReady();
     else exitReady = isStoryExitReady();
-    if(eNow&&!interactPressed&&nearNoteId>=0){
-        if(storyMgr.checkNotePickup(cam.pos,4.0f)){
-            if(tryTriggerStoryScare(scareState, storyMgr.currentNote)){
-                triggerLocalScare(0.34f, 0.18f, 5.0f);
-            }
-            gameState=STATE_NOTE;
-            playerSanity-=8.0f;
-            if(playerSanity<0)playerSanity=0;
-            if(multiState==MULTI_IN_GAME) netMgr.sendNoteCollect(nearNoteId);
-            addAttention(2.0f);
-        }
-    }else if(eNow&&!interactPressed&&nearbyWorldItemId>=0){
+    if(eNow&&!interactPressed&&nearbyWorldItemId>=0){
         if(multiState==MULTI_IN_GAME){
             if(netMgr.isHost){
                 for(auto& it:worldItems){
@@ -266,7 +255,7 @@ void gameInput(GLFWwindow*w){
         if(cam.pos.y < -25.0f || fallTimer > 3.0f){
             playerHealth = 0.0f;
             isPlayerDead = true;
-            snprintf(gDeathReason,sizeof(gDeathReason),"CAUSE: FELL INTO THE VOID");
+            snprintf(gDeathReason,sizeof(gDeathReason),"CAUSE: VOID BREACH FALL");
             playerFalling = false;
             glfwSetInputMode(w,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
         }

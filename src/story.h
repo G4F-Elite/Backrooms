@@ -8,22 +8,22 @@ enum GamePhase { PHASE_INTRO, PHASE_EXPLORATION, PHASE_SURVIVAL, PHASE_DESPERATI
 enum HallucinationType { HALLUC_NONE, HALLUC_FLICKER, HALLUC_SHADOW, HALLUC_STEPS, HALLUC_WHISPER };
 struct Hallucination { Vec3 pos; HallucinationType type; float timer, duration; bool active; };
 
-const char* NOTE_TITLES[] = {"First Entry","The Hum","Sighting","Time","They Were People","The Stalker","The Crawler","The Shadow","Transformation","No Escape","The Truth","Final Entry"};
+const char* NOTE_TITLES[] = {"Contract Brief","Signal Noise","Contact Log","Clock Drift","Crew Fragment","Hunter Pattern","Crawler Route","Shadow Zone","System Distort","Blocked Route","Archive Trace","Last Uplink"};
 const char* NOTE_CONTENTS[] = {
-    "Day 1 (I think?)\n\nI don't know how I got here.\nYellow walls everywhere.\nI need to find a way out.",
-    "The buzzing never stops.\n60Hz. My head hurts.\nI can't remember...",
-    "I SAW SOMETHING.\nTall. Wrong. When I looked\nit was gone.\nAm I losing my mind?",
-    "Day 7? My watch stopped.\nThe walls moved.\nI KNOW they moved.",
-    "I found a wallet.\nMichael Torres. Accountant.\nWhere is Michael now?",
-    "It follows when I'm not\nlooking. But when I turn\naround - nothing.",
-    "FAST. SO FAST.\nDon't run. It hears you.\nDon't run don't run",
-    "You can't see it if you\nlook. Trust your peripheral.\nIt was someone once.",
-    "I saw one... change.\nTheir body... bent. Wrong.\nWe become THEM.",
-    "There is no exit.\nThe Backrooms go on forever.\nSurviving IS the point.",
-    "This place is made of\nforgotten spaces. We're\ninside memory. OUR memory.",
-    "Don't give up. Stay human.\nAs long as you can.\n\n...what was my name?"
+    "Shift team entered Level 1.\nObjective: stabilize 3 nodes\nand hold the grid.",
+    "Fluorescent hum maps to\nresonance drift. Use scanner\nonly when route is clear.",
+    "Hostile silhouette tracked\nfrom maintenance branch.\nNoise attracts it fast.",
+    "Clock drift confirmed.\nArchive timer is more stable\nthan local watches.",
+    "Found old crew badge near\nservice vent. No body, no\ntransponder response.",
+    "Hunter tracks movement\nbreaks. Close doors, then\nrotate routes.",
+    "Crawler path loops around\nwet corridor. Use light burst\nif grab starts.",
+    "Shadow zone expands at\nhigh ATTENTION. Keep team\nspread and pings short.",
+    "Echo playback desync seen\nat critical threat levels.\nDo not spam replay.",
+    "Parking lift blocked until\nbattery, fuses, and access\nline are confirmed.",
+    "Archive traces imply prior\nshift attempts reached this\nphase and failed extraction.",
+    "If this log remains: finish\nthe contract cycle, return to\nBreakroom, report upstream."
 };
-const char* INTRO_LINES[] = {"It was just another late night...","I walked to get coffee.","The light was flickering.","I blinked...","...the hallway was longer.","The door wasn't there.","When I turned around,","neither was my office.","Just... yellow.","Endless yellow.","","LEVEL 0 - THE LOBBY"};
+const char* INTRO_LINES[] = {"ARCHIVE UPLINK ONLINE.","SHIFT TEAM STATUS: DEPLOYING.","PRIMARY TASK: STABILIZE REALITY.","CONTRACT FEED RECEIVED.","LEVEL 1: YELLOW ROOMS.","LEVEL 2: PARKING.","USE RESONATOR TO TRACK NODES.","RECORD ECHO IF SOLO.","MANAGE ATTENTION AND LIGHT.","EXTRACT AFTER CONTRACT COMPLETE.","","VOID SHIFT v1.0.0"};
 const int INTRO_LINE_COUNT = 12;
 
 class StoryManager {

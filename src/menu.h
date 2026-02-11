@@ -434,7 +434,7 @@ inline void drawDeath(float tm) {
     drawTextCentered("YOU DIED",-ch,0.2f,4.2f,0.88f*fl,0.10f*fl,0.10f*fl,p*0.82f);
     drawTextCentered("YOU DIED",ch,0.2f,4.2f,0.22f*fl,0.12f*fl,0.88f*fl,p*0.72f);
     drawTextCentered("YOU DIED",0.0f,0.2f,4.2f,0.9f*fl,0.08f*fl,0.08f*fl,p);
-    drawTextCentered("IT GOT YOU...",0.0f,0.01f,2.1f,0.72f,0.12f,0.12f,0.76f);
+    drawTextCentered("CONTRACT FAILED",0.0f,0.01f,2.1f,0.72f,0.12f,0.12f,0.76f);
     drawTextCentered(gDeathReason,0.0f,-0.05f,1.55f,0.78f,0.62f,0.52f,0.82f);
     int m=(int)(gSurvivalTime/60),s=(int)gSurvivalTime%60;
     char tb[32]; snprintf(tb,32,"SURVIVED: %d:%02d",m,s);
@@ -448,7 +448,7 @@ inline void drawEscape(float tm) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     float p=0.76f+0.12f*sinf(tm*2.4f);
     drawTextCentered("YOU ESCAPED",0.0f,0.2f,4.0f,0.75f,0.9f,0.75f,p);
-    drawTextCentered("THE EXIT DOOR OPENED.",0.0f,0.02f,2.0f,0.62f,0.78f,0.62f,0.84f);
+    drawTextCentered("EXTRACTION ROUTE UNLOCKED.",0.0f,0.02f,2.0f,0.62f,0.78f,0.62f,0.84f);
     int m=(int)(gSurvivalTime/60),s=(int)gSurvivalTime%60;
     char tb[32]; snprintf(tb,32,"SURVIVED: %d:%02d",m,s);
     drawTextCentered(tb,0.0f,-0.12f,2.0f,0.7f,0.8f,0.68f,0.86f);

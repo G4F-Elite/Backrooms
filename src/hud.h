@@ -173,8 +173,6 @@ void drawUI(){
                     else drawHudTextCentered("OPEN DOOR + COMPLETE CONTRACT TO EXIT",0.0f,-0.35f,1.25f,0.88f,0.72f,0.58f,0.93f);
                 }
             }
-            drawNoteCounter(storyMgr.totalCollected);
-            if(nearNoteId>=0 && settings.debugMode) drawInteractPrompt();
             if(nearbyWorldItemId>=0 && settings.debugMode){
                 drawHudTextCentered(worldItemPickupPrompt(nearbyWorldItemType),0.0f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.9f);
             }
@@ -199,31 +197,6 @@ void drawUI(){
             if(settings.debugMode && multiState!=MULTI_IN_GAME && echoStatusTimer>0.0f){
                 drawHudTextCentered(echoStatusText,0.0f,0.62f,1.18f,0.7f,0.86f,0.9f,0.92f);
             }
-            // === SMILE EVENT: red corridor overlay always, text hint only in debug ===
-            if(smileEvent.corridorActive){
-                drawFullscreenOverlay(0.20f,0.02f,0.02f,0.18f);
-                if(settings.debugMode) drawHudTextCentered("RED CORRIDOR. MOVE TO THE END.",0.0f,0.70f,1.18f,0.92f,0.46f,0.40f,0.95f);
-            }else if(smileEvent.eyeActive){
-                // === DEBUG MODE: eye marker wallhack/ESP ===
-                if(settings.debugMode){
-                    float sx = 0.0f, sy = 0.0f;
-                    if(projectToScreen(smileEvent.eyePos, sx, sy)){
-                        drawEyeMarker(sx, sy, 1.0f, 0.98f);
-                    }else{
-                        Vec3 rightHint(mCos(cam.yaw), 0.0f, -mSin(cam.yaw));
-                        Vec3 eyeDir = smileEvent.eyePos - cam.pos;
-                        eyeDir.y = 0.0f;
-                        float side = rightHint.dot(eyeDir);
-                        if(side >= 0.0f){
-                            drawEyeMarker(0.88f, 0.31f, 0.82f, 0.96f);
-                            drawHudText(">>",0.80f,0.27f,1.20f,0.90f,0.42f,0.38f,0.95f);
-                        }else{
-                            drawEyeMarker(-0.88f, 0.31f, 0.82f, 0.96f);
-                            drawHudText("<<",-0.95f,0.27f,1.20f,0.90f,0.42f,0.38f,0.95f);
-                        }
-                    }
-                }
-            }
             if(minimapEnabled) drawMinimapOverlay();
             if(storyMgr.hasHallucinations())drawHallucinationEffect((50.0f-playerSanity)/50.0f);
             if(multiState==MULTI_IN_GAME)drawMultiHUD(netMgr.getPlayerCount(),netMgr.isHost);
@@ -243,22 +216,6 @@ void drawUI(){
             }
             // === DEBUG MODE: trap status text, floor hazards, anomaly lock, minimap state, perf graph ===
             if(settings.debugMode){
-                if(trapCorridor.active && trapStatusTimer > 0.0f){
-                    drawHudTextCentered(trapStatusText,0.0f,0.55f,1.2f,0.82f,0.78f,0.9f,0.90f);
-                }
-                if(!floorHoles.empty()){
-                    char holeBuf[64];
-                    snprintf(holeBuf,64,"FLOOR HAZARDS: %d", (int)floorHoles.size());
-                    drawHudText(holeBuf,-0.95f,0.44f,1.10f,0.92f,0.58f,0.38f,0.90f);
-                }
-                if(trapCorridor.locked){
-                    float t = trapCorridor.stareProgress / 2.6f;
-                    if(t < 0.0f) t = 0.0f;
-                    if(t > 1.0f) t = 1.0f;
-                    char anomBuf[64];
-                    snprintf(anomBuf,64,"ANOMALY LOCK %.0f%%",t * 100.0f);
-                    drawHudText(anomBuf,-0.95f,0.38f,1.0f,0.88f,0.78f,0.90f,0.92f);
-                }
                 const char* mmState = minimapEnabled ? "MINIMAP ON [M/F8]" : "MINIMAP OFF [M/F8]";
                 drawHudText(mmState,-0.95f,0.84f,0.95f,0.88f,0.93f,0.78f,0.95f);
                 if(gPerfDebugOverlay){

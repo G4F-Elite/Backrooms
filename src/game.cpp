@@ -97,7 +97,7 @@ float noteSpawnTimer = 0;
 bool firstMouse = true;
 bool escPressed, enterPressed, isPlayerDead;
 bool playerEscaped = false;
-char gDeathReason[80] = "CAUSE: UNKNOWN";
+char gDeathReason[80] = "CAUSE: INCIDENT UNCONFIRMED";
 bool upPressed, downPressed, leftPressed, rightPressed;
 float gPerfFrameMs = 16.6f;
 float gPerfFpsSmoothed = 60.0f;
