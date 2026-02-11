@@ -144,8 +144,7 @@ void renderScene(){
     if(noteVC>0){glBindTexture(GL_TEXTURE_2D,lightTex);glBindVertexArray(noteVAO);glDrawArrays(GL_TRIANGLES,0,noteVC);}
     glEnable(GL_CULL_FACE);
 
-    // Held item render (deterministic viewmodel)
-    // Choose held item model
+    // Held item render (viewmodel)
     GLuint heldVAO = 0;
     int heldVC = 0;
     float handSide = vmHandSide;
@@ -155,12 +154,10 @@ void renderScene(){
     float pitchAdd = -0.14f;
     Vec3 scale = Vec3(0.95f, 0.95f, 1.0f);
     Vec3 heldTint(1.0f, 1.0f, 1.0f);
+
     if(activeDeviceSlot == 1){
         heldVAO = flashlightVAO;
         heldVC = flashlightVC;
-        handSide = vmHandSide;
-        handUp = vmHandUp;
-        handFwd = vmHandFwd;
         yawAdd = 0.20f;
         pitchAdd = -0.20f;
         scale = Vec3(0.92f, 0.92f, 0.92f);
@@ -174,42 +171,56 @@ void renderScene(){
         yawAdd = 0.12f;
         pitchAdd = -0.22f;
         scale = Vec3(1.05f, 1.0f, 1.25f);
+        heldTint = Vec3(0.78f, 0.86f, 0.90f);
     }else if(activeDeviceSlot == 3){
+        // Slot 3: consumable
+        handSide = vmHandSide * 0.88f;
+        handUp = vmHandUp - 0.08f;
+        handFwd = vmHandFwd - 0.04f;
+
         if(heldConsumableType == ITEM_BATTERY){
             heldVAO = batteryVAO;
             heldVC = batteryVC;
-            handSide = vmHandSide * 0.88f;
-            handUp = vmHandUp - 0.08f;
-            handFwd = vmHandFwd - 0.04f;
             yawAdd = 0.28f;
             pitchAdd = -0.32f;
             scale = Vec3(0.85f, 0.85f, 0.85f);
+            heldTint = Vec3(0.92f, 0.90f, 0.72f);
         }else{
             heldVAO = plushVAO;
             heldVC = plushVC;
-            handSide = vmHandSide * 0.88f;
-            handUp = vmHandUp - 0.08f;
-            handFwd = vmHandFwd - 0.04f;
             yawAdd = 0.22f;
             pitchAdd = -0.30f;
             scale = Vec3(0.95f, 0.95f, 0.95f);
+            heldTint = Vec3(0.96f, 0.88f, 0.78f);
         }
     }
 
     if(heldVC>0 && deviceEquip > 0.02f){
-        Vec3 base = cam.pos + vmFwdPos * handFwd + vmRightPos * handSide + worldUp * handUp;
+        Vec3 baseTarget = cam.pos + vmFwdPos * handFwd + vmRightPos * handSide + worldUp * handUp;
+
+        // "In-hand physics": smooth held item position slightly for weight.
+        static Vec3 baseSmoothed(0.0f, 0.0f, 0.0f);
+        static bool baseInit = false;
+        if(!baseInit){ baseSmoothed = baseTarget; baseInit = true; }
+        float a = 1.0f - expf(-22.0f * dTime);
+        baseSmoothed = baseSmoothed + (baseTarget - baseSmoothed) * a;
 
         Vec3 drawScale = scale * (0.8f + 0.2f * deviceEquip);
-        Mat4 heldModel = composeModelMatrix(base, vmYaw + yawAdd, vmPitch + pitchAdd, drawScale);
+        Mat4 heldModel = composeModelMatrix(baseSmoothed, vmYaw + yawAdd, vmPitch + pitchAdd, drawScale);
         glUniformMatrix4fv(mu.M,1,GL_FALSE,heldModel.m);
         if(mu.tint >= 0) glUniform3f(mu.tint,heldTint.x,heldTint.y,heldTint.z);
-        glBindTexture(GL_TEXTURE_2D,propTex);
+
+        // Use a dedicated texture for handheld devices so they don't look like wood.
+        GLuint heldTex = propTex;
+        if(activeDeviceSlot == 1 || activeDeviceSlot == 2){
+            if(deviceTex != 0) heldTex = deviceTex;
+        }
+        glBindTexture(GL_TEXTURE_2D,heldTex);
         glBindVertexArray(heldVAO);
         glDrawArrays(GL_TRIANGLES,0,heldVC);
+
         glUniformMatrix4fv(mu.M,1,GL_FALSE,model.m);
         if(mu.tint >= 0) glUniform3f(mu.tint,1.0f,1.0f,1.0f);
-
-        // NOTE: flashPos is now set before world draw; we don't update it here.
     }
     
     if(multiState==MULTI_IN_GAME && playerModelsInit){
@@ -321,6 +332,9 @@ inline void applyFramePacing(double frameStartTime, int targetFps){
     }
     while((glfwGetTime() - frameStartTime) < targetFrameSec){}
 }
+
+
+
 
 
 

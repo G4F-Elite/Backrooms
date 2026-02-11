@@ -273,4 +273,19 @@ inline void drawMinimapOverlay(){
         drawText(rows[r],-0.95f,y,1.24f,0.86f,0.90f,0.72f,0.93f);
         y -= 0.052f;
     }
+
+    // Coop ping marker (shown on minimap when recent)
+    if(multiState==MULTI_IN_GAME && netMgr.pingMarkTtl > 0.0f){
+        int markWX = (int)floorf(netMgr.pingMarkPos.x / CS);
+        int markWZ = (int)floorf(netMgr.pingMarkPos.z / CS);
+        int relX = markWX - playerWX;
+        int relZ = markWZ - playerWZ;
+        if(relX >= -MINIMAP_RADIUS && relX <= MINIMAP_RADIUS && relZ >= -MINIMAP_RADIUS && relZ <= MINIMAP_RADIUS){
+            int col = relX + MINIMAP_RADIUS;
+            int row = MINIMAP_RADIUS - relZ;
+            float gx = -0.95f + (float)col * 0.052f;
+            float gy = 0.50f - (float)row * 0.052f;
+            drawText("!", gx, gy, 1.24f, 0.95f, 0.40f, 0.25f, 0.98f);
+        }
+    }
 }

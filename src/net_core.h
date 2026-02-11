@@ -74,6 +74,21 @@ public:
     
     NetInteractRequest interactRequests[16];
     int interactRequestCount;
+
+    // Coop ping marker (simple broadcast marker)
+    bool pingMarkReceived;
+    int pingMarkFrom;
+    Vec3 pingMarkPos;
+    float pingMarkTtl;
+
+    inline void updatePingMarkTtl(float dt){
+        if(pingMarkTtl <= 0.0f) return;
+        pingMarkTtl -= dt;
+        if(pingMarkTtl <= 0.0f){
+            pingMarkTtl = 0.0f;
+            pingMarkReceived = false;
+        }
+    }
     
     int packetsSent;
     int packetsRecv;
@@ -109,6 +124,10 @@ public:
         roamEventDuration = 0.0f;
         roamEventReceived = false;
         interactRequestCount = 0;
+        pingMarkReceived = false;
+        pingMarkFrom = -1;
+        pingMarkPos = Vec3(0,0,0);
+        pingMarkTtl = 0.0f;
         packetsSent = packetsRecv = 0;
         bytesSent = bytesRecv = 0;
         rttMs = 0.0f;
@@ -331,6 +350,7 @@ public:
     void sendInventorySync();
     void sendInteractRequest(int requestType, int targetId);
     void sendRoamEvent(int eventType, int a, int b, float duration);
+    void sendPingMark(const Vec3& pos);
     void sendGameStart(Vec3 spawn);
     void sendPing(float nowTime);
     void sendLeave();
@@ -354,4 +374,5 @@ public:
     void handleInventorySync(char* buf, int len);
     void handleInteractRequest(char* buf, int len);
     void handleRoamEvent(char* buf, int len);
+    void handlePingMark(char* buf, int len);
 };

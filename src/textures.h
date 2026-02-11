@@ -303,6 +303,41 @@ inline GLuint genTex(int type) {
             g = 90.0f + grains * 0.42f + ridges * 0.10f + woodBands * 0.7f + tape * 0.22f + panel * 0.06f + card * 0.75f - rustMask * 0.18f - knotMask * 0.35f;
             b = 58.0f + grains * 0.30f + ridges * 0.08f + woodBands * 0.35f + tape * 0.12f + panel * 0.04f + card * 0.45f - rustMask * 0.24f - knotMask * 0.28f;
             h = 124.0f + ridges * 0.45f + grains * 0.18f + woodBands * 0.24f + knotMask * 0.32f;
+        } else if(type==6) { // handheld device texture (flashlight/scanner) - painted plastic/metal
+            // Purpose: avoid using the generic prop wood texture for devices.
+            // Palette: dark graphite plastic with subtle speckle + edge wear.
+            float u = (float)x / (float)sz;
+            float v = (float)y / (float)sz;
+
+            // Base graphite
+            float base = 62.0f;
+            float speck = perlin(x * 0.35f, y * 0.35f, 3) * 10.0f;
+            float micro = perlin(x * 1.2f + 3.0f, y * 1.2f + 7.0f, 2) * 4.0f;
+
+            // Panel seams (a few vertical/horizontal grooves)
+            float seamV = (fabsf(fmodf(u * 6.0f, 1.0f) - 0.5f) < 0.03f) ? 18.0f : 0.0f;
+            float seamH = (fabsf(fmodf(v * 4.0f, 1.0f) - 0.5f) < 0.03f) ? 14.0f : 0.0f;
+            float seams = (seamV + seamH);
+
+            // Edge wear (brighter near borders)
+            float edge = fminf(fminf(u, 1.0f - u), fminf(v, 1.0f - v));
+            float wear = (edge < 0.08f) ? (0.08f - edge) * 180.0f : 0.0f;
+            float wearNoise = perlin(x * 0.06f + 10.0f, y * 0.06f + 2.0f, 4) * 10.0f;
+            wear = wear * (0.7f + 0.3f * (wearNoise / 10.0f));
+
+            // Small warning stripe accent
+            float stripe = 0.0f;
+            if(v > 0.78f && v < 0.84f) {
+                float band = fmodf(u * 18.0f, 1.0f);
+                if(band < 0.5f) stripe = 32.0f;
+            }
+
+            r = base + speck + micro + seams + wear + stripe * 0.9f;
+            g = base + speck * 0.95f + micro + seams * 0.9f + wear * 0.9f + stripe * 0.55f;
+            b = base + speck * 0.90f + micro * 0.9f + seams * 0.85f + wear * 0.8f;
+
+            // Height: seams and edge wear slightly raised
+            h = 128.0f + seams * 0.6f + wear * 0.25f + speck * 0.25f;
         }
         
         // Clamp and store RGBA

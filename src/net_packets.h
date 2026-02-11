@@ -198,6 +198,15 @@ inline void NetworkManager::sendRoamEvent(int eventType, int a, int b, float dur
     broadcast(buf, 12);
 }
 
+inline void NetworkManager::sendPingMark(const Vec3& pos) {
+    if(!connected) return;
+    char buf[PACKET_SIZE];
+    buf[0] = PKT_PING_MARK;
+    buf[1] = (char)myId;
+    memcpy(buf + 2, &pos, sizeof(Vec3));
+    broadcast(buf, 32);
+}
+
 inline void NetworkManager::sendGameStart(Vec3 spawn) {
     if (!isHost) return;
     spawnPos = spawn;
@@ -278,6 +287,28 @@ inline void NetworkManager::handlePacket(char* buf, int len, sockaddr_in& from) 
     else if (type == PKT_INVENTORY_SYNC) handleInventorySync(buf, len);
     else if (type == PKT_INTERACT_REQ) handleInteractRequest(buf, len);
     else if (type == PKT_ROAM_EVENT) handleRoamEvent(buf, len);
+    else if (type == PKT_PING_MARK) handlePingMark(buf, len);
+}
+
+inline void NetworkManager::handlePingMark(char* buf, int len) {
+    if(len < 2 + (int)sizeof(Vec3)) return;
+    int fromId = (unsigned char)buf[1];
+    Vec3 p;
+    memcpy(&p, buf + 2, sizeof(Vec3));
+    pingMarkFrom = fromId;
+    pingMarkPos = p;
+    pingMarkTtl = 6.0f;
+    pingMarkReceived = true;
+    if(isHost){
+        for (int i = 1; i < MAX_PLAYERS; i++) {
+            if (!players[i].active || i == fromId) continue;
+            sockaddr_in dest;
+            dest.sin_family = AF_INET;
+            dest.sin_addr.s_addr = players[i].addr;
+            dest.sin_port = players[i].port;
+            sendto(sock, buf, 32, 0, (sockaddr*)&dest, sizeof(dest));
+        }
+    }
 }
 
 inline void NetworkManager::handleJoin(char* buf, sockaddr_in& from) {

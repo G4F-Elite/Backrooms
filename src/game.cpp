@@ -109,6 +109,8 @@ int gPerfFrameTimeHead = PERF_GRAPH_SAMPLES - 1;
 
 // OpenGL resources
 GLuint wallTex, floorTex, ceilTex, lightTex, lampTex, propTex;
+// Dedicated texture for handheld devices (flashlight/scanner) so they don't use wood-like propTex.
+GLuint deviceTex = 0;
 GLuint mainShader, vhsShader, lightShader;
 GLuint wallVAO, wallVBO, floorVAO, floorVBO;
 GLuint ceilVAO, ceilVBO, lightVAO, lightVBO;

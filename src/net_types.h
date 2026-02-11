@@ -41,7 +41,8 @@ enum PacketType {
     PKT_ITEM_SNAPSHOT,   // Host -> clients world item snapshot
     PKT_INVENTORY_SYNC,  // Host -> clients inventory state for all players
     PKT_INTERACT_REQ,    // Client -> host interaction request
-    PKT_ROAM_EVENT       // Host -> clients roaming event trigger
+    PKT_ROAM_EVENT,      // Host -> clients roaming event trigger
+    PKT_PING_MARK        // Player -> others: ping marker for minimap/HUD
 };
 
 // Network player data

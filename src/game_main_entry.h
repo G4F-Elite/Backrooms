@@ -15,10 +15,10 @@ int main(){
     glfwSetCursorPosCallback(gWin,mouse);
     glfwSetFramebufferSizeCallback(gWin,windowResize);
     if(!gladLoadGL())return -1;
-    
     glEnable(GL_DEPTH_TEST);glEnable(GL_CULL_FACE);
     genWorld();
     wallTex=genTex(0);floorTex=genTex(1);ceilTex=genTex(2);lightTex=genTex(3);lampTex=genTex(4);propTex=genTex(5);
+    deviceTex=genTex(6); // device-specific texture (flashlight/scanner)
     mainShader=mkShader(mainVS,mainFS);lightShader=mkShader(lightVS,lightFS);vhsShader=mkShader(vhsVS,vhsFS);
     buildGeom();
     computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), renderW, renderH);
@@ -33,7 +33,6 @@ int main(){
     double nextRefreshProbeTime = 0.0;
     initFrameTimeHistory(gPerfFrameTimeHistory, PERF_GRAPH_SAMPLES, 16.6f);
     gPerfFrameTimeHead = PERF_GRAPH_SAMPLES - 1;
-    
     while(!glfwWindowShouldClose(gWin)){
         double frameStartTime = glfwGetTime();
         float now=(float)frameStartTime;
@@ -73,6 +72,11 @@ int main(){
         sndState.sfxVol=settings.sfxVol;
         sndState.voiceVol=settings.voiceVol;
         sndState.deathMode = isPlayerDead;
+
+        netMgr.updatePingMarkTtl(dTime);
+
+        // Backlog: entity hearing uses player noise derived from audio locomotion state.
+        gPlayerNoise = fastClamp01(sndState.moveIntensity * 0.45f + sndState.sprintIntensity * 0.85f);
         if(isSmileSilenceActive()){ sndState.musicVol*=0.08f; sndState.ambienceVol*=0.02f; sndState.voiceVol*=0.12f; }
         sndState.sanityLevel=playerSanity/100.0f;currentWinW=winW;currentWinH=winH;
         g_fastMathEnabled = settings.fastMath;
@@ -83,7 +87,7 @@ int main(){
             sndState.monsterProximity *= 0.84f;
             sndState.monsterMenace *= 0.84f;
         }
-        
+
         if(gameState==STATE_INTRO){
             bool spNow=glfwGetKey(gWin,GLFW_KEY_SPACE)==GLFW_PRESS;
             if(spNow&&!spacePressed){storyMgr.introComplete=true;gameState=STATE_GAME;}
@@ -208,24 +212,20 @@ int main(){
                 if(tryTriggerRandomScare(scareState, dTime, storyMgr.getPhase(), playerSanity, (int)(rng()%100))){
                     triggerLocalScare(0.26f, 0.14f, 3.0f);
                 }
-                
                 for(auto&n:storyMgr.notes)if(n.active&&!n.collected)n.bobPhase+=dTime*3.0f;
                 buildNotes(vhsTime);
-                
                 nearNoteId=-1;
                 for(auto&n:storyMgr.notes){
                     if(!n.active||n.collected)continue;
                     Vec3 d=n.pos-cam.pos;d.y=0;
                     if(sqrtf(d.x*d.x+d.z*d.z)<4.0f){nearNoteId=n.id;break;}
                 }
-                
                 cleanupFarNotes();
                 noteSpawnTimer-=dTime;
                 if(noteSpawnTimer<=0&&lastSpawnedNote<11){
                     int nn=lastSpawnedNote+1;trySpawnNote(nn);
                     noteSpawnTimer=nextNoteSpawnDelaySeconds((int)rng());
                 }
-                
                 bool canSpawnEnt = (multiState!=MULTI_IN_GAME || netMgr.isHost);
                 entitySpawnTimer-=dTime;
                 int maxEnt = computeEntityCap(survivalTime);
@@ -327,7 +327,6 @@ int main(){
                 }
                 camShake*=0.9f;damageFlash*=0.92f;survivalTime+=dTime;
                 if(multiState==MULTI_IN_GAME && !netMgr.isHost) captureSessionSnapshot();
-                
                 updateMultiplayer();
             }
         }

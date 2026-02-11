@@ -17,6 +17,9 @@
 // Provides GLuint for VAO/VBO handles used across the game.
 #include <glad/glad.h>
 
+// Textures are created in game_main_entry.h (declared in game.cpp)
+extern GLuint deviceTex;
+
 GLuint noteVAO=0, noteVBO=0;
 int noteVC=0;
 // First-person held items (separate models per slot/type)
@@ -108,6 +111,12 @@ int invPlush = 0;
 // 0 = none, 1 = flashlight, 2 = scanner, 3 = held consumable (battery/plush)
 int activeDeviceSlot = 1;
 float scannerSignal = 0.0f;
+// Scanner advanced mechanic state (backlog: overheating/false peaks)
+float scannerHeat = 0.0f;          // 0..1
+bool scannerOverheated = false;
+float scannerOverheatTimer = 0.0f; // seconds remaining until recovered
+float scannerPhantomTimer = 0.0f;  // 0..: forces false peaks for a short time
+float scannerPhantomBias = 0.0f;   // -0.35..+0.35 signal bias during phantom
 EchoSignal echoSignal = {};
 float echoSpawnTimer = 14.0f;
 float echoStatusTimer = 0.0f;

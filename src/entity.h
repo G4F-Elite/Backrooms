@@ -9,6 +9,10 @@
 #include "entity_model.h"
 #include "world.h"
 
+// Backlog: "hearing" support for entities (crawler reacts to loud footsteps/sprinting)
+// Values are set from gameplay/audio (see game_main_entry.h loop).
+inline float gPlayerNoise = 0.0f; // 0..1
+
 class EntityManager {
 public:
     std::vector<Entity> entities;
@@ -85,12 +89,21 @@ public:
             EntityState prevState = e.state;
             Vec3 toP = pPos - e.pos; toP.y = 0;
             float dist = sqrtf(toP.x*toP.x + toP.z*toP.z);
+
+            // Crawler hearing: expands detection range based on player noise.
+            float effectiveDetect = e.detectionRange;
+            if(e.type == ENTITY_CRAWLER){
+                float noise = gPlayerNoise;
+                if(noise < 0.0f) noise = 0.0f;
+                if(noise > 1.0f) noise = 1.0f;
+                effectiveDetect = e.detectionRange + noise * 10.0f; // up to +10m
+            }
             Vec3 look(mSin(pYaw), 0, mCos(pYaw)), toE = e.pos - pPos; toE.y = 0;
             float toEL = sqrtf(toE.x*toE.x + toE.z*toE.z);
             if(toEL > 0.01f) { toE.x /= toEL; toE.z /= toEL; }
-            bool looking = (look.x*toE.x + look.z*toE.z) > 0.85f && dist < e.detectionRange;
-            if(dist < e.detectionRange + 5.0f) {
-                float prox = 1.0f - dist/(e.detectionRange + 5.0f);
+            bool looking = (look.x*toE.x + look.z*toE.z) > 0.85f && dist < effectiveDetect;
+            if(dist < effectiveDetect + 5.0f) {
+                float prox = 1.0f - dist/(effectiveDetect + 5.0f);
                 if(prox > dangerLevel) dangerLevel = prox;
             }
 
@@ -112,7 +125,7 @@ public:
             }
             
             if(e.type == ENTITY_STALKER) updateStalker(e, dt, pPos, dist, looking, maze, mzw, mzh, cs);
-            else if(e.type == ENTITY_CRAWLER) updateCrawler(e, dt, pPos, dist, maze, mzw, mzh, cs);
+            else if(e.type == ENTITY_CRAWLER) updateCrawler(e, dt, pPos, dist, effectiveDetect, maze, mzw, mzh, cs);
             else if(e.type == ENTITY_SHADOW) updateShadow(e, dt, pPos, dist, looking, pYaw);
             // Check for attacking state for shadow/crawler
             if(e.type == ENTITY_SHADOW && dist < e.attackRange && !looking) e.state = ENT_ATTACKING;
@@ -188,7 +201,7 @@ public:
         if(dist < e.attackRange && e.state == ENT_STALKING) e.state = ENT_ATTACKING;
     }
     
-    void updateCrawler(Entity& e, float dt, Vec3 pPos, float dist, int maze[][30], int mzw, int mzh, float cs) {
+    void updateCrawler(Entity& e, float dt, Vec3 pPos, float dist, float effectiveDetect, int maze[][30], int mzw, int mzh, float cs) {
         (void)maze; (void)mzw; (void)mzh; (void)cs;
         e.stateTimer += dt; e.pos.y = -0.8f; // Stay low
         float speedMul = 1.0f;
@@ -201,7 +214,7 @@ public:
                 e.stateTimer = 0.0f;
             }
         }
-        if(dist < e.detectionRange) { e.state = ENT_CHASING;
+        if(dist < effectiveDetect) { e.state = ENT_CHASING;
             Vec3 dir = pPos - e.pos; dir.y = 0; float len = sqrtf(dir.x*dir.x + dir.z*dir.z);
             if(len > 0.1f) { dir.x /= len; dir.z /= len;
                 if(e.behaviorMode == BEHAVIOR_FLANK){

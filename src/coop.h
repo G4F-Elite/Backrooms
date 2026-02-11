@@ -68,7 +68,23 @@ inline void applyItemUse(int type){
         return;
     }
     if(type==ITEM_PLUSH_TOY){
+        // Mod: allow plush toy use even when not in inventory (slot 3 always available).
+        if(invPlush <= 0){
+            playerSanity += 28.0f;
+            if(playerSanity > 100.0f) playerSanity = 100.0f;
+            setEchoStatus("PLUSH TOY: YOUR MIND FEELS WHOLE AGAIN");
+            return;
+        }
         applyPlushToyUse();
+        return;
+    }
+
+    if(type==ITEM_MED_SPRAY){
+        if(isPlayerDead) return;
+        playerHealth += 40.0f;
+        if(playerHealth > 100.0f) playerHealth = 100.0f;
+        setEchoStatus("MED SPRAY: WOUNDS STITCH UP");
+        return;
     }
 }
 

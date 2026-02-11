@@ -78,6 +78,14 @@ void drawUI(){
             if(activeDeviceSlot == 2){
                 float y = -0.70f;
                 drawHudText("SCANNER",0.52f,y,1.15f,0.55f,0.82f,0.86f,0.92f);
+                if(scannerOverheated){
+                    drawHudText("OVERHEAT",0.52f,y-0.06f,1.05f,0.92f,0.44f,0.30f,0.92f);
+                }else if(scannerHeat > 0.02f){
+                    float h = scannerHeat;
+                    if(h<0.0f) h=0.0f;
+                    if(h>1.0f) h=1.0f;
+                    drawSlider(0.66f,y-0.06f,0.30f,h,0.95f,0.62f,0.20f);
+                }
                 float sig = scannerSignal;
                 if(sig < 0.0f) sig = 0.0f;
                 if(sig > 1.0f) sig = 1.0f;
