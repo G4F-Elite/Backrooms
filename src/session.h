@@ -186,6 +186,11 @@ Vec3 level2VentNode(0, 0, 0);
 bool level2VentDone = false;
 Vec3 level2LiftNode(0, 0, 0);
 Vec3 level2PowerNode(0, 0, 0);
+Vec3 level2CameraNode(0, 0, 0);
+Vec3 level2DroneNode(0, 0, 0);
+bool level2CameraOnline = false;
+bool level2DroneReprogrammed = false;
+float level2DroneAssistTimer = 0.0f;
 
 int archivePoints = 0;
 int archiveTier = 0;
@@ -436,6 +441,9 @@ inline void initLevel2PuzzleStages();
 inline bool processLevel2Step(const Vec3& playerPos);
 inline bool buildLevel2ActionPrompt(const Vec3& playerPos, char* out, int outSize);
 inline bool isLevel2HoldMaintained();
+inline bool processLevel2SideTechStep(const Vec3& playerPos);
+inline bool buildLevel2SideTechPrompt(const Vec3& playerPos, char* out, int outSize);
+inline void updateLevel2DroneAssist(float dt);
 inline void initVoidShiftSetpieces();
 inline void triggerConferenceCallSetpiece(float duration);
 inline void triggerCorridorShiftSetpiece(float duration);
@@ -446,6 +454,7 @@ inline void updateVoidShiftHoldPhases(float dt);
 #include "void_shift_runtime.h"
 #include "void_shift_puzzles_ext.h"
 #include "void_shift_level2_ext.h"
+#include "void_shift_side_tech_ext.h"
 #include "void_shift_setpieces_ext.h"
 
 inline int storyNotesRequired(){

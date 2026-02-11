@@ -130,6 +130,11 @@ inline void resetVoidShiftState(const Vec3& spawnPos, const Vec3& exitDoorPos) {
     level2VentNode = Vec3(spawnPos.x - CS * 7.0f, 0.0f, spawnPos.z + CS * 2.0f);
     level2LiftNode = exitDoorPos;
     level2PowerNode = Vec3(spawnPos.x + CS * 5.0f, 0.0f, spawnPos.z + CS * 1.0f);
+    level2CameraNode = Vec3(spawnPos.x - CS * 4.0f, 0.0f, spawnPos.z - CS * 5.0f);
+    level2DroneNode = Vec3(spawnPos.x + CS * 2.0f, 0.0f, spawnPos.z + CS * 7.0f);
+    level2CameraOnline = false;
+    level2DroneReprogrammed = false;
+    level2DroneAssistTimer = 0.0f;
 
     initVoidShiftNpcSpots(spawnPos, exitDoorPos);
     initSideContractForLevel(); initLevel2PuzzleStages(); initVoidShiftSetpieces();
@@ -266,6 +271,7 @@ inline void buildVoidShiftInteractPrompt(const Vec3& playerPos, char* out, int o
     }
 
     if (buildLevel2ActionPrompt(playerPos, out, outSize)) return;
+    if (buildLevel2SideTechPrompt(playerPos, out, outSize)) return;
     for (int i = 0; i < 3; i++) {
         if (level2FuseDone[i]) continue;
         if (nearPoint2D(playerPos, level2FuseNodes[i], 2.4f)) {
@@ -306,7 +312,7 @@ inline void buildVoidShiftObjectiveLine(char* out, int outSize) {
     }
 
     if (!level2BatteryInstalled || level2FuseCount < 3 || !level2AccessReady) {
-        std::snprintf(out, outSize, "CONTRACT L2: BAT %d(%d) FUSE %d/3 PWR %d ACCESS %d", level2BatteryInstalled ? 1 : 0, level2BatteryStage, level2FuseCount, level2FusePanelPowered ? 1 : 0, level2AccessReady ? 1 : 0);
+        std::snprintf(out, outSize, "CONTRACT L2: BAT %d(%d) FUSE %d/3 PWR %d ACCESS %d CAM %d DRN %d", level2BatteryInstalled ? 1 : 0, level2BatteryStage, level2FuseCount, level2FusePanelPowered ? 1 : 0, level2AccessReady ? 1 : 0, level2CameraOnline ? 1 : 0, level2DroneReprogrammed ? 1 : 0);
         return;
     }
     if (level2HoldActive) {
@@ -383,7 +389,7 @@ inline bool tryHandleVoidShiftInteract(const Vec3& playerPos) {
         return false;
     }
 
-    if (processLevel2Step(playerPos)) return true;
+    if (processLevel2Step(playerPos) || processLevel2SideTechStep(playerPos)) return true;
     for (int i = 0; i < 3; i++) {
         if (level2FuseDone[i]) continue;
         if (!nearPoint2D(playerPos, level2FuseNodes[i], 2.4f)) continue;
@@ -470,6 +476,8 @@ inline void updateVoidShiftSystems(float dt, bool sprinting, bool flashlightActi
     } else {
         coLevel = 0.0f;
     }
+
+    updateLevel2DroneAssist(dt);
 
     if (dispatcherCallCooldown > 0.0f) {
         dispatcherCallCooldown -= dt;
