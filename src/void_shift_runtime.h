@@ -513,6 +513,8 @@ inline void updateVoidShiftSystems(float dt, bool sprinting, bool flashlightActi
             attentionEventCooldown = 12.0f;
         } else if (attentionLevel >= 75.0f) {
             setTrapStatus(isLevelZero(gCurrentLevel) ? "HIGH: LAMP-HUSHER SWARM" : "HIGH: HEADLIGHT SWARM");
+            if (isLevelZero(gCurrentLevel)) lightsOutTimer = 18.0f;
+            else falseDoorTimer = 14.0f;
             if (multiState != MULTI_IN_GAME) {
                 Vec3 ep = findSpawnPos(cam.pos, 10.0f);
                 entityMgr.spawnEntity(ENTITY_CRAWLER, ep, nullptr, 0, 0);
@@ -520,6 +522,7 @@ inline void updateVoidShiftSystems(float dt, bool sprinting, bool flashlightActi
             attentionEventCooldown = 10.0f;
         } else if (attentionLevel >= 50.0f) {
             setTrapStatus(isLevelZero(gCurrentLevel) ? "ATTENTION RISING: PHONE MIMIC RISK" : "ATTENTION RISING: DRONE ALERT");
+            if (isLevelZero(gCurrentLevel)) falseDoorTimer = 10.0f;
             attentionEventCooldown = 8.0f;
         } else if (attentionLevel >= 25.0f) {
             setTrapStatus(isLevelZero(gCurrentLevel) ? "ATTENTION: PAPERCLIP NOISE" : "ATTENTION: OIL TRACKS DETECTED");
