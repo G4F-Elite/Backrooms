@@ -158,11 +158,8 @@ int main(){
                         glfwGetKey(gWin,GLFW_KEY_SPACE)==GLFW_PRESS;
                 bool esN=glfwGetKey(gWin,GLFW_KEY_ESCAPE)==GLFW_PRESS;
                 if(eN&&!enterPressed){
-                    gCurrentLevel++;
-                    gCompletedLevels++;
-                    genWorld();
-                    buildGeom();
-                    gameState=STATE_INTRO;
+                    if(isLevelZero(gCurrentLevel)){ gCurrentLevel = 1; gCompletedLevels++; genWorld(); buildGeom(); gameState=STATE_INTRO; }
+                    else{ gCompletedLevels++; gCurrentLevel = 0; gameState=STATE_MENU; menuSel=0; glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL); }
                 }
                 if(esN&&!escPressed){
                     gameState=STATE_MENU;menuSel=0;

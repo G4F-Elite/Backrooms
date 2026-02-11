@@ -45,12 +45,14 @@ inline void resetVoidShiftState(const Vec3& spawnPos, const Vec3& exitDoorPos) {
     level2HoldActive = false;
     level2HoldTimer = 15.0f;
     level2ContractComplete = false;
+    level2VentDone = false;
     for (int i = 0; i < 3; i++) level2FuseDone[i] = false;
     level2BatteryNode = Vec3(spawnPos.x + CS * 6.0f, 0.0f, spawnPos.z - CS * 2.0f);
     level2FuseNodes[0] = Vec3(spawnPos.x - CS * 2.0f, 0.0f, spawnPos.z + CS * 6.0f);
     level2FuseNodes[1] = Vec3(spawnPos.x + CS * 7.0f, 0.0f, spawnPos.z + CS * 4.0f);
     level2FuseNodes[2] = Vec3(spawnPos.x - CS * 6.0f, 0.0f, spawnPos.z - CS * 1.0f);
     level2AccessNode = Vec3(spawnPos.x + CS * 1.0f, 0.0f, spawnPos.z - CS * 7.0f);
+    level2VentNode = Vec3(spawnPos.x - CS * 7.0f, 0.0f, spawnPos.z + CS * 2.0f);
     level2LiftNode = exitDoorPos;
 }
 
@@ -96,6 +98,84 @@ inline bool isVoidShiftExitReady() {
     return level2ContractComplete;
 }
 
+inline bool getVoidShiftResonanceTarget(Vec3& outPos) {
+    if (isLevelZero(gCurrentLevel)) {
+        if (level1HoldActive || level1ContractComplete) {
+            outPos = coop.doorPos;
+            return true;
+        }
+        for (int i = 0; i < 3; i++) {
+            if (level1NodeDone[i]) continue;
+            outPos = level1Nodes[i];
+            return true;
+        }
+        return false;
+    }
+
+    if (!level2BatteryInstalled) {
+        outPos = level2BatteryNode;
+        return true;
+    }
+    for (int i = 0; i < 3; i++) {
+        if (level2FuseDone[i]) continue;
+        outPos = level2FuseNodes[i];
+        return true;
+    }
+    if (!level2AccessReady) {
+        outPos = level2AccessNode;
+        return true;
+    }
+    if (!level2HoldActive && !level2ContractComplete) {
+        outPos = level2LiftNode;
+        return true;
+    }
+    outPos = level2LiftNode;
+    return true;
+}
+
+inline void buildVoidShiftInteractPrompt(const Vec3& playerPos, char* out, int outSize) {
+    if (!out || outSize < 2) return;
+    out[0] = '\0';
+
+    if (isLevelZero(gCurrentLevel)) {
+        for (int i = 0; i < 3; i++) {
+            if (level1NodeDone[i]) continue;
+            if (nearPoint2D(playerPos, level1Nodes[i], 2.3f)) {
+                std::snprintf(out, outSize, "[E] CALIBRATE STABILIZER NODE");
+                return;
+            }
+        }
+        if (level1HoldActive && nearPoint2D(playerPos, coop.doorPos, 2.5f)) {
+            std::snprintf(out, outSize, "[E] EXIT TO PARKING");
+            return;
+        }
+        return;
+    }
+
+    if (!level2BatteryInstalled && nearPoint2D(playerPos, level2BatteryNode, 2.4f)) {
+        std::snprintf(out, outSize, "[E] INSTALL TRACTION BATTERY");
+        return;
+    }
+    for (int i = 0; i < 3; i++) {
+        if (level2FuseDone[i]) continue;
+        if (nearPoint2D(playerPos, level2FuseNodes[i], 2.4f)) {
+            std::snprintf(out, outSize, "[E] INSTALL LIFT FUSE");
+            return;
+        }
+    }
+    if (!level2AccessReady && nearPoint2D(playerPos, level2AccessNode, 2.4f)) {
+        std::snprintf(out, outSize, "[E] AUTHORIZE SECURITY ACCESS");
+        return;
+    }
+    if (!level2VentDone && nearPoint2D(playerPos, level2VentNode, 2.4f)) {
+        std::snprintf(out, outSize, "[E] ENABLE VENTILATION");
+        return;
+    }
+    if (!level2HoldActive && !level2ContractComplete && level2BatteryInstalled && level2FuseCount >= 3 && level2AccessReady && nearPoint2D(playerPos, level2LiftNode, 2.6f)) {
+        std::snprintf(out, outSize, "[E] START LIFT HOLD");
+    }
+}
+
 inline void buildVoidShiftObjectiveLine(char* out, int outSize) {
     if (!out || outSize < 2) return;
     if (isLevelZero(gCurrentLevel)) {
@@ -119,7 +199,7 @@ inline void buildVoidShiftObjectiveLine(char* out, int outSize) {
         std::snprintf(out, outSize, "CONTRACT L2: HOLD LIFT %.0fs", level2HoldTimer);
         return;
     }
-    std::snprintf(out, outSize, "CONTRACT L2 COMPLETE: LIFT READY");
+    std::snprintf(out, outSize, level2VentDone ? "CONTRACT L2 COMPLETE: LIFT READY + VENT" : "CONTRACT L2 COMPLETE: LIFT READY");
 }
 
 inline bool tryHandleVoidShiftInteract(const Vec3& playerPos) {
@@ -160,6 +240,13 @@ inline bool tryHandleVoidShiftInteract(const Vec3& playerPos) {
         level2AccessReady = true;
         addAttention(10.0f);
         setTrapStatus("SECURITY ACCESS ACCEPTED");
+        return true;
+    }
+    if (!level2VentDone && nearPoint2D(playerPos, level2VentNode, 2.4f)) {
+        level2VentDone = true;
+        ventilationOnline = true;
+        addAttention(6.0f);
+        setTrapStatus("VENTILATION ONLINE");
         return true;
     }
     if (!level2HoldActive && !level2ContractComplete && level2BatteryInstalled && level2FuseCount >= 3 && level2AccessReady && nearPoint2D(playerPos, level2LiftNode, 2.6f)) {
@@ -209,6 +296,9 @@ inline void updateVoidShiftSystems(float dt, bool sprinting, bool flashlightActi
         float coDamage = coLevel / 100.0f;
         playerStamina -= dt * coDamage * 4.0f;
         if (playerStamina < 0.0f) playerStamina = 0.0f;
+        if (level2VentDone && coLevel <= 20.0f) {
+            setEchoStatus("CO STABLE: ROUTE SAFER");
+        }
     } else {
         coLevel = 0.0f;
     }
@@ -236,9 +326,17 @@ inline void updateVoidShiftSystems(float dt, bool sprinting, bool flashlightActi
     if (attentionEventCooldown <= 0.0f) {
         if (attentionLevel >= 90.0f) {
             setTrapStatus("ATTENTION CRITICAL");
+            if (multiState != MULTI_IN_GAME) {
+                Vec3 ep = findSpawnPos(cam.pos, 12.0f);
+                entityMgr.spawnEntity(ENTITY_SHADOW, ep, nullptr, 0, 0);
+            }
             attentionEventCooldown = 12.0f;
         } else if (attentionLevel >= 75.0f) {
             setTrapStatus("ATTENTION HIGH");
+            if (multiState != MULTI_IN_GAME) {
+                Vec3 ep = findSpawnPos(cam.pos, 10.0f);
+                entityMgr.spawnEntity(ENTITY_CRAWLER, ep, nullptr, 0, 0);
+            }
             attentionEventCooldown = 10.0f;
         } else if (attentionLevel >= 50.0f) {
             setTrapStatus("ATTENTION RISING");

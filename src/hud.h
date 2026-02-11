@@ -133,7 +133,7 @@ void drawUI(){
                     blockY -= 0.06f;
                     drawHudText(isStoryExitReady()?"EXIT READY":"EXIT LOCKED",blockX,blockY,1.08f,0.72f,0.86f,0.90f,0.93f);
                     blockY -= 0.06f;
-                    drawHudText("ACTION: COMPLETE CONTRACT STEPS",blockX,blockY,1.00f,0.82f,0.86f,0.62f,0.90f);
+                    drawHudText(level2VentDone?"ACTION: CONTRACT + VENT ONLINE":"ACTION: COMPLETE CONTRACT STEPS",blockX,blockY,1.00f,0.82f,0.86f,0.62f,0.90f);
                     blockY -= 0.06f;
                 }
                 char phaseBuf[64];
@@ -178,39 +178,22 @@ void drawUI(){
             if(nearbyWorldItemId>=0 && settings.debugMode){
                 drawHudTextCentered(worldItemPickupPrompt(nearbyWorldItemType),0.0f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.9f);
             }
-            // === ECHO SIGNAL: immersive pulsing indicator (always), debug shows distance ===
-            if(multiState!=MULTI_IN_GAME && echoSignal.active){
-                Vec3 d = echoSignal.pos - cam.pos;
-                d.y = 0;
-                float dist = d.len();
-                if(settings.debugMode){
-                    char echoBuf[72];
-                    snprintf(echoBuf,72,"ECHO SIGNAL %.0fm",dist);
-                    drawHudText(echoBuf,-0.95f,0.50f,1.18f,0.62f,0.85f,0.86f,0.90f);
-                }else{
-                    // Immersive echo: faint, flickering beacon with a VHS-like pulse (no text)
-                    float proximity = 1.0f - (dist / 60.0f);
-                    if(proximity < 0.05f) proximity = 0.05f;
-                    if(proximity > 1.0f) proximity = 1.0f;
-                    float t = (float)glfwGetTime();
-                    float pulse = 0.32f + 0.68f * proximity;
-                    float flicker = 0.72f + 0.28f * sinf(t * (1.4f + proximity * 6.2f));
-                    float alpha = pulse * flicker;
-                    float driftX = 0.006f * sinf(t * 0.9f + dist * 0.04f);
-                    float driftY = 0.006f * cosf(t * 0.7f + dist * 0.03f);
-                    float baseX = -0.90f + driftX;
-                    float baseY = 0.50f + driftY;
-                    float core = 0.010f + 0.010f * proximity;
-                    float glow = core * 2.8f;
-                    drawOverlayRectNdc(baseX - glow, baseY - glow, baseX + glow, baseY + glow, 0.18f, 0.36f, 0.42f, alpha * 0.20f);
-                    drawOverlayRectNdc(baseX - core * 1.8f, baseY - core * 0.12f, baseX + core * 1.8f, baseY + core * 0.12f, 0.28f, 0.68f, 0.78f, alpha * 0.55f);
-                    drawOverlayRectNdc(baseX - core * 0.12f, baseY - core * 1.8f, baseX + core * 0.12f, baseY + core * 1.8f, 0.38f, 0.82f, 0.92f, alpha * 0.70f);
-                    float smearY = baseY - 0.035f + 0.01f * sinf(t * 1.25f + proximity);
-                    float smearW = 0.04f + 0.05f * proximity;
-                    drawOverlayRectNdc(baseX - smearW, smearY - 0.004f, baseX + smearW, smearY + 0.004f, 0.22f, 0.50f, 0.58f, alpha * 0.28f);
+            if(multiState!=MULTI_IN_GAME){
+                Vec3 resonancePos(0,0,0);
+                if(getVoidShiftResonanceTarget(resonancePos)){
+                    Vec3 d = resonancePos - cam.pos;
+                    d.y = 0;
+                    float dist = d.len();
+                    if(settings.debugMode){
+                        char echoBuf[72];
+                        snprintf(echoBuf,72,"RESONANCE %.0fm",dist);
+                        drawHudText(echoBuf,-0.95f,0.50f,1.18f,0.62f,0.85f,0.86f,0.90f);
+                    }
                 }
-                if(settings.debugMode && isEchoInRange(cam.pos, echoSignal.pos, 2.5f)){
-                    drawHudTextCentered("[E]",0.0f,-0.50f,1.6f,0.72f,0.88f,0.9f,0.90f);
+                char actionPrompt[96];
+                buildVoidShiftInteractPrompt(cam.pos, actionPrompt, 96);
+                if(actionPrompt[0] != '\0'){
+                    drawHudTextCentered(actionPrompt,0.0f,-0.43f,1.28f,0.8f,0.84f,0.62f,0.92f);
                 }
             }
             if(settings.debugMode && multiState!=MULTI_IN_GAME && echoStatusTimer>0.0f){

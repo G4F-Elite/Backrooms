@@ -13,8 +13,7 @@ void gameInput(GLFWwindow*w){
     static bool debugEscPressed = false;
     static bool perfTogglePressed = false;
     static bool hudTogglePressed = false;
-    static bool recordPressed = false;
-    static bool playbackPressed = false;
+    static bool recordPressed = false, playbackPressed = false;
     bool debugToggleNow = glfwGetKey(w,GLFW_KEY_F10)==GLFW_PRESS;
     if(settings.debugMode && debugToggleNow && !debugTogglePressed){
         debugTools.open = !debugTools.open;
@@ -198,8 +197,7 @@ void gameInput(GLFWwindow*w){
     bool k2=glfwGetKey(w,settings.binds.item2)==GLFW_PRESS;
     bool k3=glfwGetKey(w,settings.binds.item3)==GLFW_PRESS;
     bool k4=glfwGetKey(w,settings.binds.item4)==GLFW_PRESS;
-    bool recordNow = glfwGetKey(w, GLFW_KEY_R) == GLFW_PRESS;
-    bool playbackNow = glfwGetKey(w, GLFW_KEY_P) == GLFW_PRESS;
+    bool recordNow = glfwGetKey(w, GLFW_KEY_R) == GLFW_PRESS, playbackNow = glfwGetKey(w, GLFW_KEY_P) == GLFW_PRESS;
     static bool pingPressed=false;
     bool pingNow = glfwGetKey(w, GLFW_KEY_G) == GLFW_PRESS;
     if(k1&&!key1Pressed){
@@ -216,6 +214,7 @@ void gameInput(GLFWwindow*w){
     if(k2&&!key2Pressed){
         if(activeDeviceSlot != 2){
             activeDeviceSlot = 2;
+            resonatorMode = RESONATOR_SCAN;
             if(flashlightOn){
                 flashlightOn = false;
                 flashlightShutdownBlinkActive = false;
@@ -366,9 +365,10 @@ void gameInput(GLFWwindow*w){
     );
     
     float rawSignal = 0.0f;
-    bool scannerHasTarget = (activeDeviceSlot == 2 && echoSignal.active && multiState!=MULTI_IN_GAME);
+    Vec3 resonanceTarget(0, 0, 0);
+    bool scannerHasTarget = (activeDeviceSlot == 2 && multiState!=MULTI_IN_GAME && getVoidShiftResonanceTarget(resonanceTarget));
     if(scannerHasTarget){
-        Vec3 toEcho = echoSignal.pos - cam.pos;
+        Vec3 toEcho = resonanceTarget - cam.pos;
         float dist = toEcho.len();
         if(dist < 0.01f) dist = 0.01f;
         Vec3 fwdScan(mSin(cam.yaw), 0.0f, mCos(cam.yaw));

@@ -163,6 +163,8 @@ Vec3 level2BatteryNode(0, 0, 0);
 Vec3 level2FuseNodes[3];
 bool level2FuseDone[3] = {false, false, false};
 Vec3 level2AccessNode(0, 0, 0);
+Vec3 level2VentNode(0, 0, 0);
+bool level2VentDone = false;
 Vec3 level2LiftNode(0, 0, 0);
 TrapCorridorState trapCorridor = {};
 DebugToolsState debugTools = {};
