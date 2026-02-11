@@ -479,6 +479,7 @@ inline void updateVoidShiftSystems(float dt, bool sprinting, bool flashlightActi
     updateNpcTrustState(dt);
 
     updateLevel2DroneAssist(dt);
+    updateVoidShiftEnemyEffects(dt);
 
     if (dispatcherCallCooldown > 0.0f) {
         dispatcherCallCooldown -= dt;

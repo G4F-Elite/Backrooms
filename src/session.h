@@ -143,6 +143,9 @@ bool recipeBeaconUnlocked = false;
 bool recipeFlashLampUnlocked = false;
 bool recipeFixatorUnlocked = false;
 int markerStyleIndex = 0;
+float paperclipSwarmTimer = 0.0f;
+float oilSlipTimer = 0.0f;
+float headlightExposureTimer = 0.0f;
 
 inline void setSquadCallout(const char* txt) {
     if (!txt) return;
@@ -463,6 +466,7 @@ inline void triggerCorridorShiftSetpiece(float duration);
 inline void triggerBlackoutSetpiece(float duration);
 inline void updateVoidShiftSetpieces(float dt);
 inline void updateVoidShiftHoldPhases(float dt);
+inline void updateVoidShiftEnemyEffects(float dt);
 inline void initNpcTrustState();
 inline void updateNpcTrustState(float dt);
 inline void applyCartographerInteractionOutcome();
@@ -478,6 +482,7 @@ inline void tryCraftFixator();
 #include "void_shift_level2_ext.h"
 #include "void_shift_side_tech_ext.h"
 #include "void_shift_setpieces_ext.h"
+#include "void_shift_enemy_effects_ext.h"
 #include "void_shift_crafting_ext.h"
 #include "void_shift_npc_trust_ext.h"
 
