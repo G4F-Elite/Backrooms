@@ -472,11 +472,8 @@ vec3 c = vec3(r,g,b);
  c.r *= mix(vig, 1.0, 0.05);
  c.g *= vig;
  c.b *= mix(vig, 1.0, -0.03);
- // Subtle warm light leak from edge (like old camera)
- float leakAngle = atan(vigUV.y, vigUV.x);
- float leak = sin(leakAngle * 1.5 + tm * 0.05) * 0.5 + 0.5;
- float leakMask = smoothstep(0.35, 0.55, length(vigUV)) * leak * 0.015 * inten;
- c += vec3(leakMask * 1.2, leakMask * 0.9, leakMask * 0.4);
+// Warm edge light leak disabled (it created a crawling light band on the main menu)
+float leakMask = 0.0;
  // Ghost frame (visible double image at higher intensity)
  vec3 ghost = resolveSample(uv - vec2(0.003, 0.0015));
  c = mix(c, ghost * vec3(1.03, 0.98, 0.95), 0.080 * inten);
