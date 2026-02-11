@@ -195,6 +195,20 @@ void drawUI(){
                         drawHudText(echoBuf,-0.95f,0.50f,1.18f,0.62f,0.85f,0.86f,0.90f);
                     }
                 }
+
+                if(settings.debugMode){
+                    float sx = 0.0f, sy = 0.0f;
+                    if(npcCartographerActive && projectToScreen(npcCartographerPos + Vec3(0,1.7f,0), sx, sy)){
+                        drawHudTextCentered("CARTOGRAPHER", sx, sy, 1.0f, 0.76f, 0.90f, 0.74f, 0.92f);
+                    }
+                    if(npcDispatcherActive && projectToScreen(npcDispatcherPhonePos + Vec3(0,1.7f,0), sx, sy)){
+                        drawHudTextCentered("DISPATCH", sx, sy, 1.0f, 0.78f, 0.84f, 0.96f, 0.92f);
+                    }
+                    if(npcLostSurvivorActive && projectToScreen(npcLostSurvivorPos + Vec3(0,1.7f,0), sx, sy)){
+                        drawHudTextCentered("LOST SURVIVOR", sx, sy, 1.0f, 0.92f, 0.78f, 0.64f, 0.92f);
+                    }
+                }
+
                 char actionPrompt[96];
                 buildVoidShiftInteractPrompt(cam.pos, actionPrompt, 96);
                 if(actionPrompt[0] != '\0'){
@@ -219,6 +233,18 @@ void drawUI(){
                     if(dist > 40.0f) continue;
                     const char* nm = netMgr.players[i].name[0] ? netMgr.players[i].name : "Player";
                     drawHudTextCentered(nm, sx, sy, 1.1f, 0.85f, 0.9f, 0.7f, 0.90f);
+                }
+
+                netMgr.updatePingMarkTtl(dTime);
+                if(netMgr.pingMarkReceived && netMgr.pingMarkTtl > 0.0f){
+                    float psx = 0.0f, psy = 0.0f;
+                    Vec3 pmark = netMgr.pingMarkPos + Vec3(0, 1.5f, 0);
+                    if(projectToScreen(pmark, psx, psy)){
+                        float alpha = 0.35f + 0.6f * (netMgr.pingMarkTtl / 6.0f);
+                        if(alpha > 0.95f) alpha = 0.95f;
+                        drawHudTextCentered("PING", psx, psy, 1.22f, 0.90f, 0.85f, 0.50f, alpha);
+                        drawHudTextCentered("+", psx, psy - 0.04f, 1.35f, 0.96f, 0.88f, 0.58f, alpha);
+                    }
                 }
             }
             // === DEBUG MODE: trap status text, floor hazards, anomaly lock, minimap state, perf graph ===
