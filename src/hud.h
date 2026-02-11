@@ -75,6 +75,18 @@ void drawUI(){
             if(playerSanity<100)drawSanityBar(playerSanity);
             drawStaminaBar(playerStamina);
             if(flashlightBattery<100)drawFlashlightBattery(flashlightBattery,flashlightOn);
+            {
+                char contractBuf[128];
+                buildVoidShiftObjectiveLine(contractBuf, 128);
+                drawHudText(contractBuf,-0.95f,0.88f,1.08f,0.88f,0.90f,0.72f,0.95f);
+                char attBuf[96];
+                if(isParkingLevel(gCurrentLevel)){
+                    snprintf(attBuf,96,"ATTENTION %.0f%%  CO %.0f%%  RESO %.0f%%",attentionLevel,coLevel,resonatorBattery);
+                }else{
+                    snprintf(attBuf,96,"ATTENTION %.0f%%  RESO %.0f%%",attentionLevel,resonatorBattery);
+                }
+                drawHudText(attBuf,-0.95f,0.82f,1.02f,0.78f,0.86f,0.76f,0.92f);
+            }
             if(activeDeviceSlot == 2){
                 float y = -0.70f;
                 drawOverlayRectNdc(0.48f, y - 0.14f, 0.95f, y + 0.07f, 0.04f, 0.09f, 0.10f, 0.42f);
@@ -115,17 +127,13 @@ void drawUI(){
                     if(!coop.doorOpen) drawHudText("ACTION HOLD 2 SWITCHES",blockX,blockY,1.02f,0.82f,0.86f,0.62f,0.90f);
                     blockY -= 0.06f;
                 }else{
-                    const int notesRequired = storyNotesRequired();
-                    bool exitReady = isStoryExitReady();
-                    char notesLine[64];
-                    snprintf(notesLine,64,"NOTES %d/%d",storyMgr.totalCollected,notesRequired);
-                    drawHudText(notesLine,blockX,blockY,1.18f,0.86f,0.90f,0.68f,0.95f);
+                    char contractLine[96];
+                    buildVoidShiftObjectiveLine(contractLine, 96);
+                    drawHudText(contractLine,blockX,blockY,1.02f,0.86f,0.90f,0.68f,0.95f);
                     blockY -= 0.06f;
-                    drawHudText(storyEchoAttuned?"ECHO ATTUNED":"ECHO NOT ATTUNED",blockX,blockY,1.08f,0.72f,0.86f,0.90f,0.93f);
+                    drawHudText(isStoryExitReady()?"EXIT READY":"EXIT LOCKED",blockX,blockY,1.08f,0.72f,0.86f,0.90f,0.93f);
                     blockY -= 0.06f;
-                    drawHudText(exitReady?"EXIT DOOR READY":"EXIT DOOR LOCKED",blockX,blockY,1.16f,0.88f,0.84f,0.62f,0.95f);
-                    blockY -= 0.06f;
-                    drawHudText(exitReady?"ACTION GO TO DOOR AND PRESS E":"ACTION NOTES + ECHO REQUIRED",blockX,blockY,1.02f,0.82f,0.86f,0.62f,0.90f);
+                    drawHudText("ACTION: COMPLETE CONTRACT STEPS",blockX,blockY,1.00f,0.82f,0.86f,0.62f,0.90f);
                     blockY -= 0.06f;
                 }
                 char phaseBuf[64];
@@ -156,13 +164,13 @@ void drawUI(){
                 bool nearExit = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
                 if(nearExit && settings.debugMode){
                     if(isStoryExitReady()) drawHudTextCentered("[E] EXIT LEVEL",0.0f,-0.35f,1.4f,0.75f,0.88f,0.70f,0.95f);
-                    else drawHudTextCentered("COLLECT NOTES + ATTUNE ECHO TO UNLOCK EXIT",0.0f,-0.35f,1.2f,0.88f,0.72f,0.58f,0.93f);
+                    else drawHudTextCentered("COMPLETE CONTRACT TO UNLOCK EXIT",0.0f,-0.35f,1.2f,0.88f,0.72f,0.58f,0.93f);
                 }
             }else{
                 bool nearExit = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
                 if(nearExit && settings.debugMode){
-                    if(coop.doorOpen && storyMgr.totalCollected>=storyNotesRequired()) drawHudTextCentered("[E] EXIT LEVEL",0.0f,-0.35f,1.4f,0.75f,0.88f,0.70f,0.95f);
-                    else drawHudTextCentered("OPEN DOOR + COLLECT NOTES TO EXIT",0.0f,-0.35f,1.25f,0.88f,0.72f,0.58f,0.93f);
+                    if(coop.doorOpen && isStoryExitReady()) drawHudTextCentered("[E] EXIT LEVEL",0.0f,-0.35f,1.4f,0.75f,0.88f,0.70f,0.95f);
+                    else drawHudTextCentered("OPEN DOOR + COMPLETE CONTRACT TO EXIT",0.0f,-0.35f,1.25f,0.88f,0.72f,0.58f,0.93f);
                 }
             }
             drawNoteCounter(storyMgr.totalCollected);

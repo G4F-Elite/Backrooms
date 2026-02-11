@@ -13,6 +13,7 @@
 #include "entity_ai.h"
 #include "trap_events.h"
 #include "debug_tools.h"
+#include <vector>
 
 // Provides GLuint for VAO/VBO handles used across the game.
 #include <glad/glad.h>
@@ -125,6 +126,44 @@ float echoStatusTimer = 0.0f;
 char echoStatusText[96] = {};
 bool storyEchoAttuned = false;
 int storyEchoAttunedCount = 0;
+enum ResonatorMode {
+    RESONATOR_SCAN = 0,
+    RESONATOR_RECORD = 1,
+    RESONATOR_PLAYBACK = 2,
+    RESONATOR_PING = 3
+};
+int resonatorMode = RESONATOR_SCAN;
+float resonatorBattery = 100.0f;
+float attentionLevel = 0.0f;
+float attentionEventCooldown = 0.0f;
+float coLevel = 0.0f;
+bool ventilationOnline = false;
+
+bool echoRecording = false;
+bool echoPlayback = false;
+float echoRecordTimer = 0.0f;
+std::vector<Vec3> echoTrack;
+int echoPlaybackIndex = 0;
+Vec3 echoGhostPos(0, 0, 0);
+bool echoGhostActive = false;
+
+Vec3 level1Nodes[3];
+bool level1NodeDone[3] = {false, false, false};
+bool level1HoldActive = false;
+float level1HoldTimer = 90.0f;
+bool level1ContractComplete = false;
+
+bool level2BatteryInstalled = false;
+int level2FuseCount = 0;
+bool level2AccessReady = false;
+bool level2HoldActive = false;
+float level2HoldTimer = 15.0f;
+bool level2ContractComplete = false;
+Vec3 level2BatteryNode(0, 0, 0);
+Vec3 level2FuseNodes[3];
+bool level2FuseDone[3] = {false, false, false};
+Vec3 level2AccessNode(0, 0, 0);
+Vec3 level2LiftNode(0, 0, 0);
 TrapCorridorState trapCorridor = {};
 DebugToolsState debugTools = {};
 SmileEventState smileEvent = {false, Vec3(0,0,0), 0.0f, 0.0f, 28.0f, false, Vec3(0,0,0), Vec3(0,0,0), 0.0f};
@@ -334,11 +373,13 @@ inline void applyPlushToyUse(){
     setEchoStatus("PLUSH TOY: YOUR MIND FEELS WHOLE AGAIN");
 }
 
+#include "void_shift_runtime.h"
+
 inline int storyNotesRequired(){
-    if (isParkingLevel(gCurrentLevel)) return 7;
-    return 5;
+    if (isParkingLevel(gCurrentLevel)) return 3;
+    return 3;
 }
 
 inline bool isStoryExitReady(){
-    return storyMgr.totalCollected >= storyNotesRequired() && (storyEchoAttuned || trapCorridor.resolved);
+    return isVoidShiftExitReady();
 }

@@ -13,6 +13,8 @@ void gameInput(GLFWwindow*w){
     static bool debugEscPressed = false;
     static bool perfTogglePressed = false;
     static bool hudTogglePressed = false;
+    static bool recordPressed = false;
+    static bool playbackPressed = false;
     bool debugToggleNow = glfwGetKey(w,GLFW_KEY_F10)==GLFW_PRESS;
     if(settings.debugMode && debugToggleNow && !debugTogglePressed){
         debugTools.open = !debugTools.open;
@@ -145,7 +147,7 @@ void gameInput(GLFWwindow*w){
     bool nearEchoSignal = echoSignal.active && isEchoInRange(cam.pos, echoSignal.pos, 2.5f);
     bool nearExitDoor = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
     bool exitReady = false;
-    if(multiState==MULTI_IN_GAME) exitReady = coop.doorOpen && storyMgr.totalCollected>=5;
+    if(multiState==MULTI_IN_GAME) exitReady = coop.doorOpen && isStoryExitReady();
     else exitReady = isStoryExitReady();
     if(eNow&&!interactPressed&&nearNoteId>=0){
         if(storyMgr.checkNotePickup(cam.pos,4.0f)){
@@ -183,6 +185,8 @@ void gameInput(GLFWwindow*w){
         }
     }else if(eNow&&!interactPressed&&nearEchoSignal){
         resolveEchoInteraction();
+    }else if(eNow&&!interactPressed&&tryHandleVoidShiftInteract(cam.pos)){
+        // Contract interaction handled.
     }else if(eNow&&!interactPressed&&nearExitDoor&&exitReady){
         playerEscaped=true;
         glfwSetInputMode(w,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
@@ -194,6 +198,8 @@ void gameInput(GLFWwindow*w){
     bool k2=glfwGetKey(w,settings.binds.item2)==GLFW_PRESS;
     bool k3=glfwGetKey(w,settings.binds.item3)==GLFW_PRESS;
     bool k4=glfwGetKey(w,settings.binds.item4)==GLFW_PRESS;
+    bool recordNow = glfwGetKey(w, GLFW_KEY_R) == GLFW_PRESS;
+    bool playbackNow = glfwGetKey(w, GLFW_KEY_P) == GLFW_PRESS;
     static bool pingPressed=false;
     bool pingNow = glfwGetKey(w, GLFW_KEY_G) == GLFW_PRESS;
     if(k1&&!key1Pressed){
@@ -237,8 +243,20 @@ void gameInput(GLFWwindow*w){
         netMgr.pingMarkReceived = true;
     }
 
+    if(recordNow && !recordPressed){
+        resonatorMode = RESONATOR_RECORD;
+        if(!echoRecording) startEchoRecordingTrack();
+        else stopEchoRecordingTrack();
+    }
+    if(playbackNow && !playbackPressed){
+        resonatorMode = RESONATOR_PLAYBACK;
+        startEchoPlaybackTrack();
+    }
+
     key1Pressed=k1; key2Pressed=k2; key3Pressed=k3; key4Pressed=k4;
     pingPressed = pingNow;
+    recordPressed = recordNow;
+    playbackPressed = playbackNow;
     
     if(playerFalling){
         fallTimer += dTime;
@@ -276,6 +294,7 @@ void gameInput(GLFWwindow*w){
         }
     }
     if(staminaCooldown>0)staminaCooldown-=dTime;
+    updateVoidShiftSystems(dTime, sprinting, flashlightOn);
 
     if(debugTools.flyMode){
         cam.crouch=false;

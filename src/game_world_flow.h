@@ -422,6 +422,7 @@ void genWorld(){
 
     resetPlayerInterpolation();
     initCoopObjectives(coopBase);
+    resetVoidShiftState(cam.pos, coop.doorPos);
     {
         Vec3 d = cam.pos - coop.doorPos;
         d.y = 0.0f;
