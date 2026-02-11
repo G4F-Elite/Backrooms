@@ -133,6 +133,11 @@ float conferenceCallPulse = 0.0f;
 float corridorShiftTimer = 0.0f;
 bool corridorShiftArmed = false;
 float blackoutSectorTimer = 0.0f;
+int craftedNoiseLure = 0;
+int craftedBeacon = 0;
+int craftedFlashLamp = 0;
+int craftedButtonFixator = 0;
+float craftedFixatorTimer = 0.0f;
 
 inline void setSquadCallout(const char* txt) {
     if (!txt) return;

@@ -52,6 +52,27 @@ inline void updateVoidShiftSetpieces(float dt) {
         blackoutSectorTimer -= dt;
         if (lightsOutTimer < 1.6f) lightsOutTimer = 1.6f;
     }
+
+    if (craftedFixatorTimer > 0.0f) {
+        craftedFixatorTimer -= dt;
+        if (craftedFixatorTimer < 0.0f) craftedFixatorTimer = 0.0f;
+    }
+
+    if (attentionLevel >= 90.0f && craftedFlashLamp > 0) {
+        craftedFlashLamp--;
+        addAttention(-18.0f);
+        setTrapStatus("CRAFT: FLASH LAMP STAGGER");
+    }
+
+    if (level2HoldActive && !isLevel2HoldMaintained() && craftedButtonFixator > 0 && craftedFixatorTimer <= 0.0f) {
+        craftedButtonFixator--;
+        craftedFixatorTimer = 6.0f;
+        setTrapStatus("CRAFT: BUTTON FIXATOR LOCKED");
+    }
+
+    if (craftedFixatorTimer > 0.0f && level2HoldActive) {
+        level2HoldTimer -= dt * 0.7f;
+    }
 }
 
 inline void updateVoidShiftHoldPhases(float dt) {

@@ -329,15 +329,17 @@ inline void buildVoidShiftSupportLine(char* out, int outSize) {
         return;
     }
     if (sideContractCompleted) {
-        std::snprintf(out, outSize, "SIDE COMPLETE: ARCHIVE +35");
+        std::snprintf(out, outSize, "SIDE COMPLETE: +35  CRAFT F%d/X%d", craftedFlashLamp, craftedButtonFixator);
         return;
     }
-    std::snprintf(out, outSize, "ARCHIVE %d  TIER %d", archivePoints, archiveTier);
+    std::snprintf(out, outSize, "ARCHIVE %d TIER %d CRAFT N%d B%d F%d X%d", archivePoints, archiveTier, craftedNoiseLure, craftedBeacon, craftedFlashLamp, craftedButtonFixator);
 }
 
 inline bool tryHandleVoidShiftInteract(const Vec3& playerPos) {
     if (npcCartographerActive && nearPoint2D(playerPos, npcCartographerPos, 2.2f)) {
         awardArchivePoints(10, "CARTOGRAPHER TRADE COMPLETE");
+        if (isParkingLevel(gCurrentLevel)) { craftedButtonFixator++; craftedFlashLamp++; }
+        else { craftedNoiseLure++; craftedBeacon++; }
         if (isLevelZero(gCurrentLevel) && !sideContractCompleted && sideContractType == SIDE_SCAN_WALLS) {
             progressSideContract(1, "SIDE: CARTOGRAPHER LOGGED A PATTERN");
         }
