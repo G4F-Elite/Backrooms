@@ -71,10 +71,14 @@ void buildGeom(){
                     float px=wx*CS,pz=wz*CS;
                     const float uvFloor = 1.0f;
                     const float uvCeil = 1.0f;
+                    int8_t cellElev = it->second.elev[lx][lz];
+                    float floorY = isRamp(cellElev) ? 0.0f : getFloorYFromElev(cellElev);
                     bool hasHole = isFloorHoleCell(wx,wz) || isAbyssCell(wx,wz);
-                    if(!hasHole){
-                        float fl[]={px,0,pz,0,0,0,1,0,px,0,pz+CS,0,uvFloor,0,1,0,px+CS,0,pz+CS,uvFloor,uvFloor,0,1,0,
-                                   px,0,pz,0,0,0,1,0,px+CS,0,pz+CS,uvFloor,uvFloor,0,1,0,px+CS,0,pz,uvFloor,0,0,1,0};
+                    if(isRamp(cellElev)){
+                        mkRamp(fv, px, pz, cellElev, CS);
+                    }else if(!hasHole){
+                        float fl[]={px,floorY,pz,0,0,0,1,0,px,floorY,pz+CS,0,uvFloor,0,1,0,px+CS,floorY,pz+CS,uvFloor,uvFloor,0,1,0,
+                                   px,floorY,pz,0,0,0,1,0,px+CS,floorY,pz+CS,uvFloor,uvFloor,0,1,0,px+CS,floorY,pz,uvFloor,0,0,1,0};
                         for(int i=0;i<48;i++)fv.push_back(fl[i]);
                     }else{
                         const float shaftDepth = 30.0f;
@@ -98,6 +102,19 @@ void buildGeom(){
                     if(wallR)mkWall(wv,px+CS,pz+CS,0,-CS,WH,CS,WH);
                     if(wallB)mkWall(wv,px+CS,pz,-CS,0,WH,CS,WH);
                     if(wallF)mkWall(wv,px,pz+CS,CS,0,WH,CS,WH);
+                    // Ledge walls between elevated and ground cells
+                    if(isElevated(cellElev)){
+                        auto isGroundOpen = [&](int nx, int nz) -> bool {
+                            if(getCellWorld(nx,nz)!=0) return false;
+                            int8_t ne = getElevWorld(nx,nz);
+                            return ne == 0;
+                        };
+                        // Ledge wall: short wall 0→FLOOR2_Y on the ground side
+                        if(isGroundOpen(wx-1,wz)) mkWall(wv,px,pz,0,CS,FLOOR2_Y,CS,WH);
+                        if(isGroundOpen(wx+1,wz)) mkWall(wv,px+CS,pz+CS,0,-CS,FLOOR2_Y,CS,WH);
+                        if(isGroundOpen(wx,wz-1)) mkWall(wv,px+CS,pz,-CS,0,FLOOR2_Y,CS,WH);
+                        if(isGroundOpen(wx,wz+1)) mkWall(wv,px,pz+CS,CS,0,FLOOR2_Y,CS,WH);
+                    }
 
                     if(!hasHole){
                         bool corridorZ = wallL && wallR && !wallB && !wallF;
@@ -135,20 +152,6 @@ void buildGeom(){
                             }
                         }
 
-                        if(isLevelZero(gCurrentLevel) && (corridorZ || corridorX) && (doorHash % 100u) < 3u){
-                            float rampY0 = 0.0f;
-                            float segW = CS * 0.18f;
-                            for(int step = 0; step < 5; step++){
-                                float sy = rampY0 + (float)step * 0.24f;
-                                if(corridorZ){
-                                    float sx = px + CS * (0.16f + (float)step * 0.17f);
-                                    mkBox(dv, sx, sy, czCell, segW, 0.10f, CS * 0.86f);
-                                }else{
-                                    float sz = pz + CS * (0.16f + (float)step * 0.17f);
-                                    mkBox(dv, cxCell, sy, sz, CS * 0.86f, 0.10f, segW);
-                                }
-                            }
-                        }
                     }
                 }
             }

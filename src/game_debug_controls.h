@@ -337,10 +337,16 @@ void gameInput(GLFWwindow*w){
         }
     }
 
+    float targetGroundY = debugTools.flyMode ? 0.0f : getGroundY(cam.pos.x, cam.pos.z);
+    static float smoothGroundY = 0.0f;
+    float groundLerp = 12.0f * dTime;
+    if (groundLerp > 1.0f) groundLerp = 1.0f;
+    smoothGroundY += (targetGroundY - smoothGroundY) * groundLerp;
+    float groundY = smoothGroundY;
     static float bobT=0,lastB=0;
     if(mv && !debugTools.flyMode){
         bobT+=dTime*(spd>5.0f?12.0f:8.0f);
-        float cb=mSin(bobT);cam.pos.y=cam.curH+cb*0.04f;
+        float cb=mSin(bobT);cam.pos.y=groundY+cam.curH+cb*0.04f;
         if(lastB>-0.7f&&cb<=-0.7f&&!sndState.stepTrig){
             sndState.stepTrig=true;
             sndState.footPhase=0;
@@ -350,7 +356,7 @@ void gameInput(GLFWwindow*w){
         }
         lastB=cb;
     }else{
-        cam.pos.y=cam.curH+(cam.pos.y-cam.curH)*0.9f;bobT=0;lastB=0;
+        cam.pos.y=groundY+cam.curH+(cam.pos.y-groundY-cam.curH)*0.9f;bobT=0;lastB=0;
     }
 
     float moveIntensity = mv ? (sprinting ? 1.0f : 0.62f) : 0.0f;

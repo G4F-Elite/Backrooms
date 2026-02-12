@@ -9,11 +9,15 @@ inline bool isSliderItem(int tab, int sel) {
     }
     if(tab == SETTINGS_TAB_VIDEO) {
         int vi = sel - 1;
-        return vi == 0 || vi == 1 || vi == 4; // VHS, mouse sens, FSR sharp
+        return vi == 0 || vi == 3; // VHS, FSR sharp
     }
     if(tab == SETTINGS_TAB_EFFECTS) {
         int vi = sel - 1;
         return vi == 5; // denoiser strength
+    }
+    if(tab == SETTINGS_TAB_BINDS) {
+        int ci = sel - 1;
+        return ci == 0; // mouse sens
     }
     return false;
 }
@@ -35,8 +39,10 @@ inline void applySliderInputValue() {
     } else if(sliderInputTab == SETTINGS_TAB_VIDEO) {
         int vi = sliderInputItem - 1;
         if(vi == 0) settings.vhsIntensity = nv;
-        else if(vi == 1) settings.mouseSens = nv * 0.006f;
-        else if(vi == 4) settings.fsrSharpness = nv;
+        else if(vi == 3) settings.fsrSharpness = nv;
+    } else if(sliderInputTab == SETTINGS_TAB_BINDS) {
+        int ci = sliderInputItem - 1;
+        if(ci == 0) settings.mouseSens = nv * 0.006f;
     } else if(sliderInputTab == SETTINGS_TAB_EFFECTS) {
         int vi = sliderInputItem - 1;
         if(vi == 5) settings.rtxDenoiseStrength = nv;
@@ -132,15 +138,19 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
     auto videoAdjust = [&](int idx, int dir) {
         int vi = idx - 1;
         if(vi==0){ settings.vhsIntensity+=0.05f*(float)dir; if(settings.vhsIntensity<0)settings.vhsIntensity=0; if(settings.vhsIntensity>1)settings.vhsIntensity=1; return true; }
-        if(vi==1){ settings.mouseSens+=0.0003f*(float)dir; if(settings.mouseSens<0.0005f)settings.mouseSens=0.0005f; if(settings.mouseSens>0.006f)settings.mouseSens=0.006f; return true; }
-        if(vi==2){ settings.upscalerMode=clampUpscalerMode(settings.upscalerMode+dir); return true; }
-        if(vi==3){ settings.renderScalePreset=stepRenderScalePreset(settings.renderScalePreset,dir); return true; }
-        if(vi==4){ settings.fsrSharpness=clampFsrSharpness(settings.fsrSharpness+0.05f*(float)dir); return true; }
-        if(vi==5){ settings.aaMode=stepAaMode(settings.aaMode,dir); return true; }
-        if(vi==6){ settings.fastMath=!settings.fastMath; return true; }
-        if(vi==7){ settings.frameGenMode=stepFrameGenMode(settings.frameGenMode,dir); return true; }
-        if(vi==8){ settings.vsync=!settings.vsync; return true; }
-        if(vi==9){ settings.debugMode=!settings.debugMode; return true; }
+        if(vi==1){ settings.upscalerMode=clampUpscalerMode(settings.upscalerMode+dir); return true; }
+        if(vi==2){ settings.renderScalePreset=stepRenderScalePreset(settings.renderScalePreset,dir); return true; }
+        if(vi==3){ settings.fsrSharpness=clampFsrSharpness(settings.fsrSharpness+0.05f*(float)dir); return true; }
+        if(vi==4){ settings.aaMode=stepAaMode(settings.aaMode,dir); return true; }
+        if(vi==5){ settings.fastMath=!settings.fastMath; return true; }
+        if(vi==6){ settings.frameGenMode=stepFrameGenMode(settings.frameGenMode,dir); return true; }
+        if(vi==7){ settings.vsync=!settings.vsync; return true; }
+        if(vi==8){ settings.debugMode=!settings.debugMode; return true; }
+        return false;
+    };
+    auto controlsAdjust = [&](int idx, int dir) {
+        int ci = idx - 1;
+        if(ci==0){ settings.mouseSens+=0.0003f*(float)dir; if(settings.mouseSens<0.0005f)settings.mouseSens=0.0005f; if(settings.mouseSens>0.006f)settings.mouseSens=0.006f; return true; }
         return false;
     };
     auto effectsAdjust = [&](int idx, int dir) {
@@ -160,17 +170,29 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
         if (menuSel == 0) { switchTab(dir); changed = true; }
         else if (settingsTab == SETTINGS_TAB_AUDIO) changed = audioAdjust(menuSel, dir);
         else if (settingsTab == SETTINGS_TAB_EFFECTS) changed = effectsAdjust(menuSel, dir);
+        else if (settingsTab == SETTINGS_TAB_BINDS) changed = controlsAdjust(menuSel, dir);
         else changed = videoAdjust(menuSel, dir);
         if (changed) triggerMenuAdjustSound();
     };
     
-    if (up && !upPressed) {
-        menuSel = clampSettingsSelection(settingsTab, menuSel - 1);
+    static int navHoldDir = 0;
+    static double nextNavTime = 0.0;
+    const double navFirstDelay = 0.32;
+    const double navRepeatInterval = 0.10;
+    auto applyNav = [&](int dir) {
+        menuSel = clampSettingsSelection(settingsTab, menuSel + dir);
         triggerMenuNavigateSound();
-    }
-    if (down && !downPressed) {
-        menuSel = clampSettingsSelection(settingsTab, menuSel + 1);
-        triggerMenuNavigateSound();
+    };
+    int navDir = up ? -1 : (down ? 1 : 0);
+    if (navDir == 0) {
+        navHoldDir = 0; nextNavTime = 0.0;
+    } else if (navHoldDir != navDir) {
+        navHoldDir = navDir;
+        applyNav(navDir);
+        nextNavTime = now + navFirstDelay;
+    } else if (now >= nextNavTime) {
+        applyNav(navDir);
+        nextNavTime = now + navRepeatInterval;
     }
     if (tab && !tabPressed) {
         switchTab(1);

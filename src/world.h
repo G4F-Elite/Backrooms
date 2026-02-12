@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include "math.h"
 #include "progression.h"
+#include "elevation.h"
 
 extern const float CS, WH;
 extern std::mt19937 rng;
@@ -13,7 +14,7 @@ extern unsigned int worldSeed;
 const int CHUNK_SIZE = 16;
 const int VIEW_CHUNKS = 2;
 
-struct Chunk { int cx, cz, cells[CHUNK_SIZE][CHUNK_SIZE]; bool gen; };
+struct Chunk { int cx, cz, cells[CHUNK_SIZE][CHUNK_SIZE]; int8_t elev[CHUNK_SIZE][CHUNK_SIZE]; bool gen; };
 struct Light { Vec3 pos; float sizeX, sizeZ, intensity; bool on; };
 
 extern std::unordered_map<long long, Chunk> chunks;
@@ -22,6 +23,8 @@ extern std::vector<Vec3> pillars;
 extern int playerChunkX, playerChunkZ;
 
 inline long long chunkKey(int cx, int cz) { return ((long long)cx << 32) | (cz & 0xFFFFFFFF); }
+
+inline void applyElevation(Chunk& c, std::mt19937& cr);
 
 inline bool isInnerCell(int x, int z) {
     return x > 0 && x < CHUNK_SIZE - 1 && z > 0 && z < CHUNK_SIZE - 1;
@@ -199,13 +202,34 @@ inline void setCellWorld(int wx, int wz, int val) {
     if (it != chunks.end()) it->second.cells[lx][lz] = val;
 }
 
+inline int8_t getElevWorld(int wx, int wz) {
+    int cx = wx >= 0 ? wx / CHUNK_SIZE : (wx - CHUNK_SIZE + 1) / CHUNK_SIZE;
+    int cz = wz >= 0 ? wz / CHUNK_SIZE : (wz - CHUNK_SIZE + 1) / CHUNK_SIZE;
+    int lx = wx - cx * CHUNK_SIZE, lz = wz - cz * CHUNK_SIZE;
+    auto it = chunks.find(chunkKey(cx, cz));
+    return (it == chunks.end()) ? 0 : it->second.elev[lx][lz];
+}
+
+inline float getGroundY(float x, float z) {
+    int wx = (int)floorf(x / CS), wz = (int)floorf(z / CS);
+    int8_t e = getElevWorld(wx, wz);
+    if (e == 0) return 0.0f;
+    if (e == 1) return FLOOR2_Y;
+    float fracX = (x - wx * CS) / CS, fracZ = (z - wz * CS) / CS;
+    if (fracX < 0.0f) fracX = 0.0f;
+    if (fracX > 1.0f) fracX = 1.0f;
+    if (fracZ < 0.0f) fracZ = 0.0f;
+    if (fracZ > 1.0f) fracZ = 1.0f;
+    return getRampY(e, fracX, fracZ);
+}
+
 inline void generateChunk(int cx, int cz) {
     long long key = chunkKey(cx, cz);
     if (chunks.find(key) != chunks.end()) return;
     Chunk c; c.cx = cx; c.cz = cz; c.gen = true;
     unsigned int seed = worldSeed ^ (unsigned)(cx * 73856093) ^ (unsigned)(cz * 19349663);
     std::mt19937 cr(seed);
-    for (int x = 0; x < CHUNK_SIZE; x++) for (int z = 0; z < CHUNK_SIZE; z++) c.cells[x][z] = 1;
+    for (int x = 0; x < CHUNK_SIZE; x++) for (int z = 0; z < CHUNK_SIZE; z++) { c.cells[x][z] = 1; c.elev[x][z] = 0; }
     
     std::vector<std::pair<int,int>> stk;
     int sx = 1 + cr() % (CHUNK_SIZE-2), sz = 1 + cr() % (CHUNK_SIZE-2);
@@ -255,7 +279,9 @@ inline void generateChunk(int cx, int cz) {
     }
     
     if (countOpenCells(c) < 50) carveRect(c, 2, 2, CHUNK_SIZE - 4, CHUNK_SIZE - 4);
-    
+
+    if (isLevelZero(gCurrentLevel)) applyElevation(c, cr);
+
     chunks[key] = c;
 }
 
@@ -267,49 +293,7 @@ inline void updateVisibleChunks(float px, float pz) {
     playerChunkX = pcx; playerChunkZ = pcz;
 }
 
-inline void applyRampRoutePattern(Chunk& c, std::mt19937& cr) {
-    carveRect(c, 1, 1, CHUNK_SIZE - 2, CHUNK_SIZE - 2);
-    int laneA = 3 + (int)(cr() % 2);
-    int laneB = CHUNK_SIZE - 4 - (int)(cr() % 2);
-    for (int x = 2; x < CHUNK_SIZE - 2; x++) {
-        c.cells[x][laneA] = 0;
-        c.cells[x][laneB] = 0;
-    }
-    int r0 = 3 + (int)(cr() % 5);
-    int r1 = r0 + 3;
-    for (int x = 2; x < CHUNK_SIZE - 2; x++) {
-        if ((x % 4) < 2) {
-            c.cells[x][r0] = 0;
-            c.cells[x][r1] = 0;
-        }
-    }
-    for (int z = 2; z < CHUNK_SIZE - 2; z++) {
-        if ((z % 5) == 0) {
-            c.cells[3][z] = 0;
-            c.cells[CHUNK_SIZE - 4][z] = 0;
-        }
-    }
-}
-
-inline void applyParkingPattern(Chunk& c, std::mt19937& cr) {
-    carveRect(c, 1, 1, CHUNK_SIZE - 2, CHUNK_SIZE - 2);
-    int laneL = 4 + (int)(cr() % 2);
-    int laneR = CHUNK_SIZE - 5 - (int)(cr() % 2);
-    for (int z = 2; z < CHUNK_SIZE - 2; z++) {
-        c.cells[laneL][z] = 1;
-        c.cells[laneR][z] = 1;
-    }
-    for (int z = 3; z < CHUNK_SIZE - 3; z += 2) {
-        c.cells[laneL][z] = 0;
-        c.cells[laneR][z] = 0;
-    }
-    for (int x = 2; x < CHUNK_SIZE - 2; x++) {
-        if ((x % 3) == 0) {
-            c.cells[x][2] = 1;
-            c.cells[x][CHUNK_SIZE - 3] = 1;
-        }
-    }
-}
+#include "world_patterns.h"
 
 inline bool circleOverlapsAabb2D(float x, float z, float r, float minX, float maxX, float minZ, float maxZ) {
     float clx = x < minX ? minX : (x > maxX ? maxX : x);
@@ -319,75 +303,32 @@ inline bool circleOverlapsAabb2D(float x, float z, float r, float minX, float ma
     return dx * dx + dz * dz < r * r;
 }
 
-inline bool collideDoorFrameAtCell(float x, float z, float r, int wx, int wz) {
-    if (getCellWorld(wx, wz) != 0) return false;
-
-    bool wallL = getCellWorld(wx - 1, wz) == 1;
-    bool wallR = getCellWorld(wx + 1, wz) == 1;
-    bool wallB = getCellWorld(wx, wz - 1) == 1;
-    bool wallF = getCellWorld(wx, wz + 1) == 1;
-    bool corridorZ = wallL && wallR && !wallB && !wallF;
-    bool corridorX = wallB && wallF && !wallL && !wallR;
-    if (!corridorZ && !corridorX) return false;
-
-    unsigned int doorHash = (unsigned int)(wx * 73856093u) ^ (unsigned int)(wz * 19349663u) ^ (worldSeed * 83492791u);
-    if ((doorHash % 100u) >= 7u) return false;
-
-    float px = wx * CS;
-    float pz = wz * CS;
-    float cxCell = px + CS * 0.5f;
-    float czCell = pz + CS * 0.5f;
-    float openingHalf = CS * 0.23f;
-    float edgeHalf = CS * 0.49f;
-    float sideFillW = edgeHalf - openingHalf;
-    float sideFillCenter = (edgeHalf + openingHalf) * 0.5f;
-    float postW = CS * 0.06f;
-    float frameT = CS * 0.10f;
-    float wallFillT = frameT * 0.92f;
-    float postHalfW = postW * 0.5f;
-    float frameHalfT = frameT * 0.5f;
-
-    if (corridorZ) {
-        if (circleOverlapsAabb2D(x, z, r,
-            cxCell - sideFillCenter - sideFillW * 0.5f, cxCell - sideFillCenter + sideFillW * 0.5f,
-            czCell - wallFillT * 0.5f, czCell + wallFillT * 0.5f)) return true;
-        if (circleOverlapsAabb2D(x, z, r,
-            cxCell + sideFillCenter - sideFillW * 0.5f, cxCell + sideFillCenter + sideFillW * 0.5f,
-            czCell - wallFillT * 0.5f, czCell + wallFillT * 0.5f)) return true;
-        if (circleOverlapsAabb2D(x, z, r,
-            cxCell - openingHalf - postHalfW, cxCell - openingHalf + postHalfW,
-            czCell - frameHalfT, czCell + frameHalfT)) return true;
-        if (circleOverlapsAabb2D(x, z, r,
-            cxCell + openingHalf - postHalfW, cxCell + openingHalf + postHalfW,
-            czCell - frameHalfT, czCell + frameHalfT)) return true;
-        return false;
-    }
-
-    if (circleOverlapsAabb2D(x, z, r,
-        cxCell - wallFillT * 0.5f, cxCell + wallFillT * 0.5f,
-        czCell - sideFillCenter - sideFillW * 0.5f, czCell - sideFillCenter + sideFillW * 0.5f)) return true;
-    if (circleOverlapsAabb2D(x, z, r,
-        cxCell - wallFillT * 0.5f, cxCell + wallFillT * 0.5f,
-        czCell + sideFillCenter - sideFillW * 0.5f, czCell + sideFillCenter + sideFillW * 0.5f)) return true;
-
-    if (circleOverlapsAabb2D(x, z, r,
-        cxCell - frameHalfT, cxCell + frameHalfT,
-        czCell - openingHalf - postHalfW, czCell - openingHalf + postHalfW)) return true;
-    if (circleOverlapsAabb2D(x, z, r,
-        cxCell - frameHalfT, cxCell + frameHalfT,
-        czCell + openingHalf - postHalfW, czCell + openingHalf + postHalfW)) return true;
-    return false;
-}
+#include "world_collision.h"
 
 inline bool collideWorld(float x, float z, float PR) {
     int wx = (int)floorf(x/CS), wz = (int)floorf(z/CS);
     float PR2 = PR * PR;
+    int8_t myElev = getElevWorld(wx, wz);
+    float myH = getGroundY(x, z);
     for (int ddx = -1; ddx <= 1; ddx++) for (int ddz = -1; ddz <= 1; ddz++) {
         int chkx = wx+ddx, chkz = wz+ddz;
-        if (getCellWorld(chkx, chkz) == 1) { float wx0 = chkx*CS, wx1 = (chkx+1)*CS, wz0 = chkz*CS, wz1 = (chkz+1)*CS;
+        int cellVal = getCellWorld(chkx, chkz);
+        bool blocked = (cellVal == 1);
+        // Block elevation transitions (ground↔elevated) unless ramp
+        if (!blocked && cellVal == 0 && (ddx != 0 || ddz != 0)) {
+            int8_t nElev = getElevWorld(chkx, chkz);
+            if (nElev != myElev && !isRamp(nElev) && !isRamp(myElev)) {
+                float nH = getFloorYFromElev(nElev);
+                if (fabsf(myH - nH) > 0.5f) blocked = true;
+            }
+        }
+        if (blocked) {
+            float wx0 = chkx*CS, wx1 = (chkx+1)*CS, wz0 = chkz*CS, wz1 = (chkz+1)*CS;
             float clx = x<wx0?wx0:(x>wx1?wx1:x), clz = z<wz0?wz0:(z>wz1?wz1:z);
             float dx = x-clx, dz = z-clz;
-            if (dx*dx+dz*dz < PR2) return true; }}
+            if (dx*dx+dz*dz < PR2) return true;
+        }
+    }
     for (int ddx = -1; ddx <= 1; ddx++) for (int ddz = -1; ddz <= 1; ddz++) {
         int chkx = wx + ddx, chkz = wz + ddz;
         if (collideDoorFrameAtCell(x, z, PR, chkx, chkz)) return true;
@@ -512,4 +453,5 @@ inline void updateLightsAndPillars(int pcx, int pcz) {
     }
 }
 
+#include "elevation_gen.h"
 #include "world_spawn.h"
