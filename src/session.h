@@ -34,6 +34,8 @@ GLuint plushVAO=0, plushVBO=0;
 int plushVC=0;
 GLuint batteryVAO=0, batteryVBO=0;
 int batteryVC=0;
+GLuint medSprayVAO=0, medSprayVBO=0;
+int medSprayVC=0;
 
 // Selected when activeDeviceSlot == 3
 int heldConsumableType = ITEM_PLUSH_TOY;

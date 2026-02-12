@@ -146,6 +146,49 @@ void renderScene(){
     if(noteVC>0){glBindTexture(GL_TEXTURE_2D,lightTex);glBindVertexArray(noteVAO);glDrawArrays(GL_TRIANGLES,0,noteVC);}
     glEnable(GL_CULL_FACE);
 
+    // World pickups (battery/plush/med spray)
+    for(const auto& wi : worldItems){
+        if(!wi.active) continue;
+        GLuint itemVAO = 0;
+        int itemVC = 0;
+        GLuint itemTex = propTex;
+        Vec3 itemScale(0.95f,0.95f,0.95f);
+        Vec3 itemTint(1.0f,1.0f,1.0f);
+        float yBase = 0.10f;
+        if(wi.type == ITEM_BATTERY){
+            itemVAO = batteryVAO;
+            itemVC = batteryVC;
+            itemScale = Vec3(0.95f,0.95f,0.95f);
+            itemTint = Vec3(0.95f,0.92f,0.72f);
+            yBase = 0.11f;
+        }else if(wi.type == ITEM_PLUSH_TOY){
+            itemVAO = plushVAO;
+            itemVC = plushVC;
+            itemTex = (plushTex != 0) ? plushTex : propTex;
+            itemScale = Vec3(1.00f,1.00f,1.00f);
+            itemTint = Vec3(0.96f,0.88f,0.78f);
+            yBase = 0.10f;
+        }else if(wi.type == ITEM_MED_SPRAY){
+            itemVAO = medSprayVAO;
+            itemVC = medSprayVC;
+            itemTex = (deviceTex != 0) ? deviceTex : propTex;
+            itemScale = Vec3(1.05f,1.05f,1.05f);
+            itemTint = Vec3(0.74f,0.88f,0.80f);
+            yBase = 0.13f;
+        }
+        if(itemVC <= 0 || itemVAO == 0) continue;
+        float bob = sinf(vhsTime * 2.4f + (float)wi.id * 0.51f) * 0.035f;
+        float yaw = vhsTime * 0.95f + (float)wi.id * 0.67f;
+        Mat4 itemModel = composeModelMatrix(Vec3(wi.pos.x, yBase + bob, wi.pos.z), yaw, 0.0f, itemScale);
+        glUniformMatrix4fv(mu.M,1,GL_FALSE,itemModel.m);
+        if(mu.tint >= 0) glUniform3f(mu.tint,itemTint.x,itemTint.y,itemTint.z);
+        glBindTexture(GL_TEXTURE_2D,itemTex);
+        glBindVertexArray(itemVAO);
+        glDrawArrays(GL_TRIANGLES,0,itemVC);
+    }
+    glUniformMatrix4fv(mu.M,1,GL_FALSE,model.m);
+    if(mu.tint >= 0) glUniform3f(mu.tint,1.0f,1.0f,1.0f);
+
     // Held item render (viewmodel)
     GLuint heldVAO = 0;
     int heldVC = 0;

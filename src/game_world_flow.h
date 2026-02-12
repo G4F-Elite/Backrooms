@@ -299,6 +299,12 @@ void buildGeom(){
         batteryVC = (int)m.size()/8;
         if(batteryVC>0) setupVAO(batteryVAO, batteryVBO, m, true);
     }
+    {
+        std::vector<float> m;
+        buildMedSprayModel(m);
+        medSprayVC = (int)m.size()/8;
+        if(medSprayVC>0) setupVAO(medSprayVAO, medSprayVBO, m, true);
+    }
     wallVC=(int)wv.size()/8;floorVC=(int)fv.size()/8;ceilVC=(int)cv.size()/8;
     pillarVC=(int)pv.size()/8;decorVC=(int)dv.size()/8;lightVC=(int)lv.size()/5;lightOffVC=(int)lvOff.size()/5;
     setupVAO(wallVAO,wallVBO,wv,true);setupVAO(floorVAO,floorVBO,fv,true);

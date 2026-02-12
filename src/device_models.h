@@ -97,3 +97,11 @@ inline void buildBatteryModel(std::vector<float>& v){
     mkBoxAtlas(v, 0.0f, -0.06f, 0.0f, 0.10f, 0.16f, 0.10f, 0.00f,0.00f,0.82f,1.00f);
     mkBoxAtlas(v, 0.0f, 0.10f, 0.0f, 0.06f, 0.05f, 0.06f, 0.82f,0.00f,1.00f,0.70f);
 }
+
+inline void buildMedSprayModel(std::vector<float>& v){
+    // body: 0..0.75, cap/nozzle: 0.75..1.00
+    mkClosedBoxAtlas(v, 0.0f, -0.10f, 0.0f, 0.12f, 0.26f, 0.12f, 0.00f,0.00f,0.75f,1.00f);
+    mkClosedBoxAtlas(v, 0.0f, 0.16f, 0.0f, 0.10f, 0.06f, 0.10f, 0.75f,0.00f,1.00f,0.55f);
+    mkClosedBoxAtlas(v, 0.0f, 0.22f, 0.03f, 0.06f, 0.05f, 0.12f, 0.75f,0.55f,1.00f,1.00f);
+    mkClosedBoxAtlas(v, 0.0f, -0.02f, 0.07f, 0.06f, 0.10f, 0.03f, 0.75f,0.00f,1.00f,0.55f);
+}

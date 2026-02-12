@@ -104,16 +104,24 @@ float noise(vec2 p){
 }
 void main(){
     vec2 p = uv * 2.0 - 1.0;
-    float n0 = noise(uv * vec2(5.0, 22.0) + vec2(tm * 0.08, tm * 0.03));
-    float n1 = noise(uv * vec2(11.0, 44.0) + vec2(-tm * 0.12, tm * 0.05));
-    float fog = n0 * 0.65 + n1 * 0.35;
-    float shaftA = exp(-pow(abs(p.x + sin(tm * 0.25 + p.y * 2.5) * 0.35), 2.0) * 14.0);
-    float shaftB = exp(-pow(abs(p.x - cos(tm * 0.21 + p.y * 2.0) * 0.30), 2.0) * 18.0);
-    float shaftPulse = 0.6 + 0.4 * sin(tm * 0.6 + p.y * 4.0);
-    float shaft = (shaftA * 0.65 + shaftB * 0.45) * shaftPulse;
-    float vign = 1.0 - smoothstep(0.55, 1.20, length(p));
-    vec3 col = vec3(0.16, 0.14, 0.10) * fog + vec3(0.48, 0.42, 0.30) * shaft * 0.28;
-    float alpha = (0.035 + fog * 0.050 + shaft * 0.08) * (0.55 + vign * 0.45);
+    float fogA = noise(uv * vec2(3.8, 16.0) + vec2(tm * 0.16, -tm * 0.06));
+    float fogB = noise(uv * vec2(9.5, 38.0) + vec2(-tm * 0.23, tm * 0.10));
+    float fog = fogA * 0.58 + fogB * 0.42;
+
+    float beamA = exp(-pow(abs(p.x + sin(tm * 0.42 + p.y * 2.8) * 0.42), 2.0) * 9.5);
+    float beamB = exp(-pow(abs(p.x - cos(tm * 0.35 + p.y * 2.1) * 0.35), 2.0) * 12.5);
+    float pulse = 0.70 + 0.30 * sin(tm * 0.85 + p.y * 5.0);
+    float beams = (beamA * 0.80 + beamB * 0.65) * pulse;
+
+    float scan = 0.5 + 0.5 * sin((uv.y * 160.0) + tm * 2.4);
+    scan = pow(scan, 5.0) * 0.22;
+
+    float vign = 1.0 - smoothstep(0.45, 1.15, length(p));
+    vec3 warmFog = vec3(0.22, 0.18, 0.11) * (0.22 + fog * 0.78);
+    vec3 beamsCol = vec3(0.95, 0.82, 0.54) * beams * 0.52;
+    vec3 scanCol = vec3(0.55, 0.48, 0.35) * scan;
+    vec3 col = warmFog + beamsCol + scanCol;
+    float alpha = (0.10 + fog * 0.13 + beams * 0.18 + scan * 0.20) * (0.58 + vign * 0.42);
     fc = vec4(col, alpha);
 })";
 inline const char* menuBgVS = R"(#version 330 core
@@ -171,11 +179,14 @@ inline void initText() {
 }
 
 inline void drawFullscreenOverlay(float r, float g, float b, float a) {
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     glUseProgram(overlayShader);
     glUniform3f(glGetUniformLocation(overlayShader,"col"),r,g,b);
     glUniform1f(glGetUniformLocation(overlayShader,"alpha"),a);
     glBindVertexArray(overlayVAO);
     glDrawArrays(GL_TRIANGLES,0,6);
+    glDisable(GL_BLEND);
 }
 
 inline void drawOverlayRectNdc(float left, float bottom, float right, float top, float r, float g, float b, float a) {
@@ -278,10 +289,13 @@ inline void drawSlider(float x,float y,float w,float val,float r,float g,float b
 }
 
 inline void drawMenuAtmosphere(float tm) {
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     glUseProgram(menuFxShader);
     glUniform1f(glGetUniformLocation(menuFxShader,"tm"),tm);
     glBindVertexArray(overlayVAO);
     glDrawArrays(GL_TRIANGLES,0,6);
+    glDisable(GL_BLEND);
     float drift = 0.5f + 0.5f * sinf(tm * 0.28f);
     drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.88f,0.03f,0.03f,0.03f,0.07f + drift * 0.02f);
     drawOverlayRectNdc(-1.0f,0.88f,1.0f,1.0f,0.03f,0.03f,0.03f,0.07f + (1.0f - drift) * 0.02f);
