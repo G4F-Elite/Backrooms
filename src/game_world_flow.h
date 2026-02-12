@@ -107,7 +107,7 @@ void buildGeom(){
                         unsigned int doorHash = (unsigned int)(wx * 73856093u) ^ (unsigned int)(wz * 19349663u) ^ (worldSeed * 83492791u);
                         bool spawnDoorway = (doorHash % 100u) < 7u;
                         if(spawnDoorway && (corridorZ || corridorX)){
-                            std::vector<float>& doorV = isParkingLevel(gCurrentLevel) ? wv : dv;
+                            std::vector<float>& doorV = isParkingLevel(gCurrentLevel) ? cv : dv;
                             float openingH = WH * 0.62f;
                             float postH = openingH;
                             float postW = CS * 0.06f;

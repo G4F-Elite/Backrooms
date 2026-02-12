@@ -221,12 +221,13 @@ int main(){
                 entityMgr.update(dTime,cam.pos,cam.yaw,nullptr,0,0,CS);
                 float nearestMonster = 9999.0f;
                 float menace = 0.0f;
+                EntityType dominantMonster = ENTITY_NONE;
                 for(const auto& e:entityMgr.entities){
                     if(!e.active) continue;
                     Vec3 dd = e.pos - cam.pos;
                     dd.y = 0;
                     float dist = dd.len();
-                    if(dist < nearestMonster) nearestMonster = dist;
+                    if(dist < nearestMonster){ nearestMonster = dist; dominantMonster = e.type; }
                     float localMenace = 0.35f;
                     if(e.type==ENTITY_STALKER) localMenace = 0.45f;
                     else if(e.type==ENTITY_CRAWLER) localMenace = 0.75f;
@@ -237,11 +238,10 @@ int main(){
                 float monsterProx = 0.0f;
                 if(nearestMonster < 30.0f){
                     monsterProx = 1.0f - nearestMonster / 30.0f;
-                    if(monsterProx < 0.0f) monsterProx = 0.0f;
-                    if(monsterProx > 1.0f) monsterProx = 1.0f;
+                    if(monsterProx < 0.0f) monsterProx = 0.0f; else if(monsterProx > 1.0f) monsterProx = 1.0f;
                 }
                 sndState.monsterProximity = monsterProx;
-                sndState.monsterMenace = menace > 1.0f ? 1.0f : menace;
+                sndState.monsterMenace = menace > 1.0f ? 1.0f : menace; sndState.monsterType = monsterTypeMixFromEntity(dominantMonster);
                 
                 reshuffleTimer-=dTime;
                 float reshuffleChance=30.0f+survivalTime*0.1f;
@@ -262,8 +262,7 @@ int main(){
                 }else if(reshuffleTimer<=0)reshuffleTimer=8.0f+(rng()%8);
                 
                 float levelDanger = levelDangerScale(gCurrentLevel);
-                if(activeDeviceSlot==3 && heldConsumableType==ITEM_PLUSH_TOY) playerSanity += 3.8f*dTime;
-                else playerSanity -= sanityPassiveDrainPerSec(levelDanger) * dTime;
+                if(activeDeviceSlot==3 && heldConsumableType==ITEM_PLUSH_TOY) playerSanity += 3.8f*dTime; else playerSanity -= sanityPassiveDrainPerSec(levelDanger) * dTime;
                 if(entityMgr.dangerLevel>0.1f) playerSanity -= entityMgr.dangerLevel*(8.0f * levelDanger)*dTime;
                 playerSanity=playerSanity>100?100:(playerSanity<0?0:playerSanity);
                 int cellX = (int)floorf(cam.pos.x / CS);
@@ -300,14 +299,16 @@ int main(){
                     sanityCollapseTimer -= dTime * 1.7f;
                     if(sanityCollapseTimer < 0.0f) sanityCollapseTimer = 0.0f;
                 }
-                if(entityMgr.checkPlayerAttack(cam.pos)){
-                    playerHealth-=35.0f*dTime;playerSanity-=15.0f*dTime;
-                    camShake=0.15f;damageFlash=0.4f;
+                EntityType attackerType = entityMgr.getAttackingType(cam.pos);
+                if(attackerType != ENTITY_NONE){
+                    MonsterAttackProfile attack = monsterAttackProfile(attackerType);
+                    playerHealth-=attack.healthDps*dTime;playerSanity-=attack.sanityDps*dTime;
+                    if(attack.hitShake > camShake) camShake = attack.hitShake; if(attack.hitFlash > damageFlash) damageFlash = attack.hitFlash;
                     if(multiState==MULTI_IN_GAME){
                         netMgr.sendScare(netMgr.myId);
-                        if(netMgr.isHost) triggerScare();
+                        if(netMgr.isHost) triggerScare(attack.scareVol);
                     }else{
-                        triggerScare();
+                        triggerScare(attack.scareVol);
                     }
                     if(playerHealth<=0){
                         if(!playerDowned){

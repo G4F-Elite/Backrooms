@@ -23,7 +23,7 @@ const unsigned char FONT_DATA[96][7] = {
 
 inline GLuint fontTex=0, textShader=0, textVAO=0, textVBO=0;
 inline GLuint overlayShader=0, overlayVAO=0, overlayVBO=0;
-inline GLuint menuBgShader=0;
+inline GLuint menuBgShader=0, menuFxShader=0;
 // Textures are created in game_main_entry.h (declared in game.cpp)
 extern GLuint wallTex, floorTex, ceilTex, lampTex;
 extern char gDeathReason[80];
@@ -90,6 +90,32 @@ out vec4 fc;
 uniform vec3 col;
 uniform float alpha;
 void main() { fc = vec4(col, alpha); })";
+inline const char* menuFxVS = R"(#version 330 core
+layout(location=0) in vec2 p; out vec2 uv;
+void main() { gl_Position = vec4(p, 0.0, 1.0); uv = p * 0.5 + 0.5; })";
+inline const char* menuFxFS = R"(#version 330 core
+in vec2 uv; out vec4 fc; uniform float tm;
+float hash(vec2 p){ return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453); }
+float noise(vec2 p){
+    vec2 i=floor(p), f=fract(p);
+    float a=hash(i), b=hash(i+vec2(1,0)), c=hash(i+vec2(0,1)), d=hash(i+vec2(1,1));
+    vec2 u=f*f*(3.0-2.0*f);
+    return mix(mix(a,b,u.x),mix(c,d,u.x),u.y);
+}
+void main(){
+    vec2 p = uv * 2.0 - 1.0;
+    float n0 = noise(uv * vec2(5.0, 22.0) + vec2(tm * 0.08, tm * 0.03));
+    float n1 = noise(uv * vec2(11.0, 44.0) + vec2(-tm * 0.12, tm * 0.05));
+    float fog = n0 * 0.65 + n1 * 0.35;
+    float shaftA = exp(-pow(abs(p.x + sin(tm * 0.25 + p.y * 2.5) * 0.35), 2.0) * 14.0);
+    float shaftB = exp(-pow(abs(p.x - cos(tm * 0.21 + p.y * 2.0) * 0.30), 2.0) * 18.0);
+    float shaftPulse = 0.6 + 0.4 * sin(tm * 0.6 + p.y * 4.0);
+    float shaft = (shaftA * 0.65 + shaftB * 0.45) * shaftPulse;
+    float vign = 1.0 - smoothstep(0.55, 1.20, length(p));
+    vec3 col = vec3(0.16, 0.14, 0.10) * fog + vec3(0.48, 0.42, 0.30) * shaft * 0.28;
+    float alpha = (0.035 + fog * 0.050 + shaft * 0.08) * (0.55 + vign * 0.45);
+    fc = vec4(col, alpha);
+})";
 inline const char* menuBgVS = R"(#version 330 core
 layout(location=0) in vec2 p; out vec2 uv;
 void main() { gl_Position = vec4(p, 0.0, 1.0); uv = p * 0.5 + 0.5; })";
@@ -124,6 +150,11 @@ inline void initText() {
     GLuint bfs=glCreateShader(GL_FRAGMENT_SHADER); glShaderSource(bfs,1,&menuBgFS,0); glCompileShader(bfs);
     menuBgShader=glCreateProgram(); glAttachShader(menuBgShader,bvs); glAttachShader(menuBgShader,bfs); glLinkProgram(menuBgShader);
     glDeleteShader(bvs); glDeleteShader(bfs);
+
+    GLuint mvs=glCreateShader(GL_VERTEX_SHADER); glShaderSource(mvs,1,&menuFxVS,0); glCompileShader(mvs);
+    GLuint mfs=glCreateShader(GL_FRAGMENT_SHADER); glShaderSource(mfs,1,&menuFxFS,0); glCompileShader(mfs);
+    menuFxShader=glCreateProgram(); glAttachShader(menuFxShader,mvs); glAttachShader(menuFxShader,mfs); glLinkProgram(menuFxShader);
+    glDeleteShader(mvs); glDeleteShader(mfs);
 
     // Bind menu background samplers to fixed texture units
     glUseProgram(menuBgShader);
@@ -247,22 +278,13 @@ inline void drawSlider(float x,float y,float w,float val,float r,float g,float b
 }
 
 inline void drawMenuAtmosphere(float tm) {
-    float pulse = 0.5f + 0.5f * sinf(tm * 0.34f);
-    drawOverlayRectNdc(-1.0f,-1.0f,1.0f,1.0f,0.07f,0.06f,0.04f,0.045f + pulse * 0.015f);
-    for(int i=0;i<6;i++){
-        float fi=(float)i;
-        float cx=-0.92f+fi*0.36f+sinf(tm*(0.19f+fi*0.02f)+fi)*0.05f;
-        float cy=0.52f-0.20f*fi+cosf(tm*(0.24f+fi*0.02f)+fi*0.6f)*0.03f;
-        float rad=0.08f+0.02f*sinf(tm*0.46f+fi*0.8f);
-        float a=0.010f+0.012f*(0.5f+0.5f*sinf(tm*0.57f+fi));
-        drawOverlayRectNdc(cx-rad,cy-rad,cx+rad,cy+rad,0.90f,0.78f,0.48f,a);
-    }
-    for(int i=0;i<5;i++){
-        float y=-0.76f+i*0.38f+sinf(tm*0.27f+i)*0.014f;
-        drawOverlayRectNdc(-1.0f,y-0.015f,1.0f,y+0.015f,0.16f,0.13f,0.09f,0.020f);
-    }
-    drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.86f,0.03f,0.03f,0.03f,0.08f);
-    drawOverlayRectNdc(-1.0f,0.86f,1.0f,1.0f,0.03f,0.03f,0.03f,0.08f);
+    glUseProgram(menuFxShader);
+    glUniform1f(glGetUniformLocation(menuFxShader,"tm"),tm);
+    glBindVertexArray(overlayVAO);
+    glDrawArrays(GL_TRIANGLES,0,6);
+    float drift = 0.5f + 0.5f * sinf(tm * 0.28f);
+    drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.88f,0.03f,0.03f,0.03f,0.07f + drift * 0.02f);
+    drawOverlayRectNdc(-1.0f,0.88f,1.0f,1.0f,0.03f,0.03f,0.03f,0.07f + (1.0f - drift) * 0.02f);
 }
 
 inline void drawMenu(float tm) {

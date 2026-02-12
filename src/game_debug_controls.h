@@ -359,7 +359,8 @@ void gameInput(GLFWwindow*w){
         sprinting ? 1.0f : 0.0f,
         playerStamina / 125.0f,
         sndState.monsterProximity,
-        sndState.monsterMenace
+        sndState.monsterMenace,
+        sndState.monsterType
     );
     
     float rawSignal = 0.0f;

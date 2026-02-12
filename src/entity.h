@@ -66,7 +66,7 @@ public:
         (void)maze; (void)mzw; (void)mzh;
         Entity e; e.type = type; e.pos = pos; e.pos.y = 0; e.active = true; e.state = ENT_ROAMING;
         if(type==ENTITY_STALKER) { e.speed=1.7f; e.detectionRange=22.0f; e.attackRange=1.15f; }
-        else if(type==ENTITY_CRAWLER) { e.speed=3.4f; e.detectionRange=17.0f; e.attackRange=1.35f; e.pos.y=-0.8f; }
+        else if(type==ENTITY_CRAWLER) { e.speed=3.4f; e.detectionRange=17.0f; e.attackRange=1.35f; e.pos.y=0.58f; }
         else if(type==ENTITY_SHADOW) { e.speed=1.15f; e.detectionRange=12.0f; e.attackRange=1.8f; }
 
         if(isParkingLevel(gCurrentLevel)){
@@ -122,16 +122,18 @@ public:
             if(e.behaviorTimer <= 0.0f){
                 e.behaviorTimer = 0.9f + (float)(rand()%190) / 100.0f;
                 if(e.type == ENTITY_STALKER){
-                    if(dist < 8.0f && !looking) e.behaviorMode = BEHAVIOR_RUSH;
-                    else if(looking && dist < 14.0f) e.behaviorMode = BEHAVIOR_SNEAK;
-                    else e.behaviorMode = (rand()%100 < 48) ? BEHAVIOR_FLANK : BEHAVIOR_DEFAULT;
+                    if(looking && dist < 11.0f) e.behaviorMode = BEHAVIOR_SNEAK;
+                    else if(!looking && dist > 7.0f && dist < 18.0f) e.behaviorMode = BEHAVIOR_FLANK;
+                    else if(dist < 7.0f) e.behaviorMode = BEHAVIOR_RUSH;
+                    else e.behaviorMode = BEHAVIOR_DEFAULT;
                 }else if(e.type == ENTITY_CRAWLER){
-                    if(dist < 6.5f && playerMove > 0.02f) e.behaviorMode = BEHAVIOR_RUSH;
-                    else e.behaviorMode = (rand()%100 < 50) ? BEHAVIOR_FLANK : BEHAVIOR_DEFAULT;
+                    if(dist < 5.8f || (dist < 9.0f && playerMove > 0.035f)) e.behaviorMode = BEHAVIOR_RUSH;
+                    else if(playerMove > 0.02f && dist < 13.0f) e.behaviorMode = BEHAVIOR_FLANK;
+                    else e.behaviorMode = BEHAVIOR_DEFAULT;
                 }else if(e.type == ENTITY_SHADOW){
-                    if(looking) e.behaviorMode = BEHAVIOR_FLANK;
-                    else if(playerMove > 0.03f) e.behaviorMode = BEHAVIOR_RUSH;
-                    else e.behaviorMode = (rand()%100 < 55) ? BEHAVIOR_SNEAK : BEHAVIOR_DEFAULT;
+                    if(looking) e.behaviorMode = BEHAVIOR_SNEAK;
+                    else if(dist < 8.5f) e.behaviorMode = BEHAVIOR_RUSH;
+                    else e.behaviorMode = BEHAVIOR_FLANK;
                 }
             }
             
@@ -166,8 +168,21 @@ public:
         else if(e.behaviorMode == BEHAVIOR_RUSH) speedMul = 1.72f;
         else if(e.behaviorMode == BEHAVIOR_FLANK) speedMul = 1.12f;
         if(looking && dist < e.detectionRange) {
+            e.state = ENT_STALKING;
             e.lastSeenTimer += dt;
-            if(e.lastSeenTimer > 2.5f) e.state = ENT_FLEEING;
+            Vec3 dir = pPos - e.pos; dir.y = 0; float len = sqrtf(dir.x*dir.x + dir.z*dir.z);
+            if(len > 0.1f) {
+                dir.x /= len; dir.z /= len;
+                float sideSign = ((int)(e.animPhase * 2.2f) & 1) ? -1.0f : 1.0f;
+                float sx = dir.z * sideSign;
+                float sz = -dir.x * sideSign;
+                float keep = (dist < 5.5f) ? -0.55f : 0.15f;
+                float nx = e.pos.x + (sx * 0.75f + dir.x * keep) * e.speed * speedMul * dt;
+                float nz = e.pos.z + (sz * 0.75f + dir.z * keep) * e.speed * speedMul * dt;
+                if(!collideWorld(nx,nz,0.32f)) { e.pos.x = nx; e.pos.z = nz; }
+                e.yaw = atan2f(sx, sz);
+            }
+            if(e.lastSeenTimer > 3.2f) e.state = ENT_FLEEING;
         }
         else { e.lastSeenTimer = 0;
             if(dist < e.detectionRange) { e.state = ENT_STALKING;
@@ -221,7 +236,7 @@ public:
     
     void updateCrawler(Entity& e, float dt, Vec3 pPos, float dist, float effectiveDetect, int maze[][30], int mzw, int mzh, float cs) {
         (void)maze; (void)mzw; (void)mzh; (void)cs;
-        e.stateTimer += dt; e.pos.y = -0.8f; // Stay low
+        e.stateTimer += dt; e.pos.y = 0.58f; // Keep body above floor
         float speedMul = 1.0f;
         if(e.behaviorMode == BEHAVIOR_RUSH) speedMul = 1.70f;
         else if(e.behaviorMode == BEHAVIOR_FLANK) speedMul = 1.15f;
@@ -235,20 +250,29 @@ public:
         if(dist < effectiveDetect) { e.state = ENT_CHASING;
             Vec3 dir = pPos - e.pos; dir.y = 0; float len = sqrtf(dir.x*dir.x + dir.z*dir.z);
             if(len > 0.1f) { dir.x /= len; dir.z /= len;
-                if(e.behaviorMode == BEHAVIOR_FLANK){
-                    float ox = dir.x;
-                    dir.x = -dir.z;
-                    dir.z = ox;
+                float burstMul = 1.0f;
+                if(e.behaviorMode == BEHAVIOR_RUSH){
+                    if(e.stateTimer < 0.55f) burstMul = 2.25f;
+                    else if(e.stateTimer < 1.10f) burstMul = 1.55f;
                 }
-                float nx = e.pos.x + dir.x*e.speed*speedMul*dt, nz = e.pos.z + dir.z*e.speed*speedMul*dt;
+                float moveX = dir.x;
+                float moveZ = dir.z;
+                if(e.behaviorMode == BEHAVIOR_FLANK){
+                    float zig = sinf(e.animPhase * 2.4f) * 0.55f;
+                    moveX = dir.x + (-dir.z) * zig;
+                    moveZ = dir.z + dir.x * zig;
+                    float mLen = sqrtf(moveX*moveX + moveZ*moveZ);
+                    if(mLen > 0.1f){ moveX /= mLen; moveZ /= mLen; }
+                }
+                float nx = e.pos.x + moveX*e.speed*speedMul*burstMul*dt, nz = e.pos.z + moveZ*e.speed*speedMul*burstMul*dt;
                 if(!collideWorld(nx,nz,0.34f)) { e.pos.x = nx; e.pos.z = nz; }
                 else {
-                    float bx = e.pos.x - dir.z*e.speed*0.7f*speedMul*dt;
-                    float bz = e.pos.z + dir.x*e.speed*0.7f*speedMul*dt;
+                    float bx = e.pos.x - moveZ*e.speed*0.7f*speedMul*dt;
+                    float bz = e.pos.z + moveX*e.speed*0.7f*speedMul*dt;
                     if(!collideWorld(bx,bz,0.34f)) { e.pos.x = bx; e.pos.z = bz; }
                 }
-                e.yaw = atan2f(dir.x, dir.z); }
-            if(e.behaviorMode == BEHAVIOR_RUSH && dist > 6.0f && e.stateTimer > 1.6f){
+                e.yaw = atan2f(moveX, moveZ); }
+            if(e.behaviorMode == BEHAVIOR_RUSH && e.stateTimer > 1.35f){
                 e.behaviorMode = BEHAVIOR_DEFAULT;
                 e.stateTimer = 0.0f;
             }
@@ -299,12 +323,16 @@ public:
             Vec3 dir = pPos - e.pos; dir.y = 0; float len = sqrtf(dir.x*dir.x+dir.z*dir.z);
             if(len > 0.1f) {
                 dir.x/=len; dir.z/=len;
-                float moveMul = (e.behaviorMode == BEHAVIOR_SNEAK) ? 0.8f : 1.95f;
-                if(e.behaviorMode == BEHAVIOR_FLANK){
+                float moveMul = (e.behaviorMode == BEHAVIOR_SNEAK) ? 0.72f : 1.75f;
+                if(e.behaviorMode == BEHAVIOR_RUSH){
+                    moveMul = 2.25f;
+                }
+                if(e.behaviorMode == BEHAVIOR_FLANK || dist < 6.5f){
                     float ox = dir.x;
                     dir.x = dir.z;
                     dir.z = -ox;
-                    moveMul = 1.35f;
+                    if((rand()%100) < 45){ dir.x = -dir.x; dir.z = -dir.z; }
+                    moveMul = (dist < 6.5f) ? 1.65f : 1.35f;
                 }
                 float nx = e.pos.x + dir.x*e.speed*moveMul*dt;
                 float nz = e.pos.z + dir.z*e.speed*moveMul*dt;
@@ -360,11 +388,22 @@ public:
         }
     }
     
+    EntityType getAttackingType(Vec3 pPos) {
+        float bestDist = 1e9f;
+        EntityType best = ENTITY_NONE;
+        for(auto& e : entities) {
+            if(!e.active || e.state != ENT_ATTACKING) continue;
+            Vec3 d = e.pos - pPos; d.y = 0;
+            float dist = sqrtf(d.x*d.x + d.z*d.z);
+            if(dist >= e.attackRange || dist >= bestDist) continue;
+            bestDist = dist;
+            best = e.type;
+        }
+        return best;
+    }
+
     bool checkPlayerAttack(Vec3 pPos) {
-        for(auto& e : entities) { if(!e.active) continue;
-            Vec3 d = e.pos - pPos; d.y = 0; float dist = sqrtf(d.x*d.x + d.z*d.z);
-            if(dist < e.attackRange && e.state == ENT_ATTACKING) return true; }
-        return false;
+        return getAttackingType(pPos) != ENTITY_NONE;
     }
     
     void reset() { entities.clear(); spawnTimer = 0; dangerLevel = 0; hasLastPlayerPos = false; }

@@ -41,6 +41,7 @@ struct SoundState {
     float lowStamina=0.0f;
     float monsterProximity=0.0f;
     float monsterMenace=0.0f;
+    float monsterType=0.0f;
     bool deathMode=false;
 };
 extern SoundState sndState;
@@ -57,12 +58,13 @@ inline float clamp01Audio(float v) {
     if (v > 1.0f) return 1.0f;
     return v;
 }
-inline void updateGameplayAudioState(float moveIntensity, float sprintIntensity, float staminaNorm, float monsterProximity, float monsterMenace) {
+inline void updateGameplayAudioState(float moveIntensity, float sprintIntensity, float staminaNorm, float monsterProximity, float monsterMenace, float monsterType=0.0f) {
     sndState.moveIntensity = clamp01Audio(moveIntensity);
     sndState.sprintIntensity = clamp01Audio(sprintIntensity);
     sndState.lowStamina = 1.0f - clamp01Audio(staminaNorm);
     sndState.monsterProximity = clamp01Audio(monsterProximity);
     sndState.monsterMenace = clamp01Audio(monsterMenace);
+    sndState.monsterType = clamp01Audio(monsterType);
 }
 
 inline void fillAudio(short* buf, int len) {
@@ -430,14 +432,37 @@ inline void fillAudio(short* buf, int len) {
         }
         float monsterTone = 0.0f;
         if(!sndState.deathMode && monsterProx > 0.03f){
-            float freq = 34.0f + monsterMenace * 18.0f;
             monsterPhase += dt * (0.5f + monsterProx * 1.9f);
             if(monsterPhase > 1.0f) monsterPhase -= 1.0f;
-            float wob = 1.0f + sinf(twoPi * monsterPhase) * 0.08f;
-            float baseGrowl = sinf(twoPi * (freq * wob) * globalPhase) * 0.085f;
-            float overGrowl = sinf(twoPi * (freq * 2.06f) * globalPhase) * 0.025f;
             float pulse = 0.55f + 0.45f * sinf(twoPi * monsterPhase * 0.5f);
-            monsterTone = (baseGrowl + overGrowl) * monsterProx * (0.5f + monsterMenace * 0.7f) * pulse;
+            float t = clamp01Audio(sndState.monsterType);
+            float wStalker = 1.0f - t * 2.0f;
+            if(wStalker < 0.0f) wStalker = 0.0f;
+            float wCrawler = 1.0f - fabsf(t - 0.5f) * 2.0f;
+            if(wCrawler < 0.0f) wCrawler = 0.0f;
+            float wShadow = (t - 0.5f) * 2.0f;
+            if(wShadow < 0.0f) wShadow = 0.0f;
+            float wSum = wStalker + wCrawler + wShadow;
+            if(wSum < 0.001f) { wStalker = 1.0f; wCrawler = 0.0f; wShadow = 0.0f; wSum = 1.0f; }
+            wStalker /= wSum; wCrawler /= wSum; wShadow /= wSum;
+
+            float stalkFreq = 30.0f + monsterMenace * 14.0f;
+            float stalkWob = 1.0f + sinf(twoPi * monsterPhase * 0.8f) * 0.06f;
+            float stalkTone = (sinf(twoPi * (stalkFreq * stalkWob) * globalPhase) * 0.085f +
+                               sinf(twoPi * (stalkFreq * 2.0f) * globalPhase) * 0.020f);
+
+            float crawlFreq = 62.0f + monsterMenace * 24.0f;
+            float crawlPulse = 0.30f + 0.70f * clamp01Audio(sinf(twoPi * monsterPhase * 1.7f) * 0.5f + 0.5f);
+            float crawlTone = (sinf(twoPi * crawlFreq * globalPhase) * 0.042f +
+                               sinf(twoPi * (crawlFreq * 0.52f) * globalPhase) * 0.060f) * crawlPulse;
+
+            float shadowFreq = 18.0f + monsterMenace * 10.0f;
+            float shadowWob = sinf(twoPi * monsterPhase * 0.37f + globalPhase * 2.8f);
+            float shadowTone = (sinf(twoPi * shadowFreq * globalPhase + shadowWob * 1.8f) * 0.060f +
+                                sinf(twoPi * (shadowFreq * 3.4f) * globalPhase) * 0.016f);
+
+            float mixTone = stalkTone * wStalker + crawlTone * wCrawler + shadowTone * wShadow;
+            monsterTone = mixTone * monsterProx * (0.5f + monsterMenace * 0.7f) * pulse;
         }
         float deathTone = 0.0f;
         if(sndState.deathMode){
@@ -477,7 +502,7 @@ inline void fillAudio(short* buf, int len) {
         buf[i]=(short)(v*32767);
     }
 }
-inline void triggerScare() { sndState.scareVol = 0.8f; sndState.scareTimer = 0; }
+inline void triggerScare(float vol=0.8f, float timer=0.0f) { sndState.scareVol = vol; sndState.scareTimer = timer; }
 inline void triggerMenuNavigateSound() {
     static int noteStep = 0;
     const float scale[6] = {1.0f, 1.059f, 1.122f, 1.189f, 1.122f, 1.059f};

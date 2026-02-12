@@ -30,6 +30,7 @@
 #include "world.h"
 #include "map_content.h"
 #include "entity_types.h"
+#include "monster_profiles.h"
 #include "entity_model.h"
 #include "entity.h"
 #include "entity_ai.h"

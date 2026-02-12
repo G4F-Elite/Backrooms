@@ -126,17 +126,28 @@ inline void buildCrawlerModel(std::vector<float>& verts) {
 
 inline void buildShadowModel(std::vector<float>& verts) {
     verts.clear();
-    auto emitBillboard = [&](float y0,float y1,float halfW,float nz){
+    auto emitBillboardX = [&](float y0,float y1,float halfW,float nz){
         float tri[] = {
             -halfW,y0,0,0,0,0,0,nz, halfW,y0,0,1,0,0,0,nz, halfW,y1,0,1,1,0,0,nz,
             -halfW,y0,0,0,0,0,0,nz, halfW,y1,0,1,1,0,0,nz, -halfW,y1,0,0,1,0,0,nz
         };
         for(int i=0;i<48;i++) verts.push_back(tri[i]);
     };
-    emitBillboard(-0.05f, 2.65f, 0.58f, 1.0f);
-    emitBillboard(-0.05f, 2.65f, 0.58f, -1.0f);
-    emitBillboard(0.10f, 2.45f, 0.30f, 1.0f);
-    emitBillboard(0.10f, 2.45f, 0.30f, -1.0f);
+    auto emitBillboardZ = [&](float y0,float y1,float halfW,float nx){
+        float tri[] = {
+            0,y0,-halfW,0,0,nx,0,0, 0,y0,halfW,1,0,nx,0,0, 0,y1,halfW,1,1,nx,0,0,
+            0,y0,-halfW,0,0,nx,0,0, 0,y1,halfW,1,1,nx,0,0, 0,y1,-halfW,0,1,nx,0,0
+        };
+        for(int i=0;i<48;i++) verts.push_back(tri[i]);
+    };
+    emitBillboardX(-0.05f, 2.65f, 0.58f, 1.0f);
+    emitBillboardX(-0.05f, 2.65f, 0.58f, -1.0f);
+    emitBillboardZ(-0.05f, 2.65f, 0.58f, 1.0f);
+    emitBillboardZ(-0.05f, 2.65f, 0.58f, -1.0f);
+    emitBillboardX(0.10f, 2.45f, 0.30f, 1.0f);
+    emitBillboardX(0.10f, 2.45f, 0.30f, -1.0f);
+    emitBillboardZ(0.10f, 2.45f, 0.30f, 1.0f);
+    emitBillboardZ(0.10f, 2.45f, 0.30f, -1.0f);
 }
 
 // Generate dark entity texture
