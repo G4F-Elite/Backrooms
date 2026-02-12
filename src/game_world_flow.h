@@ -72,14 +72,18 @@ void buildGeom(){
                     const float uvFloor = 1.0f;
                     const float uvCeil = 1.0f;
                     int8_t cellElev = it->second.elev[lx][lz];
-                    float floorY = isRamp(cellElev) ? 0.0f : getFloorYFromElev(cellElev);
-                    bool hasHole = isFloorHoleCell(wx,wz) || isAbyssCell(wx,wz);
+                    bool hasHole = !isAboveGround(cellElev) && (isFloorHoleCell(wx,wz) || isAbyssCell(wx,wz));
+                    auto pushFloor=[&](std::vector<float>&v,float y){
+                        float f[]={px,y,pz,0,0,0,1,0,px,y,pz+CS,0,uvFloor,0,1,0,px+CS,y,pz+CS,uvFloor,uvFloor,0,1,0,
+                                   px,y,pz,0,0,0,1,0,px+CS,y,pz+CS,uvFloor,uvFloor,0,1,0,px+CS,y,pz,uvFloor,0,0,1,0};
+                        for(int i=0;i<48;i++)v.push_back(f[i]);
+                    };
                     if(isRamp(cellElev)){
                         mkRamp(fv, px, pz, cellElev, CS);
+                    }else if(isElevated(cellElev)){
+                        pushFloor(fv,0); pushFloor(fv,FLOOR2_Y);
                     }else if(!hasHole){
-                        float fl[]={px,floorY,pz,0,0,0,1,0,px,floorY,pz+CS,0,uvFloor,0,1,0,px+CS,floorY,pz+CS,uvFloor,uvFloor,0,1,0,
-                                   px,floorY,pz,0,0,0,1,0,px+CS,floorY,pz+CS,uvFloor,uvFloor,0,1,0,px+CS,floorY,pz,uvFloor,0,0,1,0};
-                        for(int i=0;i<48;i++)fv.push_back(fl[i]);
+                        pushFloor(fv,0);
                     }else{
                         const float shaftDepth = 30.0f;
                         bool leftSolid = getCellWorld(wx-1,wz)==1 || (!isFloorHoleCell(wx-1,wz) && !isAbyssCell(wx-1,wz) && getCellWorld(wx-1,wz)==0);
@@ -91,29 +95,41 @@ void buildGeom(){
                         if(backSolid) mkShaftWall(wv,px+CS,pz,-CS,0,0,shaftDepth,CS);
                         if(frontSolid) mkShaftWall(wv,px,pz+CS,CS,0,0,shaftDepth,CS);
                     }
-                    float cl[]={px,WH,pz,0,0,0,-1,0,px,WH,pz+CS,0,uvCeil,0,-1,0,px+CS,WH,pz+CS,uvCeil,uvCeil,0,-1,0,
-                               px,WH,pz,0,0,0,-1,0,px+CS,WH,pz+CS,uvCeil,uvCeil,0,-1,0,px+CS,WH,pz,uvCeil,0,0,-1,0};
-                    for(int i=0;i<48;i++)cv.push_back(cl[i]);
+                    float ceilH = isAboveGround(cellElev) ? FLOOR2_CEIL : WH;
+                    auto pushCeil=[&](std::vector<float>&v,float y){
+                        float c[]={px,y,pz,0,0,0,-1,0,px,y,pz+CS,0,uvCeil,0,-1,0,px+CS,y,pz+CS,uvCeil,uvCeil,0,-1,0,
+                                   px,y,pz,0,0,0,-1,0,px+CS,y,pz+CS,uvCeil,uvCeil,0,-1,0,px+CS,y,pz,uvCeil,0,0,-1,0};
+                        for(int i=0;i<48;i++)v.push_back(c[i]);
+                    };
+                    pushCeil(cv, ceilH);
                     bool wallL = getCellWorld(wx-1,wz)==1;
                     bool wallR = getCellWorld(wx+1,wz)==1;
                     bool wallB = getCellWorld(wx,wz-1)==1;
                     bool wallF = getCellWorld(wx,wz+1)==1;
+                    // Ground floor walls (0→WH)
                     if(wallL)mkWall(wv,px,pz,0,CS,WH,CS,WH);
                     if(wallR)mkWall(wv,px+CS,pz+CS,0,-CS,WH,CS,WH);
                     if(wallB)mkWall(wv,px+CS,pz,-CS,0,WH,CS,WH);
                     if(wallF)mkWall(wv,px,pz+CS,CS,0,WH,CS,WH);
-                    // Ledge walls between elevated and ground cells
-                    if(isElevated(cellElev)){
-                        auto isGroundOpen = [&](int nx, int nz) -> bool {
-                            if(getCellWorld(nx,nz)!=0) return false;
-                            int8_t ne = getElevWorld(nx,nz);
-                            return ne == 0;
+                    if(isAboveGround(cellElev)){
+                        // Second floor walls (FLOOR2_Y→FLOOR2_CEIL) where neighbor is wall
+                        if(wallL) mkWallAt(wv,px,pz,0,CS,FLOOR2_Y,FLOOR2_CEIL,CS);
+                        if(wallR) mkWallAt(wv,px+CS,pz+CS,0,-CS,FLOOR2_Y,FLOOR2_CEIL,CS);
+                        if(wallB) mkWallAt(wv,px+CS,pz,-CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
+                        if(wallF) mkWallAt(wv,px,pz+CS,CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
+                        // Perimeter walls where neighbor is ground-level open
+                        auto isGround = [&](int nx, int nz) -> bool {
+                            return getCellWorld(nx,nz)==0 && !isAboveGround(getElevWorld(nx,nz));
                         };
-                        // Ledge wall: short wall 0→FLOOR2_Y on the ground side
-                        if(isGroundOpen(wx-1,wz)) mkWall(wv,px,pz,0,CS,FLOOR2_Y,CS,WH);
-                        if(isGroundOpen(wx+1,wz)) mkWall(wv,px+CS,pz+CS,0,-CS,FLOOR2_Y,CS,WH);
-                        if(isGroundOpen(wx,wz-1)) mkWall(wv,px+CS,pz,-CS,0,FLOOR2_Y,CS,WH);
-                        if(isGroundOpen(wx,wz+1)) mkWall(wv,px,pz+CS,CS,0,FLOOR2_Y,CS,WH);
+                        // Railing at edges facing ground (can look down)
+                        if(isGround(wx-1,wz))
+                            mkBox(dv,px+0.06f,FLOOR2_Y,pz+CS*0.5f,0.12f,RAILING_H,CS);
+                        if(isGround(wx+1,wz))
+                            mkBox(dv,px+CS-0.06f,FLOOR2_Y,pz+CS*0.5f,0.12f,RAILING_H,CS);
+                        if(isGround(wx,wz-1))
+                            mkBox(dv,px+CS*0.5f,FLOOR2_Y,pz+0.06f,CS,RAILING_H,0.12f);
+                        if(isGround(wx,wz+1))
+                            mkBox(dv,px+CS*0.5f,FLOOR2_Y,pz+CS-0.06f,CS,RAILING_H,0.12f);
                     }
 
                     if(!hasHole){

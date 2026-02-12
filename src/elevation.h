@@ -6,16 +6,18 @@
 
 extern const float CS, WH;
 
-const float FLOOR2_Y = 2.25f;
-const float RAILING_H = 0.9f;
+const float FLOOR2_Y = 4.5f;       // Second floor height (== WH)
+const float FLOOR2_ROOM_H = 2.5f;  // Second floor room height
+const float FLOOR2_CEIL = 7.0f;    // FLOOR2_Y + FLOOR2_ROOM_H
+const float RAILING_H = 1.0f;
 
-// Elevation values per cell:
-// 0 = ground (Y=0), 1 = elevated (Y=FLOOR2_Y)
-// 2 = ramp +X, 3 = ramp -X, 4 = ramp +Z, 5 = ramp -Z
+// Elevation values: 0=ground, 1=second floor, 2=ramp+X, 3=ramp-X, 4=ramp+Z, 5=ramp-Z
+inline bool isRamp(int8_t e) { return e >= 2 && e <= 5; }
+inline bool isElevated(int8_t e) { return e == 1; }
+inline bool isAboveGround(int8_t e) { return e >= 1 && e <= 5; }
 
 inline float getFloorYFromElev(int8_t e) {
-    if (e == 1) return FLOOR2_Y;
-    return 0.0f;
+    return (e == 1) ? FLOOR2_Y : 0.0f;
 }
 
 inline float getRampY(int8_t e, float fracX, float fracZ) {
@@ -28,43 +30,55 @@ inline float getRampY(int8_t e, float fracX, float fracZ) {
     }
 }
 
-inline bool isRamp(int8_t e) { return e >= 2 && e <= 5; }
-inline bool isElevated(int8_t e) { return e == 1; }
-inline bool isAboveGround(int8_t e) { return e >= 1 && e <= 5; }
+// Wall from y0 to y1 (generalized mkWall)
+inline void mkWallAt(std::vector<float>& v, float x, float z,
+                     float dx, float dz, float y0, float y1, float cs) {
+    Vec3 n = Vec3(dz, 0, -dx).norm();
+    float wallLen = sqrtf(dx * dx + dz * dz);
+    float tx = (wallLen / cs) * 1.8f;
+    float ty = ((y1 - y0) / 4.5f) * 1.6f;
+    float vv[] = {
+        x,y0,z, 0,0, n.x,n.y,n.z, x,y1,z, 0,ty, n.x,n.y,n.z,
+        x+dx,y1,z+dz, tx,ty, n.x,n.y,n.z, x,y0,z, 0,0, n.x,n.y,n.z,
+        x+dx,y1,z+dz, tx,ty, n.x,n.y,n.z, x+dx,y0,z+dz, tx,0, n.x,n.y,n.z
+    };
+    v.insert(v.end(), vv, vv + 48);
+}
 
+// Ramp slope surface from Y=0 to Y=FLOOR2_Y
 inline void mkRamp(std::vector<float>& v, float px, float pz, int8_t elev, float cs) {
-    float y0 = 0.0f, y1 = FLOOR2_Y;
+    float y1 = FLOOR2_Y;
     Vec3 n;
     if (elev == 2) {
-        n = Vec3(-FLOOR2_Y, cs, 0).norm();
+        n = Vec3(-y1, cs, 0).norm();
         float d[] = {
-            px,y0,pz, 0,0, n.x,n.y,n.z, px,y0,pz+cs, 0,1, n.x,n.y,n.z,
-            px+cs,y1,pz+cs, 1,1, n.x,n.y,n.z, px,y0,pz, 0,0, n.x,n.y,n.z,
+            px,0,pz, 0,0, n.x,n.y,n.z, px,0,pz+cs, 0,1, n.x,n.y,n.z,
+            px+cs,y1,pz+cs, 1,1, n.x,n.y,n.z, px,0,pz, 0,0, n.x,n.y,n.z,
             px+cs,y1,pz+cs, 1,1, n.x,n.y,n.z, px+cs,y1,pz, 1,0, n.x,n.y,n.z
         };
         v.insert(v.end(), d, d+48);
     } else if (elev == 3) {
-        n = Vec3(FLOOR2_Y, cs, 0).norm();
+        n = Vec3(y1, cs, 0).norm();
         float d[] = {
             px,y1,pz, 0,0, n.x,n.y,n.z, px,y1,pz+cs, 0,1, n.x,n.y,n.z,
-            px+cs,y0,pz+cs, 1,1, n.x,n.y,n.z, px,y1,pz, 0,0, n.x,n.y,n.z,
-            px+cs,y0,pz+cs, 1,1, n.x,n.y,n.z, px+cs,y0,pz, 1,0, n.x,n.y,n.z
+            px+cs,0,pz+cs, 1,1, n.x,n.y,n.z, px,y1,pz, 0,0, n.x,n.y,n.z,
+            px+cs,0,pz+cs, 1,1, n.x,n.y,n.z, px+cs,0,pz, 1,0, n.x,n.y,n.z
         };
         v.insert(v.end(), d, d+48);
     } else if (elev == 4) {
-        n = Vec3(0, cs, -FLOOR2_Y).norm();
+        n = Vec3(0, cs, -y1).norm();
         float d[] = {
-            px,y0,pz, 0,0, n.x,n.y,n.z, px+cs,y0,pz, 1,0, n.x,n.y,n.z,
-            px+cs,y1,pz+cs, 1,1, n.x,n.y,n.z, px,y0,pz, 0,0, n.x,n.y,n.z,
+            px,0,pz, 0,0, n.x,n.y,n.z, px+cs,0,pz, 1,0, n.x,n.y,n.z,
+            px+cs,y1,pz+cs, 1,1, n.x,n.y,n.z, px,0,pz, 0,0, n.x,n.y,n.z,
             px+cs,y1,pz+cs, 1,1, n.x,n.y,n.z, px,y1,pz+cs, 0,1, n.x,n.y,n.z
         };
         v.insert(v.end(), d, d+48);
     } else if (elev == 5) {
-        n = Vec3(0, cs, FLOOR2_Y).norm();
+        n = Vec3(0, cs, y1).norm();
         float d[] = {
             px,y1,pz, 0,0, n.x,n.y,n.z, px+cs,y1,pz, 1,0, n.x,n.y,n.z,
-            px+cs,y0,pz+cs, 1,1, n.x,n.y,n.z, px,y1,pz, 0,0, n.x,n.y,n.z,
-            px+cs,y0,pz+cs, 1,1, n.x,n.y,n.z, px,y0,pz+cs, 0,1, n.x,n.y,n.z
+            px+cs,0,pz+cs, 1,1, n.x,n.y,n.z, px,y1,pz, 0,0, n.x,n.y,n.z,
+            px+cs,0,pz+cs, 1,1, n.x,n.y,n.z, px,0,pz+cs, 0,1, n.x,n.y,n.z
         };
         v.insert(v.end(), d, d+48);
     }
