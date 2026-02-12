@@ -40,7 +40,7 @@ struct Settings {
     float fsrSharpness=0.35f;
     int aaMode=AA_MODE_TAA;
     bool fastMath=false;
-    int ssaoQuality=2; int giQuality=1; bool godRays=true; bool bloom=true;
+    int ssaoQuality=0; int giQuality=0; bool godRays=false; bool bloom=false;
     bool rtxDenoise=true;
     float rtxDenoiseStrength=0.65f;
     int frameGenMode=FRAME_GEN_MODE_OFF;
@@ -52,13 +52,14 @@ inline Settings settings;
 enum SettingsTab {
     SETTINGS_TAB_VIDEO = 0,
     SETTINGS_TAB_EFFECTS = 1,
-    SETTINGS_TAB_AUDIO = 2
+    SETTINGS_TAB_AUDIO = 2,
+    SETTINGS_TAB_BINDS = 3
 };
 inline int settingsTab = SETTINGS_TAB_VIDEO;
 
-inline int settingsItemsForTab(int tab) { if(tab==SETTINGS_TAB_AUDIO) return 7; if(tab==SETTINGS_TAB_EFFECTS) return 8; return 13; }
-inline int settingsBindsIndexForTab(int tab) { return (tab == SETTINGS_TAB_VIDEO) ? 11 : -1; }
-inline int settingsBackIndexForTab(int tab) { if(tab==SETTINGS_TAB_AUDIO) return 6; if(tab==SETTINGS_TAB_EFFECTS) return 7; return 12; }
+inline int settingsItemsForTab(int tab) { if(tab==SETTINGS_TAB_AUDIO) return 7; if(tab==SETTINGS_TAB_EFFECTS) return 8; if(tab==SETTINGS_TAB_BINDS) return 3; return 12; }
+inline int settingsBindsIndexForTab(int tab) { return (tab == SETTINGS_TAB_BINDS) ? 1 : -1; }
+inline int settingsBackIndexForTab(int tab) { if(tab==SETTINGS_TAB_AUDIO) return 6; if(tab==SETTINGS_TAB_EFFECTS) return 7; if(tab==SETTINGS_TAB_BINDS) return 2; return 11; }
 
 inline int clampSettingsSelection(int tab, int idx) {
     int cnt = settingsItemsForTab(tab);
@@ -246,24 +247,15 @@ inline void drawSlider(float x,float y,float w,float val,float r,float g,float b
 }
 
 inline void drawMenuAtmosphere(float tm) {
-    for(int i = 0; i < 7; i++) {
-        float fi = (float)i;
-        float yCenter = -0.90f + fi * 0.30f;
-        float drift = sinf(tm * (0.18f + fi * 0.02f) + fi * 0.8f) * 0.04f;
-        float w = 0.15f + 0.03f * sinf(tm * 0.28f + fi * 0.5f);
-        float alpha = 0.018f + 0.012f * (0.5f + 0.5f * sinf(tm * 0.36f + fi * 0.6f));
-        drawOverlayRectNdc(-1.0f, yCenter - w + drift, 1.0f, yCenter + w + drift, 0.16f, 0.14f, 0.11f, alpha);
+    drawOverlayRectNdc(-1.0f,-1.0f,1.0f,1.0f,0.09f,0.08f,0.06f,0.10f);
+    for(int i=0;i<6;i++){
+        float fi=(float)i, cx=-0.88f+fi*0.34f+sinf(tm*(0.16f+fi*0.02f)+fi)*0.04f;
+        float cy=0.58f-0.22f*fi+cosf(tm*(0.21f+fi*0.03f)+fi*0.7f)*0.03f;
+        float rad=0.11f+0.02f*sinf(tm*0.33f+fi*0.5f), a=0.025f+0.012f*(0.5f+0.5f*sinf(tm*0.41f+fi));
+        drawOverlayRectNdc(cx-rad,cy-rad,cx+rad,cy+rad,0.86f,0.74f,0.46f,a);
     }
-    for(int i = 0; i < 5; i++) {
-        float fi = (float)i;
-        float x = -0.95f + fi * 0.48f + sinf(tm * 0.22f + fi * 1.4f) * 0.06f;
-        float glow = 0.018f + 0.010f * (0.5f + 0.5f * sinf(tm * 0.45f + fi));
-        drawOverlayRectNdc(x - 0.055f, -1.0f, x + 0.055f, 1.0f, 0.82f, 0.70f, 0.40f, glow);
-    }
-    drawOverlayRectNdc(-1.0f, -1.0f, -0.78f, 1.0f, 0.04f, 0.04f, 0.04f, 0.15f);
-    drawOverlayRectNdc(0.78f, -1.0f, 1.0f, 1.0f, 0.04f, 0.04f, 0.04f, 0.15f);
-    drawOverlayRectNdc(-1.0f, -1.0f, 1.0f, -0.80f, 0.03f, 0.03f, 0.03f, 0.12f);
-    drawOverlayRectNdc(-1.0f, 0.80f, 1.0f, 1.0f, 0.03f, 0.03f, 0.03f, 0.12f);
+    for(int i=0;i<5;i++){ float y=-0.74f+i*0.36f+sinf(tm*0.24f+i)*0.02f; drawOverlayRectNdc(-1.0f,y-0.05f,1.0f,y+0.05f,0.14f,0.12f,0.09f,0.035f); }
+    drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.82f,0.03f,0.03f,0.03f,0.12f); drawOverlayRectNdc(-1.0f,0.82f,1.0f,1.0f,0.03f,0.03f,0.03f,0.12f);
 }
 
 inline void drawMenu(float tm) {
@@ -279,7 +271,7 @@ inline void drawMenu(float tm) {
     char levelBuf[32];
     buildLevelLabel(gCurrentLevel, levelBuf, 32);
     drawTextCentered(levelBuf,0.0f,0.35f,2.5f,0.7f,0.65f,0.3f,0.8f);
-    const char* it[]={"START CONTRACT","MULTIPLAYER","SETTINGS","GDD BRIEF","QUIT"};
+    const char* it[]={"START CONTRACT","MULTIPLAYER","SETTINGS","GUIDE","QUIT"};
     for(int i=0;i<5;i++){
         float s=(menuSel==i)?1.0f:0.5f; float y=0.10f-i*0.11f;
         float baseX = -measureTextWidthNdc(it[i], 2.0f) * 0.5f;
@@ -296,17 +288,17 @@ inline void drawGuideScreen() {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     drawFullscreenOverlay(0.02f,0.02f,0.03f,0.80f);
-    drawTextCentered("VOID SHIFT BRIEF",0.0f,0.58f,2.8f,0.9f,0.85f,0.4f,0.96f);
-    drawTextCentered("GOAL: COMPLETE CONTRACTS, STABILIZE REALITY, THEN EXTRACT",0.0f,0.40f,1.42f,0.82f,0.86f,0.64f,0.94f);
-    drawTextCentered("RESONATOR MODES: SCAN / RECORD / PLAYBACK / PING",0.0f,0.30f,1.32f,0.72f,0.84f,0.86f,0.92f);
-    drawTextCentered("ECHO RECORDING: HOLD R TO RECORD, RELEASE TO SAVE, P TO PLAY",0.0f,0.22f,1.26f,0.76f,0.74f,0.86f,0.92f);
-    drawTextCentered("ATTENTION RISES FROM NOISE/LIGHT/ECHO. STAY IN CONTROL",0.0f,0.12f,1.30f,0.92f,0.66f,0.50f,0.94f);
-    drawTextCentered("LEVEL 1: STABILIZE 3 NODES + HOLD 90s",0.0f,0.04f,1.28f,0.90f,0.72f,0.64f,0.92f);
-    drawTextCentered("LEVEL 2: BATTERY + 3 FUSES + ACCESS + LIFT HOLD",0.0f,-0.06f,1.28f,0.82f,0.86f,0.64f,0.92f);
-    drawTextCentered("NPCS: CARTOGRAPHER / DISPATCHER / LOST SURVIVOR",0.0f,-0.16f,1.18f,0.78f,0.84f,0.70f,0.90f);
-    drawTextCentered("SIDE CONTRACTS GRANT ARCHIVE POINTS + PERKS",0.0f,-0.24f,1.14f,0.76f,0.84f,0.72f,0.90f);
-    drawTextCentered("CONTROLS: WASD MOVE, SHIFT SPRINT, C CROUCH, E INTERACT",0.0f,-0.32f,1.24f,0.70f,0.76f,0.66f,0.90f);
-    drawTextCentered("ESC OR ENTER - BACK",0.0f,-0.70f,1.4f,0.56f,0.62f,0.50f,0.82f);
+    drawTextCentered("VOID SHIFT GUIDE",0.0f,0.58f,3.0f,0.9f,0.85f,0.4f,0.96f);
+    drawTextCentered("GOAL: COMPLETE CONTRACTS, STABILIZE REALITY, THEN EXTRACT",0.0f,0.40f,1.56f,0.82f,0.86f,0.64f,0.94f);
+    drawTextCentered("RESONATOR MODES: SCAN / RECORD / PLAYBACK / PING",0.0f,0.30f,1.46f,0.72f,0.84f,0.86f,0.92f);
+    drawTextCentered("ECHO RECORDING: HOLD R TO RECORD, RELEASE TO SAVE, P TO PLAY",0.0f,0.22f,1.40f,0.76f,0.74f,0.86f,0.92f);
+    drawTextCentered("ATTENTION RISES FROM NOISE/LIGHT/ECHO. STAY IN CONTROL",0.0f,0.12f,1.44f,0.92f,0.66f,0.50f,0.94f);
+    drawTextCentered("LEVEL 1: STABILIZE 3 NODES + HOLD 90s",0.0f,0.04f,1.42f,0.90f,0.72f,0.64f,0.92f);
+    drawTextCentered("LEVEL 2: BATTERY + 3 FUSES + ACCESS + LIFT HOLD",0.0f,-0.06f,1.42f,0.82f,0.86f,0.64f,0.92f);
+    drawTextCentered("NPCS: CARTOGRAPHER / DISPATCHER / LOST SURVIVOR",0.0f,-0.16f,1.34f,0.78f,0.84f,0.70f,0.90f);
+    drawTextCentered("SIDE CONTRACTS GRANT ARCHIVE POINTS + PERKS",0.0f,-0.24f,1.30f,0.76f,0.84f,0.72f,0.90f);
+    drawTextCentered("CONTROLS: WASD MOVE, SHIFT SPRINT, C CROUCH, E INTERACT",0.0f,-0.32f,1.36f,0.70f,0.76f,0.66f,0.90f);
+    drawTextCentered("ESC OR ENTER - BACK",0.0f,-0.70f,1.52f,0.56f,0.62f,0.50f,0.82f);
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
 }
@@ -319,9 +311,9 @@ inline void drawSettings(bool fp) {
     const bool audioTab = settingsTab == SETTINGS_TAB_AUDIO;
     const bool effectsTab = settingsTab == SETTINGS_TAB_EFFECTS;
     const int itemCount = settingsItemsForTab(settingsTab);
-    const char* tabN[3]={"VIDEO","EFFECTS","AUDIO"}; const char* tabB[3]={"[VIDEO]","[EFFECTS]","[AUDIO]"};
-    for(int t=0;t<3;t++){ float a=settingsTab==t?1.0f:0.52f;
-        drawTextCentered(settingsTab==t?tabB[t]:tabN[t],-0.30f+0.30f*t,0.44f,1.45f,0.86f*a,0.84f*a,0.58f*a,0.96f);
+    const char* tabN[4]={"VIDEO","EFFECTS","AUDIO","BINDS"}; const char* tabB[4]={"[VIDEO]","[EFFECTS]","[AUDIO]","[BINDS]"};
+    for(int t=0;t<4;t++){ float a=settingsTab==t?1.0f:0.52f;
+        drawTextCentered(settingsTab==t?tabB[t]:tabN[t],-0.45f+0.30f*t,0.44f,1.35f,0.86f*a,0.84f*a,0.58f*a,0.96f);
     }
     for(int i=0;i<itemCount;i++){
         float s=(menuSel==i)?1.0f:0.5f;
@@ -340,9 +332,9 @@ inline void drawSettings(bool fp) {
             drawText(lb[ai],-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             if(vl[ai]){
                 float nv=*vl[ai]/mx[ai]; if(nv>1.0f)nv=1.0f;
-                drawSlider(0.1f,y,0.45f,nv,0.9f*s,0.85f*s,0.4f*s);
+                drawSlider(-0.02f,y,0.45f,nv,0.9f*s,0.85f*s,0.4f*s);
                 char b[16]; snprintf(b,16,"%d%%",(int)(nv*100));
-                drawText(b,0.58f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+                drawTextCentered(b,rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }
         }else if(effectsTab){
             const char* lb[]={"SSAO","GI","GOD RAYS","BLOOM","DENOISER","DENOISE STR","BACK"};
@@ -355,12 +347,15 @@ inline void drawSettings(bool fp) {
             else if(vi==4) drawTextCentered(settings.rtxDenoise?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             else if(vi==5){
                 float nv=settings.rtxDenoiseStrength; if(nv>1.0f)nv=1.0f; if(nv<0.0f)nv=0.0f;
-                drawSlider(0.1f,y,0.45f,nv,0.9f*s,0.85f*s,0.4f*s);
+                drawSlider(-0.02f,y,0.45f,nv,0.9f*s,0.85f*s,0.4f*s);
                 char b[16]; snprintf(b,16,"%d%%",(int)(nv*100));
-                drawText(b,0.58f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+                drawTextCentered(b,rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }
+        }else if(settingsTab==SETTINGS_TAB_BINDS){
+            if(i==1){ drawText("OPEN BIND MENU",-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s); drawTextCentered("ENTER",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s); }
+            else if(i==2){ drawText("BACK",-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s); }
         }else{
-            const char* lb[]={"VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","ANTI-ALIASING","FAST MATH","FRAME GEN","V-SYNC","DEBUG MODE","KEY BINDS","BACK"};
+            const char* lb[]={"VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","ANTI-ALIASING","FAST MATH","FRAME GEN","V-SYNC","DEBUG MODE","BACK"};
             int vi = i - 1;
             drawText(lb[vi],-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             if(vi==0 || vi==1 || vi==4){
@@ -369,9 +364,9 @@ inline void drawSettings(bool fp) {
                 else if(vi==1){ val = settings.mouseSens; maxV = 0.006f; }
                 else val = settings.fsrSharpness;
                 float nv=val/maxV; if(nv>1.0f)nv=1.0f;
-                drawSlider(0.1f,y,0.45f,nv,0.9f*s,0.85f*s,0.4f*s);
+                drawSlider(-0.02f,y,0.45f,nv,0.9f*s,0.85f*s,0.4f*s);
                 char b[16]; snprintf(b,16,"%d%%",(int)(nv*100));
-                drawText(b,0.58f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+                drawTextCentered(b,rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==2){
                 drawTextCentered(upscalerModeLabel(settings.upscalerMode),rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==3){
@@ -389,8 +384,6 @@ inline void drawSettings(bool fp) {
                 drawTextCentered(settings.vsync?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==9){
                 drawTextCentered(settings.debugMode?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            }else if(vi==10){
-                drawTextCentered("OPEN",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }
         }
     }
@@ -404,7 +397,8 @@ inline void drawSettings(bool fp) {
         drawText(inputDisp, 0.44f, iy, 1.9f, 0.95f, 0.9f, 0.5f, 1.0f);
         drawTextCentered("TYPE 0-100  ENTER CONFIRM  ESC CANCEL", 0.0f, -0.58f, 1.35f, 0.7f, 0.65f, 0.35f, 0.8f);
     } else {
-        drawTextCentered("L/R ADJUST  ENTER TYPE VALUE  ESC BACK", 0.0f, -0.58f, 1.35f, 0.5f, 0.5f, 0.4f, 0.6f);
+        if(settingsTab==SETTINGS_TAB_BINDS) drawTextCentered("ENTER OPEN BIND MENU  ESC BACK", 0.0f, -0.58f, 1.35f, 0.5f, 0.5f, 0.4f, 0.6f);
+        else drawTextCentered("L/R ADJUST  ENTER TYPE VALUE  ESC BACK", 0.0f, -0.58f, 1.35f, 0.5f, 0.5f, 0.4f, 0.6f);
     }
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }

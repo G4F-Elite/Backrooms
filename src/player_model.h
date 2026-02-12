@@ -11,10 +11,10 @@
 extern GLuint playerTex;
 
 const float PLAYER_COLORS[4][3] = {
-    {0.1f, 0.9f, 0.2f},
-    {0.2f, 0.6f, 1.0f},
-    {1.0f, 0.5f, 0.1f},
-    {0.9f, 0.2f, 0.8f}
+    {0.72f, 0.72f, 0.72f},
+    {0.68f, 0.68f, 0.68f},
+    {0.78f, 0.78f, 0.78f},
+    {0.64f, 0.64f, 0.64f}
 };
 
 inline void addColorBox(std::vector<float>& v, float x, float y, float z,
@@ -137,8 +137,8 @@ inline int gatherRemoteFlashlights(int myId, float outPos[12], float outDir[12])
         if (i == myId || !netMgr.players[i].active || !netMgr.players[i].hasValidPos) continue;
         if (!netMgr.players[i].flashlightOn || !playerInterpReady[i]) continue;
         Vec3 pos = playerRenderPos[i];
-        float yaw = playerRenderYaw[i];
-        float pitch = playerRenderPitch[i];
+        float yaw = netMgr.players[i].yaw;
+        float pitch = netMgr.players[i].pitch;
         Vec3 dir(sinf(yaw) * cosf(pitch), sinf(pitch), cosf(yaw) * cosf(pitch));
         outPos[count * 3 + 0] = pos.x;
         outPos[count * 3 + 1] = pos.y;

@@ -142,7 +142,7 @@ inline void applyItemUse(int type){
     if(type==ITEM_PLUSH_TOY){
         // Mod: allow plush toy use even when not in inventory (slot 3 always available).
         if(invPlush <= 0){
-            playerSanity += 40.0f;
+            playerSanity += 24.0f;
             if(playerSanity > 100.0f) playerSanity = 100.0f;
             setEchoStatus("PLUSH TOY: YOUR MIND FEELS WHOLE AGAIN");
             return;

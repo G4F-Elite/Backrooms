@@ -51,6 +51,8 @@ void renderScene(){
     // Camera view (world rendering) uses full shake.
     float viewYaw = cam.yaw + shX;
     float viewPitch = cam.pitch + shY;
+    gRenderViewYaw = viewYaw;
+    gRenderViewPitch = viewPitch;
 
     // Viewmodel (held item) should be minimally affected by shake, otherwise it feels like it
     // "jumps" near the face. Keep it stable; the world can shake independently.

@@ -32,15 +32,15 @@ inline void keybindsInput(GLFWwindow* w, bool fromPause) {
             } else if (menuSel == KEYBINDS_BACK_INDEX) {
                 triggerMenuConfirmSound();
                 gameState = fromPause ? STATE_SETTINGS_PAUSE : STATE_SETTINGS;
-                settingsTab = SETTINGS_TAB_VIDEO;
-                menuSel = 10;
+                settingsTab = SETTINGS_TAB_BINDS;
+                menuSel = settingsBindsIndexForTab(settingsTab);
             }
         }
         if (esc && !escPressed) {
             triggerMenuConfirmSound();
             gameState = fromPause ? STATE_SETTINGS_PAUSE : STATE_SETTINGS;
-            settingsTab = SETTINGS_TAB_VIDEO;
-            menuSel = 10;
+            settingsTab = SETTINGS_TAB_BINDS;
+            menuSel = settingsBindsIndexForTab(settingsTab);
         }
     }
 

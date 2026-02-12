@@ -33,6 +33,14 @@ inline int clampDebugActionIndex(int idx) {
     return idx;
 }
 
+inline int wrapDebugActionIndex(int idx) {
+    int n = DEBUG_ACTION_COUNT;
+    if (n <= 0) return 0;
+    int r = idx % n;
+    if (r < 0) r += n;
+    return r;
+}
+
 inline const char* debugActionLabel(int idx) {
     switch (clampDebugActionIndex(idx)) {
         case DEBUG_ACT_TOGGLE_FLY: return "TOGGLE FLY";

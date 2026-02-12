@@ -204,13 +204,16 @@ void drawUI(){
 
                 if(settings.debugMode){
                     float sx = 0.0f, sy = 0.0f;
-                    if(npcCartographerActive && projectToScreen(npcCartographerPos + Vec3(0,1.7f,0), sx, sy)){
+                    Vec3 cartLbl = npcCartographerPos + Vec3(0,1.7f,0);
+                    if(npcCartographerActive && hasLabelLineOfSight(cartLbl) && projectToScreen(cartLbl, sx, sy)){
                         drawHudTextCentered("CARTOGRAPHER", sx, sy, 1.0f, 0.76f, 0.90f, 0.74f, 0.92f);
                     }
-                    if(npcDispatcherActive && projectToScreen(npcDispatcherPhonePos + Vec3(0,1.7f,0), sx, sy)){
+                    Vec3 dispLbl = npcDispatcherPhonePos + Vec3(0,1.7f,0);
+                    if(npcDispatcherActive && hasLabelLineOfSight(dispLbl) && projectToScreen(dispLbl, sx, sy)){
                         drawHudTextCentered("DISPATCH", sx, sy, 1.0f, 0.78f, 0.84f, 0.96f, 0.92f);
                     }
-                    if(npcLostSurvivorActive && projectToScreen(npcLostSurvivorPos + Vec3(0,1.7f,0), sx, sy)){
+                    Vec3 survLbl = npcLostSurvivorPos + Vec3(0,1.7f,0);
+                    if(npcLostSurvivorActive && hasLabelLineOfSight(survLbl) && projectToScreen(survLbl, sx, sy)){
                         drawHudTextCentered("LOST SURVIVOR", sx, sy, 1.0f, 0.92f, 0.78f, 0.64f, 0.92f);
                     }
                 }
@@ -234,7 +237,7 @@ void drawUI(){
                     if(!playerInterpReady[i]) continue;
                     Vec3 wp = playerRenderPos[i] + Vec3(0, 2.2f, 0);
                     float sx=0, sy=0;
-                    if(!projectToScreen(wp, sx, sy)) continue;
+                    if(!hasLabelLineOfSight(wp) || !projectToScreen(wp, sx, sy)) continue;
                     Vec3 dd = playerRenderPos[i] - cam.pos;
                     float dist = dd.len();
                     if(dist > 40.0f) continue;
@@ -290,14 +293,19 @@ void drawUI(){
             // === DEBUG MODE: debug tools panel (F10) ===
             if(settings.debugMode && debugTools.open){
                 drawFullscreenOverlay(0.02f,0.03f,0.04f,0.62f);
-                drawHudText("DEBUG TOOLS",-0.28f,0.56f,1.8f,0.9f,0.95f,0.82f,0.98f);
+                drawHudTextCentered("DEBUG TOOLS",0.0f,0.56f,1.8f,0.9f,0.95f,0.82f,0.98f);
                 for(int i=0;i<DEBUG_ACTION_COUNT;i++){
                     float y = 0.47f - i*0.08f;
                     float s = (debugTools.selectedAction==i)?1.0f:0.65f;
-                    if(debugTools.selectedAction==i) drawHudText(">",-0.39f,y,1.4f,0.92f,0.9f,0.65f,0.95f);
-                    drawHudText(debugActionLabel(i),-0.34f,y,1.35f,0.82f*s,0.88f*s,0.72f*s,0.92f);
+                    const char* lbl = debugActionLabel(i);
+                    if(i==DEBUG_ACT_TP_NOTE) lbl = isLevelZero(gCurrentLevel) ? "TP L1 OBJECTIVE" : "TP L2 OBJECTIVE";
+                    else if(i==DEBUG_ACT_TP_ECHO) lbl = isLevelZero(gCurrentLevel) ? "TP L1 NPC" : "TP L2 NPC";
+                    else if(i==DEBUG_ACT_TP_EXIT) lbl = isLevelZero(gCurrentLevel) ? "TP L1 EXIT" : "TP L2 LIFT";
+                    float baseX = -measureTextWidthNdc(lbl, 1.35f) * 0.5f;
+                    if(debugTools.selectedAction==i) drawHudText(">",baseX - 0.07f,y,1.4f,0.92f,0.9f,0.65f,0.95f);
+                    drawHudText(lbl,baseX,y,1.35f,0.82f*s,0.88f*s,0.72f*s,0.92f);
                 }
-                drawHudText("F10 TOGGLE  ENTER APPLY  ESC CLOSE",-0.42f,-0.20f,1.15f,0.67f,0.72f,0.78f,0.90f);
+                drawHudTextCentered("F10 TOGGLE  ENTER APPLY  ESC CLOSE",0.0f,-0.80f,1.12f,0.67f,0.72f,0.78f,0.90f);
             }
         }
     }

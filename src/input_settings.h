@@ -103,7 +103,7 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
     }
 
     auto switchTab = [&](int dir) {
-        settingsTab = (settingsTab + (dir > 0 ? 1 : 2)) % 3;
+        settingsTab = (settingsTab + (dir > 0 ? 1 : 3)) % 4;
         menuSel = clampSettingsSelection(settingsTab, menuSel);
     };
 
@@ -189,7 +189,6 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
     } else if (menuSel == bindsIndex) {
         if (enter && !enterPressed) {
             triggerMenuConfirmSound();
-            settingsTab = SETTINGS_TAB_VIDEO;
             gameState = fromPause ? STATE_KEYBINDS_PAUSE : STATE_KEYBINDS;
             menuSel = 0;
             keybindCaptureIndex = -1;

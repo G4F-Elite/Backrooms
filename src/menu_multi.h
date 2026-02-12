@@ -50,10 +50,10 @@ inline void drawMultiMenuScreen(float tm) {
     drawTextCentered(lanTab ? "[LAN]   SERVERS" : " LAN   [SERVERS]", 0.0f, -0.30f, 1.55f, 0.65f, 0.75f, 0.5f, 0.88f);
     drawTextCentered(lanTab ? "LAN MODE: USE RADMIN OR HAMACHI" : "SERVERS MODE: CENTRALIZED DIRECTORY", 0.0f, -0.40f, 1.3f, 0.55f, 0.62f, 0.46f, 0.74f);
     drawTextCentered("PORT: 27015 UDP", 0.0f, -0.48f, 1.35f, 0.5f, 0.5f, 0.4f, 0.6f);
-    drawText("NICKNAME:", -0.30f, -0.58f, 1.4f, 0.75f, 0.8f, 0.55f, 0.85f);
+    drawText("NICKNAME:", -0.22f, -0.58f, 1.4f, 0.75f, 0.8f, 0.55f, 0.85f);
     char nickVal[64];
     snprintf(nickVal, 64, "[%s%s]", multiNickname, multiEditingNickname ? "_" : "");
-    drawText(nickVal, -0.03f, -0.58f, 1.4f, 0.82f, 0.86f, 0.62f, 0.90f);
+    drawText(nickVal, 0.05f, -0.58f, 1.4f, 0.82f, 0.86f, 0.62f, 0.90f);
     drawTextCentered("TAB: EDIT NICKNAME   LEFT/RIGHT: SWITCH TAB", 0.0f, -0.68f, 1.1f, 0.55f, 0.6f, 0.45f, 0.7f);
     lanDiscovery.ensureLocalIP();
     char ipLine[96];
@@ -76,7 +76,7 @@ inline void drawJoinMenuScreen(float tm) {
 
     // IP Field (LAN target IP or Public server IP)
     float ipSel = (multiInputField == 0) ? 1.0f : 0.5f;
-    drawText(dedicated ? "PUBLIC IP:" : "IP ADDRESS:", -0.45f, 0.25f, 1.8f, 0.6f*ipSel, 0.6f*ipSel, 0.5f*ipSel, 0.8f);
+    drawText(dedicated ? "PUBLIC IP:" : "IP ADDRESS:", -0.54f, 0.25f, 1.65f, 0.6f*ipSel, 0.6f*ipSel, 0.5f*ipSel, 0.8f);
     char ipBuf[48];
     const char* shownIP = dedicated ? multiMasterIP : multiJoinIP;
     if (multiInputField == 0) {
@@ -84,11 +84,11 @@ inline void drawJoinMenuScreen(float tm) {
     } else {
         snprintf(ipBuf, 48, "[%s]", shownIP);
     }
-    drawText(ipBuf, -0.45f, 0.12f, 2.0f, 0.9f*ipSel, 0.9f*ipSel, 0.6f*ipSel, 1.0f);
+    drawText(ipBuf, -0.54f, 0.12f, 1.85f, 0.9f*ipSel, 0.9f*ipSel, 0.6f*ipSel, 1.0f);
     
     // Port Field (LAN target port or Public server port)
     float portSel = (multiInputField == 1) ? 1.0f : 0.5f;
-    drawText(dedicated ? "PUBLIC PORT:" : "PORT:", 0.15f, 0.25f, 1.8f, 0.6f*portSel, 0.6f*portSel, 0.5f*portSel, 0.8f);
+    drawText(dedicated ? "PUBLIC PORT:" : "PORT:", 0.16f, 0.25f, 1.65f, 0.6f*portSel, 0.6f*portSel, 0.5f*portSel, 0.8f);
     char portBuf[24];
     const char* shownPort = dedicated ? multiMasterPort : multiJoinPort;
     if (multiInputField == 1) {
@@ -96,47 +96,48 @@ inline void drawJoinMenuScreen(float tm) {
     } else {
         snprintf(portBuf, 24, "[%s]", shownPort);
     }
-    drawText(portBuf, 0.15f, 0.12f, 2.0f, 0.9f*portSel, 0.9f*portSel, 0.6f*portSel, 1.0f);
+    drawText(portBuf, 0.16f, 0.12f, 1.85f, 0.9f*portSel, 0.9f*portSel, 0.6f*portSel, 1.0f);
     
     // Menu options
     const char* opts[] = {"CONNECT", "BACK"};
     for (int i = 0; i < 2; i++) {
         float s = (menuSel == i) ? 1.0f : 0.5f;
         float y = -0.1f - i * 0.12f;
-        if (menuSel == i) drawText(">", -0.20f, y, 2.0f, 0.9f * s, 0.85f * s, 0.4f * s);
-        drawText(opts[i], -0.13f, y, 2.0f, 0.9f * s, 0.85f * s, 0.4f * s);
+        float baseX = -measureTextWidthNdc(opts[i], 2.0f) * 0.5f;
+        if (menuSel == i) drawText(">", baseX - 0.08f, y, 2.0f, 0.9f * s, 0.85f * s, 0.4f * s);
+        drawText(opts[i], baseX, y, 2.0f, 0.9f * s, 0.85f * s, 0.4f * s);
     }
     
-    drawText("TAB TO SWITCH FIELDS    0-9 AND . FOR INPUT", -0.58f, -0.4f, 1.3f, 0.5f, 0.5f, 0.4f, 0.6f);
-    drawText(dedicated ? "BACKSPACE TO DELETE     ENTER/G CONNECT" : "BACKSPACE TO DELETE     ENTER TO CONNECT", -0.58f, -0.5f, 1.3f, 0.5f, 0.5f, 0.4f, 0.6f);
-    drawText("LEFT/RIGHT OR T: SWITCH LAN/SERVERS TAB", -0.58f, -0.57f, 1.1f, 0.55f, 0.62f, 0.46f, 0.72f);
-    if (multiNetworkMode == 0) drawText("AUTO LAN SCAN: R REFRESH, F NEXT ROOM", -0.58f, -0.64f, 1.2f, 0.55f, 0.65f, 0.45f, 0.7f);
-    else drawText("PUBLIC ROOM: ENTER IP/PORT, G OR ENTER CONNECT", -0.58f, -0.64f, 1.05f, 0.55f, 0.65f, 0.45f, 0.7f);
+    drawTextCentered("TAB TO SWITCH FIELDS    0-9 AND . FOR INPUT", 0.0f, -0.4f, 1.3f, 0.5f, 0.5f, 0.4f, 0.6f);
+    drawTextCentered(dedicated ? "BACKSPACE TO DELETE     ENTER/G CONNECT" : "BACKSPACE TO DELETE     ENTER TO CONNECT", 0.0f, -0.5f, 1.3f, 0.5f, 0.5f, 0.4f, 0.6f);
+    drawTextCentered("LEFT/RIGHT OR T: SWITCH LAN/SERVERS TAB", 0.0f, -0.57f, 1.1f, 0.55f, 0.62f, 0.46f, 0.72f);
+    if (multiNetworkMode == 0) drawTextCentered("AUTO LAN SCAN: R REFRESH, F NEXT ROOM", 0.0f, -0.64f, 1.2f, 0.55f, 0.65f, 0.45f, 0.7f);
+    else drawTextCentered("PUBLIC ROOM: ENTER IP/PORT, G OR ENTER CONNECT", 0.0f, -0.64f, 1.05f, 0.55f, 0.65f, 0.45f, 0.7f);
     
     char roomHead[64];
     snprintf(roomHead, 64, multiNetworkMode == 0 ? "ROOMS FOUND: %d" : "PUBLIC ROOM MODE", multiNetworkMode == 0 ? lanDiscovery.roomCount : dedicatedDirectory.roomCount);
-    drawText(roomHead, -0.58f, -0.76f, 1.2f, 0.7f, 0.8f, 0.55f, 0.75f);
+    drawTextCentered(roomHead, 0.0f, -0.76f, 1.2f, 0.7f, 0.8f, 0.55f, 0.75f);
     if (!dedicated) {
         for (int i = 0; i < lanDiscovery.roomCount && i < 3; i++) {
             const LanRoomInfo& room = lanDiscovery.rooms[i];
             char roomLine[128];
             snprintf(roomLine, 128, "%s %d/%d %s", room.ip, (int)room.playerCount, (int)room.maxPlayers, room.gameStarted ? "IN GAME" : "LOBBY");
             float alpha = (i == lanDiscovery.selectedRoom) ? 0.95f : 0.65f;
-            drawText(roomLine, -0.58f, -0.84f - i * 0.07f, 1.1f, 0.75f, 0.85f, 0.6f, alpha);
+            drawTextCentered(roomLine, 0.0f, -0.84f - i * 0.07f, 1.1f, 0.75f, 0.85f, 0.6f, alpha);
         }
     } else {
         char roomLine[128];
         snprintf(roomLine, 128, "TARGET PUBLIC ROOM: %s:%s", multiMasterIP, multiMasterPort);
-        drawText(roomLine, -0.58f, -0.84f, 1.1f, 0.75f, 0.85f, 0.6f, 0.95f);
+        drawTextCentered(roomLine, 0.0f, -0.84f, 1.1f, 0.75f, 0.85f, 0.6f, 0.95f);
         float nowT = (float)glfwGetTime();
         char linkLine[128];
         if (dedicatedDirectory.hasRecentResponse(nowT)) snprintf(linkLine, 128, "MASTER LINK: ONLINE (%.1fs ago)", nowT - dedicatedDirectory.lastResponseAt);
         else if (dedicatedDirectory.queriesSent > 0) snprintf(linkLine, 128, "MASTER LINK: NO RESPONSE YET (%d req)", dedicatedDirectory.queriesSent);
         else snprintf(linkLine, 128, "MASTER LINK: NOT USED IN PUBLIC DIRECT MODE");
-        drawText(linkLine, -0.58f, -0.99f, 1.06f, 0.78f, 0.86f, 0.62f, 0.86f);
+        drawTextCentered(linkLine, 0.0f, -0.99f, 1.06f, 0.78f, 0.86f, 0.62f, 0.86f);
     }
     if (multiConnectStatus[0]) {
-        drawText(multiConnectStatus, -0.58f, -1.13f, 1.04f, 0.90f, 0.66f, 0.46f, 0.90f);
+        drawTextCentered(multiConnectStatus, 0.0f, -1.13f, 1.04f, 0.90f, 0.66f, 0.46f, 0.90f);
     }
     
     glDisable(GL_BLEND);
@@ -160,12 +161,13 @@ inline void drawHostLobbyScreen(float tm, int playerCount) {
     for (int i = 0; i < 2; i++) {
         float s = (menuSel == i) ? 1.0f : 0.5f;
         float y = -0.15f - i * 0.12f;
-        if (menuSel == i) drawText(">", -0.22f, y, 2.0f, 0.9f * s, 0.85f * s, 0.4f * s);
-        drawText(opts[i], -0.15f, y, 2.0f, 0.9f * s, 0.85f * s, 0.4f * s);
+        float baseX = -measureTextWidthNdc(opts[i], 2.0f) * 0.5f;
+        if (menuSel == i) drawText(">", baseX - 0.08f, y, 2.0f, 0.9f * s, 0.85f * s, 0.4f * s);
+        drawText(opts[i], baseX, y, 2.0f, 0.9f * s, 0.85f * s, 0.4f * s);
     }
     
     float listY = -0.42f;
-    drawText("PLAYERS IN LOBBY:", -0.42f, listY, 1.3f, 0.65f, 0.75f, 0.55f, 0.8f);
+    drawTextCentered("PLAYERS IN LOBBY:", 0.0f, listY, 1.3f, 0.65f, 0.75f, 0.55f, 0.8f);
     listY -= 0.08f;
     for (int i = 0; i < MAX_PLAYERS; i++) {
         char playerLine[80];
@@ -173,15 +175,15 @@ inline void drawHostLobbyScreen(float tm, int playerCount) {
         const char* name = active ? netMgr.players[i].name : "(empty)";
         if (active && i == 0) snprintf(playerLine, 80, "%d. %s [HOST]", i + 1, name);
         else snprintf(playerLine, 80, "%d. %s", i + 1, name);
-        drawText(playerLine, -0.42f, listY, 1.1f, active ? 0.7f : 0.45f, active ? 0.8f : 0.45f, active ? 0.55f : 0.4f, active ? 0.85f : 0.6f);
+        drawTextCentered(playerLine, 0.0f, listY, 1.1f, active ? 0.7f : 0.45f, active ? 0.8f : 0.45f, active ? 0.55f : 0.4f, active ? 0.85f : 0.6f);
         listY -= 0.07f;
     }
 
-    drawText("SHARE YOUR RADMIN/HAMACHI IP", -0.42f, -0.75f, 1.3f, 0.5f, 0.5f, 0.4f, 0.6f);
+    drawTextCentered("SHARE YOUR RADMIN/HAMACHI IP", 0.0f, -0.75f, 1.3f, 0.5f, 0.5f, 0.4f, 0.6f);
     lanDiscovery.ensureLocalIP();
     char ipLine[96];
     snprintf(ipLine, 96, "YOUR LAN IP: %s", lanDiscovery.localIP);
-    drawText(ipLine, -0.38f, -0.84f, 1.2f, 0.6f, 0.75f, 0.5f, 0.8f);
+    drawTextCentered(ipLine, 0.0f, -0.84f, 1.2f, 0.6f, 0.75f, 0.5f, 0.8f);
     
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
@@ -217,7 +219,7 @@ inline void drawWaitingScreen(float tm) {
         char line[72];
         const char* nm = netMgr.players[i].name[0] ? netMgr.players[i].name : "Player";
         snprintf(line, 72, "%d. %s%s", i + 1, nm, i == 0 ? " [HOST]" : "");
-        drawText(line, -0.3f, py, 1.1f, 0.72f, 0.82f, 0.62f, 0.78f);
+        drawTextCentered(line, 0.0f, py, 1.1f, 0.72f, 0.82f, 0.62f, 0.78f);
         py -= 0.07f;
     }
     
@@ -245,8 +247,9 @@ inline void drawMultiPause(int playerCount) {
     for (int i = 0; i < 6; i++) {
         float s = (menuSel == i) ? 1.0f : 0.5f;
         float y = 0.0f - i * 0.1f;
-        if (menuSel == i) drawText(">", -0.35f, y, 1.8f, 0.9f * s, 0.85f * s, 0.4f * s);
-        drawText(opts[i], -0.28f, y, 1.8f, 0.9f * s, 0.85f * s, 0.4f * s);
+        float baseX = -measureTextWidthNdc(opts[i], 1.8f) * 0.5f;
+        if (menuSel == i) drawText(">", baseX - 0.07f, y, 1.8f, 0.9f * s, 0.85f * s, 0.4f * s);
+        drawText(opts[i], baseX, y, 1.8f, 0.9f * s, 0.85f * s, 0.4f * s);
     }
     
     drawTextCentered("ESC - RESUME", 0.0f, -0.65f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);

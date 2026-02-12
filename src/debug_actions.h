@@ -3,6 +3,28 @@
 
 struct GLFWwindow;
 
+inline const char* debugActionRuntimeLabel(int idx){
+    int a = clampDebugActionIndex(idx);
+    if(a==DEBUG_ACT_TP_NOTE) return isLevelZero(gCurrentLevel) ? "TP L1 OBJECTIVE" : "TP L2 OBJECTIVE";
+    if(a==DEBUG_ACT_TP_ECHO) return isLevelZero(gCurrentLevel) ? "TP L1 NPC" : "TP L2 NPC";
+    if(a==DEBUG_ACT_TP_EXIT) return isLevelZero(gCurrentLevel) ? "TP L1 EXIT" : "TP L2 LIFT";
+    return debugActionLabel(idx);
+}
+
+inline void debugTeleportTo(const Vec3& p, const char* msg){
+    Vec3 tp = Vec3(p.x, PH, p.z);
+    if(collideWorld(tp.x, tp.z, 0.40f)){
+        Vec3 safe = findSpawnPos(p, 4.0f);
+        tp = Vec3(safe.x, PH, safe.z);
+    }
+    cam.pos = tp;
+    updateVisibleChunks(cam.pos.x, cam.pos.z);
+    updateLightsAndPillars(playerChunkX,playerChunkZ);
+    updateMapContent(playerChunkX,playerChunkZ);
+    buildGeom();
+    if(msg) setEchoStatus(msg);
+}
+
 inline Vec3 debugCursorSpawnPos(GLFWwindow* w){
     double cx = 0.0, cy = 0.0;
     glfwGetCursorPos(w, &cx, &cy);
@@ -41,39 +63,33 @@ inline void executeDebugAction(int action){
         return;
     }
     if(action==DEBUG_ACT_TP_NOTE){
-        int target = -1;
-        for(auto& n:storyMgr.notes){
-            if(!n.active || n.collected) continue;
-            target = n.id;
-            break;
-        }
-        if(target < 0 && lastSpawnedNote < 11){
-            trySpawnNote(lastSpawnedNote + 1);
-            for(auto& n:storyMgr.notes){
-                if(!n.active || n.collected) continue;
-                target = n.id;
+        Vec3 target = coop.doorPos;
+        if(isLevelZero(gCurrentLevel)){
+            target = coop.doorPos;
+            for(int i=0;i<3;i++){
+                if(level1NodeDone[i]) continue;
+                target = level1Nodes[i];
                 break;
             }
-        }
-        if(target >= 0){
-            Vec3 p = storyMgr.notes[target].pos;
-            cam.pos = Vec3(p.x, PH, p.z);
-            updateVisibleChunks(cam.pos.x, cam.pos.z);
-            updateLightsAndPillars(playerChunkX,playerChunkZ);
-            updateMapContent(playerChunkX,playerChunkZ);
-            buildGeom();
-            setEchoStatus("DEBUG: TELEPORTED TO NOTE");
-        }
+        }else if(!level2BatteryInstalled) target = level2BatteryNode;
+        else if(level2FuseCount < 3){
+            for(int i=0;i<3;i++) if(!level2FuseDone[i]){ target = level2FuseNodes[i]; break; }
+        }else if(!level2AccessReady) target = level2AccessNode;
+        else if(!level2HoldActive && !level2ContractComplete) target = level2LiftNode;
+        debugTeleportTo(target, "DEBUG: TELEPORTED TO OBJECTIVE");
         return;
     }
     if(action==DEBUG_ACT_TP_ECHO){
-        if(!echoSignal.active) spawnEchoSignal();
-        cam.pos = Vec3(echoSignal.pos.x, PH, echoSignal.pos.z);
-        updateVisibleChunks(cam.pos.x, cam.pos.z);
-        updateLightsAndPillars(playerChunkX,playerChunkZ);
-        updateMapContent(playerChunkX,playerChunkZ);
-        buildGeom();
-        setEchoStatus("DEBUG: TELEPORTED TO ECHO");
+        Vec3 target = npcCartographerPos;
+        if(isLevelZero(gCurrentLevel)){
+            if(npcDispatcherActive) target = npcDispatcherPhonePos;
+            if(npcLostSurvivorActive && !npcLostSurvivorEscorted) target = npcLostSurvivorPos;
+        }else{
+            if(!level2CameraOnline) target = level2CameraNode;
+            else if(!level2DroneReprogrammed) target = level2DroneNode;
+            else if(npcDispatcherActive) target = npcDispatcherPhonePos;
+        }
+        debugTeleportTo(target, "DEBUG: TELEPORTED TO TARGET");
         return;
     }
     if(action==DEBUG_ACT_TP_EXIT){
@@ -83,8 +99,32 @@ inline void executeDebugAction(int action){
         return;
     }
     if(action==DEBUG_ACT_SKIP_LEVEL){
+        if(multiState==MULTI_IN_GAME && !netMgr.isHost){
+            setTrapStatus("DEBUG: SKIP LEVEL HOST ONLY");
+            return;
+        }
         if(multiState==MULTI_IN_GAME){
-            setTrapStatus("DEBUG: SKIP LEVEL SOLO ONLY");
+            if(isLevelZero(gCurrentLevel)){
+                for(int i=0;i<3;i++) level1NodeDone[i] = true;
+                level1HoldActive = false;
+                level1HoldTimer = 0.0f;
+                level1ContractComplete = true;
+                coop.doorOpen = true;
+                setTrapStatus("DEBUG: L1 CONTRACT FORCED COMPLETE");
+            }else{
+                level2BatteryInstalled = true;
+                level2BatteryStage = 2;
+                level2FusePanelPowered = true;
+                level2FuseCount = 3;
+                for(int i=0;i<3;i++) level2FuseDone[i] = true;
+                level2AccessReady = true;
+                level2HoldActive = false;
+                level2HoldTimer = 0.0f;
+                level2VentDone = true;
+                level2ContractComplete = true;
+                coop.doorOpen = true;
+                setTrapStatus("DEBUG: L2 CONTRACT FORCED COMPLETE");
+            }
             return;
         }
         if(isLevelZero(gCurrentLevel)){

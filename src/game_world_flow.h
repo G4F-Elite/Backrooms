@@ -107,6 +107,7 @@ void buildGeom(){
                         unsigned int doorHash = (unsigned int)(wx * 73856093u) ^ (unsigned int)(wz * 19349663u) ^ (worldSeed * 83492791u);
                         bool spawnDoorway = (doorHash % 100u) < 7u;
                         if(spawnDoorway && (corridorZ || corridorX)){
+                            std::vector<float>& doorV = isParkingLevel(gCurrentLevel) ? wv : dv;
                             float openingH = WH * 0.62f;
                             float postH = openingH;
                             float postW = CS * 0.06f;
@@ -118,19 +119,19 @@ void buildGeom(){
                             float topFillH = WH - openingH;
                             float wallFillT = frameT * 0.92f;
                             if(corridorZ){
-                                mkBox(dv, cxCell - openingHalf, 0.0f, czCell, postW, postH, frameT);
-                                mkBox(dv, cxCell + openingHalf, 0.0f, czCell, postW, postH, frameT);
-                                mkBox(dv, cxCell, openingH, czCell, openingHalf * 2.0f + postW * 2.0f, CS * 0.08f, frameT);
-                                mkBox(dv, cxCell - sideFillCenter, 0.0f, czCell, sideFillW, WH, wallFillT);
-                                mkBox(dv, cxCell + sideFillCenter, 0.0f, czCell, sideFillW, WH, wallFillT);
-                                mkBox(dv, cxCell, openingH, czCell, openingHalf * 2.0f, topFillH, wallFillT);
+                                mkBox(doorV, cxCell - openingHalf, 0.0f, czCell, postW, postH, frameT);
+                                mkBox(doorV, cxCell + openingHalf, 0.0f, czCell, postW, postH, frameT);
+                                mkBox(doorV, cxCell, openingH, czCell, openingHalf * 2.0f + postW * 2.0f, CS * 0.08f, frameT);
+                                mkBox(doorV, cxCell - sideFillCenter, 0.0f, czCell, sideFillW, WH, wallFillT);
+                                mkBox(doorV, cxCell + sideFillCenter, 0.0f, czCell, sideFillW, WH, wallFillT);
+                                mkBox(doorV, cxCell, openingH, czCell, openingHalf * 2.0f, topFillH, wallFillT);
                             }else{
-                                mkBox(dv, cxCell, 0.0f, czCell - openingHalf, frameT, postH, postW);
-                                mkBox(dv, cxCell, 0.0f, czCell + openingHalf, frameT, postH, postW);
-                                mkBox(dv, cxCell, openingH, czCell, frameT, CS * 0.08f, openingHalf * 2.0f + postW * 2.0f);
-                                mkBox(dv, cxCell, 0.0f, czCell - sideFillCenter, wallFillT, WH, sideFillW);
-                                mkBox(dv, cxCell, 0.0f, czCell + sideFillCenter, wallFillT, WH, sideFillW);
-                                mkBox(dv, cxCell, openingH, czCell, wallFillT, topFillH, openingHalf * 2.0f);
+                                mkBox(doorV, cxCell, 0.0f, czCell - openingHalf, frameT, postH, postW);
+                                mkBox(doorV, cxCell, 0.0f, czCell + openingHalf, frameT, postH, postW);
+                                mkBox(doorV, cxCell, openingH, czCell, frameT, CS * 0.08f, openingHalf * 2.0f + postW * 2.0f);
+                                mkBox(doorV, cxCell, 0.0f, czCell - sideFillCenter, wallFillT, WH, sideFillW);
+                                mkBox(doorV, cxCell, 0.0f, czCell + sideFillCenter, wallFillT, WH, sideFillW);
+                                mkBox(doorV, cxCell, openingH, czCell, wallFillT, topFillH, openingHalf * 2.0f);
                             }
                         }
 
@@ -375,10 +376,14 @@ void genWorld(){
             sp=netMgr.spawnPos;
             coopBase = netMgr.spawnPos;
         }
-        sp.x+=netMgr.myId*1.5f;
+        if(netMgr.myId > 0) sp = findSpawnPos(sp, 2.2f + (float)netMgr.myId * 0.7f);
     }
     
     cam.pos=Vec3(sp.x,PH,sp.z);cam.yaw=cam.pitch=0;
+    if(collideWorld(cam.pos.x, cam.pos.z, 0.42f)){
+        Vec3 safe = findSpawnPos(cam.pos, 5.0f);
+        cam.pos = Vec3(safe.x, PH, safe.z);
+    }
     updateVisibleChunks(cam.pos.x,cam.pos.z);
     updateLightsAndPillars(playerChunkX,playerChunkZ);
     updateMapContent(playerChunkX,playerChunkZ);

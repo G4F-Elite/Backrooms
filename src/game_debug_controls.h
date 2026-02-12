@@ -7,10 +7,10 @@ struct GLFWwindow;
 #include "game_mouse_input.h"
 void gameInput(GLFWwindow*w){
     static bool debugTogglePressed = false;
-    static bool debugUpPressed = false;
-    static bool debugDownPressed = false;
     static bool debugEnterPressed = false;
     static bool debugEscPressed = false;
+    static int debugHoldDir = 0;
+    static double debugNextNavTime = 0.0;
     static bool perfTogglePressed = false;
     static bool hudTogglePressed = false;
     static bool recordPressed = false, playbackPressed = false;
@@ -88,14 +88,11 @@ void gameInput(GLFWwindow*w){
         bool downNow = glfwGetKey(w,GLFW_KEY_DOWN)==GLFW_PRESS || glfwGetKey(w,GLFW_KEY_S)==GLFW_PRESS;
         bool enterNow = glfwGetKey(w,GLFW_KEY_ENTER)==GLFW_PRESS || glfwGetKey(w,GLFW_KEY_SPACE)==GLFW_PRESS;
         bool escNow = glfwGetKey(w,GLFW_KEY_ESCAPE)==GLFW_PRESS;
-        if(upNow && !debugUpPressed){
-            debugTools.selectedAction = clampDebugActionIndex(debugTools.selectedAction - 1);
-            triggerMenuNavigateSound();
-        }
-        if(downNow && !debugDownPressed){
-            debugTools.selectedAction = clampDebugActionIndex(debugTools.selectedAction + 1);
-            triggerMenuNavigateSound();
-        }
+        int navDir = upNow ? -1 : (downNow ? 1 : 0);
+        double now = glfwGetTime();
+        if(navDir == 0){ debugHoldDir = 0; debugNextNavTime = 0.0; }
+        else if(debugHoldDir != navDir){ debugHoldDir = navDir; debugTools.selectedAction = wrapDebugActionIndex(debugTools.selectedAction + navDir); debugNextNavTime = now + 0.26; triggerMenuNavigateSound(); }
+        else if(now >= debugNextNavTime){ debugTools.selectedAction = wrapDebugActionIndex(debugTools.selectedAction + navDir); debugNextNavTime = now + 0.06; triggerMenuNavigateSound(); }
         if(enterNow && !debugEnterPressed){
             triggerMenuConfirmSound();
             executeDebugAction(debugTools.selectedAction);
@@ -106,8 +103,6 @@ void gameInput(GLFWwindow*w){
             glfwSetInputMode(w,GLFW_CURSOR,GLFW_CURSOR_DISABLED);
             firstMouse = true;
         }
-        debugUpPressed = upNow;
-        debugDownPressed = downNow;
         debugEnterPressed = enterNow;
         debugEscPressed = escNow;
         escPressed=glfwGetKey(w,settings.binds.pause)==GLFW_PRESS;
@@ -217,6 +212,12 @@ void gameInput(GLFWwindow*w){
         }
     }
     if(k3&&!key3Pressed) {
+        if(flashlightOn){
+            flashlightOn = false;
+            flashlightShutdownBlinkActive = false;
+            flashlightShutdownBlinkTimer = 0.0f;
+            sndState.flashlightOn = 0.0f;
+        }
         handleConsumableSlot3Press();
     }
     if(k4&&!key4Pressed){

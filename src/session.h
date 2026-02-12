@@ -374,10 +374,29 @@ inline bool nearPoint2D(const Vec3& a, const Vec3& b, float r){
     return sqrtf(d.x*d.x + d.z*d.z) < r;
 }
 
+inline float gRenderViewYaw = 0.0f;
+inline float gRenderViewPitch = 0.0f;
+
+inline bool hasLabelLineOfSight(const Vec3& worldPos){
+    Vec3 d = worldPos - cam.pos;
+    d.y = 0.0f;
+    float dist = d.len();
+    if(dist <= 0.6f) return true;
+    float inv = 1.0f / dist;
+    Vec3 dir(d.x * inv, 0.0f, d.z * inv);
+    float t = 0.6f;
+    while(t < dist - 0.35f){
+        Vec3 p = cam.pos + dir * t;
+        if(collideWorld(p.x, p.z, 0.08f)) return false;
+        t += 0.35f;
+    }
+    return true;
+}
+
 inline bool projectToScreen(const Vec3& worldPos, float& sx, float& sy){
     Vec3 d = worldPos - cam.pos;
-    float cy = mCos(cam.yaw), syaw = mSin(cam.yaw);
-    float cp = mCos(cam.pitch), sp = mSin(cam.pitch);
+    float cy = mCos(gRenderViewYaw), syaw = mSin(gRenderViewYaw);
+    float cp = mCos(gRenderViewPitch), sp = mSin(gRenderViewPitch);
 
     float cx = d.x * cy - d.z * syaw;
     float cz0 = d.x * syaw + d.z * cy;
@@ -443,8 +462,8 @@ inline float vmShake = 0.0f;
 inline void applyPlushToyUse(){
     if(invPlush <= 0) return;
     invPlush--;
-    // Slot 3 plush toy should be a strong sanity recovery tool.
-    playerSanity += 40.0f;
+    // Slot 3 plush toy should recover sanity, but not instantly.
+    playerSanity += 25.0f;
     if(playerSanity > 100.0f) playerSanity = 100.0f;
     setEchoStatus("PLUSH TOY: YOUR MIND FEELS WHOLE AGAIN");
 }
