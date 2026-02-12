@@ -4,6 +4,76 @@
 #include "map_content.h"
 #include "item_types.h"
 
+inline bool tryHandleVoidShiftInteract(const Vec3& playerPos);
+
+inline void captureVoidShiftState(NetVoidShiftState& out){
+    out.attentionLevel = attentionLevel;
+    out.coLevel = coLevel;
+    out.resonatorBattery = resonatorBattery;
+    out.level1HoldTimer = level1HoldTimer;
+    out.level2HoldTimer = level2HoldTimer;
+    out.sideContractType = sideContractType;
+    out.sideContractProgress = sideContractProgress;
+    out.sideContractTarget = sideContractTarget;
+    out.level2BatteryStage = level2BatteryStage;
+    out.level2FuseCount = level2FuseCount;
+    out.sideContractCompleted = sideContractCompleted;
+    for(int i=0;i<3;i++) out.level1NodeDone[i] = level1NodeDone[i];
+    out.level1HoldActive = level1HoldActive;
+    out.level1ContractComplete = level1ContractComplete;
+    out.level2BatteryInstalled = level2BatteryInstalled;
+    for(int i=0;i<3;i++) out.level2FuseDone[i] = level2FuseDone[i];
+    out.level2AccessReady = level2AccessReady;
+    out.level2FusePanelPowered = level2FusePanelPowered;
+    out.level2HoldActive = level2HoldActive;
+    out.level2ContractComplete = level2ContractComplete;
+    out.level2VentDone = level2VentDone;
+    out.level2CameraOnline = level2CameraOnline;
+    out.level2DroneReprogrammed = level2DroneReprogrammed;
+    out.ventilationOnline = ventilationOnline;
+    out.npcCartographerActive = npcCartographerActive;
+    out.npcDispatcherActive = npcDispatcherActive;
+    out.npcLostSurvivorActive = npcLostSurvivorActive;
+    out.npcLostSurvivorEscorted = npcLostSurvivorEscorted;
+    out.npcCartographerPos = npcCartographerPos;
+    out.npcDispatcherPhonePos = npcDispatcherPhonePos;
+    out.npcLostSurvivorPos = npcLostSurvivorPos;
+}
+
+inline void applyVoidShiftState(const NetVoidShiftState& state){
+    attentionLevel = state.attentionLevel;
+    coLevel = state.coLevel;
+    resonatorBattery = state.resonatorBattery;
+    level1HoldTimer = state.level1HoldTimer;
+    level2HoldTimer = state.level2HoldTimer;
+    sideContractType = state.sideContractType;
+    sideContractProgress = state.sideContractProgress;
+    sideContractTarget = state.sideContractTarget;
+    level2BatteryStage = state.level2BatteryStage;
+    level2FuseCount = state.level2FuseCount;
+    sideContractCompleted = state.sideContractCompleted;
+    for(int i=0;i<3;i++) level1NodeDone[i] = state.level1NodeDone[i];
+    level1HoldActive = state.level1HoldActive;
+    level1ContractComplete = state.level1ContractComplete;
+    level2BatteryInstalled = state.level2BatteryInstalled;
+    for(int i=0;i<3;i++) level2FuseDone[i] = state.level2FuseDone[i];
+    level2AccessReady = state.level2AccessReady;
+    level2FusePanelPowered = state.level2FusePanelPowered;
+    level2HoldActive = state.level2HoldActive;
+    level2ContractComplete = state.level2ContractComplete;
+    level2VentDone = state.level2VentDone;
+    level2CameraOnline = state.level2CameraOnline;
+    level2DroneReprogrammed = state.level2DroneReprogrammed;
+    ventilationOnline = state.ventilationOnline;
+    npcCartographerActive = state.npcCartographerActive;
+    npcDispatcherActive = state.npcDispatcherActive;
+    npcLostSurvivorActive = state.npcLostSurvivorActive;
+    npcLostSurvivorEscorted = state.npcLostSurvivorEscorted;
+    npcCartographerPos = state.npcCartographerPos;
+    npcDispatcherPhonePos = state.npcDispatcherPhonePos;
+    npcLostSurvivorPos = state.npcLostSurvivorPos;
+}
+
 inline void updateCoopObjectiveHost(){
     if(!coop.initialized) return;
     for(int s=0;s<2;s++) {
@@ -92,6 +162,13 @@ inline void applyItemUse(int type){
 
 inline void processHostInteractRequests(){
     if(!netMgr.isHost) return;
+    static float interactCooldown[MAX_PLAYERS] = {};
+    for(int p=0;p<MAX_PLAYERS;p++){
+        if(interactCooldown[p] > 0.0f){
+            interactCooldown[p] -= dTime;
+            if(interactCooldown[p] < 0.0f) interactCooldown[p] = 0.0f;
+        }
+    }
     for(int i=0;i<netMgr.interactRequestCount;i++){
         if(!netMgr.interactRequests[i].valid) continue;
         int pid = netMgr.interactRequests[i].playerId;
@@ -119,6 +196,17 @@ inline void processHostInteractRequests(){
             else if(type==REQ_DEBUG_SPAWN_SHADOW) spawnType = ENTITY_SHADOW;
             Vec3 sp = findSpawnPos(base, 6.0f);
             entityMgr.spawnEntity(spawnType, sp, nullptr, 0, 0);
+        }else if(type==REQ_VOID_SHIFT_INTERACT){
+            if(pid < 0 || pid >= MAX_PLAYERS) continue;
+            if(interactCooldown[pid] > 0.0f) continue;
+            interactCooldown[pid] = 0.25f;
+            Vec3 base = cam.pos;
+            if(pid>=0 && pid<MAX_PLAYERS && netMgr.players[pid].active && netMgr.players[pid].hasValidPos){
+                base = netMgr.players[pid].pos;
+            }
+            char prompt[96];
+            buildVoidShiftInteractPrompt(base, prompt, 96);
+            if(prompt[0] != '\0') tryHandleVoidShiftInteract(base);
         }
     }
     netMgr.interactRequestCount = 0;
@@ -140,6 +228,9 @@ inline void hostSyncFeatureState(){
     netMgr.inventoryBattery[netMgr.myId] = invBattery;
     netMgr.inventoryPlush[netMgr.myId] = invPlush;
     netMgr.sendInventorySync();
+    NetVoidShiftState state;
+    captureVoidShiftState(state);
+    netMgr.sendVoidShiftState(state);
 }
 
 inline void clientApplyFeatureState(){
@@ -159,6 +250,10 @@ inline void clientApplyFeatureState(){
         netMgr.inventorySyncReceived = false;
         invBattery = netMgr.inventoryBattery[netMgr.myId];
         invPlush = netMgr.inventoryPlush[netMgr.myId];
+    }
+    if(netMgr.voidShiftStateReceived){
+        netMgr.voidShiftStateReceived = false;
+        applyVoidShiftState(netMgr.voidShiftState);
     }
     syncCoopFromNetwork();
 }

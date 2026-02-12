@@ -144,8 +144,7 @@ void gameInput(GLFWwindow*w){
             break;
         }
     }
-    bool nearExitDoor = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
-    bool exitReady = (multiState==MULTI_IN_GAME) ? (coop.doorOpen && isStoryExitReady()) : isStoryExitReady();
+    bool nearExitDoor = nearPoint2D(cam.pos, coop.doorPos, 2.4f), exitReady = (multiState==MULTI_IN_GAME) ? (coop.doorOpen && isStoryExitReady()) : isStoryExitReady();
     if(eNow&&!interactPressed&&nearbyWorldItemId>=0){
         if(multiState==MULTI_IN_GAME){
             if(netMgr.isHost){
@@ -173,19 +172,20 @@ void gameInput(GLFWwindow*w){
                 break;
             }
         }
-    }else if(eNow&&!interactPressed&&tryHandleVoidShiftInteract(cam.pos)){
-        // Contract interaction handled.
-    }else if(eNow&&!interactPressed&&nearExitDoor&&exitReady){
-        playerEscaped=true;
-        glfwSetInputMode(w,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
+    }else if(eNow&&!interactPressed){
+        bool contractHandled = (multiState!=MULTI_IN_GAME) ? tryHandleVoidShiftInteract(cam.pos) : false;
+        if(multiState==MULTI_IN_GAME){
+            if(netMgr.isHost) contractHandled = tryHandleVoidShiftInteract(cam.pos);
+            else { char prompt[96]; buildVoidShiftInteractPrompt(cam.pos, prompt, 96); if(prompt[0] != '\0') { netMgr.sendInteractRequest(REQ_VOID_SHIFT_INTERACT, 0); contractHandled = true; } }
+        }
+        if(!contractHandled && nearExitDoor && exitReady){
+            playerEscaped=true; glfwSetInputMode(w,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
+        }
     }
     interactPressed=eNow;
     
     static bool key1Pressed=false,key2Pressed=false,key3Pressed=false,key4Pressed=false;
-    bool k1=glfwGetKey(w,settings.binds.item1)==GLFW_PRESS;
-    bool k2=glfwGetKey(w,settings.binds.item2)==GLFW_PRESS;
-    bool k3=glfwGetKey(w,settings.binds.item3)==GLFW_PRESS;
-    bool k4=glfwGetKey(w,settings.binds.item4)==GLFW_PRESS;
+    bool k1=glfwGetKey(w,settings.binds.item1)==GLFW_PRESS, k2=glfwGetKey(w,settings.binds.item2)==GLFW_PRESS, k3=glfwGetKey(w,settings.binds.item3)==GLFW_PRESS, k4=glfwGetKey(w,settings.binds.item4)==GLFW_PRESS;
     bool craftN = glfwGetKey(w, GLFW_KEY_J)==GLFW_PRESS, craftB = glfwGetKey(w, GLFW_KEY_K)==GLFW_PRESS, craftF = glfwGetKey(w, GLFW_KEY_L)==GLFW_PRESS, craftX = glfwGetKey(w, GLFW_KEY_H)==GLFW_PRESS;
     bool callHere = glfwGetKey(w, GLFW_KEY_T)==GLFW_PRESS, callDanger = glfwGetKey(w, GLFW_KEY_Y)==GLFW_PRESS, callBattery = glfwGetKey(w, GLFW_KEY_U)==GLFW_PRESS, callCode = glfwGetKey(w, GLFW_KEY_I)==GLFW_PRESS, callDoor = glfwGetKey(w, GLFW_KEY_O)==GLFW_PRESS;
     bool recordNow = glfwGetKey(w, GLFW_KEY_R) == GLFW_PRESS, playbackNow = glfwGetKey(w, GLFW_KEY_P) == GLFW_PRESS;

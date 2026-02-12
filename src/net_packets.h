@@ -207,6 +207,15 @@ inline void NetworkManager::sendPingMark(const Vec3& pos) {
     broadcast(buf, 32);
 }
 
+inline void NetworkManager::sendVoidShiftState(const NetVoidShiftState& state) {
+    if (!isHost || !connected) return;
+    char buf[PACKET_SIZE] = {};
+    buf[0] = PKT_VOID_SHIFT_STATE; int off = 1;
+    memcpy(buf + off, &state, sizeof(NetVoidShiftState)); off += (int)sizeof(NetVoidShiftState);
+    if (off > PACKET_SIZE) return;
+    broadcast(buf, off);
+}
+
 inline void NetworkManager::sendGameStart(Vec3 spawn) {
     if (!isHost) return;
     spawnPos = spawn;
@@ -288,6 +297,7 @@ inline void NetworkManager::handlePacket(char* buf, int len, sockaddr_in& from) 
     else if (type == PKT_INTERACT_REQ) handleInteractRequest(buf, len);
     else if (type == PKT_ROAM_EVENT) handleRoamEvent(buf, len);
     else if (type == PKT_PING_MARK) handlePingMark(buf, len);
+    else if (type == PKT_VOID_SHIFT_STATE) handleVoidShiftState(buf, len);
 }
 
 inline void NetworkManager::handlePingMark(char* buf, int len) {
@@ -531,6 +541,12 @@ inline void NetworkManager::handleRoamEvent(char* buf, int len) {
     roamEventB = (unsigned char)buf[3];
     memcpy(&roamEventDuration, buf + 4, 4);
     roamEventReceived = true;
+}
+
+inline void NetworkManager::handleVoidShiftState(char* buf, int len) {
+    if (len < 1 + (int)sizeof(NetVoidShiftState)) return;
+    memcpy(&voidShiftState, buf + 1, sizeof(NetVoidShiftState));
+    voidShiftStateReceived = true;
 }
 
 inline NetworkManager netMgr;

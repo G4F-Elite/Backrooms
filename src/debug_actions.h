@@ -82,6 +82,28 @@ inline void executeDebugAction(int action){
         setEchoStatus("DEBUG: TELEPORTED TO EXIT");
         return;
     }
+    if(action==DEBUG_ACT_SKIP_LEVEL){
+        if(multiState==MULTI_IN_GAME){
+            setTrapStatus("DEBUG: SKIP LEVEL SOLO ONLY");
+            return;
+        }
+        if(isLevelZero(gCurrentLevel)){
+            gCurrentLevel = 1;
+            gCompletedLevels++;
+            genWorld();
+            buildGeom();
+            gameState = STATE_INTRO;
+            setEchoStatus("DEBUG: SKIPPED TO LEVEL 2");
+        }else{
+            gCompletedLevels++;
+            gCurrentLevel = 0;
+            gameState = STATE_MENU;
+            menuSel = 0;
+            glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
+            setEchoStatus("DEBUG: RUN COMPLETE SKIPPED");
+        }
+        return;
+    }
     if(action==DEBUG_ACT_TRIGGER_EYE){
         if(smileEvent.corridorActive){
             setTrapStatus("DEBUG: EYE EVENT ALREADY ACTIVE");

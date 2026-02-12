@@ -46,7 +46,8 @@ enum InteractRequestType {
     REQ_PICK_ITEM = 2,
     REQ_DEBUG_SPAWN_STALKER = 3,
     REQ_DEBUG_SPAWN_CRAWLER = 4,
-    REQ_DEBUG_SPAWN_SHADOW = 5
+    REQ_DEBUG_SPAWN_SHADOW = 5,
+    REQ_VOID_SHIFT_INTERACT = 6
 };
 
 enum RoamEventType {

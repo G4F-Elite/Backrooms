@@ -28,6 +28,40 @@ struct NetInteractRequest {
     bool valid;
 };
 
+struct NetVoidShiftState {
+    float attentionLevel;
+    float coLevel;
+    float resonatorBattery;
+    float level1HoldTimer;
+    float level2HoldTimer;
+    int sideContractType;
+    int sideContractProgress;
+    int sideContractTarget;
+    int level2BatteryStage;
+    int level2FuseCount;
+    bool sideContractCompleted;
+    bool level1NodeDone[3];
+    bool level1HoldActive;
+    bool level1ContractComplete;
+    bool level2BatteryInstalled;
+    bool level2FuseDone[3];
+    bool level2AccessReady;
+    bool level2FusePanelPowered;
+    bool level2HoldActive;
+    bool level2ContractComplete;
+    bool level2VentDone;
+    bool level2CameraOnline;
+    bool level2DroneReprogrammed;
+    bool ventilationOnline;
+    bool npcCartographerActive;
+    bool npcDispatcherActive;
+    bool npcLostSurvivorActive;
+    bool npcLostSurvivorEscorted;
+    Vec3 npcCartographerPos;
+    Vec3 npcDispatcherPhonePos;
+    Vec3 npcLostSurvivorPos;
+};
+
 class NetworkManager {
 public:
     SOCKET sock;
@@ -74,6 +108,9 @@ public:
     
     NetInteractRequest interactRequests[16];
     int interactRequestCount;
+
+    NetVoidShiftState voidShiftState;
+    bool voidShiftStateReceived;
 
     // Coop ping marker (simple broadcast marker)
     bool pingMarkReceived;
@@ -124,6 +161,8 @@ public:
         roamEventDuration = 0.0f;
         roamEventReceived = false;
         interactRequestCount = 0;
+        voidShiftStateReceived = false;
+        memset(&voidShiftState, 0, sizeof(voidShiftState));
         pingMarkReceived = false;
         pingMarkFrom = -1;
         pingMarkPos = Vec3(0,0,0);
@@ -316,6 +355,8 @@ public:
         roamEventDuration = 0.0f;
         roamEventReceived = false;
         interactRequestCount = 0;
+        voidShiftStateReceived = false;
+        memset(&voidShiftState, 0, sizeof(voidShiftState));
         packetsSent = packetsRecv = 0;
         bytesSent = bytesRecv = 0;
         rttMs = 0.0f;
@@ -351,6 +392,7 @@ public:
     void sendInteractRequest(int requestType, int targetId);
     void sendRoamEvent(int eventType, int a, int b, float duration);
     void sendPingMark(const Vec3& pos);
+    void sendVoidShiftState(const NetVoidShiftState& state);
     void sendGameStart(Vec3 spawn);
     void sendPing(float nowTime);
     void sendLeave();
@@ -375,4 +417,5 @@ public:
     void handleInteractRequest(char* buf, int len);
     void handleRoamEvent(char* buf, int len);
     void handlePingMark(char* buf, int len);
+    void handleVoidShiftState(char* buf, int len);
 };
