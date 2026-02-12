@@ -102,26 +102,39 @@ float noise(vec2 p){
     vec2 u=f*f*(3.0-2.0*f);
     return mix(mix(a,b,u.x),mix(c,d,u.x),u.y);
 }
+float fbm(vec2 p){
+    float v = 0.0;
+    float a = 0.5;
+    for(int i=0;i<4;i++){
+        v += noise(p) * a;
+        p = p * 2.07 + vec2(19.3, 7.1);
+        a *= 0.5;
+    }
+    return v;
+}
 void main(){
     vec2 p = uv * 2.0 - 1.0;
-    float fogA = noise(uv * vec2(3.8, 16.0) + vec2(tm * 0.16, -tm * 0.06));
-    float fogB = noise(uv * vec2(9.5, 38.0) + vec2(-tm * 0.23, tm * 0.10));
-    float fog = fogA * 0.58 + fogB * 0.42;
+    float mistLo = fbm(uv * vec2(8.0, 22.0) + vec2(tm * 0.045, -tm * 0.020));
+    float mistHi = fbm(uv * vec2(22.0, 72.0) + vec2(-tm * 0.110, tm * 0.065));
+    float mist = mistLo * 0.62 + mistHi * 0.38;
 
-    float beamA = exp(-pow(abs(p.x + sin(tm * 0.42 + p.y * 2.8) * 0.42), 2.0) * 9.5);
-    float beamB = exp(-pow(abs(p.x - cos(tm * 0.35 + p.y * 2.1) * 0.35), 2.0) * 12.5);
-    float pulse = 0.70 + 0.30 * sin(tm * 0.85 + p.y * 5.0);
-    float beams = (beamA * 0.80 + beamB * 0.65) * pulse;
+    float sweepA = sin(tm * 0.19 + p.y * 1.9) * 0.12;
+    float sweepB = cos(tm * 0.16 + p.y * 1.6) * 0.09;
+    float beamA = exp(-pow(abs(p.x + sweepA), 2.0) * 64.0);
+    float beamB = exp(-pow(abs(p.x - sweepB), 2.0) * 82.0);
+    float beamThin = 0.55 + 0.45 * sin(tm * 0.62 + p.y * 8.0);
+    float beams = (beamA * 0.62 + beamB * 0.48) * beamThin;
 
-    float scan = 0.5 + 0.5 * sin((uv.y * 160.0) + tm * 2.4);
-    scan = pow(scan, 5.0) * 0.22;
+    float scan = 0.5 + 0.5 * sin(uv.y * 920.0 + tm * 3.3);
+    scan = pow(scan, 8.0) * 0.06;
+    float grain = (hash(gl_FragCoord.xy + vec2(tm * 61.0, tm * 37.0)) - 0.5) * 0.045;
 
-    float vign = 1.0 - smoothstep(0.45, 1.15, length(p));
-    vec3 warmFog = vec3(0.22, 0.18, 0.11) * (0.22 + fog * 0.78);
-    vec3 beamsCol = vec3(0.95, 0.82, 0.54) * beams * 0.52;
-    vec3 scanCol = vec3(0.55, 0.48, 0.35) * scan;
-    vec3 col = warmFog + beamsCol + scanCol;
-    float alpha = (0.10 + fog * 0.13 + beams * 0.18 + scan * 0.20) * (0.58 + vign * 0.42);
+    float vign = 1.0 - smoothstep(0.52, 1.18, length(p));
+    vec3 col = vec3(0.10, 0.085, 0.060) * (0.24 + mist * 0.44)
+             + vec3(0.95, 0.84, 0.56) * beams * 0.13
+             + vec3(0.50, 0.46, 0.36) * scan;
+    col += vec3(grain);
+    float alpha = (0.012 + mist * 0.038 + beams * 0.040 + scan) * (0.65 + vign * 0.35);
     fc = vec4(col, alpha);
 })";
 inline const char* menuBgVS = R"(#version 330 core
@@ -297,8 +310,8 @@ inline void drawMenuAtmosphere(float tm) {
     glDrawArrays(GL_TRIANGLES,0,6);
     glDisable(GL_BLEND);
     float drift = 0.5f + 0.5f * sinf(tm * 0.28f);
-    drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.88f,0.03f,0.03f,0.03f,0.07f + drift * 0.02f);
-    drawOverlayRectNdc(-1.0f,0.88f,1.0f,1.0f,0.03f,0.03f,0.03f,0.07f + (1.0f - drift) * 0.02f);
+    drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.94f,0.03f,0.03f,0.03f,0.03f + drift * 0.01f);
+    drawOverlayRectNdc(-1.0f,0.94f,1.0f,1.0f,0.03f,0.03f,0.03f,0.03f + (1.0f - drift) * 0.01f);
 }
 
 inline void drawMenu(float tm) {
@@ -306,8 +319,8 @@ inline void drawMenu(float tm) {
     drawMainMenuBackdrop(tm);
     drawMenuAtmosphere(tm);
     // Keep corridor visible while adding warm grade
-    drawFullscreenOverlay(0.02f,0.02f,0.02f,0.16f);
-    drawFullscreenOverlay(0.17f,0.13f,0.08f,0.05f);
+    drawFullscreenOverlay(0.02f,0.02f,0.02f,0.08f);
+    drawFullscreenOverlay(0.17f,0.13f,0.08f,0.015f);
     float p=0.82f+0.06f*sinf(tm*2.0f);
     float gl = sinf(tm * 0.7f) * 0.0016f;
     drawTextCentered("BACKROOMS: VOID SHIFT",0.0f+gl,0.5f,3.4f,0.9f,0.85f,0.4f,p);
