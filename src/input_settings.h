@@ -51,10 +51,12 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
     bool down = glfwGetKey(w, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS;
     bool left = glfwGetKey(w, GLFW_KEY_LEFT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_A) == GLFW_PRESS;
     bool right = glfwGetKey(w, GLFW_KEY_RIGHT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_D) == GLFW_PRESS;
+    bool tab = glfwGetKey(w, GLFW_KEY_TAB) == GLFW_PRESS;
     bool enter = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_KP_ENTER) == GLFW_PRESS;
     const double now = glfwGetTime();
     static int adjustHoldDir = 0;
     static double nextAdjustTime = 0.0;
+    static bool tabPressed = false;
     const double adjustFirstDelay = 0.28;
     const double adjustRepeatInterval = 0.055;
 
@@ -99,6 +101,7 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
         escPressed = esc; enterPressed = enter;
         upPressed = up; downPressed = down;
         leftPressed = left; rightPressed = right;
+        tabPressed = tab;
         return;
     }
 
@@ -169,6 +172,10 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
         menuSel = clampSettingsSelection(settingsTab, menuSel + 1);
         triggerMenuNavigateSound();
     }
+    if (tab && !tabPressed) {
+        switchTab(1);
+        triggerMenuNavigateSound();
+    }
     
     int adjustDir = right ? 1 : (left ? -1 : 0);
     int bindsIndex = settingsBindsIndexForTab(settingsTab);
@@ -225,6 +232,7 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
     downPressed = down; 
     leftPressed = left; 
     rightPressed = right; 
+    tabPressed = tab;
     enterPressed = enter;
 }
 

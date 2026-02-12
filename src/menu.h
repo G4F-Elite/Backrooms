@@ -247,24 +247,31 @@ inline void drawSlider(float x,float y,float w,float val,float r,float g,float b
 }
 
 inline void drawMenuAtmosphere(float tm) {
-    drawOverlayRectNdc(-1.0f,-1.0f,1.0f,1.0f,0.09f,0.08f,0.06f,0.10f);
+    float pulse = 0.5f + 0.5f * sinf(tm * 0.34f);
+    drawOverlayRectNdc(-1.0f,-1.0f,1.0f,1.0f,0.07f,0.06f,0.04f,0.045f + pulse * 0.015f);
     for(int i=0;i<6;i++){
-        float fi=(float)i, cx=-0.88f+fi*0.34f+sinf(tm*(0.16f+fi*0.02f)+fi)*0.04f;
-        float cy=0.58f-0.22f*fi+cosf(tm*(0.21f+fi*0.03f)+fi*0.7f)*0.03f;
-        float rad=0.11f+0.02f*sinf(tm*0.33f+fi*0.5f), a=0.025f+0.012f*(0.5f+0.5f*sinf(tm*0.41f+fi));
-        drawOverlayRectNdc(cx-rad,cy-rad,cx+rad,cy+rad,0.86f,0.74f,0.46f,a);
+        float fi=(float)i;
+        float cx=-0.92f+fi*0.36f+sinf(tm*(0.19f+fi*0.02f)+fi)*0.05f;
+        float cy=0.52f-0.20f*fi+cosf(tm*(0.24f+fi*0.02f)+fi*0.6f)*0.03f;
+        float rad=0.08f+0.02f*sinf(tm*0.46f+fi*0.8f);
+        float a=0.010f+0.012f*(0.5f+0.5f*sinf(tm*0.57f+fi));
+        drawOverlayRectNdc(cx-rad,cy-rad,cx+rad,cy+rad,0.90f,0.78f,0.48f,a);
     }
-    for(int i=0;i<5;i++){ float y=-0.74f+i*0.36f+sinf(tm*0.24f+i)*0.02f; drawOverlayRectNdc(-1.0f,y-0.05f,1.0f,y+0.05f,0.14f,0.12f,0.09f,0.035f); }
-    drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.82f,0.03f,0.03f,0.03f,0.12f); drawOverlayRectNdc(-1.0f,0.82f,1.0f,1.0f,0.03f,0.03f,0.03f,0.12f);
+    for(int i=0;i<5;i++){
+        float y=-0.76f+i*0.38f+sinf(tm*0.27f+i)*0.014f;
+        drawOverlayRectNdc(-1.0f,y-0.015f,1.0f,y+0.015f,0.16f,0.13f,0.09f,0.020f);
+    }
+    drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.86f,0.03f,0.03f,0.03f,0.08f);
+    drawOverlayRectNdc(-1.0f,0.86f,1.0f,1.0f,0.03f,0.03f,0.03f,0.08f);
 }
 
 inline void drawMenu(float tm) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     drawMainMenuBackdrop(tm);
     drawMenuAtmosphere(tm);
-    // Lighter overlays so background stays readable
-    drawFullscreenOverlay(0.02f,0.02f,0.02f,0.28f);
-    drawFullscreenOverlay(0.17f,0.13f,0.08f,0.10f);
+    // Keep corridor visible while adding warm grade
+    drawFullscreenOverlay(0.02f,0.02f,0.02f,0.16f);
+    drawFullscreenOverlay(0.17f,0.13f,0.08f,0.05f);
     float p=0.82f+0.06f*sinf(tm*2.0f);
     float gl = sinf(tm * 0.7f) * 0.0016f;
     drawTextCentered("BACKROOMS: VOID SHIFT",0.0f+gl,0.5f,3.4f,0.9f,0.85f,0.4f,p);
@@ -397,8 +404,8 @@ inline void drawSettings(bool fp) {
         drawText(inputDisp, 0.44f, iy, 1.9f, 0.95f, 0.9f, 0.5f, 1.0f);
         drawTextCentered("TYPE 0-100  ENTER CONFIRM  ESC CANCEL", 0.0f, -0.58f, 1.35f, 0.7f, 0.65f, 0.35f, 0.8f);
     } else {
-        if(settingsTab==SETTINGS_TAB_BINDS) drawTextCentered("ENTER OPEN BIND MENU  ESC BACK", 0.0f, -0.58f, 1.35f, 0.5f, 0.5f, 0.4f, 0.6f);
-        else drawTextCentered("L/R ADJUST  ENTER TYPE VALUE  ESC BACK", 0.0f, -0.58f, 1.35f, 0.5f, 0.5f, 0.4f, 0.6f);
+        if(settingsTab==SETTINGS_TAB_BINDS) drawTextCentered("TAB NEXT TAB  ENTER OPEN BIND MENU  ESC BACK", 0.0f, -0.58f, 1.35f, 0.5f, 0.5f, 0.4f, 0.6f);
+        else drawTextCentered("TAB NEXT TAB  L/R ADJUST  ENTER TYPE VALUE  ESC BACK", 0.0f, -0.58f, 1.35f, 0.5f, 0.5f, 0.4f, 0.6f);
     }
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }

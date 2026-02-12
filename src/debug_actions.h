@@ -8,6 +8,11 @@ inline const char* debugActionRuntimeLabel(int idx){
     if(a==DEBUG_ACT_TP_NOTE) return isLevelZero(gCurrentLevel) ? "TP L1 OBJECTIVE" : "TP L2 OBJECTIVE";
     if(a==DEBUG_ACT_TP_ECHO) return isLevelZero(gCurrentLevel) ? "TP L1 NPC" : "TP L2 NPC";
     if(a==DEBUG_ACT_TP_EXIT) return isLevelZero(gCurrentLevel) ? "TP L1 EXIT" : "TP L2 LIFT";
+    if(a==DEBUG_ACT_SKIP_LEVEL){
+        if(multiState==MULTI_IN_GAME) return isLevelZero(gCurrentLevel) ? "COMPLETE L1 CONTRACT" : "COMPLETE L2 CONTRACT";
+        return isLevelZero(gCurrentLevel) ? "SKIP TO LEVEL 2" : "END RUN TO MENU";
+    }
+    if(a==DEBUG_ACT_TRIGGER_EYE) return isLevelZero(gCurrentLevel) ? "TRIGGER EYE EVENT" : "TRIGGER TOWMAN EVENT";
     return debugActionLabel(idx);
 }
 
