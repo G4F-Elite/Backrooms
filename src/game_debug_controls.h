@@ -5,6 +5,7 @@ struct GLFWwindow;
 #include "consumable_slot.h"
 #include "debug_actions.h"
 #include "game_mouse_input.h"
+#include "game_input_helpers.h"
 void gameInput(GLFWwindow*w){
     static bool debugTogglePressed = false;
     static bool debugEnterPressed = false;
@@ -414,45 +415,9 @@ void gameInput(GLFWwindow*w){
     }
     float targetSignal = scannerLock ? rawSignal : rawSignal * 0.12f;
 
-    const float heatUpPerSec = 0.12f;
-    const float heatDownPerSec = 0.10f;
-    if(activeDeviceSlot == 2 && scannerLock && !scannerOverheated) scannerHeat += heatUpPerSec * dTime;
-    else scannerHeat -= heatDownPerSec * dTime;
-    if(scannerHeat < 0.0f) scannerHeat = 0.0f;
-    if(scannerHeat > 1.0f) scannerHeat = 1.0f;
-    if(!scannerOverheated && scannerHeat >= 0.98f){
-        scannerOverheated = true;
-        scannerOverheatTimer = 2.8f;
-        setTrapStatus("SCANNER OVERHEAT");
-    }
-    if(scannerOverheated){
-        scannerOverheatTimer -= dTime;
-        if(scannerOverheatTimer <= 0.0f && scannerHeat <= 0.34f){
-            scannerOverheated = false;
-            scannerOverheatTimer = 0.0f;
-        }
-    }
+    updateScannerHeat(scannerHeat, scannerOverheated, scannerOverheatTimer, activeDeviceSlot == 2, scannerLock, dTime);
 
-    if(activeDeviceSlot == 2 && !scannerOverheated && scannerPhantomTimer <= 0.0f){
-        float sanityLoss = 1.0f - (playerSanity / 100.0f);
-        if(sanityLoss < 0.0f) sanityLoss = 0.0f;
-        if(sanityLoss > 1.0f) sanityLoss = 1.0f;
-        float lateInsanity = (sanityLoss - 0.72f) / 0.28f;
-        if(lateInsanity < 0.0f) lateInsanity = 0.0f;
-        if(lateInsanity > 1.0f) lateInsanity = 1.0f;
-        float p = lateInsanity * 0.020f;
-        if(((float)(rng()%10000) / 10000.0f) < p * dTime){
-            scannerPhantomTimer = 0.9f + (float)(rng()%90) / 100.0f;
-            scannerPhantomBias = ((float)(rng()%1000) / 1000.0f) * 0.24f - 0.12f;
-        }
-    }
-    if(scannerPhantomTimer > 0.0f){
-        scannerPhantomTimer -= dTime;
-        if(scannerPhantomTimer <= 0.0f){
-            scannerPhantomTimer = 0.0f;
-            scannerPhantomBias = 0.0f;
-        }
-    }
+    updateScannerPhantom(scannerPhantomTimer, scannerPhantomBias, activeDeviceSlot == 2 && !scannerOverheated, playerSanity, dTime);
 
     float biasedTarget = targetSignal;
     if(scannerPhantomTimer > 0.0f) biasedTarget += scannerPhantomBias;
@@ -475,61 +440,6 @@ void gameInput(GLFWwindow*w){
     if(scannerSignal < 0.0f) scannerSignal = 0.0f;
     if(scannerSignal > 1.0f) scannerSignal = 1.0f;
     static float scannerBeepTimer = 0.0f;
-    if(activeDeviceSlot == 2){
-        scannerBeepTimer -= dTime;
-        if(scannerOverheated){
-            if(scannerBeepTimer <= 0.0f){
-                float r = (float)(rng()%1000) / 1000.0f;
-                sndState.scannerBeepPitch = 0.40f + r * 0.95f;
-                sndState.scannerBeepVol = 0.08f + r * 0.06f;
-                sndState.scannerBeepTrig = true;
-                scannerBeepTimer = 0.22f + r * 0.22f;
-            }
-        }else if(scannerSignal > 0.05f){
-            float heatMuffle = 1.0f - fastClamp01(scannerHeat * 0.48f);
-            float rel = 1.0f - scannerSignal;
-            if(rel < 0.0f) rel = 0.0f;
-            if(rel > 1.0f) rel = 1.0f;
-            float rate = 0.18f + 0.85f * (rel * rel);
-            if(scannerBeepTimer <= 0.0f){
-                sndState.scannerBeepPitch = 0.55f + scannerSignal * 1.0f;
-                sndState.scannerBeepVol = (0.35f + scannerSignal * 0.55f) * heatMuffle;
-                sndState.scannerBeepTrig = true;
-                scannerBeepTimer = rate;
-            }
-        }else{
-            scannerBeepTimer = 0.0f;
-        }
-    }else{
-        scannerBeepTimer = 0.0f;
-    }
-    if(flashlightOn){
-        if(!flashlightShutdownBlinkActive && shouldStartFlashlightShutdownBlink(flashlightBattery)){
-            flashlightShutdownBlinkActive = true;
-            flashlightShutdownBlinkTimer = 0.0f;
-        }
-        if(flashlightShutdownBlinkActive){
-            flashlightShutdownBlinkTimer += dTime;
-            sndState.flashlightOn = isFlashlightOnDuringShutdownBlink(flashlightShutdownBlinkTimer) ? 1.0f : 0.0f;
-            flashlightBattery -= dTime * 1.67f;
-            if(flashlightBattery < 0.0f) flashlightBattery = 0.0f;
-            if(isFlashlightShutdownBlinkFinished(flashlightShutdownBlinkTimer)){
-                flashlightBattery = 0.0f;
-                flashlightOn = false;
-                flashlightShutdownBlinkActive = false;
-                flashlightShutdownBlinkTimer = 0.0f;
-                sndState.flashlightOn = 0.0f;
-            }
-        }else{
-            sndState.flashlightOn = 1.0f;
-            flashlightBattery-=dTime*1.67f;
-            if(flashlightBattery<=0){flashlightBattery=0;flashlightOn=false;sndState.flashlightOn=0;}
-        }
-    }else{
-        flashlightShutdownBlinkActive = false;
-        flashlightShutdownBlinkTimer = 0.0f;
-        float rechargeRate = (activeDeviceSlot == 1) ? 10.0f : 6.0f;
-        flashlightBattery+=dTime*rechargeRate;
-        if(flashlightBattery>100)flashlightBattery=100;
-    }
+    updateScannerBeep(scannerBeepTimer, activeDeviceSlot == 2, scannerOverheated, scannerSignal, scannerHeat, dTime);
+    updateFlashlightBattery(flashlightBattery, flashlightOn, flashlightShutdownBlinkActive, flashlightShutdownBlinkTimer, activeDeviceSlot, dTime);
 }
