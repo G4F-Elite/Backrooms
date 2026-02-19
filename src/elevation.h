@@ -7,8 +7,8 @@
 extern const float CS, WH;
 
 const float FLOOR2_Y = 4.5f;       // Second floor height (== WH)
-const float FLOOR2_ROOM_H = 2.5f;  // Second floor room height
-const float FLOOR2_CEIL = 7.0f;    // FLOOR2_Y + FLOOR2_ROOM_H
+const float FLOOR2_ROOM_H = 4.5f;  // Second floor room height (same as first floor)
+const float FLOOR2_CEIL = 9.0f;    // FLOOR2_Y + FLOOR2_ROOM_H
 const float RAILING_H = 1.0f;
 
 // Elevation values: 0=ground, 1=second floor, 2=ramp+X, 3=ramp-X, 4=ramp+Z, 5=ramp-Z
