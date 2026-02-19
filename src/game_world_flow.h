@@ -70,37 +70,22 @@ void buildGeom(){
                     int8_t cellType = it->second.cells[lx][lz];
                     int8_t cellElev = it->second.elev[lx][lz];
                     float px=wx*CS,pz=wz*CS;
-                    const float uvFloor = 1.0f;
-                    const float uvCeil = 1.0f;
-                    
-                    // Handle second floor WALL cells - they need walls too!
+                    const float uvFloor = 1.0f, uvCeil = 1.0f;
+                    // Second floor WALL cells need walls
                     if(cellType == 1 && isAboveGround(cellElev)){
-                        // This is a wall on second floor - generate wall faces
-                        bool openL = getCellWorld(wx-1,wz)==0 && isAboveGround(getElevWorld(wx-1,wz));
-                        bool openR = getCellWorld(wx+1,wz)==0 && isAboveGround(getElevWorld(wx+1,wz));
-                        bool openB = getCellWorld(wx,wz-1)==0 && isAboveGround(getElevWorld(wx,wz-1));
-                        bool openF = getCellWorld(wx,wz+1)==0 && isAboveGround(getElevWorld(wx,wz+1));
-                        
-                        // Generate walls facing open second floor cells
-                        if(openL) mkWallAt(wv,px,pz,0,CS,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        if(openR) mkWallAt(wv,px+CS,pz+CS,0,-CS,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        if(openB) mkWallAt(wv,px+CS,pz,-CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        if(openF) mkWallAt(wv,px,pz+CS,CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        
-                        // Also generate walls facing ground-level open cells
-                        bool groundL = getCellWorld(wx-1,wz)==0 && !isAboveGround(getElevWorld(wx-1,wz));
-                        bool groundR = getCellWorld(wx+1,wz)==0 && !isAboveGround(getElevWorld(wx+1,wz));
-                        bool groundB = getCellWorld(wx,wz-1)==0 && !isAboveGround(getElevWorld(wx,wz-1));
-                        bool groundF = getCellWorld(wx,wz+1)==0 && !isAboveGround(getElevWorld(wx,wz+1));
-                        
-                        if(groundL) mkWallAt(wv,px,pz,0,CS,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        if(groundR) mkWallAt(wv,px+CS,pz+CS,0,-CS,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        if(groundB) mkWallAt(wv,px+CS,pz,-CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        if(groundF) mkWallAt(wv,px,pz+CS,CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        continue; // Skip rest of processing for wall cells
+                        // Second-floor wall cells: build quads so their FRONT faces the adjacent open cell.
+                        // With back-face culling enabled, reversed winding here makes walls look "transparent".
+                        const int dx[4] = {-1, 1, 0, 0}, dz[4] = {0, 0, -1, 1};
+                        // i=0 west, i=1 east, i=2 north, i=3 south
+                        const float wx1[4] = {0, CS, 0, CS}, wz1[4] = {CS, 0, 0, CS};
+                        const float wx2[4] = {0, 0, CS, -CS}, wz2[4] = {-CS, CS, 0, 0};
+                        for(int i=0;i<4;i++){
+                            int nx=wx+dx[i], nz=wz+dz[i];
+                            if(getCellWorld(nx,nz)==0) mkWallAt(wv,px+wx1[i],pz+wz1[i],wx2[i],wz2[i],FLOOR2_Y,FLOOR2_CEIL,CS);
+                        }
+                        continue;
                     }
-                    
-                    if(cellType!=0)continue; // Skip non-open cells (except second floor walls handled above)
+                    if(cellType!=0)continue;
                     
                     bool hasHole = !isAboveGround(cellElev) && (isFloorHoleCell(wx,wz) || isAbyssCell(wx,wz));
                     auto pushFloor=[&](std::vector<float>&v,float y){
@@ -141,38 +126,13 @@ void buildGeom(){
                     if(wallR)mkWall(wv,px+CS,pz+CS,0,-CS,WH,CS,WH);
                     if(wallB)mkWall(wv,px+CS,pz,-CS,0,WH,CS,WH);
                     if(wallF)mkWall(wv,px,pz+CS,CS,0,WH,CS,WH);
+                    // Second floor walls - only at edges facing ground
                     if(isAboveGround(cellElev)){
-                        // Check second floor specific walls (cells that are walls AND elevated)
-                        bool wallL2 = getCellWorld(wx-1,wz)==1 && isAboveGround(getElevWorld(wx-1,wz));
-                        bool wallR2 = getCellWorld(wx+1,wz)==1 && isAboveGround(getElevWorld(wx+1,wz));
-                        bool wallB2 = getCellWorld(wx,wz-1)==1 && isAboveGround(getElevWorld(wx,wz-1));
-                        bool wallF2 = getCellWorld(wx,wz+1)==1 && isAboveGround(getElevWorld(wx,wz+1));
-                        
-                        // Second floor walls (FLOOR2_Y→FLOOR2_CEIL) where neighbor is also elevated wall
-                        if(wallL2) mkWallAt(wv,px,pz,0,CS,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        if(wallR2) mkWallAt(wv,px+CS,pz+CS,0,-CS,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        if(wallB2) mkWallAt(wv,px+CS,pz,-CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        if(wallF2) mkWallAt(wv,px,pz+CS,CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        
-                        // Also add walls if neighbor is ground-level wall
-                        if(wallL && !wallL2) mkWallAt(wv,px,pz,0,CS,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        if(wallR && !wallR2) mkWallAt(wv,px+CS,pz+CS,0,-CS,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        if(wallB && !wallB2) mkWallAt(wv,px+CS,pz,-CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        if(wallF && !wallF2) mkWallAt(wv,px,pz+CS,CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        
-                        // Perimeter walls where neighbor is ground-level open
-                        auto isGround = [&](int nx, int nz) -> bool {
-                            return getCellWorld(nx,nz)==0 && !isAboveGround(getElevWorld(nx,nz));
-                        };
-                        // Full height walls at edges facing ground (not just railing)
-                        if(isGround(wx-1,wz))
-                            mkWallAt(wv,px,pz,0,CS,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        if(isGround(wx+1,wz))
-                            mkWallAt(wv,px+CS,pz+CS,0,-CS,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        if(isGround(wx,wz-1))
-                            mkWallAt(wv,px+CS,pz,-CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        if(isGround(wx,wz+1))
-                            mkWallAt(wv,px,pz+CS,CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
+                        auto isGround = [&](int nx, int nz)->bool{return getCellWorld(nx,nz)==0&&!isAboveGround(getElevWorld(nx,nz));};
+                        if(isGround(wx-1,wz))mkWallAt(wv,px,pz,0,CS,FLOOR2_Y,FLOOR2_CEIL,CS);
+                        if(isGround(wx+1,wz))mkWallAt(wv,px+CS,pz+CS,0,-CS,FLOOR2_Y,FLOOR2_CEIL,CS);
+                        if(isGround(wx,wz-1))mkWallAt(wv,px+CS,pz,-CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
+                        if(isGround(wx,wz+1))mkWallAt(wv,px,pz+CS,CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
                     }
 
                     if(!hasHole){

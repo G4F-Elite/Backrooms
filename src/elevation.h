@@ -33,16 +33,20 @@ inline float getRampY(int8_t e, float fracX, float fracZ) {
 // Wall from y0 to y1 (generalized mkWall)
 inline void mkWallAt(std::vector<float>& v, float x, float z,
                      float dx, float dz, float y0, float y1, float cs) {
-    Vec3 n = Vec3(dz, 0, -dx).norm();
     float wallLen = sqrtf(dx * dx + dz * dz);
     float tx = (wallLen / cs) * 1.8f;
     float ty = ((y1 - y0) / 4.5f) * 1.6f;
-    float vv[] = {
-        x,y0,z, 0,0, n.x,n.y,n.z, x,y1,z, 0,ty, n.x,n.y,n.z,
-        x+dx,y1,z+dz, tx,ty, n.x,n.y,n.z, x,y0,z, 0,0, n.x,n.y,n.z,
-        x+dx,y1,z+dz, tx,ty, n.x,n.y,n.z, x+dx,y0,z+dz, tx,0, n.x,n.y,n.z
+    auto pushFace = [&](float sx, float sz, float sdx, float sdz) {
+        Vec3 n = Vec3(sdz, 0, -sdx).norm();
+        float vv[] = {
+            sx,y0,sz, 0,0, n.x,n.y,n.z, sx,y1,sz, 0,ty, n.x,n.y,n.z,
+            sx+sdx,y1,sz+sdz, tx,ty, n.x,n.y,n.z, sx,y0,sz, 0,0, n.x,n.y,n.z,
+            sx+sdx,y1,sz+sdz, tx,ty, n.x,n.y,n.z, sx+sdx,y0,sz+sdz, tx,0, n.x,n.y,n.z
+        };
+        v.insert(v.end(), vv, vv + 48);
     };
-    v.insert(v.end(), vv, vv + 48);
+    pushFace(x, z, dx, dz);
+    pushFace(x + dx, z + dz, -dx, -dz);
 }
 
 // Ramp slope surface from Y=0 to Y=FLOOR2_Y

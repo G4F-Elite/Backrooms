@@ -64,18 +64,18 @@ inline void applyElevation(Chunk& c, std::mt19937& cr) {
     std::vector<RC> cands;
     for (int x = x0; x < x0 + w; x++) {
         for (int z = z0; z < z0 + h; z++) {
-            if (c.elev[x][z] != 1) continue; // Only elevated cells
+            if (c.elev[x][z] != 1 || c.cells[x][z] != 0) continue; // Only walkable elevated cells
             bool edge = (x==x0 || x==x0+w-1 || z==z0 || z==z0+h-1);
             if (!edge) continue;
             
-            // Check for ground-level neighbors
-            if (x==x0 && x>1 && c.cells[x-1][z]==0 && c.elev[x-1][z]==0)
+            // Check for ground-level neighbors plus a clear elevated interior connection
+            if (x==x0 && x>1 && c.cells[x-1][z]==0 && c.elev[x-1][z]==0 && c.cells[x+1][z]==0 && c.elev[x+1][z]==1)
                 cands.push_back({x, z, 2}); // rises +X toward interior
-            if (x==x0+w-1 && x<CHUNK_SIZE-2 && c.cells[x+1][z]==0 && c.elev[x+1][z]==0)
+            if (x==x0+w-1 && x<CHUNK_SIZE-2 && c.cells[x+1][z]==0 && c.elev[x+1][z]==0 && c.cells[x-1][z]==0 && c.elev[x-1][z]==1)
                 cands.push_back({x, z, 3}); // rises -X toward interior
-            if (z==z0 && z>1 && c.cells[x][z-1]==0 && c.elev[x][z-1]==0)
+            if (z==z0 && z>1 && c.cells[x][z-1]==0 && c.elev[x][z-1]==0 && c.cells[x][z+1]==0 && c.elev[x][z+1]==1)
                 cands.push_back({x, z, 4}); // rises +Z toward interior
-            if (z==z0+h-1 && z<CHUNK_SIZE-2 && c.cells[x][z+1]==0 && c.elev[x][z+1]==0)
+            if (z==z0+h-1 && z<CHUNK_SIZE-2 && c.cells[x][z+1]==0 && c.elev[x][z+1]==0 && c.cells[x][z-1]==0 && c.elev[x][z-1]==1)
                 cands.push_back({x, z, 5}); // rises -Z toward interior
         }
     }
@@ -84,15 +84,20 @@ inline void applyElevation(Chunk& c, std::mt19937& cr) {
     int nR = 2 + (cands.size() > 6 ? (int)(cr() % 3) : 0);
     for (int i = 0; i < nR && !cands.empty(); i++) {
         int idx = cr() % cands.size();
-        c.elev[cands[idx].x][cands[idx].z] = cands[idx].dir;
-        cands.erase(cands.begin() + idx);
+        RC chosen = cands[idx];
+        c.elev[chosen.x][chosen.z] = chosen.dir;
+        for (int j = (int)cands.size() - 1; j >= 0; j--) {
+            if (cands[j].x == chosen.x && cands[j].z == chosen.z) {
+                cands.erase(cands.begin() + j);
+            }
+        }
     }
     
     // Ensure at least 2 ramps, otherwise cancel elevation
     int rampCount = 0;
     for (int x = 0; x < CHUNK_SIZE; x++) {
         for (int z = 0; z < CHUNK_SIZE; z++) {
-            if (isRamp(c.elev[x][z])) rampCount++;
+            if (c.cells[x][z] == 0 && isRamp(c.elev[x][z])) rampCount++;
         }
     }
     if (rampCount < 2) {
