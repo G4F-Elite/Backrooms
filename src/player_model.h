@@ -42,24 +42,39 @@ inline void buildPlayerModel(std::vector<float>& v, int colorId) {
     float r = PLAYER_COLORS[colorId][0];
     float g = PLAYER_COLORS[colorId][1];
     float b = PLAYER_COLORS[colorId][2];
+    // Torso
     addColorBox(v, 0, 1.0f, 0, 0.45f, 0.55f, 0.22f, r, g, b);
-    addColorBox(v, 0.41f, 0.80f, 0.16f, 0.20f, 0.06f, 0.06f, 0.08f, 0.08f, 0.09f);
-    addColorBox(v, 0.49f, 0.80f, 0.16f, 0.08f, 0.07f, 0.07f, 0.14f, 0.14f, 0.15f);
-    addColorBox(v, 0.54f, 0.80f, 0.16f, 0.03f, 0.05f, 0.05f, 0.92f, 0.92f, 0.78f);
-    addColorBox(v, 0.37f, 0.72f, 0.16f, 0.05f, 0.16f, 0.05f, 0.09f, 0.09f, 0.10f);
+    // Head
     addColorBox(v, 0, 1.5f, 0, 0.28f, 0.28f, 0.28f, 0.85f, 0.75f, 0.65f);
+    // Cap/hat
     addColorBox(v, 0, 1.67f, 0, 0.30f, 0.08f, 0.30f, 0.15f, 0.1f, 0.05f);
+    // Eyes
     addColorBox(v, -0.06f, 1.52f, 0.14f, 0.05f, 0.03f, 0.02f, 0.1f, 0.1f, 0.1f);
     addColorBox(v, 0.06f, 1.52f, 0.14f, 0.05f, 0.03f, 0.02f, 0.1f, 0.1f, 0.1f);
+    // Legs
     addColorBox(v, -0.1f, 0.35f, 0, 0.14f, 0.65f, 0.14f, 0.15f, 0.2f, 0.35f);
     addColorBox(v, 0.1f, 0.35f, 0, 0.14f, 0.65f, 0.14f, 0.15f, 0.2f, 0.35f);
+    // Feet
     addColorBox(v, -0.1f, 0.05f, 0.02f, 0.14f, 0.1f, 0.18f, 0.1f, 0.1f, 0.1f);
     addColorBox(v, 0.1f, 0.05f, 0.02f, 0.14f, 0.1f, 0.18f, 0.1f, 0.1f, 0.1f);
+    // Arms
     addColorBox(v, -0.32f, 1.0f, 0, 0.1f, 0.45f, 0.1f, r*0.8f, g*0.8f, b*0.8f);
     addColorBox(v, 0.32f, 1.0f, 0, 0.1f, 0.45f, 0.1f, r*0.8f, g*0.8f, b*0.8f);
+    // Hands
     addColorBox(v, -0.32f, 0.72f, 0, 0.08f, 0.1f, 0.08f, 0.85f, 0.75f, 0.65f);
     addColorBox(v, 0.32f, 0.72f, 0, 0.08f, 0.1f, 0.08f, 0.85f, 0.75f, 0.65f);
+    // Backpack
     addColorBox(v, 0, 1.0f, -0.18f, 0.3f, 0.4f, 0.12f, 0.2f, 0.15f, 0.1f);
+    
+    // Flashlight (held in right hand - proper model)
+    // Handle
+    addColorBox(v, 0.32f, 0.68f, 0.12f, 0.06f, 0.14f, 0.06f, 0.12f, 0.12f, 0.13f);
+    // Main body
+    addColorBox(v, 0.32f, 0.58f, 0.18f, 0.05f, 0.08f, 0.12f, 0.18f, 0.18f, 0.20f);
+    // Head/lens
+    addColorBox(v, 0.32f, 0.58f, 0.26f, 0.06f, 0.09f, 0.04f, 0.95f, 0.95f, 0.85f);
+    // Lens glow
+    addColorBox(v, 0.32f, 0.58f, 0.29f, 0.04f, 0.06f, 0.02f, 1.0f, 1.0f, 0.9f);
 }
 
 inline GLuint playerVAOs[MAX_PLAYERS] = {0};

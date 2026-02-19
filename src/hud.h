@@ -235,14 +235,25 @@ void drawUI(){
                 for(int i=0;i<MAX_PLAYERS;i++){
                     if(i==netMgr.myId || !netMgr.players[i].active || !netMgr.players[i].hasValidPos) continue;
                     if(!playerInterpReady[i]) continue;
-                    Vec3 wp = playerRenderPos[i] + Vec3(0, 2.2f, 0);
+                    // Use interpolated position for stable nametag
+                    Vec3 playerPos = playerRenderPos[i];
+                    Vec3 wp = playerPos + Vec3(0, 2.0f, 0);
                     float sx=0, sy=0;
-                    if(!hasLabelLineOfSight(wp) || !projectToScreen(wp, sx, sy)) continue;
-                    Vec3 dd = playerRenderPos[i] - cam.pos;
+                    // Check distance first for optimization
+                    Vec3 dd = playerPos - cam.pos;
                     float dist = dd.len();
                     if(dist > 40.0f) continue;
+                    if(dist < 0.5f) continue; // Too close
+                    // Project to screen using current camera
+                    if(!projectToScreen(wp, sx, sy)) continue;
+                    // Check line of sight from camera to player head
+                    if(!hasLabelLineOfSight(wp)) continue;
                     const char* nm = netMgr.players[i].name[0] ? netMgr.players[i].name : "Player";
-                    drawHudTextCentered(nm, sx, sy, 1.1f, 0.85f, 0.9f, 0.7f, 0.90f);
+                    // Fade based on distance
+                    float alpha = 1.0f - (dist - 20.0f) / 20.0f;
+                    if(alpha > 1.0f) alpha = 1.0f;
+                    if(alpha < 0.3f) alpha = 0.3f;
+                    drawHudTextCentered(nm, sx, sy, 1.0f, 0.85f, 0.9f, 0.7f, alpha);
                 }
 
                 netMgr.updatePingMarkTtl(dTime);

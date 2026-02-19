@@ -336,55 +336,58 @@ float linZ(vec2 tc){
  return 20.0 / (100.1 - (d * 2.0 - 1.0) * 99.9);
 }
 float rtxSSAO(vec2 tc, int ns){
- float z0 = linZ(tc);
- if(z0 > 30.0) return 1.0;
- float rad = 0.010 + 0.028 / max(z0, 0.8);
- float ao = 0.0;
- float rot = rnd(floor(gl_FragCoord.xy * 0.25) * 0.17) * 6.283 + tm * 0.02;
- for(int i = 0; i < ns; i++){
-  float a = float(i) * 6.283 / float(ns) + rot;
-  float r = rad * (0.3 + 0.7 * float(i+1) / float(ns));
-  vec2 sc = tc + vec2(cos(a), sin(a)) * r;
-  float diff = z0 - linZ(sc);
-  if(diff > 0.003 && diff < 0.26) ao += smoothstep(0.26, 0.003, diff);
- }
- return clamp(1.0 - ao / float(ns) * 1.68, 0.45, 1.0);
+  float z0 = linZ(tc);
+  if(z0 > 30.0) return 1.0;
+  float rad = 0.010 + 0.028 / max(z0, 0.8);
+  float ao = 0.0;
+  // Stable rotation based on pixel position only (no time component to reduce noise)
+  float rot = rnd(floor(gl_FragCoord.xy * 0.25) * 0.17) * 6.283;
+  for(int i = 0; i < ns; i++){
+   float a = float(i) * 6.283 / float(ns) + rot;
+   float r = rad * (0.3 + 0.7 * float(i+1) / float(ns));
+   vec2 sc = tc + vec2(cos(a), sin(a)) * r;
+   float diff = z0 - linZ(sc);
+   if(diff > 0.003 && diff < 0.26) ao += smoothstep(0.26, 0.003, diff);
+  }
+  return clamp(1.0 - ao / float(ns) * 1.68, 0.45, 1.0);
 }
 vec3 rtxGI(vec2 tc, int ns){
- float z0 = linZ(tc);
- float rad = 0.05 + 0.07 / max(z0, 0.8);
- vec3 gi = vec3(0.0); float tw = 0.001;
- float rot = rnd(floor(gl_FragCoord.xy * 0.25) * 0.11 + vec2(0.3)) * 6.283 + tm * 0.02;
- for(int i = 0; i < ns; i++){
-  float a = float(i) * 6.283 / float(ns) + rot;
-  float r = rad * (0.3 + 0.7 * float(i+1) / float(ns));
-  vec2 sc = tc + vec2(cos(a), sin(a)) * r;
-  vec3 sC = texture(tex, sc).rgb;
-  float depthDiff = abs(z0 - linZ(sc));
-  float w = smoothstep(1.2, 0.0, depthDiff);
-  float br = dot(sC, vec3(0.3, 0.59, 0.11));
-  w *= br;
-  gi += sC * w; tw += w;
- }
- return (gi / tw) * 1.78;
+  float z0 = linZ(tc);
+  float rad = 0.05 + 0.07 / max(z0, 0.8);
+  vec3 gi = vec3(0.0); float tw = 0.001;
+  // Stable rotation (no time component)
+  float rot = rnd(floor(gl_FragCoord.xy * 0.25) * 0.11 + vec2(0.3)) * 6.283;
+  for(int i = 0; i < ns; i++){
+   float a = float(i) * 6.283 / float(ns) + rot;
+   float r = rad * (0.3 + 0.7 * float(i+1) / float(ns));
+   vec2 sc = tc + vec2(cos(a), sin(a)) * r;
+   vec3 sC = texture(tex, sc).rgb;
+   float depthDiff = abs(z0 - linZ(sc));
+   float w = smoothstep(1.2, 0.0, depthDiff);
+   float br = dot(sC, vec3(0.3, 0.59, 0.11));
+   w *= br;
+   gi += sC * w; tw += w;
+  }
+  return (gi / tw) * 1.78;
 }
 vec3 rtxRays(vec2 tc, int ns){
- vec3 rays = vec3(0.0);
- float rot = rnd(floor(gl_FragCoord.xy * 0.5) * 0.13) * 6.283 + tm * 0.01;
- for(int i = 0; i < ns; i++){
-  float a = float(i) * 6.283 / float(ns) + rot;
-  float r = 0.02 + 0.12 * float(i) / float(ns);
-  vec2 sc = clamp(tc + vec2(cos(a), sin(a)) * r, 0.001, 0.999);
-  vec3 s = texture(tex, sc).rgb;
-  float lum = dot(s, vec3(0.3, 0.59, 0.11));
-  if(lum > 0.08){
-   float nearW = smoothstep(20.0, 1.0, linZ(sc));
-   float decay = 1.0 - float(i) / float(ns);
-   rays += s * (lum - 0.08) * decay * decay * nearW;
+  vec3 rays = vec3(0.0);
+  // Stable rotation (no time component)
+  float rot = rnd(floor(gl_FragCoord.xy * 0.5) * 0.13) * 6.283;
+  for(int i = 0; i < ns; i++){
+   float a = float(i) * 6.283 / float(ns) + rot;
+   float r = 0.02 + 0.12 * float(i) / float(ns);
+   vec2 sc = clamp(tc + vec2(cos(a), sin(a)) * r, 0.001, 0.999);
+   vec3 s = texture(tex, sc).rgb;
+   float lum = dot(s, vec3(0.3, 0.59, 0.11));
+   if(lum > 0.08){
+    float nearW = smoothstep(20.0, 1.0, linZ(sc));
+    float decay = 1.0 - float(i) / float(ns);
+    rays += s * (lum - 0.08) * decay * decay * nearW;
+   }
   }
+  return (rays / float(ns)) * 1.75;
  }
- return (rays / float(ns)) * 1.75;
-}
 vec3 rtxBloom(vec2 tc, int rad){
  vec3 bl = vec3(0.0); float tw = 0.0;
  float sx = texelX * 2.5, sy = texelY * 2.5;
@@ -397,29 +400,42 @@ vec3 rtxBloom(vec2 tc, int rad){
  return (bl / max(tw, 1.0)) * 1.58;
 }
 vec3 rtxDenoise(vec2 tc, vec3 orig, vec3 mod_c){
- float z0 = linZ(tc);
- vec3 sum = mod_c; float wSum = 1.0;
- vec3 ratio = mod_c / max(orig, vec3(0.01));
- ratio = clamp(ratio, vec3(0.0), vec3(2.0));
- for(int dx = -2; dx <= 2; dx++) for(int dy = -2; dy <= 2; dy++){
-  if(dx == 0 && dy == 0) continue;
-  vec2 sc = tc + vec2(float(dx) * texelX * 1.35, float(dy) * texelY * 1.35);
-  float zn = linZ(sc);
-  vec3 nOrig = texture(tex, sc).rgb;
-  float dw = exp(-abs(z0 - zn) * 18.0);
-  float cw = exp(-length(orig - nOrig) * 8.5);
-  float w = dw * cw;
-  if(w < 0.01) continue;
-  sum += nOrig * ratio * w;
-  wSum += w;
+  float z0 = linZ(tc);
+  vec3 sum = mod_c; float wSum = 1.0;
+  // Edge-preserving denoise using depth and color similarity
+  for(int dx = -2; dx <= 2; dx++) for(int dy = -2; dy <= 2; dy++){
+   if(dx == 0 && dy == 0) continue;
+   vec2 sc = tc + vec2(float(dx) * texelX * 1.5, float(dy) * texelY * 1.5);
+   float zn = linZ(sc);
+   vec3 neighbor = texture(tex, sc).rgb;
+   // Depth weight - don't blend across edges
+   float dw = exp(-abs(z0 - zn) * 25.0);
+   // Color weight - prefer similar colors
+   float cd = length(orig - neighbor);
+   float cw = exp(-cd * 10.0);
+   // Spatial weight - closer pixels matter more
+   float sw = exp(-float(dx*dx + dy*dy) * 0.3);
+   float w = dw * cw * sw;
+   if(w < 0.005) continue;
+   sum += neighbor * w;
+   wSum += w;
+  }
+  vec3 outC = sum / wSum;
+  // Temporal accumulation if TAA is available
+  if(taaValid > 0.5){
+   vec3 hist = texture(histTex, tc).rgb;
+   // Clamp history to current neighborhood to prevent ghosting
+   vec3 mn = orig, mx = orig;
+   for(int dx = -1; dx <= 1; dx++) for(int dy = -1; dy <= 1; dy++){
+    vec3 s = texture(tex, tc + vec2(float(dx) * texelX, float(dy) * texelY)).rgb;
+    mn = min(mn, s); mx = max(mx, s);
+   }
+   vec3 clampedHist = clamp(hist, mn, mx);
+   float blend = 0.25 * clamp(rtxDenoiseStrength, 0.0, 1.0);
+   outC = mix(outC, clampedHist, blend);
+  }
+  return outC;
  }
- vec3 outC = sum / wSum;
- if(taaValid > 0.5){
-  vec3 hist = texture(histTex, tc).rgb;
-  outC = mix(outC, hist, 0.16 * clamp(rtxDenoiseStrength, 0.0, 1.0));
- }
- return outC;
-}
 vec3 deathPost(vec2 tc, vec3 base){
  float d = clamp(deathFx, 0.0, 1.0); if(d <= 0.001) return base;
  vec2 dir = tc - 0.5; float len2 = dot(dir, dir); vec2 nDir = len2 > 0.000001 ? normalize(dir) : vec2(1.0, 0.0);

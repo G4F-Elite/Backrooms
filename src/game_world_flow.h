@@ -112,24 +112,37 @@ void buildGeom(){
                     if(wallB)mkWall(wv,px+CS,pz,-CS,0,WH,CS,WH);
                     if(wallF)mkWall(wv,px,pz+CS,CS,0,WH,CS,WH);
                     if(isAboveGround(cellElev)){
-                        // Second floor walls (FLOOR2_Y→FLOOR2_CEIL) where neighbor is wall
-                        if(wallL) mkWallAt(wv,px,pz,0,CS,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        if(wallR) mkWallAt(wv,px+CS,pz+CS,0,-CS,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        if(wallB) mkWallAt(wv,px+CS,pz,-CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        if(wallF) mkWallAt(wv,px,pz+CS,CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
+                        // Check second floor specific walls (cells that are walls AND elevated)
+                        bool wallL2 = getCellWorld(wx-1,wz)==1 && isAboveGround(getElevWorld(wx-1,wz));
+                        bool wallR2 = getCellWorld(wx+1,wz)==1 && isAboveGround(getElevWorld(wx+1,wz));
+                        bool wallB2 = getCellWorld(wx,wz-1)==1 && isAboveGround(getElevWorld(wx,wz-1));
+                        bool wallF2 = getCellWorld(wx,wz+1)==1 && isAboveGround(getElevWorld(wx,wz+1));
+                        
+                        // Second floor walls (FLOOR2_Y→FLOOR2_CEIL) where neighbor is also elevated wall
+                        if(wallL2) mkWallAt(wv,px,pz,0,CS,FLOOR2_Y,FLOOR2_CEIL,CS);
+                        if(wallR2) mkWallAt(wv,px+CS,pz+CS,0,-CS,FLOOR2_Y,FLOOR2_CEIL,CS);
+                        if(wallB2) mkWallAt(wv,px+CS,pz,-CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
+                        if(wallF2) mkWallAt(wv,px,pz+CS,CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
+                        
+                        // Also add walls if neighbor is ground-level wall
+                        if(wallL && !wallL2) mkWallAt(wv,px,pz,0,CS,FLOOR2_Y,FLOOR2_CEIL,CS);
+                        if(wallR && !wallR2) mkWallAt(wv,px+CS,pz+CS,0,-CS,FLOOR2_Y,FLOOR2_CEIL,CS);
+                        if(wallB && !wallB2) mkWallAt(wv,px+CS,pz,-CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
+                        if(wallF && !wallF2) mkWallAt(wv,px,pz+CS,CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
+                        
                         // Perimeter walls where neighbor is ground-level open
                         auto isGround = [&](int nx, int nz) -> bool {
                             return getCellWorld(nx,nz)==0 && !isAboveGround(getElevWorld(nx,nz));
                         };
-                        // Railing at edges facing ground (can look down)
+                        // Full height walls at edges facing ground (not just railing)
                         if(isGround(wx-1,wz))
-                            mkBox(dv,px+0.06f,FLOOR2_Y,pz+CS*0.5f,0.12f,RAILING_H,CS);
+                            mkWallAt(wv,px,pz,0,CS,FLOOR2_Y,FLOOR2_CEIL,CS);
                         if(isGround(wx+1,wz))
-                            mkBox(dv,px+CS-0.06f,FLOOR2_Y,pz+CS*0.5f,0.12f,RAILING_H,CS);
+                            mkWallAt(wv,px+CS,pz+CS,0,-CS,FLOOR2_Y,FLOOR2_CEIL,CS);
                         if(isGround(wx,wz-1))
-                            mkBox(dv,px+CS*0.5f,FLOOR2_Y,pz+0.06f,CS,RAILING_H,0.12f);
+                            mkWallAt(wv,px+CS,pz,-CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
                         if(isGround(wx,wz+1))
-                            mkBox(dv,px+CS*0.5f,FLOOR2_Y,pz+CS-0.06f,CS,RAILING_H,0.12f);
+                            mkWallAt(wv,px,pz+CS,CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
                     }
 
                     if(!hasHole){
