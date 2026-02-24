@@ -57,51 +57,60 @@ inline void mkClosedBox(std::vector<float>& v, float cx, float y0, float cz, flo
     );
 }
 
-void buildGeom(){
-    std::vector<float>wv,fv,cv,pv,lv,lvOff,dv;
-    int pcx=playerChunkX,pcz=playerChunkZ;
-    for(int dcx=-VIEW_CHUNKS;dcx<=VIEW_CHUNKS;dcx++){
-        for(int dcz=-VIEW_CHUNKS;dcz<=VIEW_CHUNKS;dcz++){
-            auto it=chunks.find(chunkKey(pcx+dcx,pcz+dcz));
-            if(it==chunks.end())continue;
-            for(int lx=0;lx<CHUNK_SIZE;lx++){
-                for(int lz=0;lz<CHUNK_SIZE;lz++){
-                    int wx=(pcx+dcx)*CHUNK_SIZE+lx,wz=(pcz+dcz)*CHUNK_SIZE+lz;
-                    int8_t cellType = it->second.cells[lx][lz];
-                    int8_t cellElev = it->second.elev[lx][lz];
-                    float px=wx*CS,pz=wz*CS;
-                    const float uvFloor = 1.0f, uvCeil = 1.0f;
-                    // Second floor WALL cells need walls
-                    if(cellType == 1 && isAboveGround(cellElev)){
-                        // Second-floor wall cells: build quads so their FRONT faces the adjacent open cell.
-                        // With back-face culling enabled, reversed winding here makes walls look "transparent".
-                        const int dx[4] = {-1, 1, 0, 0}, dz[4] = {0, 0, -1, 1};
-                        // i=0 west, i=1 east, i=2 north, i=3 south
-                        const float wx1[4] = {0, CS, 0, CS}, wz1[4] = {CS, 0, 0, CS};
-                        const float wx2[4] = {0, 0, CS, -CS}, wz2[4] = {-CS, CS, 0, 0};
-                        for(int i=0;i<4;i++){
-                            int nx=wx+dx[i], nz=wz+dz[i];
-                            if(getCellWorld(nx,nz)==0) mkWallAt(wv,px+wx1[i],pz+wz1[i],wx2[i],wz2[i],FLOOR2_Y,FLOOR2_CEIL,CS);
-                        }
-                        continue;
-                    }
-                    if(cellType!=0)continue;
-                    
-                    bool hasHole = !isAboveGround(cellElev) && (isFloorHoleCell(wx,wz) || isAbyssCell(wx,wz));
-                    auto pushFloor=[&](std::vector<float>&v,float y){
-                        float f[]={px,y,pz,0,0,0,1,0,px,y,pz+CS,0,uvFloor,0,1,0,px+CS,y,pz+CS,uvFloor,uvFloor,0,1,0,
-                                   px,y,pz,0,0,0,1,0,px+CS,y,pz+CS,uvFloor,uvFloor,0,1,0,px+CS,y,pz,uvFloor,0,0,1,0};
-                        for(int i=0;i<48;i++)v.push_back(f[i]);
-                    };
-                    if(isRamp(cellElev)){
-                        mkRamp(fv, px, pz, cellElev, CS);
-                    }else if(isElevated(cellElev)){
-                        pushFloor(fv,0); pushFloor(fv,FLOOR2_Y);
-                    }else if(!hasHole){
-                        pushFloor(fv,0);
-                    }else{
-                        const float shaftDepth = 30.0f;
-                        bool leftSolid = getCellWorld(wx-1,wz)==1 || (!isFloorHoleCell(wx-1,wz) && !isAbyssCell(wx-1,wz) && getCellWorld(wx-1,wz)==0);
+	void buildGeom(){
+	    std::vector<float>wv,fv,cv,pv,lv,lvOff,dv;
+	    int pcx=playerChunkX,pcz=playerChunkZ;
+	    for(int dcx=-VIEW_CHUNKS;dcx<=VIEW_CHUNKS;dcx++){
+	        for(int dcz=-VIEW_CHUNKS;dcz<=VIEW_CHUNKS;dcz++){
+	            auto it=chunks.find(chunkKey(pcx+dcx,pcz+dcz));
+	            if(it==chunks.end())continue;
+	            for(int lx=0;lx<CHUNK_SIZE;lx++){
+	                for(int lz=0;lz<CHUNK_SIZE;lz++){
+	                    int wx=(pcx+dcx)*CHUNK_SIZE+lx,wz=(pcz+dcz)*CHUNK_SIZE+lz;
+	                    int8_t cellType = it->second.cells[lx][lz];
+	                    int8_t cellElev = it->second.elev[lx][lz];
+	                    float px=wx*CS,pz=wz*CS;
+	                    const float uvFloor = 1.0f, uvCeil = 1.0f;
+	                    // Second floor WALL cells need walls
+	                    if(cellType == 1 && isAboveGround(cellElev)){
+	                        // Second-floor wall cells: build quads so their FRONT faces the adjacent open cell.
+	                        // With back-face culling enabled, reversed winding here makes walls look "transparent".
+	                        const int dx[4] = {-1, 1, 0, 0}, dz[4] = {0, 0, -1, 1};
+	                        // i=0 west, i=1 east, i=2 north, i=3 south
+	                        const float wx1[4] = {0, CS, 0, CS}, wz1[4] = {CS, 0, 0, CS};
+	                        const float wx2[4] = {0, 0, CS, -CS}, wz2[4] = {-CS, CS, 0, 0};
+	                        for(int i=0;i<4;i++){
+	                            int nx=wx+dx[i], nz=wz+dz[i];
+	                            if(getCellWorld(nx,nz)==0) mkWallAt(wv,px+wx1[i],pz+wz1[i],wx2[i],wz2[i],FLOOR2_Y,FLOOR2_CEIL,CS);
+	                        }
+	                        continue;
+	                    }
+	                    if(cellType!=0)continue;
+	                    
+	                    bool hasHole = !isAboveGround(cellElev) && (isFloorHoleCell(wx,wz) || isAbyssCell(wx,wz));
+	                    auto pushFloor=[&](std::vector<float>&v,float y){
+	                        float f[]={px,y,pz,0,0,0,1,0,px,y,pz+CS,0,uvFloor,0,1,0,px+CS,y,pz+CS,uvFloor,uvFloor,0,1,0,
+	                                   px,y,pz,0,0,0,1,0,px+CS,y,pz+CS,uvFloor,uvFloor,0,1,0,px+CS,y,pz,uvFloor,0,0,1,0};
+	                        for(int i=0;i<48;i++)v.push_back(f[i]);
+	                    };
+	                    auto pushCeil=[&](std::vector<float>&v,float y){
+	                        // Winding is flipped vs floor so front-face points downward (works with culling on).
+	                        float c[]={px,y,pz,0,0,0,-1,0,px+CS,y,pz+CS,uvCeil,uvCeil,0,-1,0,px,y,pz+CS,0,uvCeil,0,-1,0,
+	                                   px,y,pz,0,0,0,-1,0,px+CS,y,pz,uvCeil,0,0,-1,0,px+CS,y,pz+CS,uvCeil,uvCeil,0,-1,0};
+	                        for(int i=0;i<48;i++)v.push_back(c[i]);
+	                    };
+	                    if(isRamp(cellElev)){
+	                        mkRamp(fv, px, pz, cellElev, CS);
+	                    }else if(isElevated(cellElev)){
+	                        pushFloor(fv,0); pushFloor(fv,FLOOR2_Y);
+	                        // Underside of the second floor: without this the first floor "ceiling" is missing
+	                        // because the walkable floor quad is culled when viewed from below.
+	                        pushCeil(cv, FLOOR2_Y);
+	                    }else if(!hasHole){
+	                        pushFloor(fv,0);
+	                    }else{
+	                        const float shaftDepth = 30.0f;
+	                        bool leftSolid = getCellWorld(wx-1,wz)==1 || (!isFloorHoleCell(wx-1,wz) && !isAbyssCell(wx-1,wz) && getCellWorld(wx-1,wz)==0);
                         bool rightSolid = getCellWorld(wx+1,wz)==1 || (!isFloorHoleCell(wx+1,wz) && !isAbyssCell(wx+1,wz) && getCellWorld(wx+1,wz)==0);
                         bool backSolid = getCellWorld(wx,wz-1)==1 || (!isFloorHoleCell(wx,wz-1) && !isAbyssCell(wx,wz-1) && getCellWorld(wx,wz-1)==0);
                         bool frontSolid = getCellWorld(wx,wz+1)==1 || (!isFloorHoleCell(wx,wz+1) && !isAbyssCell(wx,wz+1) && getCellWorld(wx,wz+1)==0);
@@ -109,31 +118,33 @@ void buildGeom(){
                         if(rightSolid) mkShaftWall(wv,px+CS,pz+CS,0,-CS,0,shaftDepth,CS);
                         if(backSolid) mkShaftWall(wv,px+CS,pz,-CS,0,0,shaftDepth,CS);
                         if(frontSolid) mkShaftWall(wv,px,pz+CS,CS,0,0,shaftDepth,CS);
-                    }
-                    float ceilH = isAboveGround(cellElev) ? FLOOR2_CEIL : WH;
-                    auto pushCeil=[&](std::vector<float>&v,float y){
-                        float c[]={px,y,pz,0,0,0,-1,0,px,y,pz+CS,0,uvCeil,0,-1,0,px+CS,y,pz+CS,uvCeil,uvCeil,0,-1,0,
-                                   px,y,pz,0,0,0,-1,0,px+CS,y,pz+CS,uvCeil,uvCeil,0,-1,0,px+CS,y,pz,uvCeil,0,0,-1,0};
-                        for(int i=0;i<48;i++)v.push_back(c[i]);
-                    };
-                    pushCeil(cv, ceilH);
-                    bool wallL = getCellWorld(wx-1,wz)==1;
-                    bool wallR = getCellWorld(wx+1,wz)==1;
-                    bool wallB = getCellWorld(wx,wz-1)==1;
-                    bool wallF = getCellWorld(wx,wz+1)==1;
+	                    }
+	                    float ceilH = isAboveGround(cellElev) ? FLOOR2_CEIL : WH;
+	                    pushCeil(cv, ceilH);
+	                    bool wallL = getCellWorld(wx-1,wz)==1;
+	                    bool wallR = getCellWorld(wx+1,wz)==1;
+	                    bool wallB = getCellWorld(wx,wz-1)==1;
+	                    bool wallF = getCellWorld(wx,wz+1)==1;
                     // Ground floor walls (0→WH)
                     if(wallL)mkWall(wv,px,pz,0,CS,WH,CS,WH);
                     if(wallR)mkWall(wv,px+CS,pz+CS,0,-CS,WH,CS,WH);
                     if(wallB)mkWall(wv,px+CS,pz,-CS,0,WH,CS,WH);
                     if(wallF)mkWall(wv,px,pz+CS,CS,0,WH,CS,WH);
-                    // Second floor walls - only at edges facing ground
-                    if(isAboveGround(cellElev)){
-                        auto isGround = [&](int nx, int nz)->bool{return getCellWorld(nx,nz)==0&&!isAboveGround(getElevWorld(nx,nz));};
-                        if(isGround(wx-1,wz))mkWallAt(wv,px,pz,0,CS,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        if(isGround(wx+1,wz))mkWallAt(wv,px+CS,pz+CS,0,-CS,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        if(isGround(wx,wz-1))mkWallAt(wv,px+CS,pz,-CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
-                        if(isGround(wx,wz+1))mkWallAt(wv,px,pz+CS,CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
-                    }
+	                    // Second floor walls - only at edges facing ground
+	                    if(isAboveGround(cellElev)){
+	                        auto isGround = [&](int nx, int nz)->bool{return getCellWorld(nx,nz)==0&&!isAboveGround(getElevWorld(nx,nz));};
+	                        auto isGroundWall = [&](int nx, int nz)->bool{return getCellWorld(nx,nz)==1&&!isAboveGround(getElevWorld(nx,nz));};
+	                        if(isGround(wx-1,wz))mkWallAt(wv,px,pz,0,CS,FLOOR2_Y,FLOOR2_CEIL,CS);
+	                        if(isGround(wx+1,wz))mkWallAt(wv,px+CS,pz+CS,0,-CS,FLOOR2_Y,FLOOR2_CEIL,CS);
+	                        if(isGround(wx,wz-1))mkWallAt(wv,px+CS,pz,-CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
+	                        if(isGround(wx,wz+1))mkWallAt(wv,px,pz+CS,CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
+	                        // Also cap walls that exist only on the ground floor; otherwise the second floor sees
+	                        // "missing" wall height and looks transparent above WH.
+	                        if(isGroundWall(wx-1,wz))mkWallAt(wv,px,pz,0,CS,FLOOR2_Y,FLOOR2_CEIL,CS);
+	                        if(isGroundWall(wx+1,wz))mkWallAt(wv,px+CS,pz+CS,0,-CS,FLOOR2_Y,FLOOR2_CEIL,CS);
+	                        if(isGroundWall(wx,wz-1))mkWallAt(wv,px+CS,pz,-CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
+	                        if(isGroundWall(wx,wz+1))mkWallAt(wv,px,pz+CS,CS,0,FLOOR2_Y,FLOOR2_CEIL,CS);
+	                    }
 
                     if(!hasHole){
                         bool corridorZ = wallL && wallR && !wallB && !wallF;

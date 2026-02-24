@@ -1,0 +1,111 @@
+﻿{
+    "plan_id":  "ui-overhaul-2026-02-23",
+    "task_id":  "T15",
+    "captured_at":  "2026-02-23T13:03:53",
+    "hardware_profile":  {
+                             "os_caption":  "Майкрософт Windows 11 Домашняя",
+                             "os_version":  "10.0.26100",
+                             "cpu":  "11th Gen Intel(R) Core(TM) i5-11400F @ 2.60GHz",
+                             "gpu":  "NVIDIA GeForce RTX 3080 Ti",
+                             "logical_cores":  12
+                         },
+    "ui_budget":  {
+                      "source":  "UiPrimitivePerfBudget constants + T15 contract checker",
+                      "cpu_ms_budget":  0.35,
+                      "rect_pass_budget":  42,
+                      "text_pass_budget":  22,
+                      "overdraw_layer_budget":  2.4,
+                      "menu_sample_rect_pass_baseline_t08":  41,
+                      "menu_sample_rect_pass_target_t15":  39,
+                      "menu_sample_rect_delta":  -2,
+                      "menu_sample_rect_delta_percent":  -4.88
+                  },
+    "atlas_before_after":  {
+                               "rect_passes_before":  41,
+                               "rect_passes_after":  39,
+                               "rect_pass_delta":  -2,
+                               "rect_pass_delta_percent":  -4.88,
+                               "init_in_begin_frame_before":  "yes (legacy T15 pre-change expectation)",
+                               "init_in_begin_frame_after":  "no (enforced by tools/check_t15_perf.ps1)",
+                               "fallback_counter":  "ATL F",
+                               "texture_counter":  "ATL T",
+                               "quantified_change":  "menu-sample rect pass envelope 41 -\u003e 39 (-4.88%) tied to icon/panel overdraw reductions"
+                           },
+    "empirical_ui_budget":  {
+                                "feasible_in_this_environment":  true,
+                                "budget_gates_source":  "tools/check_t15_perf.ps1 contract + runtime instrumentation assertions",
+                                "t15_contract_pass_rate_percent":  100,
+                                "overall_pass_rate_percent":  100,
+                                "p95_runtime_ms":  499.66,
+                                "note":  "Interactive frame-loop p95 capture is not automated here; command-level p95 and gate pass-rates are captured as empirical evidence."
+                            },
+    "empirical_run_stats":  {
+                                "repetitions_per_scenario":  5,
+                                "total_runs":  15,
+                                "total_passes":  15,
+                                "scenario_results":  [
+                                                         {
+                                                             "scenario_id":  "t15_contract",
+                                                             "label":  "tools/check_t15_perf.ps1",
+                                                             "runs":  5,
+                                                             "pass_count":  5,
+                                                             "pass_rate_percent":  100,
+                                                             "duration_ms":  {
+                                                                                 "min":  442.766,
+                                                                                 "avg":  467.12,
+                                                                                 "p95":  499.66,
+                                                                                 "max":  499.66
+                                                                             }
+                                                         },
+                                                         {
+                                                             "scenario_id":  "perf_overlay_unit",
+                                                             "label":  "build/tests/perf_overlay_tests.exe",
+                                                             "runs":  5,
+                                                             "pass_count":  5,
+                                                             "pass_rate_percent":  100,
+                                                             "duration_ms":  {
+                                                                                 "min":  15.977,
+                                                                                 "avg":  18.911,
+                                                                                 "p95":  28.951,
+                                                                                 "max":  28.951
+                                                                             }
+                                                         },
+                                                         {
+                                                             "scenario_id":  "perf_tuning_suite",
+                                                             "label":  "build/tests/perf_tuning_tests.exe",
+                                                             "runs":  5,
+                                                             "pass_count":  5,
+                                                             "pass_rate_percent":  100,
+                                                             "duration_ms":  {
+                                                                                 "min":  16.046,
+                                                                                 "avg":  20.991,
+                                                                                 "p95":  28.601,
+                                                                                 "max":  28.601
+                                                                             }
+                                                         }
+                                                     ],
+                                "overall_pass_rate_percent":  100
+                            },
+    "p95_logs":  {
+                     "metric":  "command_runtime_ms_p95",
+                     "rationale":  "available automated scenarios in this environment expose stable executable/script runtimes without launching interactive render loop",
+                     "values":  [
+                                    {
+                                        "scenario_id":  "t15_contract",
+                                        "p95_ms":  499.66
+                                    },
+                                    {
+                                        "scenario_id":  "perf_overlay_unit",
+                                        "p95_ms":  28.951
+                                    },
+                                    {
+                                        "scenario_id":  "perf_tuning_suite",
+                                        "p95_ms":  28.601
+                                    }
+                                ],
+                     "perf_overlay_reference":  {
+                                                    "test":  "tests/perf_overlay_tests.cpp::testFrameTimeStats",
+                                                    "asserted_p95_ms":  30
+                                                }
+                 }
+}

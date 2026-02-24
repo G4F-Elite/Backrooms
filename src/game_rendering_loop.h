@@ -132,19 +132,23 @@ void renderScene(){
         glUniform3f(mu.flashPos, lens.x, lens.y, lens.z);
     }
     
-    glBindTexture(GL_TEXTURE_2D,wallTex);glBindVertexArray(wallVAO);glDrawArrays(GL_TRIANGLES,0,wallVC);
-    glBindVertexArray(pillarVAO);glDrawArrays(GL_TRIANGLES,0,pillarVC);
-    if(decorVC>0){
-        glDisable(GL_CULL_FACE);
-        glBindTexture(GL_TEXTURE_2D,propTex);
-        glBindVertexArray(decorVAO);glDrawArrays(GL_TRIANGLES,0,decorVC);
-        glEnable(GL_CULL_FACE);
-    }
-    glBindTexture(GL_TEXTURE_2D,floorTex);glBindVertexArray(floorVAO);glDrawArrays(GL_TRIANGLES,0,floorVC);
-    glDisable(GL_CULL_FACE);
-    glBindTexture(GL_TEXTURE_2D,ceilTex);glBindVertexArray(ceilVAO);glDrawArrays(GL_TRIANGLES,0,ceilVC);
-    if(noteVC>0){glBindTexture(GL_TEXTURE_2D,lightTex);glBindVertexArray(noteVAO);glDrawArrays(GL_TRIANGLES,0,noteVC);}
-    glEnable(GL_CULL_FACE);
+	    glBindTexture(GL_TEXTURE_2D,wallTex);glBindVertexArray(wallVAO);glDrawArrays(GL_TRIANGLES,0,wallVC);
+	    glBindVertexArray(pillarVAO);glDrawArrays(GL_TRIANGLES,0,pillarVC);
+	    if(decorVC>0){
+	        glDisable(GL_CULL_FACE);
+	        glBindTexture(GL_TEXTURE_2D,propTex);
+	        glBindVertexArray(decorVAO);glDrawArrays(GL_TRIANGLES,0,decorVC);
+	        glEnable(GL_CULL_FACE);
+	    }
+	    glBindTexture(GL_TEXTURE_2D,floorTex);glBindVertexArray(floorVAO);glDrawArrays(GL_TRIANGLES,0,floorVC);
+	    glBindTexture(GL_TEXTURE_2D,ceilTex);glBindVertexArray(ceilVAO);glDrawArrays(GL_TRIANGLES,0,ceilVC);
+	    if(noteVC>0){
+	        glDisable(GL_CULL_FACE);
+	        glBindTexture(GL_TEXTURE_2D,lightTex);
+	        glBindVertexArray(noteVAO);
+	        glDrawArrays(GL_TRIANGLES,0,noteVC);
+	        glEnable(GL_CULL_FACE);
+	    }
 
     // World pickups (battery/plush/med spray)
     for(const auto& wi : worldItems){

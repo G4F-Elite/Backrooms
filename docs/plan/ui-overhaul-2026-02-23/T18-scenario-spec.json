@@ -1,0 +1,116 @@
+{
+  "plan_id": "ui-overhaul-2026-02-23",
+  "task_id": "T18",
+  "schema_version": "1.0.0",
+  "focus_dimensions": [
+    "clarity",
+    "immersion",
+    "cognitive-load",
+    "task-completion-speed"
+  ],
+  "scenarios": [
+    {
+      "id": "S1-new-run-objective-read",
+      "title": "Start run and interpret objective guidance",
+      "entry_surface": "ui-main-menu",
+      "exit_surface": "hud-objective",
+      "target_completion_seconds": 85,
+      "scripted_steps": [
+        {
+          "id": "open-main-menu",
+          "ui_surface": "ui-main-menu",
+          "instruction": "Open New Run flow",
+          "success_marker": "state_game_ready"
+        },
+        {
+          "id": "read-objective-panel",
+          "ui_surface": "hud-objective",
+          "instruction": "State objective in your own words",
+          "success_marker": "objective_summary_confirmed"
+        },
+        {
+          "id": "find-next-action",
+          "ui_surface": "hud-prompt",
+          "instruction": "Use prompt/event panel to decide next action",
+          "success_marker": "first-context-action-identified"
+        }
+      ]
+    },
+    {
+      "id": "S2-settings-accessibility-adjust",
+      "title": "Adjust accessibility and return to gameplay",
+      "entry_surface": "ui-pause-menu",
+      "exit_surface": "ui-settings",
+      "target_completion_seconds": 70,
+      "scripted_steps": [
+        {
+          "id": "open-settings",
+          "ui_surface": "ui-pause-menu",
+          "instruction": "Open settings from pause",
+          "success_marker": "settings_screen_open"
+        },
+        {
+          "id": "enable-reduced-motion",
+          "ui_surface": "ui-settings-accessibility",
+          "instruction": "Enable reduced motion",
+          "success_marker": "reduced_motion_enabled"
+        },
+        {
+          "id": "confirm-and-return",
+          "ui_surface": "ui-settings",
+          "instruction": "Apply and return to previous screen",
+          "success_marker": "return_to_previous_menu"
+        }
+      ]
+    },
+    {
+      "id": "S3-multiplayer-join-status",
+      "title": "Complete join flow and interpret waiting status",
+      "entry_surface": "ui-multi-main",
+      "exit_surface": "ui-multi-wait",
+      "target_completion_seconds": 95,
+      "scripted_steps": [
+        {
+          "id": "open-join",
+          "ui_surface": "ui-multi-main",
+          "instruction": "Open join/connect screen",
+          "success_marker": "join_menu_open"
+        },
+        {
+          "id": "initiate-connection",
+          "ui_surface": "ui-multi-join",
+          "instruction": "Start connect/join",
+          "success_marker": "join_request_sent"
+        },
+        {
+          "id": "interpret-status",
+          "ui_surface": "ui-multi-wait",
+          "instruction": "Describe what the waiting state means",
+          "success_marker": "status_interpretation_correct"
+        }
+      ]
+    }
+  ],
+  "telemetry_event_contract": {
+    "required_fields": [
+      "run_id",
+      "cohort_id",
+      "scenario_id",
+      "event_type",
+      "timestamp_utc",
+      "ui_surface",
+      "step",
+      "is_simulated"
+    ],
+    "event_types": [
+      "scenario_start",
+      "step_complete",
+      "scenario_complete",
+      "help_opened",
+      "prompt_repeat",
+      "menu_backtrack",
+      "idle_hesitation",
+      "fail_state"
+    ]
+  }
+}

@@ -1,0 +1,300 @@
+plan_id: ui-overhaul-2026-02-23
+objective: UI overhaul from text-style to immersive attractive UI.
+risks:
+  - Scope creep from parallel feature requests during UI migration.
+  - Performance regressions from animated layers, post-processing, and high-resolution assets.
+  - Inconsistent UX if old and new UI systems coexist too long without guardrails.
+  - Multiplayer desync risk if HUD/state timing changes are not validated in network scenarios.
+  - Accessibility regressions if visual polish work bypasses contrast, focus, and readability checks.
+  - Build instability across Windows/Linux from shader/UI pipeline changes.
+
+tasks:
+  - id: T01
+    title: Establish UI vision, principles, and target mood board
+    description: Define immersive visual direction, interaction tone, and UI quality bar; produce reference set for in-game HUD, menus, and overlays.
+    owner_role: UI/UX Lead
+    status: completed
+    dependencies: []
+    requires_review: true
+    success_criteria:
+      - Vision brief approved by game director and art lead.
+      - Mood board includes at least 3 benchmark references per major UI surface.
+      - Principles documented for readability, tension, and player guidance.
+
+  - id: T02
+    title: Inventory current UI surfaces and technical entry points
+    description: Catalog all text-style UI screens, HUD widgets, and debug overlays in `src/`, identifying ownership, data source, and render hooks.
+    owner_role: UI Engineer
+    status: completed
+    dependencies: [T01]
+    requires_review: true
+    success_criteria:
+      - Full UI inventory spreadsheet completed with owner and priority tags.
+      - Source mapping created for each screen/widget to concrete file/module.
+      - Deprecated and experimental UI paths explicitly marked.
+
+  - id: T03
+    title: Define phased rollout architecture and migration toggles
+    description: Specify how old/new UI coexist using feature flags and fallback paths to reduce integration risk during staged delivery.
+    owner_role: Technical Lead
+    status: completed
+    dependencies: [T02]
+    requires_review: true
+    success_criteria:
+      - Rollout architecture doc approved by engineering leads.
+      - Toggle strategy implemented in design spec with default states per build type.
+      - Clear rollback procedure documented for each phase.
+
+  - id: T04
+    title: Build UI style token system
+    description: Create canonical tokens for spacing, typography scale, contrast-safe colors, depth, and motion timing to enforce consistency.
+    owner_role: UI Engineer
+    status: completed
+    dependencies: [T01, T03]
+    requires_review: true
+    success_criteria:
+      - Token set covers all major UI primitives and states.
+      - No hard-coded ad hoc values required in new UI implementation examples.
+      - Token documentation published and referenced by all UI tasks.
+
+  - id: T05
+    title: Create interaction and motion guidelines draft
+    description: Define animation language for transitions, hover/focus states, damage feedback, and critical alerts to increase immersion without overload; produce review-ready draft artifacts.
+    owner_role: UX Designer
+    status: completed
+    dependencies: [T01, T04]
+    requires_review: true
+    success_criteria:
+      - Motion spec includes durations, easing, and interruption rules.
+      - Usability constraints set for low-distraction gameplay moments.
+      - Draft package prepared for design and engineering review.
+
+  - id: T05A
+    title: Human approval gate for interaction and motion guidelines
+    description: Obtain required stakeholder sign-off (design and engineering) for the T05 draft before dependent implementation work proceeds.
+    owner_role: Design + Engineering Leads
+    status: pending
+    dependencies: [T05]
+    requires_review: true
+    success_criteria:
+      - Team sign-off obtained from design and engineering.
+
+  - id: T06
+    title: Produce high-fidelity HUD concept set
+    description: Design new immersive HUD concepts for health/sanity/objectives/minimap with clear hierarchy and atmospheric styling.
+    owner_role: UI Artist
+    status: completed
+    dependencies: [T04, T05]
+    requires_review: true
+    success_criteria:
+      - HUD concepts delivered for exploration, combat, and critical-state scenarios.
+      - Visual hierarchy validated in low-light and high-motion screenshots.
+      - Final concept selected for implementation.
+
+  - id: T07
+    title: Produce high-fidelity menu and flow concepts
+    description: Design main menu, pause, settings, and multiplayer flow screens with cohesive thematic presentation and clear navigation.
+    owner_role: UI Artist
+    status: completed
+    dependencies: [T04, T05]
+    requires_review: true
+    success_criteria:
+      - Concept pack covers all primary and secondary menu states.
+      - Navigation flow map includes back/cancel/error states.
+      - Concept review approval recorded.
+
+  - id: T08
+    title: Implement UI foundation layer and component primitives
+    description: Add reusable panel, button, input, list, modal, tooltip, and status indicator primitives aligned with tokens and motion spec.
+    owner_role: UI Engineer
+    status: completed
+    dependencies: [T04, T05]
+    requires_review: true
+    success_criteria:
+      - Core primitives integrated into runtime with theming support.
+      - Sample screen built exclusively with primitives without custom one-offs.
+      - Primitive performance baseline measured and documented.
+      - T08 regression-risk check artifact exists with explicit validation scope for integration, primitive composition, and baseline metrics.
+      - Targeted T08 integration guard check passes (`tools/check_t08_integration.ps1`).
+
+  - id: T09
+    title: Integrate font pipeline and iconography atlas
+    description: Replace text-only look with curated typography hierarchy and icon atlas while preserving legibility at gameplay distances.
+    owner_role: Tech Artist
+    status: completed
+    dependencies: [T04, T08]
+    requires_review: true
+    success_criteria:
+      - Font assets loaded with fallback and language coverage defined.
+      - Icon atlas integrated with scalable rendering rules.
+      - Visual QA confirms readability at target resolutions.
+
+  - id: T10
+    title: Implement immersive HUD v1 in gameplay loop
+    description: Replace legacy HUD widgets with new layered HUD tied to player state, events, and context-sensitive prompts.
+    owner_role: Gameplay Engineer
+    status: completed
+    dependencies: [T06, T08, T09]
+    requires_review: true
+    success_criteria:
+      - Legacy HUD path can be toggled off for test branch.
+      - New HUD updates correctly for health, sanity, objectives, and key events.
+      - No blocking gameplay regressions in smoke tests.
+
+  - id: T11
+    title: Implement immersive menu system v1
+    description: Replace text-style menus with designed panels, transitions, and clear information architecture across singleplayer/multiplayer setup.
+    owner_role: UI Engineer
+    status: completed
+    dependencies: [T07, T08, T09]
+    requires_review: true
+    success_criteria:
+      - Main, pause, and settings menus fully navigable by keyboard/controller.
+      - Multiplayer setup flow migrated to new components.
+      - Legacy menu fallback remains available behind flag.
+
+  - id: T12
+    title: Release-gated contextual feedback and world-reactive UI effects
+    description: Integrate approved contextual effects into release-candidate UI behavior after T05A sign-off, reconciling provisional implementation findings with approved motion guidance.
+    owner_role: Gameplay Engineer
+    status: pending
+    dependencies: [T10, T12P, T05A]
+    requires_review: true
+    success_criteria:
+      - Approved contextual effects trigger from live gameplay signals.
+      - Effects remain readable and do not obscure critical information.
+      - Provisional findings from T12P are reconciled with T05A decisions before release candidate sign-off.
+
+  - id: T12P
+    title: Provisional contextual feedback spike (non-release)
+    description: Implement contextual UI effects behind explicit non-release gating to allow engineering, perf, and UX learning to continue while T05A remains pending.
+    owner_role: Gameplay Engineer
+    status: completed
+    dependencies: [T10, T05]
+    requires_review: true
+    success_criteria:
+      - Provisional effects run only behind explicit migration gating and remain default-off for release configurations.
+      - Perf/readability observations and implementation notes are documented for T12 reconciliation.
+      - Open risks and questions are captured for T05A stakeholder review.
+
+  - id: T13
+    title: Integrate UI audio feedback and mix rules
+    description: Add interactive UI sound cues and adaptive mixing so menu/HUD interactions feel responsive without overwhelming ambient horror audio.
+    owner_role: Audio Engineer
+    status: completed
+    dependencies: [T10, T11]
+    requires_review: true
+    success_criteria:
+      - Distinct audio cues assigned to primary UI actions.
+      - Mix ducking and priority rules documented and implemented.
+      - Audio QA confirms clarity in high-intensity scenes.
+      - Reproducible high-intensity audio QA checklist artifact exists with explicit pass/fail scenarios.
+      - Targeted high-intensity audio hook guard check passes (`tools/check_t13_high_intensity_hooks.ps1`).
+
+  - id: T14
+    title: Implement accessibility baseline for new UI
+    description: Enforce contrast, text scaling, focus visibility, input remapping support, and reduced motion options across all new UI surfaces.
+    owner_role: Accessibility Specialist
+    status: completed
+    dependencies: [T10, T11]
+    requires_review: true
+    success_criteria:
+      - Contrast and legibility checks pass agreed acceptance thresholds.
+      - Reduced motion mode disables non-essential transitions.
+      - Keyboard/controller navigation works across all critical screens.
+
+  - id: T15
+    title: Optimize render performance for UI effects
+    description: Profile draw calls, overdraw, texture memory, and animation update cost; optimize to maintain framerate targets on minimum spec.
+    owner_role: Rendering Engineer
+    status: completed
+    dependencies: [T10, T11, T12P]
+    requires_review: true
+    success_criteria:
+      - UI frame cost budget defined and met on target hardware.
+      - Overdraw and atlas usage reduced versus initial implementation.
+      - Performance report shared with actionable metrics.
+
+  - id: T16
+    title: Validate multiplayer and net-state UI consistency
+    description: Verify HUD/menu state updates are deterministic across host/client and reconnect scenarios, including latency and packet loss conditions.
+    owner_role: Network Engineer
+    status: completed
+    dependencies: [T10, T11]
+    requires_review: true
+    success_criteria:
+      - Host/client UI state parity confirmed for key gameplay events.
+      - Reconnect and session transition UI flows validated.
+      - No critical desync bugs remain open.
+
+  - id: T17
+    title: Migrate remaining secondary screens and overlays
+    description: Move debug-safe player-facing overlays, tutorials, progression summaries, and session-end screens onto new component system.
+    owner_role: UI Engineer
+    status: completed
+    dependencies: [T10, T11, T08]
+    requires_review: true
+    success_criteria:
+      - All player-facing legacy text screens replaced or intentionally retained.
+      - Screen migration checklist reaches 100 percent coverage.
+      - Regression smoke tests pass for each migrated screen.
+
+  - id: T18
+    title: Structured UX validation governance umbrella
+    description: Track split completion across automation telemetry and required human cohort validation so progress reporting stays truthful while release gating remains strict.
+    owner_role: UX Researcher
+    status: completed
+    dependencies: [T12P, T14, T17]
+    requires_review: true
+    success_criteria:
+      - Automation telemetry subtask (T18A) reflects completed simulated/automated cohort evidence.
+      - Human cohort gate subtask (T18H) remains required before downstream polish/release progression.
+      - Gating state is documented in `docs/plan/ui-overhaul-2026-02-23/t18-gating-note.md`.
+
+  - id: T18A
+    title: Complete automated/simulated UX telemetry cohorts
+    description: Finalize scripted automation/simulation cohorts and publish telemetry outcomes for clarity, immersion, cognitive load, and task completion speed.
+    owner_role: UX Researcher
+    status: completed
+    dependencies: [T12P, T14, T17]
+    requires_review: true
+    success_criteria:
+      - Automated/simulated cohorts complete scripted scenarios.
+      - Telemetry dashboard includes completion time and confusion hotspots.
+      - Findings from automation runs are prioritized with severity labels.
+
+  - id: T18H
+    title: Human cohort validation gate for structured UX playtests
+    description: Run required human playtest cohorts on release-candidate UX behavior and record governance sign-off before downstream release work proceeds.
+    owner_role: UX Researcher
+    status: pending
+    dependencies: [T12, T14, T17, T18A]
+    requires_review: true
+    success_criteria:
+      - At least 3 human playtest cohorts complete scripted scenarios.
+      - Human-session telemetry and qualitative findings are consolidated with T18A outputs.
+      - Gate sign-off is recorded in `docs/plan/ui-overhaul-2026-02-23/t18-gating-note.md`.
+
+  - id: T19
+    title: Polish pass from feedback and defect triage
+    description: Address high/medium issues from playtests and QA, refining visual hierarchy, transitions, wording, and interaction flow.
+    owner_role: UI/UX Lead
+    status: pending
+    dependencies: [T18H, T15, T16, T12]
+    requires_review: true
+    success_criteria:
+      - All high-severity usability defects resolved or waived with rationale.
+      - Visual and interaction polish checklist completed.
+      - Stakeholder review confirms release readiness.
+
+  - id: T20
+    title: Release hardening, documentation, and handoff
+    description: Finalize rollout checklist, update developer docs, define maintenance ownership, and enable new UI by default for target release branch.
+    owner_role: Producer
+    status: pending
+    dependencies: [T19, T05A]
+    requires_review: true
+    success_criteria:
+      - Release checklist executed with no critical blockers.
+      - Documentation updated for architecture, toggles, and troubleshooting.
+      - New UI enabled by default with rollback plan retained.

@@ -1,0 +1,575 @@
+plan_id: ui-overhaul-2026-02-23
+task_id: T02
+generated_on: 2026-02-23
+artifact: ui_surface_inventory
+scope: src/
+
+technical_entry_points:
+  render_root:
+    - citation: src/game_main_entry.h:drawUI (line 500)
+      symbol: drawUI
+      file: src/game_main_entry.h
+    - citation: src/hud.h:drawUI (line 340)
+      symbol: drawUI
+      file: src/hud.h
+    - citation: src/hud.h:drawUiParityPath (line 30)
+      symbol: drawUiParityPath
+      file: src/hud.h
+  input_root:
+    - citation: src/game_main_entry.h:menuInput call (line 114)
+      symbol: menuInput
+      file: src/game_main_entry.h
+    - citation: src/game_main_entry.h:settingsInput call (line 108)
+      symbol: settingsInput
+      file: src/game_main_entry.h
+    - citation: src/game_main_entry.h:keybindsInput call (line 110)
+      symbol: keybindsInput
+      file: src/game_main_entry.h
+    - citation: src/game_main_entry.h:gameInput branch for STATE_GAME (line 130+)
+      symbol: gameInput
+      file: src/game_main_entry.h
+  state_router:
+    - citation: src/menu.h:GameState enum (line 72)
+      symbol: GameState
+      file: src/menu.h
+
+surfaces:
+  - id: ui-main-menu
+    type: screen
+    name: Main Menu
+    status: active
+    owner_guess: UI Engineer
+    citations:
+      - src/menu.h:drawMenu (line 331)
+      - src/hud.h:STATE_MENU dispatch to drawMenu (line 31)
+      - src/input_menu.h:STATE_MENU handling (line 10)
+    data_source:
+      - menuSel
+      - gCurrentLevel via buildLevelLabel
+      - vhsTime
+    render_hooks:
+      - drawMenu
+      - drawTextCentered
+      - drawMainMenuBackdrop
+    input_hooks:
+      - menuInputParityPath (STATE_MENU)
+    priority_tags: [p0, player-facing, migration-critical]
+
+  - id: ui-guide
+    type: screen
+    name: Guide Screen
+    status: active
+    owner_guess: UI Engineer
+    citations:
+      - src/menu.h:drawGuideScreen (line 357)
+      - src/hud.h:STATE_GUIDE dispatch (line 32)
+      - src/input_menu.h:STATE_GUIDE handling (line 45)
+    data_source:
+      - static guide lines in drawGuideScreen
+      - guideReturnToPause
+    render_hooks:
+      - drawGuideScreen
+    input_hooks:
+      - menuInputParityPath (STATE_GUIDE)
+    priority_tags: [p1, player-facing, migration-critical]
+
+  - id: ui-settings
+    type: screen
+    name: Settings (main/pause variants)
+    status: active
+    owner_guess: UI Engineer
+    citations:
+      - src/menu.h:drawSettings (line 369)
+      - src/hud.h:STATE_SETTINGS/STATE_SETTINGS_PAUSE dispatch (line 40)
+      - src/input_settings.h:settingsInput (line 54)
+      - src/game_main_entry.h:settingsInput calls (lines 108-109)
+    data_source:
+      - settings (audio/video/effects/binds)
+      - settingsTab
+      - menuSel
+      - sliderInput* state
+    render_hooks:
+      - drawSettings
+      - drawSlider
+      - drawOverlayRectNdc
+    input_hooks:
+      - settingsInput
+    priority_tags: [p0, player-facing, settings, migration-critical]
+
+  - id: ui-keybinds
+    type: screen
+    name: Keybinds Menu
+    status: active
+    owner_guess: UI Engineer
+    citations:
+      - src/menu.h:drawKeybindsMenu (line 514)
+      - src/hud.h:STATE_KEYBINDS dispatch (line 41)
+      - src/input_keybinds.h:keybindsInput (line 2)
+    data_source:
+      - settings.binds
+      - keybindCaptureIndex
+      - menuSel
+    render_hooks:
+      - drawKeybindsMenu
+    input_hooks:
+      - keybindsInput
+    priority_tags: [p1, player-facing, accessibility-input, migration-critical]
+
+  - id: ui-pause-single
+    type: screen
+    name: Pause Menu (singleplayer)
+    status: active
+    owner_guess: UI Engineer
+    citations:
+      - src/menu.h:drawPause (line 463)
+      - src/hud.h:STATE_PAUSE non-multiplayer branch (line 39)
+      - src/input_menu.h:STATE_PAUSE non-multiplayer handling (line 102)
+    data_source:
+      - menuSel
+      - gameState
+    render_hooks:
+      - drawPause
+    input_hooks:
+      - menuInputParityPath (STATE_PAUSE)
+    priority_tags: [p0, player-facing, migration-critical]
+
+  - id: ui-intro
+    type: screen
+    name: Intro Text Sequence
+    status: active
+    owner_guess: Narrative/Gameplay Engineer
+    citations:
+      - src/menu_pages.h:drawIntro (line 9)
+      - src/hud.h:STATE_INTRO dispatch (line 42)
+      - src/game_main_entry.h:STATE_INTRO progression and skip (line 96+)
+    data_source:
+      - storyMgr.introLine
+      - storyMgr.introTimer
+      - INTRO_LINES
+    render_hooks:
+      - drawIntro
+    input_hooks:
+      - menuInputParityPath (indirect state transitions)
+      - game_main_entry intro skip (space)
+    priority_tags: [p2, player-facing, narrative]
+
+  - id: ui-note-reader
+    type: screen
+    name: Note Reader Overlay
+    status: active
+    owner_guess: Narrative/Gameplay Engineer
+    citations:
+      - src/menu_pages.h:drawNote (line 31)
+      - src/hud.h:STATE_NOTE dispatch (line 43-44)
+    data_source:
+      - storyMgr.currentNote
+      - NOTE_TITLES
+      - NOTE_CONTENTS
+    render_hooks:
+      - drawNote
+      - drawOverlayRectNdc
+    input_hooks:
+      - game interaction flow (E/ESC exits note state)
+    priority_tags: [p2, player-facing, narrative]
+
+  - id: ui-death
+    type: screen
+    name: Death Screen
+    status: active
+    owner_guess: Gameplay Engineer
+    citations:
+      - src/menu.h:drawDeath (line 478)
+      - src/hud.h:isPlayerDead branch to drawDeath (line 48)
+    data_source:
+      - gDeathReason
+      - gSurvivalTime
+      - vhsTime
+    render_hooks:
+      - drawDeath
+      - drawOverlayRectNdc
+    input_hooks:
+      - game_main_entry restart/menu actions in STATE_GAME death branch
+    priority_tags: [p1, player-facing, end-state]
+
+  - id: ui-escape
+    type: screen
+    name: Escape/Extraction Screen
+    status: active
+    owner_guess: Gameplay Engineer
+    citations:
+      - src/menu.h:drawEscape (line 496)
+      - src/hud.h:playerEscaped branch to drawEscape (line 47)
+    data_source:
+      - gSurvivalTime
+      - vhsTime
+    render_hooks:
+      - drawEscape
+    input_hooks:
+      - game_main_entry escaped flow (enter/escape handling)
+    priority_tags: [p1, player-facing, end-state]
+
+  - id: ui-multi-main
+    type: screen
+    name: Multiplayer Main Menu
+    status: active
+    owner_guess: Network/UI Engineer
+    citations:
+      - src/menu_multi.h:drawMultiMenuScreen (line 33)
+      - src/hud.h:STATE_MULTI dispatch (line 33)
+      - src/input_menu.h:STATE_MULTI handling (line 133)
+    data_source:
+      - menuSel
+      - multiNetworkMode
+      - multiNickname
+      - lanDiscovery.localIP
+    render_hooks:
+      - drawMultiMenuScreen
+    input_hooks:
+      - menuInputParityPath (STATE_MULTI)
+      - handleNicknameInput
+    priority_tags: [p0, player-facing, multiplayer, migration-critical]
+
+  - id: ui-multi-join
+    type: screen
+    name: Multiplayer Join/Connect Screen
+    status: active
+    owner_guess: Network/UI Engineer
+    citations:
+      - src/menu_multi.h:drawJoinMenuScreen (line 68)
+      - src/hud.h:STATE_MULTI_JOIN dispatch (line 35)
+      - src/input_menu.h:STATE_MULTI_JOIN handling (line 257)
+    data_source:
+      - multiJoinIP/multiJoinPort
+      - multiMasterIP/multiMasterPort
+      - lanDiscovery rooms
+      - dedicatedDirectory response status
+      - multiConnectStatus
+    render_hooks:
+      - drawJoinMenuScreen
+    input_hooks:
+      - menuInputParityPath (STATE_MULTI_JOIN)
+      - numeric IP/port editing and quick-connect keys
+    priority_tags: [p0, player-facing, multiplayer, migration-critical]
+
+  - id: ui-multi-host-lobby
+    type: screen
+    name: Host Lobby
+    status: active
+    owner_guess: Network/UI Engineer
+    citations:
+      - src/menu_multi.h:drawHostLobbyScreen (line 148)
+      - src/hud.h:STATE_MULTI_HOST dispatch (line 34)
+      - src/input_menu.h:STATE_MULTI_HOST handling (line 222)
+    data_source:
+      - netMgr.players
+      - netMgr.getPlayerCount()
+      - lanDiscovery.localIP
+    render_hooks:
+      - drawHostLobbyScreen
+    input_hooks:
+      - menuInputParityPath (STATE_MULTI_HOST)
+    priority_tags: [p0, player-facing, multiplayer, migration-critical]
+
+  - id: ui-multi-wait
+    type: screen
+    name: Multiplayer Waiting/Connecting
+    status: active
+    owner_guess: Network/UI Engineer
+    citations:
+      - src/menu_multi.h:drawWaitingScreen (line 193)
+      - src/hud.h:STATE_MULTI_WAIT dispatch (line 36)
+      - src/input_menu.h:STATE_MULTI_WAIT handling (line 437)
+    data_source:
+      - netMgr.welcomeReceived
+      - netMgr.connected/rttMs/player list
+      - multiConnectStatus
+    render_hooks:
+      - drawWaitingScreen
+    input_hooks:
+      - menuInputParityPath (STATE_MULTI_WAIT)
+    priority_tags: [p0, player-facing, multiplayer, migration-critical]
+
+  - id: ui-multi-pause
+    type: screen
+    name: Multiplayer Pause Menu
+    status: active
+    owner_guess: Network/UI Engineer
+    citations:
+      - src/menu_multi.h:drawMultiPause (line 234)
+      - src/hud.h:STATE_PAUSE multiplayer branch (line 38)
+      - src/input_menu.h:STATE_PAUSE multiplayer handling (line 58)
+    data_source:
+      - menuSel
+      - netMgr.getPlayerCount()
+    render_hooks:
+      - drawMultiPause
+    input_hooks:
+      - menuInputParityPath (STATE_PAUSE + MULTI_IN_GAME)
+    priority_tags: [p0, player-facing, multiplayer, migration-critical]
+
+  - id: hud-core-vitals
+    type: hud_widget_group
+    name: Core Vitals HUD (HP/SN/ST/FL)
+    status: active
+    owner_guess: Gameplay/UI Engineer
+    citations:
+      - src/menu_hud.h:drawHealthBar/drawSanityBar/drawStaminaBar/drawFlashlightBattery (lines 3/11/27/36)
+      - src/hud.h:calls from gameplay HUD path (lines 76-79)
+    data_source:
+      - playerHealth
+      - playerSanity
+      - playerStamina
+      - flashlightBattery/flashlightOn
+    render_hooks:
+      - drawHealthBar
+      - drawSanityBar
+      - drawStaminaBar
+      - drawFlashlightBattery
+    input_hooks:
+      - gameInput (indirect via state mutation)
+    priority_tags: [p0, gameplay-critical, migration-critical]
+
+  - id: hud-survival-timer
+    type: hud_widget
+    name: Survival Time Counter
+    status: active
+    owner_guess: Gameplay/UI Engineer
+    citations:
+      - src/menu.h:drawSurvivalTime (line 508)
+      - src/hud.h:gameplay HUD call (line 51)
+    data_source:
+      - survivalTime
+    render_hooks:
+      - drawSurvivalTime
+    input_hooks:
+      - none-direct
+    priority_tags: [p2, gameplay]
+
+  - id: hud-damage-hallucination
+    type: overlay_group
+    name: Damage + Hallucination Fullscreen Effects
+    status: active
+    owner_guess: Gameplay/UI Engineer
+    citations:
+      - src/menu_hud.h:drawDamageOverlay/drawHallucinationEffect (lines 19/67)
+      - src/hud.h:drawDamageOverlay + storyMgr.hasHallucinations callsites (lines 50/233)
+    data_source:
+      - damageFlash
+      - playerHealth
+      - playerSanity
+      - storyMgr.hasHallucinations
+    render_hooks:
+      - drawDamageOverlay
+      - drawHallucinationEffect
+    input_hooks:
+      - none-direct
+    priority_tags: [p1, gameplay-feedback]
+
+  - id: hud-objective-block
+    type: hud_widget_group
+    name: Objective/Support/Attention/Action Prompts
+    status: active
+    owner_guess: Gameplay/UI Engineer
+    citations:
+      - src/hud.h:objective/support/attention drawHudText block (lines 88-99)
+      - src/hud.h:interact prompt block using buildVoidShiftInteractPrompt (lines 223-227)
+    data_source:
+      - buildVoidShiftObjectiveLine
+      - buildVoidShiftSupportLine
+      - attentionLevel/coLevel/resonatorBattery
+      - buildVoidShiftInteractPrompt
+    render_hooks:
+      - drawHudText
+      - drawHudTextCentered
+    input_hooks:
+      - gameInput interact flow (src/game_debug_controls.h)
+    priority_tags: [p0, gameplay-critical, migration-critical]
+
+  - id: hud-scanner-panel
+    type: hud_widget
+    name: Scanner Panel + Heat/Signal Sliders
+    status: active
+    owner_guess: Gameplay/UI Engineer
+    citations:
+      - src/hud.h:scanner panel block (lines 102-118)
+      - src/game_debug_controls.h:updateScanner* state updaters (lines 8/28/52)
+    data_source:
+      - activeDeviceSlot
+      - scannerSignal
+      - scannerHeat
+      - scannerOverheated
+    render_hooks:
+      - drawOverlayRectNdc
+      - drawSlider
+      - drawHudText
+    input_hooks:
+      - gameInput device slot toggles and scanner mode controls
+    priority_tags: [p0, gameplay-critical, migration-critical]
+
+  - id: hud-minimap
+    type: overlay
+    name: Minimap Overlay
+    status: active
+    owner_guess: Gameplay/UI Engineer
+    citations:
+      - src/traps.h:drawMinimapOverlay (line 263)
+      - src/hud.h:minimapEnabled call (line 232)
+      - src/session.h:updateMinimapCheat (line 421)
+      - src/game_debug_controls.h:updateMinimapCheat call (line 118)
+    data_source:
+      - cam.pos
+      - world cells via minimapWallSampler/getCellWorld
+      - minimapEnabled + minimap cheat state
+      - netMgr.pingMarkPos/TTL
+    render_hooks:
+      - drawMinimapOverlay
+      - buildMinimapRows
+    input_hooks:
+      - updateMinimapCheat (M/F8 + cheat sequence)
+    priority_tags: [p2, optional-utility, migration-review]
+
+  - id: hud-multi-in-game
+    type: hud_widget_group
+    name: Multiplayer In-Game HUD (players/host, nametags, ping mark)
+    status: active
+    owner_guess: Network/UI Engineer
+    citations:
+      - src/menu_multi.h:drawMultiHUD (line 262)
+      - src/hud.h:drawMultiHUD + nametag loop + ping mark overlay (lines 234, 237-273)
+      - src/game_debug_controls.h:ping mark input (G) (line 250+)
+    data_source:
+      - netMgr.getPlayerCount/isHost
+      - netMgr.players[]
+      - playerRenderPos interpolation
+      - netMgr.pingMark*
+    render_hooks:
+      - drawMultiHUD
+      - drawHudTextCentered
+    input_hooks:
+      - gameInput ping/callout controls
+    priority_tags: [p0, multiplayer, gameplay-critical, migration-critical]
+
+  - id: hud-debug-telemetry
+    type: debug_overlay
+    name: Debug Telemetry + Perf Graph + Debug Flags
+    status: active
+    owner_guess: Engine/Tools Engineer
+    citations:
+      - src/hud.h:debug telemetry rows and perf graph (lines 54-73, 276-301)
+      - src/game_debug_controls.h:F3/F6 toggles (lines 27-38)
+      - src/perf_overlay.h:formatFrameGenPipeline/formatUpscalePipeline/buildFrameTimeGraph
+    data_source:
+      - gPerfFpsSmoothed/gPerfFrameMs/history
+      - settings.debugMode
+      - gPerfDebugOverlay
+      - gHudTelemetryVisible
+      - netMgr.rttMs
+    render_hooks:
+      - drawHudText
+      - buildFrameTimeGraph
+      - formatFrameGenPipeline
+    input_hooks:
+      - gameInput F3/F6 toggles
+    priority_tags: [p2, debug-only, engine-tools]
+
+  - id: hud-debug-tools-panel
+    type: debug_overlay
+    name: Debug Tools Action Menu
+    status: active
+    owner_guess: Engine/Tools Engineer
+    citations:
+      - src/hud.h:debugTools.open panel rendering (lines 309-321)
+      - src/game_debug_controls.h:F10 toggle + panel nav/confirm (lines 15-106)
+      - src/debug_tools.h:DebugToolsState/debugActionLabel (line 21+)
+    data_source:
+      - debugTools.open/selectedAction
+      - debug action labels and runtime flags
+    render_hooks:
+      - drawHudTextCentered
+      - drawHudText
+      - drawFullscreenOverlay
+    input_hooks:
+      - gameInput F10 / arrow / enter / esc in debug panel mode
+    priority_tags: [p2, debug-only, engine-tools]
+
+  - id: hud-echo-status-toast
+    type: overlay
+    name: Echo Status Toast (singleplayer debug-mode gated)
+    status: active
+    owner_guess: Gameplay Engineer
+    citations:
+      - src/session.h:echoStatusText/echoStatusTimer + setEchoStatus (lines 128-129, 444-445)
+      - src/hud.h:echoStatusTimer gated drawHudTextCentered (lines 229-230)
+    data_source:
+      - echoStatusText
+      - echoStatusTimer
+      - settings.debugMode
+      - multiState!=MULTI_IN_GAME
+    render_hooks:
+      - drawHudTextCentered
+    input_hooks:
+      - none-direct (producer calls setEchoStatus)
+    priority_tags: [p2, debug-gated, gameplay-feedback]
+
+  - id: ui-migration-path
+    type: technical_path
+    name: Legacy/New UI migration toggles (parity implementation)
+    status: experimental
+    owner_guess: UI/Technical Lead
+    citations:
+      - src/ui_migration_toggle.h:BR_UI_COMPILE_* and BR_UI_PATH env switch (lines 5-10, 70, 84)
+      - src/hud.h:drawLegacyUI/drawNewUI/drawUI switch (lines 331-349)
+      - src/input_menu.h:menuInputLegacy/menuInputNew/menuInput switch (lines 504-529)
+    data_source:
+      - compile flags BR_UI_COMPILE_ALLOW_LEGACY/NEW
+      - environment BR_UI_PATH
+    render_hooks:
+      - drawUI -> drawLegacyUI/drawNewUI
+    input_hooks:
+      - menuInput -> menuInputLegacy/menuInputNew
+    priority_tags: [p0, migration-foundation, experimental]
+    notes: |
+      Current new/legacy paths both route into parity implementations (`drawUiParityPath`, `menuInputParityPath`),
+      so this is a migration scaffold rather than a visually distinct new UI yet.
+
+  - id: ui-legacy-widget-stubs
+    type: widget_group
+    name: Legacy HUD helper stubs (currently unreferenced)
+    status: deprecated
+    owner_guess: Gameplay/UI Engineer
+    citations:
+      - src/menu_hud.h:drawContractCounter/drawPhaseIndicator/drawInteractPrompt declarations (lines 44/51/61)
+      - src/grep cross-ref: no callsites outside definitions in src/
+    data_source:
+      - contract count / phase / prompt literals
+    render_hooks:
+      - drawContractCounter
+      - drawPhaseIndicator
+      - drawInteractPrompt
+    input_hooks:
+      - none
+    priority_tags: [p3, deprecated, cleanup-candidate]
+
+  - id: ui-trap-status-path
+    type: overlay
+    name: Trap Status Toast Path
+    status: deprecated
+    owner_guess: Gameplay Engineer
+    citations:
+      - src/session.h:trapStatusText/trapStatusTimer + setTrapStatus (lines 249-250, 449-450)
+      - src/traps.h:trapStatusTimer update (line 70)
+      - src/hud.h:no corresponding drawTrapStatus render path (echo status has explicit draw at lines 229-230)
+    data_source:
+      - trapStatusText
+      - trapStatusTimer
+    render_hooks:
+      - none currently wired
+    input_hooks:
+      - producer-only via setTrapStatus calls
+    priority_tags: [p2, deprecated, bug-risk, cleanup-candidate]
+
+inventory_notes:
+  - Text rendering is centralized in src/menu.h (`drawText`, `drawTextCentered`, shader setup), then reused by all UI surfaces.
+  - Gameplay and debug overlays are heavily co-located in src/hud.h, mixing player-facing and debug-only responsibilities.
+  - Multiplayer UI is split between presentation (src/menu_multi.h) and control flow (src/input_menu.h + net manager state).
+  - Migration toggles exist but currently provide parity routing, not a distinct new UI implementation.
