@@ -330,7 +330,7 @@ inline void drawMenu(float tm) {
     const char* it[]={"START CONTRACT","MULTIPLAYER","SETTINGS","GUIDE","QUIT"};
     for(int i=0;i<5;i++){
         float s=(menuSel==i)?1.0f:0.5f; float y=0.10f-i*0.11f;
-        float baseX = -measureTextWidthNdc(it[i], 2.0f) * 0.5f;
+        float baseX = -measureTextWidthNdc(it[i], 2.0f * 0.5f);
         if(menuSel==i)drawText(">", baseX - 0.08f, y, 2.0f, 0.9f*s,0.85f*s,0.4f*s);
         drawText(it[i], baseX, y, 2.0f,0.9f*s,0.85f*s,0.4f*s);
     }
@@ -363,9 +363,8 @@ inline void drawSettings(bool fp) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     if(fp) drawFullscreenOverlay(0.02f,0.02f,0.03f,0.72f);
     drawTextCentered("SETTINGS",0.0f,0.55f,3.0f,0.9f,0.85f,0.4f);
-    const float rightColCenterX = 0.50f;
-    const bool audioTab = settingsTab == SETTINGS_TAB_AUDIO;
-    const bool effectsTab = settingsTab == SETTINGS_TAB_EFFECTS;
+    const float rightColCenterX = 0.50f, rcx = rightColCenterX;
+    const bool audioTab = settingsTab == SETTINGS_TAB_AUDIO, effectsTab = settingsTab == SETTINGS_TAB_EFFECTS;
     const int itemCount = settingsItemsForTab(settingsTab);
     const char* tabN[4]={"VIDEO","EFFECTS","AUDIO","BINDS"}; const char* tabB[4]={"[VIDEO]","[EFFECTS]","[AUDIO]","[BINDS]"};
     for(int t=0;t<4;t++){ float a=settingsTab==t?1.0f:0.52f;
@@ -377,7 +376,7 @@ inline void drawSettings(bool fp) {
         if(menuSel==i)drawText(">",-0.55f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
         if(i==0){
             drawText("CATEGORY",-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            drawTextCentered(tabN[settingsTab],rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            drawTextCentered(tabN[settingsTab],rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             continue;
         }
         if(audioTab){
@@ -390,25 +389,25 @@ inline void drawSettings(bool fp) {
                 float nv=*vl[ai]/mx[ai]; if(nv>1.0f)nv=1.0f;
                 drawSlider(-0.02f,y,0.45f,nv,0.9f*s,0.85f*s,0.4f*s);
                 char b[16]; snprintf(b,16,"%d%%",(int)(nv*100));
-                drawTextCentered(b,rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+                drawTextCentered(b,rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }
         }else if(effectsTab){
             const char* lb[]={"SSAO","GI","GOD RAYS","BLOOM","DENOISER","DENOISE STR","BACK"};
             int vi = i - 1;
             drawText(lb[vi],-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            if(vi==0) drawTextCentered(ssaoLabel(settings.ssaoQuality),rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            else if(vi==1) drawTextCentered(giLabel(settings.giQuality),rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            else if(vi==2) drawTextCentered(settings.godRays?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            else if(vi==3) drawTextCentered(settings.bloom?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            else if(vi==4) drawTextCentered(settings.rtxDenoise?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            if(vi==0) drawTextCentered(ssaoLabel(settings.ssaoQuality),rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            else if(vi==1) drawTextCentered(giLabel(settings.giQuality),rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            else if(vi==2) drawTextCentered(settings.godRays?"ON":"OFF",rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            else if(vi==3) drawTextCentered(settings.bloom?"ON":"OFF",rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            else if(vi==4) drawTextCentered(settings.rtxDenoise?"ON":"OFF",rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             else if(vi==5){
                 float nv=settings.rtxDenoiseStrength; if(nv>1.0f)nv=1.0f; if(nv<0.0f)nv=0.0f;
                 drawSlider(-0.02f,y,0.45f,nv,0.9f*s,0.85f*s,0.4f*s);
                 char b[16]; snprintf(b,16,"%d%%",(int)(nv*100));
-                drawTextCentered(b,rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+                drawTextCentered(b,rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }
         }else if(settingsTab==SETTINGS_TAB_BINDS){
-            if(i==1){ drawText("OPEN BIND MENU",-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s); drawTextCentered("ENTER",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s); }
+            if(i==1){ drawText("OPEN BIND MENU",-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s); drawTextCentered("ENTER",rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s); }
             else if(i==2){ drawText("BACK",-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s); }
         }else{
             const char* lb[]={"VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","ANTI-ALIASING","FAST MATH","FRAME GEN","V-SYNC","DEBUG MODE","BACK"};
@@ -422,24 +421,24 @@ inline void drawSettings(bool fp) {
                 float nv=val/maxV; if(nv>1.0f)nv=1.0f;
                 drawSlider(-0.02f,y,0.45f,nv,0.9f*s,0.85f*s,0.4f*s);
                 char b[16]; snprintf(b,16,"%d%%",(int)(nv*100));
-                drawTextCentered(b,rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+                drawTextCentered(b,rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==2){
-                drawTextCentered(upscalerModeLabel(settings.upscalerMode),rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+                drawTextCentered(upscalerModeLabel(settings.upscalerMode),rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==3){
                 char rb[24];
                 if(clampUpscalerMode(settings.upscalerMode)==UPSCALER_MODE_OFF) snprintf(rb,24,"NATIVE");
                 else { snprintf(rb,24,"%d%%",renderScalePercentFromPreset(settings.renderScalePreset)); }
-                drawTextCentered(rb,rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+                drawTextCentered(rb,rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==5){
-                drawTextCentered(aaModeLabel(settings.aaMode),rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+                drawTextCentered(aaModeLabel(settings.aaMode),rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==6){
-                drawTextCentered(settings.fastMath?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+                drawTextCentered(settings.fastMath?"ON":"OFF",rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==7){
-                drawTextCentered(frameGenModeLabel(settings.frameGenMode),rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+                drawTextCentered(frameGenModeLabel(settings.frameGenMode),rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==8){
-                drawTextCentered(settings.vsync?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+                drawTextCentered(settings.vsync?"ON":"OFF",rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==9){
-                drawTextCentered(settings.debugMode?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+                drawTextCentered(settings.debugMode?"ON":"OFF",rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }
         }
     }
@@ -466,7 +465,7 @@ inline void drawPause() {
     const char* it[]={"RESUME","SETTINGS","GUIDE","MAIN MENU","QUIT"};
     for(int i=0;i<5;i++){
         float s=(menuSel==i)?1.0f:0.5f,y=-i*0.1f;
-        float baseX = -measureTextWidthNdc(it[i], 1.8f) * 0.5f;
+        float baseX = -measureTextWidthNdc(it[i], 1.8f * 0.5f);
         if(menuSel==i)drawText(">",baseX - 0.07f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
         drawText(it[i],baseX,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
     }
@@ -474,25 +473,86 @@ inline void drawPause() {
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 
-inline void drawDeath(float tm) {
+inline void drawDeath(float tm, const char* deathReason) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    bool isCognitive = (deathReason && strstr(deathReason, "COGNITIVE OVERLOAD") != nullptr);
     float fl=(rand()%100<28)?0.25f:1.0f, p=0.68f+0.22f*sinf(tm*4.2f);
-    float deathPulse = 0.5f + 0.5f * sinf(tm * 2.8f);
-    float ch = 0.0015f + deathPulse * 0.0045f;
-    drawFullscreenOverlay(0.01f,0.0f,0.0f,0.88f);
-    drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.86f,0.32f,0.02f,0.02f,0.55f);
-    drawOverlayRectNdc(-1.0f,0.86f,1.0f,1.0f,0.32f,0.02f,0.02f,0.55f);
-    drawOverlayRectNdc(-1.0f,-1.0f,1.0f,1.0f,0.18f,0.02f,0.02f,0.06f + deathPulse * 0.08f);
-    drawTextCentered("YOU DIED",-ch,0.2f,4.2f,0.88f*fl,0.10f*fl,0.10f*fl,p*0.82f);
-    drawTextCentered("YOU DIED",ch,0.2f,4.2f,0.22f*fl,0.12f*fl,0.88f*fl,p*0.72f);
-    drawTextCentered("YOU DIED",0.0f,0.2f,4.2f,0.9f*fl,0.08f*fl,0.08f*fl,p);
-    drawTextCentered("CONTRACT FAILED",0.0f,0.01f,2.1f,0.72f,0.12f,0.12f,0.76f);
-    drawTextCentered(gDeathReason,0.0f,-0.05f,1.55f,0.78f,0.62f,0.52f,0.82f);
-    int m=(int)(gSurvivalTime/60),s=(int)gSurvivalTime%60;
-    char tb[32]; snprintf(tb,32,"SURVIVED: %d:%02d",m,s);
-    drawTextCentered(tb,0.0f,-0.16f,2.0f,0.7f,0.6f,0.3f,0.8f);
-    drawTextCentered("PRESS ENTER TO RESTART",0.0f,-0.35f,1.8f,0.5f,0.4f,0.35f,0.6f);
-    drawTextCentered("PRESS ESC FOR MAIN MENU",0.0f,-0.47f,1.8f,0.5f,0.4f,0.35f,0.6f);
+    float deathPulse = 0.5f + 0.5f * sinf(tm * 2.8f), ch = 0.0015f + deathPulse * 0.0045f;
+    if (isCognitive) {
+        float postDeath = (tm > 2.3f) ? (tm - 2.3f) : 0.0f, intensity = fminf(tm, 2.3f) / 2.3f;
+        if (tm < 2.3f) {
+            float ha = intensity * 0.6f;
+            drawOverlayRectNdc(-1.0f,0.82f,1.0f,1.0f,0.35f,0.0f,0.45f,ha);
+            drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.82f,0.35f,0.0f,0.45f,ha);
+            drawOverlayRectNdc(-1.0f,-1.0f,-0.82f,1.0f,0.35f,0.0f,0.45f,ha*0.8f);
+            drawOverlayRectNdc(0.82f,-1.0f,1.0f,1.0f,0.35f,0.0f,0.45f,ha*0.8f);
+            float cab = 0.002f + intensity * 0.012f;
+            drawOverlayRectNdc(-1.0f+cab,-1.0f,1.0f+cab,1.0f,0.9f,0.0f,0.0f,0.12f*intensity);
+            drawOverlayRectNdc(-1.0f-cab,-1.0f,1.0f-cab,1.0f,0.0f,0.0f,0.9f,0.12f*intensity);
+            for (int i = 0; i < 4; i++) {
+                float by=-1.0f+(i/4.0f)*2.0f, ta=intensity*0.18f*(0.5f+0.5f*sinf(tm*22.0f+i*3.1f));
+                if (ta > 0.01f) drawOverlayRectNdc(-1.0f+sinf(tm*18.0f+i*2.3f)*0.04f*intensity,by,1.0f+sinf(tm*18.0f+i*2.3f)*0.04f*intensity,by+0.08f+sinf(tm*14.0f+i*1.7f)*0.03f,0.15f,0.0f,0.2f,ta);
+            }
+            drawOverlayRectNdc(-1.0f+sinf(tm*20.0f)*0.03f*intensity,-1.0f,1.0f+sinf(tm*20.0f)*0.03f*intensity,1.0f,0.02f,0.0f,0.02f,0.3f*intensity);
+            drawFullscreenOverlay(0.01f,0.0f,0.01f,0.3f+intensity*0.5f);
+            float va = 0.1f + intensity * 0.4f;
+            drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.86f,0.4f,0.0f,0.05f,va);
+            drawOverlayRectNdc(-1.0f,0.86f,1.0f,1.0f,0.4f,0.0f,0.05f,va);
+            drawOverlayRectNdc(-1.0f,-1.0f,1.0f,1.0f,0.2f,0.0f,0.02f,intensity*0.15f);
+        }
+        if (postDeath > 0.0f) {
+            drawFullscreenOverlay(0.005f,0.0f,0.008f,0.88f+fminf(postDeath/1.5f,1.0f)*0.12f);
+            float ce = fminf(postDeath*0.6f,1.0f);
+            for (int i = 0; i < 8; i++) {
+                float a=(i/8.0f)*3.14159f+0.15f*sinf((float)i*2.7f), ca=cosf(a), sa=sinf(a);
+                float ex=ca*ce*2.2f, ey=sa*ce*2.2f, px=-sa*(0.001f+ce*0.004f), py=ca*(0.001f+ce*0.004f);
+                float lx=fminf(0.0f,ex), ly=fminf(0.05f,ey), rx=fmaxf(0.0f,ex), ry=fmaxf(0.05f,ey);
+                float cra=0.7f+0.3f*sinf(postDeath*3.0f+i);
+                drawOverlayRectNdc(lx+px,ly+py,rx-px,ry-py,0.0f,0.0f,0.0f,cra*0.9f);
+                drawOverlayRectNdc(lx+px*2.0f,ly+py*2.0f,rx-px*2.0f,ry-py*2.0f,0.2f,0.0f,0.25f,cra*0.25f);
+            }
+            float inward=fminf(postDeath*0.08f,0.35f), sa2=fminf(postDeath*0.5f,0.85f);
+            const float sil[4][4]={{-1.0f,-0.1f,0.12f,0.55f},{1.0f,0.0f,0.14f,0.6f},{-0.85f,0.6f,0.10f,0.45f},{0.85f,-0.5f,0.11f,0.5f}};
+            for (int i = 0; i < 4; i++) {
+                float sx=sil[i][0], sy=sil[i][1], sw=sil[i][2], sh=sil[i][3];
+                sx+=(sx>0.0f)?-inward:((sx<0.0f)?inward:0.0f); sy+=(sy>0.0f)?-inward:((sy<0.0f)?inward:0.0f);
+                drawOverlayRectNdc(sx-sw*0.5f,sy-sh*0.5f,sx+sw*0.5f,sy+sh*0.5f,0.0f,0.0f,0.0f,sa2);
+                drawOverlayRectNdc(sx-sw*0.3f,sy+sh*0.35f,sx+sw*0.3f,sy+sh*0.55f,0.0f,0.0f,0.0f,sa2);
+            }
+            drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.86f,0.32f,0.02f,0.02f,0.55f);
+            drawOverlayRectNdc(-1.0f,0.86f,1.0f,1.0f,0.32f,0.02f,0.02f,0.55f);
+            drawOverlayRectNdc(-1.0f,-1.0f,1.0f,1.0f,0.18f,0.02f,0.02f,0.06f+deathPulse*0.08f);
+            float go=(postDeath<0.5f)?(0.5f-postDeath)*0.02f:0.0f, ta2=fminf(postDeath*2.0f,1.0f), gr=(postDeath<0.5f)?sinf(postDeath*60.0f)*go:0.0f, gb=(postDeath<0.5f)?cosf(postDeath*55.0f)*go:0.0f;
+            drawTextCentered("YOU DIED",0.0f-ch+gr,0.2f,4.2f,0.88f*fl,0.10f*fl,0.10f*fl,p*0.82f*ta2);
+            drawTextCentered("YOU DIED",0.0f+ch+gb,0.2f,4.2f,0.22f*fl,0.12f*fl,0.88f*fl,p*0.72f*ta2);
+            drawTextCentered("YOU DIED",0.0f,0.2f,4.2f,0.9f*fl,0.08f*fl,0.08f*fl,p*ta2);
+            drawTextCentered("MIND FRACTURED",0.0f,0.01f,2.1f,0.72f,0.12f,0.12f,0.76f*ta2);
+            drawTextCentered(deathReason,0.0f,-0.05f,1.55f,0.78f,0.62f,0.52f,0.82f*ta2);
+            int m=(int)(gSurvivalTime/60),s=(int)gSurvivalTime%60;
+            char tb[32]; snprintf(tb,32,"SURVIVED: %d:%02d",m,s);
+            drawTextCentered(tb,0.0f,-0.16f,2.0f,0.7f,0.6f,0.3f,0.8f*ta2);
+            float pa = fminf((postDeath-0.8f)*1.5f,1.0f);
+            if (pa > 0.0f) {
+                drawTextCentered("PRESS ENTER TO RESTART",0.0f,-0.35f,1.8f,0.5f,0.4f,0.35f,0.6f*pa);
+                drawTextCentered("PRESS ESC FOR MAIN MENU",0.0f,-0.47f,1.8f,0.5f,0.4f,0.35f,0.6f*pa);
+            }
+        }
+    } else {
+        drawFullscreenOverlay(0.01f,0.0f,0.0f,0.88f);
+        drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.86f,0.32f,0.02f,0.02f,0.55f);
+        drawOverlayRectNdc(-1.0f,0.86f,1.0f,1.0f,0.32f,0.02f,0.02f,0.55f);
+        drawOverlayRectNdc(-1.0f,-1.0f,1.0f,1.0f,0.18f,0.02f,0.02f,0.06f+deathPulse*0.08f);
+        drawTextCentered("YOU DIED",0.0f-ch,0.2f,4.2f,0.88f*fl,0.10f*fl,0.10f*fl,p*0.82f);
+        drawTextCentered("YOU DIED",0.0f+ch,0.2f,4.2f,0.22f*fl,0.12f*fl,0.88f*fl,p*0.72f);
+        drawTextCentered("YOU DIED",0.0f,0.2f,4.2f,0.9f*fl,0.08f*fl,0.08f*fl,p);
+        drawTextCentered("CONTRACT FAILED",0.0f,0.01f,2.1f,0.72f,0.12f,0.12f,0.76f);
+        drawTextCentered(deathReason,0.0f,-0.05f,1.55f,0.78f,0.62f,0.52f,0.82f);
+        int m=(int)(gSurvivalTime/60),s=(int)gSurvivalTime%60;
+        char tb[32]; snprintf(tb,32,"SURVIVED: %d:%02d",m,s);
+        drawTextCentered(tb,0.0f,-0.16f,2.0f,0.7f,0.6f,0.3f,0.8f);
+        drawTextCentered("PRESS ENTER TO RESTART",0.0f,-0.35f,1.8f,0.5f,0.4f,0.35f,0.6f);
+        drawTextCentered("PRESS ESC FOR MAIN MENU",0.0f,-0.47f,1.8f,0.5f,0.4f,0.35f,0.6f);
+    }
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 
@@ -512,7 +572,7 @@ inline void drawEscape(float tm) {
 inline void drawSurvivalTime(float t) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     int m=(int)(t/60),s=(int)t%60; char b[16]; snprintf(b,16,"%d:%02d",m,s);
-    drawText(b,0.72f,0.9f,2.0f,0.78f,0.72f,0.48f,0.96f);
+    drawText(b,0.96f-measureTextWidthNdc(b,2.0f),0.9f,2.0f,0.78f,0.72f,0.48f,0.96f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 

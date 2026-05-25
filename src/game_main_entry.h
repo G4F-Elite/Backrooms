@@ -263,7 +263,7 @@ int main(){
                 
                 float levelDanger = levelDangerScale(gCurrentLevel);
                 if(activeDeviceSlot==3 && heldConsumableType==ITEM_PLUSH_TOY) playerSanity += 3.8f*dTime; else playerSanity -= sanityPassiveDrainPerSec(levelDanger) * dTime;
-                if(entityMgr.dangerLevel>0.1f) playerSanity -= entityMgr.dangerLevel*(8.0f * levelDanger)*dTime;
+                if(entityMgr.dangerLevel>0.1f) playerSanity -= entityMgr.dangerLevel*(8.0f * levelDanger)*dTime; else playerSanity += sanityRecoveryPerSec(true, playerSanity) * dTime;
                 playerSanity=playerSanity>100?100:(playerSanity<0?0:playerSanity);
                 int cellX = (int)floorf(cam.pos.x / CS);
                 int cellZ = (int)floorf(cam.pos.z / CS);

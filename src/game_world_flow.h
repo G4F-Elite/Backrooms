@@ -135,20 +135,7 @@ void buildGeom(){
                             }
                         }
 
-                        if(isLevelZero(gCurrentLevel) && (corridorZ || corridorX) && (doorHash % 100u) < 3u){
-                            float rampY0 = 0.0f;
-                            float segW = CS * 0.18f;
-                            for(int step = 0; step < 5; step++){
-                                float sy = rampY0 + (float)step * 0.24f;
-                                if(corridorZ){
-                                    float sx = px + CS * (0.16f + (float)step * 0.17f);
-                                    mkBox(dv, sx, sy, czCell, segW, 0.10f, CS * 0.86f);
-                                }else{
-                                    float sz = pz + CS * (0.16f + (float)step * 0.17f);
-                                    mkBox(dv, cxCell, sy, sz, CS * 0.86f, 0.10f, segW);
-                                }
-                            }
-                        }
+                        // Wooden stair steps disabled
                     }
                 }
             }

@@ -43,7 +43,7 @@ void drawUI(){
     else if(gameState==STATE_GAME){
         gSurvivalTime=survivalTime;
         if(playerEscaped) drawEscape(vhsTime);
-        else if(isPlayerDead) drawDeath(vhsTime);
+        else if(isPlayerDead) drawDeath(vhsTime, gDeathReason);
         else{
             drawDamageOverlay(damageFlash,playerHealth);
             drawSurvivalTime(survivalTime);
@@ -71,10 +71,12 @@ void drawUI(){
                 }
             }
 
+            drawLeftBarPanel();  // Always visible
             if(playerHealth<100)drawHealthBar(playerHealth);
             if(playerSanity<100)drawSanityBar(playerSanity);
             drawStaminaBar(playerStamina);
             if(flashlightBattery<100)drawFlashlightBattery(flashlightBattery,flashlightOn);
+            else drawRightBarPanel();  // Always visible when flashlight bar not drawn
             if(playerDowned){
                 char downBuf[64];
                 snprintf(downBuf,64,"DOWNED %.0fs",playerDownedTimer);

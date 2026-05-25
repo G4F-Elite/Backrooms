@@ -366,19 +366,84 @@ public:
             model.m[0]=c; model.m[2]=s; model.m[8]=-s; model.m[10]=c;
             float bobAmp = 0.02f;
             float yOffset = e.pos.y;
-            if(e.type==ENTITY_CRAWLER){
-                bobAmp = 0.03f;
+            float scaleX=1.0f, scaleY=1.0f, scaleZ=1.0f;
+            float tiltX=0.0f, tiltZ=0.0f;
+
+            if(e.type==ENTITY_STALKER){
+                // Menacing sway — subtle body lean that shifts side to side
+                bobAmp = 0.025f;
+                tiltZ = mSin(e.animPhase * 1.2f) * 0.06f; // lateral sway
+                tiltX = mSin(e.animPhase * 0.8f) * 0.03f; // forward hunch pulse
+                // Breathing effect — subtle chest expansion
+                scaleY = 1.0f + mSin(e.animPhase * 1.5f) * 0.012f;
+                scaleX = 1.0f + mSin(e.animPhase * 1.5f + 1.57f) * 0.008f;
+            }else if(e.type==ENTITY_CRAWLER){
+                // Skittering — rapid lateral jitter + body squirm
+                bobAmp = 0.04f;
+                float squirm = mSin(e.animPhase * 4.0f) * 0.04f;
+                tiltZ = squirm;
+                scaleX = 1.0f + mSin(e.animPhase * 3.5f) * 0.05f;
+                scaleZ = 1.0f + mSin(e.animPhase * 3.5f + 1.57f) * 0.05f;
+                // Faster bob when chasing
+                if(e.state == ENT_CHASING || e.state == ENT_ATTACKING){
+                    bobAmp = 0.06f;
+                    tiltZ *= 1.8f;
+                }
                 model.m[0] = c * 0.95f;
                 model.m[2] = s * 0.95f;
                 model.m[8] = -s * 1.15f;
                 model.m[10] = c * 1.15f;
             }else if(e.type==ENTITY_SHADOW){
+                // Ethereal pulse — scale breathing + rotation wobble
                 bobAmp = 0.06f;
                 yOffset += 0.08f * mSin(e.animPhase * 0.7f);
+                float pulse = 1.0f + mSin(e.animPhase * 1.5f) * 0.08f;
+                scaleX = pulse;
+                scaleY = pulse + mSin(e.animPhase * 2.0f) * 0.05f;
+                scaleZ = pulse;
+                // Ghostly rotation wobble
+                tiltX = mSin(e.animPhase * 0.9f) * 0.08f;
+                tiltZ = mSin(e.animPhase * 1.1f) * 0.06f;
+                // Lateral drift
+                model.m[12] = e.pos.x + mSin(e.animPhase * 0.5f) * 0.12f;
+                model.m[14] = e.pos.z + mCos(e.animPhase * 0.7f) * 0.08f;
             }
-            model.m[12]=e.pos.x + mSin(e.animPhase) * bobAmp;
-            model.m[13]=yOffset;
-            model.m[14]=e.pos.z;
+
+            // Apply scale to rotation matrix columns
+            model.m[0] *= scaleX; model.m[1] *= scaleY; model.m[2] *= scaleZ;
+            model.m[4] *= scaleX; model.m[5] *= scaleY; model.m[6] *= scaleZ;
+            model.m[8] *= scaleX; model.m[9] *= scaleY; model.m[10] *= scaleZ;
+
+            // Apply tilt (rotation perturbation)
+            if(tiltX != 0.0f || tiltZ != 0.0f){
+                float cx2 = mCos(tiltX), sx2 = mSin(tiltX);
+                float cz2 = mCos(tiltZ), sz2 = mSin(tiltZ);
+                // Compose tilt into model matrix
+                float m0=model.m[0], m1=model.m[1], m2=model.m[2];
+                float m4=model.m[4], m5=model.m[5], m6=model.m[6];
+                float m9=model.m[9], m10=model.m[10];
+                // Z tilt
+                model.m[0] = m0*cz2 + m4*sz2;
+                model.m[1] = m1*cz2 + m5*sz2;
+                model.m[2] = m2*cz2 + m6*sz2;
+                model.m[4] = m4*cz2 - m0*sz2;
+                model.m[5] = m5*cz2 - m1*sz2;
+                model.m[6] = m6*cz2 - m2*sz2;
+                // X tilt
+                m1=model.m[1]; m2=model.m[2];
+                m9=model.m[9]; m10=model.m[10];
+                model.m[1] = m1*cx2 + m9*sx2;
+                model.m[2] = m2*cx2 + m10*sx2;
+                model.m[9] = m9*cx2 - m1*sx2;
+                model.m[10] = m10*cx2 - m2*sx2;
+            }
+
+            if(e.type != ENTITY_SHADOW){
+                model.m[12] = e.pos.x + mSin(e.animPhase) * bobAmp;
+                model.m[14] = e.pos.z;
+            }
+            model.m[13] = yOffset;
+
             glUniformMatrix4fv(glGetUniformLocation(shader,"M"),1,GL_FALSE,model.m);
             int ti = (int)e.type;
             if(ti < 0 || ti > 3 || entityVC[ti] <= 0) continue;
