@@ -6,6 +6,14 @@ build.bat          # Compile
 build/backrooms.exe  # Run
 ```
 
+### UI migration gating
+- Compile-time path gating is controlled by preprocessor defines in `src/ui_migration_toggle.h`:
+    - `BR_UI_COMPILE_ALLOW_LEGACY` (0/1)
+    - `BR_UI_COMPILE_ALLOW_NEW` (0/1)
+    - `BR_UI_COMPILE_DEFAULT_NEW` (0/1, only valid when new path is compiled)
+- At least one path must be enabled at compile time.
+- Runtime selection via `BR_UI_PATH` (`legacy`, `new`, `auto`) is only used when both paths are compiled.
+
 ## Code Architecture
 
 **IMPORTANT: Max 250 lines per file, each module has ONE responsibility**

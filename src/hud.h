@@ -5,27 +5,196 @@
 #include "progression.h"
 #include "smile_event.h"
 #include "item_types.h"
+#include "ui_migration_toggle.h"
+#include "ui_primitives.h"
+#include "ui_menu_immersive.h"
+#include "hud_inline_helpers.h"
 
-inline void drawHudText(const char* s, float x, float y, float sc, float r, float g, float b, float a = 0.95f) {
-    drawText(s, x - 0.002f, y - 0.002f, sc, 0.0f, 0.0f, 0.0f, a * 0.72f);
-    drawText(s, x, y, sc, r, g, b, a);
+inline void drawProvisionalContextualFeedbackSpike(const UiPrimitiveTheme& theme, UiPrimitiveTone eventTone, UiPrimitiveTone promptTone){
+    if(!useT12pContextualFeedbackSpike()) return;
+
+    float healthRatio = uiHudClamp01(playerHealth / 100.0f);
+    float sanityRatio = uiHudClamp01(playerSanity / 100.0f);
+    float pressure = (1.0f - healthRatio) * 0.52f + (1.0f - sanityRatio) * 0.36f;
+    if(playerDowned) pressure = 1.0f;
+    if(multiState==MULTI_IN_GAME && netMgr.connectionUnstable((float)glfwGetTime())) pressure += 0.18f;
+    pressure = uiHudClamp01(pressure);
+
+    UiPrimitiveTone pressureTone = UI_PRIMITIVE_TONE_DEFAULT;
+    if(playerDowned || eventTone == UI_PRIMITIVE_TONE_CRITICAL) pressureTone = UI_PRIMITIVE_TONE_CRITICAL;
+    else if(promptTone == UI_PRIMITIVE_TONE_WARNING || pressure >= 0.45f) pressureTone = UI_PRIMITIVE_TONE_WARNING;
+
+    char spikeBuf[128];
+    std::snprintf(spikeBuf, sizeof(spikeBuf), "T12P CONTEXT SPIKE  PRESSURE %.0f%%", pressure * 100.0f);
+    drawUiStatusIndicatorPrimitive(theme, 0.10f, -0.56f, 0.66f, -0.50f, spikeBuf, pressureTone);
+
+    UiColorToken accent = uiPrimitiveToneColor(pressureTone);
+    float accentAlpha = 0.08f + pressure * 0.12f;
+    uiVRect(0.10f, -0.58f, 0.66f, -0.575f, accent, accentAlpha);
 }
 
-inline void drawHudTextCentered(const char* s, float x, float y, float sc, float r, float g, float b, float a = 0.95f) {
-    drawTextCentered(s, x - 0.002f, y - 0.002f, sc, 0.0f, 0.0f, 0.0f, a * 0.72f);
-    drawTextCentered(s, x, y, sc, r, g, b, a);
+inline void drawImmersiveHudMeter(const UiPrimitiveTheme& theme, const char* title, float value, float maxValue, float vl, float vb, float vr, float vt){
+    float ratio = (maxValue > 0.0f) ? uiHudClamp01(value / maxValue) : 0.0f;
+    UiPrimitiveTone tone = uiHudToneForRatio(ratio);
+    drawUiPanelPrimitive(theme, vl, vb, vr, vt, title, tone);
+    UiColorToken tc = uiPrimitiveToneColor(tone);
+    float bl = uiX(vl + 0.02f), br = uiX(vr - 0.02f), bb = uiY(vb + 0.02f), bt = bb + uiH(0.028f);
+    uiPrimitiveRect(bl, bb, br, bt, UiColor::kOverlayWarm, 0.35f);
+    uiPrimitiveRect(bl + uiW(0.002f), bb + uiH(0.002f), bl + (br - bl - uiW(0.004f)) * ratio, bt - uiH(0.002f), tc, 0.82f);
+    char vb2[48]; std::snprintf(vb2, sizeof(vb2), "%.0f%%", ratio * 100.0f);
+    uiPrimitiveText(vb2, bl, bt + uiH(0.006f), UiTypography::kScaleHint, theme.text, 0.92f, UI_FONT_ROLE_BODY);
 }
 
-inline void drawEyeMarker(float sx, float sy, float scale, float alpha) {
-    float w = 0.050f * scale;
-    float h = 0.022f * scale;
-    drawOverlayRectNdc(sx - w, sy - h, sx + w, sy + h, 0.46f, 0.08f, 0.08f, alpha * 0.62f);
-    drawOverlayRectNdc(sx - w * 0.86f, sy - h * 0.68f, sx + w * 0.86f, sy + h * 0.68f, 0.84f, 0.16f, 0.14f, alpha * 0.92f);
-    drawOverlayRectNdc(sx - w * 0.28f, sy - h * 0.58f, sx + w * 0.28f, sy + h * 0.58f, 0.05f, 0.02f, 0.02f, alpha);
-    drawOverlayRectNdc(sx - w * 0.10f, sy - h * 0.20f, sx + w * 0.10f, sy + h * 0.20f, 0.90f, 0.30f, 0.24f, alpha);
+inline void buildImmersiveHudObjectiveLines(char* primary, int primarySize, char* support, int supportSize){
+    if(!primary || primarySize < 2 || !support || supportSize < 2) return;
+    primary[0] = '\0';
+    support[0] = '\0';
+
+    if(multiState==MULTI_IN_GAME){
+        int switchCount = (coop.switchOn[0]?1:0) + (coop.switchOn[1]?1:0);
+        std::snprintf(primary, primarySize, "CO-OP: SWITCHES %d/2", switchCount);
+        if(coop.doorOpen) std::snprintf(support, supportSize, "DOOR OPEN - EXIT WHEN CONTRACT READY");
+        else std::snprintf(support, supportSize, "DOOR LOCKED - HOLD BOTH SWITCHES");
+        return;
+    }
+
+    buildVoidShiftObjectiveLine(primary, primarySize);
+    buildVoidShiftSupportLine(support, supportSize);
 }
 
-void drawUI(){
+inline void buildImmersiveHudPromptLine(char* out, int outSize){
+    if(!out || outSize < 2) return;
+    out[0] = '\0';
+
+    if(playerDowned){
+        std::snprintf(out, outSize, "[E] USE PLUSH TO SELF-REVIVE");
+        return;
+    }
+
+    if(nearbyWorldItemId>=0){
+        std::snprintf(out, outSize, "%s", worldItemPickupPrompt(nearbyWorldItemType));
+        return;
+    }
+
+    char actionPrompt[96];
+    actionPrompt[0] = '\0';
+    buildVoidShiftInteractPrompt(cam.pos, actionPrompt, 96);
+    if(actionPrompt[0] != '\0'){
+        std::snprintf(out, outSize, "%s", actionPrompt);
+        return;
+    }
+
+    bool nearExit = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
+    if(nearExit){
+        if(multiState==MULTI_IN_GAME){
+            if(coop.doorOpen && isStoryExitReady()) std::snprintf(out, outSize, "[E] EXIT LEVEL");
+            else std::snprintf(out, outSize, "OPEN DOOR + COMPLETE CONTRACT TO EXIT");
+        }else{
+            if(isStoryExitReady()) std::snprintf(out, outSize, "[E] EXIT LEVEL");
+            else std::snprintf(out, outSize, "COMPLETE CONTRACT TO UNLOCK EXIT");
+        }
+        return;
+    }
+
+    std::snprintf(out, outSize, "NO CONTEXT ACTION");
+}
+
+inline void buildImmersiveHudKeyEventLine(char* out, int outSize){
+    if(!out || outSize < 2) return;
+    out[0] = '\0';
+
+    if(playerDowned){
+        std::snprintf(out, outSize, "CRITICAL: DOWNED %.0fs", playerDownedTimer);
+        return;
+    }
+    if(multiState==MULTI_IN_GAME && netMgr.connectionUnstable((float)glfwGetTime())){
+        std::snprintf(out, outSize, "NETWORK UNSTABLE - RECONNECT MAY OCCUR");
+        return;
+    }
+    if(falseDoorTimer>0.0f){
+        std::snprintf(out, outSize, "EVENT: FALSE DOOR SHIFT");
+        return;
+    }
+    if(echoStatusTimer>0.0f){
+        std::snprintf(out, outSize, "%s", echoStatusText);
+        return;
+    }
+    if(squadCalloutTimer>0.0f){
+        std::snprintf(out, outSize, "%s", squadCalloutText);
+        return;
+    }
+
+    std::snprintf(out, outSize, "EVENT CHANNEL CLEAR");
+}
+
+inline void drawImmersiveGameplayHudV1(){
+    UiPrimitiveTheme theme = makeUiPrimitiveTheme();
+    uiPrimitiveBeginFrame(vhsTime);
+
+    // Status meters — compact, tucked into corners
+    drawImmersiveHudMeter(theme, "HEALTH",     playerHealth,     100.0f, -0.66f, -0.96f, -0.22f, -0.86f);
+    drawImmersiveHudMeter(theme, "SANITY",     playerSanity,     100.0f, -0.66f, -0.84f, -0.22f, -0.74f);
+    drawImmersiveHudMeter(theme, "STAMINA",    playerStamina,    125.0f, -0.66f, -0.72f, -0.22f, -0.62f);
+    drawImmersiveHudMeter(theme, "FLASHLIGHT", flashlightBattery,100.0f,  0.22f, -0.96f,  0.66f, -0.86f);
+
+    // Objective — top-left, compact
+    char oP[128], oS[128];
+    buildImmersiveHudObjectiveLines(oP, 128, oS, 128);
+    drawUiPanelPrimitive(theme, -0.66f, 0.86f, -0.10f, 0.96f, "OBJECTIVE", UI_PRIMITIVE_TONE_DEFAULT);
+    uiPrimitiveText(oP, uiX(-0.62f), uiY(0.90f), UiTypography::kScaleMeta, theme.text, 0.88f, UI_FONT_ROLE_META);
+    uiPrimitiveText(oS, uiX(-0.62f), uiY(0.87f), UiTypography::kScaleMeta, theme.mutedText, 0.75f, UI_FONT_ROLE_META);
+
+    // Events — top-right, compact
+    char eL[128]; buildImmersiveHudKeyEventLine(eL, 128);
+    UiPrimitiveTone eT = (playerDowned || (multiState==MULTI_IN_GAME && netMgr.connectionUnstable((float)glfwGetTime()))) ? UI_PRIMITIVE_TONE_CRITICAL : UI_PRIMITIVE_TONE_WARNING;
+    drawUiPanelPrimitive(theme, 0.10f, 0.86f, 0.66f, 0.96f, "EVENTS", eT);
+    uiPrimitiveText(eL, uiX(0.14f), uiY(0.90f), UiTypography::kScaleMeta, theme.text, 0.88f, UI_FONT_ROLE_META);
+
+    // Prompt — bottom-right
+    char pL[128]; buildImmersiveHudPromptLine(pL, 128);
+    UiPrimitiveTone pT = (pL[0] == '[') ? UI_PRIMITIVE_TONE_WARNING : UI_PRIMITIVE_TONE_DEFAULT;
+    if(playerDowned) pT = UI_PRIMITIVE_TONE_CRITICAL;
+    drawUiPanelPrimitive(theme, 0.10f, -0.72f, 0.66f, -0.58f, "PROMPT", pT);
+    uiPrimitiveText(pL, uiX(0.14f), uiY(-0.66f), UiTypography::kScaleHint, theme.text, 0.90f, UI_FONT_ROLE_BODY);
+
+    if(activeDeviceSlot == 2){
+        UiPrimitiveTone st = scannerOverheated ? UI_PRIMITIVE_TONE_CRITICAL : (scannerHeat>0.75f ? UI_PRIMITIVE_TONE_WARNING : UI_PRIMITIVE_TONE_DEFAULT);
+        drawUiPanelPrimitive(theme, 0.34f, -0.56f, 0.66f, -0.44f, "SCANNER", st);
+        char sb[96];
+        if(scannerOverheated) std::snprintf(sb,sizeof(sb),"OVERHEAT  SIG %.0f%%",uiHudClamp01(scannerSignal)*100.0f);
+        else std::snprintf(sb,sizeof(sb),"SIG %.0f%%  HEAT %.0f%%",uiHudClamp01(scannerSignal)*100.0f,uiHudClamp01(scannerHeat)*100.0f);
+        uiPrimitiveText(sb, uiX(0.38f), uiY(-0.52f), UiTypography::kScaleMeta, theme.text, 0.88f, UI_FONT_ROLE_META);
+    }
+
+    drawProvisionalContextualFeedbackSpike(theme, eT, pT);
+    uiPrimitiveEndFrame();
+}
+
+inline void drawImmersiveSessionEndOverlay(bool escaped, float tm){
+    uiImmersiveGlBegin();
+    uiImmersiveDrawBackdrop(tm, true);
+    UiPrimitiveTheme theme = makeUiPrimitiveTheme();
+    uiPrimitiveBeginFrame(tm);
+
+    if(escaped){
+        uiImmersiveDrawHeader(theme, "EXTRACTION COMPLETE", "SESSION END", false);
+        drawUiModalPrimitive(theme, "YOU ESCAPED", "EXTRACTION ROUTE SECURED", UI_PRIMITIVE_TONE_DEFAULT);
+    }else{
+        uiImmersiveDrawHeader(theme, "CONTRACT FAILED", "SESSION END", true);
+        drawUiModalPrimitive(theme, "YOU DIED", gDeathReason, UI_PRIMITIVE_TONE_CRITICAL);
+    }
+
+    int m=(int)(gSurvivalTime/60),s=(int)gSurvivalTime%60;
+    char tb[64]; snprintf(tb,64,"SURVIVED %d:%02d",m,s);
+    uiPrimitiveTextCentered(tb, 0.0f, uiY(-0.24f), UiTypography::kScaleHint, UiColor::kStateWarning, 0.78f, UI_FONT_ROLE_BODY);
+    uiImmersiveDrawFooter(theme, "ENTER/A CONTINUE   ESC/B MAIN MENU");
+
+    uiPrimitiveEndFrame();
+    uiImmersiveGlEnd();
+}
+
+#if BR_UI_COMPILE_ALLOW_LEGACY || BR_UI_COMPILE_ALLOW_NEW
+inline void drawUiParityPath(){
     if(gameState==STATE_MENU) drawMenu(vhsTime);
     else if(gameState==STATE_GUIDE) drawGuideScreen();
     else if(gameState==STATE_MULTI) drawMultiMenuScreen(vhsTime);
@@ -41,10 +210,18 @@ void drawUI(){
     else if(gameState==STATE_NOTE&&storyMgr.readingNote&&storyMgr.currentNote>=0)
         drawNote(storyMgr.currentNote,NOTE_TITLES[storyMgr.currentNote],NOTE_CONTENTS[storyMgr.currentNote]);
     else if(gameState==STATE_GAME){
+        const bool immersiveUiPath = useNewUiMigrationPath();
         gSurvivalTime=survivalTime;
-        if(playerEscaped) drawEscape(vhsTime);
-        else if(isPlayerDead) drawDeath(vhsTime);
+        if(playerEscaped){
+            if(immersiveUiPath) drawImmersiveSessionEndOverlay(true, vhsTime);
+            else drawEscape(vhsTime);
+        }
+        else if(isPlayerDead){
+            if(immersiveUiPath) drawImmersiveSessionEndOverlay(false, vhsTime);
+            else drawDeath(vhsTime);
+        }
         else{
+            const bool immersiveHudActive = useNewUiMigrationPath();
             drawDamageOverlay(damageFlash,playerHealth);
             drawSurvivalTime(survivalTime);
 
@@ -71,30 +248,34 @@ void drawUI(){
                 }
             }
 
-            if(playerHealth<100)drawHealthBar(playerHealth);
-            if(playerSanity<100)drawSanityBar(playerSanity);
-            drawStaminaBar(playerStamina);
-            if(flashlightBattery<100)drawFlashlightBattery(flashlightBattery,flashlightOn);
-            if(playerDowned){
-                char downBuf[64];
-                snprintf(downBuf,64,"DOWNED %.0fs",playerDownedTimer);
-                drawHudText(downBuf,-0.20f,-0.22f,1.45f,0.96f,0.52f,0.44f,0.95f);
-                drawHudTextCentered("[E] USE PLUSH TO SELF-REVIVE",0.0f,-0.30f,1.2f,0.90f,0.72f,0.62f,0.92f);
-            }
-            {
-                char contractBuf[128];
-                buildVoidShiftObjectiveLine(contractBuf, 128);
-                drawHudText(contractBuf,-0.95f,0.88f,1.08f,0.88f,0.90f,0.72f,0.95f);
-                char supportBuf[128];
-                buildVoidShiftSupportLine(supportBuf, 128);
-                drawHudText(supportBuf,-0.95f,0.85f,0.98f,0.78f,0.88f,0.74f,0.90f);
-                char attBuf[96];
-                if(isParkingLevel(gCurrentLevel)){
-                    snprintf(attBuf,96,"ATTENTION %.0f%%  CO %.0f%%  RESO %.0f%%",attentionLevel,coLevel,resonatorBattery);
-                }else{
-                    snprintf(attBuf,96,"ATTENTION %.0f%%  RESO %.0f%%",attentionLevel,resonatorBattery);
+            if(immersiveHudActive){
+                drawImmersiveGameplayHudV1();
+            }else{
+                if(playerHealth<100)drawHealthBar(playerHealth);
+                if(playerSanity<100)drawSanityBar(playerSanity);
+                drawStaminaBar(playerStamina);
+                if(flashlightBattery<100)drawFlashlightBattery(flashlightBattery,flashlightOn);
+                if(playerDowned){
+                    char downBuf[64];
+                    snprintf(downBuf,64,"DOWNED %.0fs",playerDownedTimer);
+                    drawHudText(downBuf,-0.20f,-0.22f,1.45f,0.96f,0.52f,0.44f,0.95f);
+                    drawHudTextCentered("[E] USE PLUSH TO SELF-REVIVE",0.0f,-0.30f,1.2f,0.90f,0.72f,0.62f,0.92f);
                 }
-                drawHudText(attBuf,-0.95f,0.79f,1.02f,0.78f,0.86f,0.76f,0.92f);
+                {
+                    char contractBuf[128];
+                    buildVoidShiftObjectiveLine(contractBuf, 128);
+                    drawHudText(contractBuf,-0.95f,0.88f,1.08f,0.88f,0.90f,0.72f,0.95f);
+                    char supportBuf[128];
+                    buildVoidShiftSupportLine(supportBuf, 128);
+                    drawHudText(supportBuf,-0.95f,0.85f,0.98f,0.78f,0.88f,0.74f,0.90f);
+                    char attBuf[96];
+                    if(isParkingLevel(gCurrentLevel)){
+                        snprintf(attBuf,96,"ATTENTION %.0f%%  CO %.0f%%  RESO %.0f%%",attentionLevel,coLevel,resonatorBattery);
+                    }else{
+                        snprintf(attBuf,96,"ATTENTION %.0f%%  RESO %.0f%%",attentionLevel,resonatorBattery);
+                    }
+                    drawHudText(attBuf,-0.95f,0.79f,1.02f,0.78f,0.86f,0.76f,0.92f);
+                }
             }
             if(activeDeviceSlot == 2){
                 float y = -0.70f;
@@ -167,26 +348,28 @@ void drawUI(){
                 }
             }
 
-            if(multiState==MULTI_IN_GAME && !coop.doorOpen){
+            if(!immersiveHudActive && multiState==MULTI_IN_GAME && !coop.doorOpen){
                 if(settings.debugMode){
                     if(nearPoint2D(cam.pos, coop.switches[0], 2.6f)||nearPoint2D(cam.pos, coop.switches[1], 2.6f))
                         drawHudTextCentered("HOLD SWITCH POSITION",0.0f,-0.35f,1.4f,0.75f,0.8f,0.55f,0.90f);
                 }
             }
-            if(multiState!=MULTI_IN_GAME){
+            if(!immersiveHudActive && multiState!=MULTI_IN_GAME){
                 bool nearExit = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
                 if(nearExit && settings.debugMode){
                     if(isStoryExitReady()) drawHudTextCentered("[E] EXIT LEVEL",0.0f,-0.35f,1.4f,0.75f,0.88f,0.70f,0.95f);
                     else drawHudTextCentered("COMPLETE CONTRACT TO UNLOCK EXIT",0.0f,-0.35f,1.2f,0.88f,0.72f,0.58f,0.93f);
                 }
             }else{
-                bool nearExit = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
-                if(nearExit && settings.debugMode){
-                    if(coop.doorOpen && isStoryExitReady()) drawHudTextCentered("[E] EXIT LEVEL",0.0f,-0.35f,1.4f,0.75f,0.88f,0.70f,0.95f);
-                    else drawHudTextCentered("OPEN DOOR + COMPLETE CONTRACT TO EXIT",0.0f,-0.35f,1.25f,0.88f,0.72f,0.58f,0.93f);
+                if(!immersiveHudActive){
+                    bool nearExit = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
+                    if(nearExit && settings.debugMode){
+                        if(coop.doorOpen && isStoryExitReady()) drawHudTextCentered("[E] EXIT LEVEL",0.0f,-0.35f,1.4f,0.75f,0.88f,0.70f,0.95f);
+                        else drawHudTextCentered("OPEN DOOR + COMPLETE CONTRACT TO EXIT",0.0f,-0.35f,1.25f,0.88f,0.72f,0.58f,0.93f);
+                    }
                 }
             }
-            if(nearbyWorldItemId>=0 && settings.debugMode){
+            if(!immersiveHudActive && nearbyWorldItemId>=0 && settings.debugMode){
                 drawHudTextCentered(worldItemPickupPrompt(nearbyWorldItemType),0.0f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.9f);
             }
             if(multiState!=MULTI_IN_GAME){
@@ -218,19 +401,21 @@ void drawUI(){
                     }
                 }
 
-                char actionPrompt[96];
-                buildVoidShiftInteractPrompt(cam.pos, actionPrompt, 96);
-                if(actionPrompt[0] != '\0'){
-                    drawHudTextCentered(actionPrompt,0.0f,-0.43f,1.28f,0.8f,0.84f,0.62f,0.92f);
+                if(!immersiveHudActive){
+                    char actionPrompt[96];
+                    buildVoidShiftInteractPrompt(cam.pos, actionPrompt, 96);
+                    if(actionPrompt[0] != '\0'){
+                        drawHudTextCentered(actionPrompt,0.0f,-0.43f,1.28f,0.8f,0.84f,0.62f,0.92f);
+                    }
                 }
             }
-            if(settings.debugMode && multiState!=MULTI_IN_GAME && echoStatusTimer>0.0f){
+            if(!immersiveHudActive && settings.debugMode && multiState!=MULTI_IN_GAME && echoStatusTimer>0.0f){
                 drawHudTextCentered(echoStatusText,0.0f,0.62f,1.18f,0.7f,0.86f,0.9f,0.92f);
             }
             if(minimapEnabled) drawMinimapOverlay();
             if(storyMgr.hasHallucinations())drawHallucinationEffect((50.0f-playerSanity)/50.0f);
             if(multiState==MULTI_IN_GAME)drawMultiHUD(netMgr.getPlayerCount(),netMgr.isHost);
-            if(squadCalloutTimer > 0.0f) drawHudTextCentered(squadCalloutText,0.0f,-0.52f,1.08f,0.88f,0.84f,0.62f,0.92f);
+            if(!immersiveHudActive && squadCalloutTimer > 0.0f) drawHudTextCentered(squadCalloutText,0.0f,-0.52f,1.08f,0.88f,0.84f,0.62f,0.92f);
             if(multiState==MULTI_IN_GAME){
                 for(int i=0;i<MAX_PLAYERS;i++){
                     if(i==netMgr.myId || !netMgr.players[i].active || !netMgr.players[i].hasValidPos) continue;
@@ -298,7 +483,7 @@ void drawUI(){
                     drawHudText("DEBUG STAMINA: INF",0.52f,0.90f,1.02f,0.75f,0.92f,0.78f,0.96f);
                 }
             }
-            if(multiState==MULTI_IN_GAME && netMgr.connectionUnstable((float)glfwGetTime())){
+            if(!immersiveHudActive && multiState==MULTI_IN_GAME && netMgr.connectionUnstable((float)glfwGetTime())){
                 drawHudTextCentered("NETWORK UNSTABLE - RECONNECTING MAY OCCUR",0.0f,0.74f,1.12f,0.95f,0.64f,0.44f,0.95f);
             }
             // === DEBUG MODE: debug tools panel (F10) ===
@@ -321,100 +506,33 @@ void drawUI(){
         }
     }
 }
+#endif
 
-void updateMultiplayer(){
-    if(multiState!=MULTI_IN_GAME) return;
-    
-    static float netSendTimer=0;
-    static float stateSyncTimer=0;
-    netSendTimer+=dTime;
-    stateSyncTimer+=dTime;
-    if(netSendTimer>=0.05f){
-        netMgr.sendPlayerState(cam.pos,cam.yaw,cam.pitch,flashlightOn);
-        netSendTimer=0;
-    }
-    netMgr.update();
-    netMgr.sendPing((float)glfwGetTime());
-    updatePlayerInterpolation(netMgr.myId, dTime);
-    if(!netMgr.isHost && netMgr.clientTimedOut((float)glfwGetTime())){
-        captureSessionSnapshot();
-        netMgr.shutdown();
-        reconnectInProgress = true;
-        restoreAfterReconnect = true;
-        reconnectAttemptTimer = 0.0f;
-        reconnectAttempts = 0;
-        multiState = MULTI_CONNECTING;
-        gameState = STATE_MULTI_WAIT;
+#if BR_UI_COMPILE_ALLOW_LEGACY
+inline void drawLegacyUI(){
+    drawUiParityPath();
+}
+#endif
+
+#if BR_UI_COMPILE_ALLOW_NEW
+inline void drawNewUI(){
+    if(drawUiImmersiveMenuLayer(vhsTime)){
         return;
     }
-    
-    if(netMgr.roamEventReceived){
-        netMgr.roamEventReceived = false;
-        applyRoamEvent(netMgr.roamEventType, netMgr.roamEventA, netMgr.roamEventB, netMgr.roamEventDuration);
-    }
-    
-    if(!netMgr.isHost && netMgr.reshuffleReceived){
-        netMgr.reshuffleReceived = false;
-        long long key = chunkKey(netMgr.reshuffleChunkX, netMgr.reshuffleChunkZ);
-        auto it = chunks.find(key);
-        if (it == chunks.end()) {
-            generateChunk(netMgr.reshuffleChunkX, netMgr.reshuffleChunkZ);
-            it = chunks.find(key);
-        }
-        if (it != chunks.end()) {
-            for (int x = 0; x < CHUNK_SIZE; x++) {
-                for (int z = 0; z < CHUNK_SIZE; z++) {
-                    int idx = x * CHUNK_SIZE + z;
-                    it->second.cells[x][z] = (int)netMgr.reshuffleCells[idx];
-                }
-            }
-        }
-        worldSeed = netMgr.reshuffleSeed;
-        updateLightsAndPillars(playerChunkX, playerChunkZ);
-        buildGeom();
-    }
-    
-    if(!netMgr.isHost){
-        entitySpawnTimer = 999;
-        clientApplyFeatureState();
-        if(netMgr.entitySnapshotReceived){
-            netMgr.entitySnapshotReceived = false;
-            entityMgr.entities.clear();
-            for(int i=0;i<netMgr.entitySnapshotCount;i++){
-                if(!netMgr.entitySnapshot[i].active) continue;
-                Entity e;
-                e.type = (EntityType)netMgr.entitySnapshot[i].type;
-                e.pos = netMgr.entitySnapshot[i].pos;
-                e.yaw = netMgr.entitySnapshot[i].yaw;
-                e.state = (EntityState)netMgr.entitySnapshot[i].state;
-                e.active = true;
-                if(e.type==ENTITY_STALKER){ e.speed=1.5f; e.detectionRange=20.0f; e.attackRange=1.0f; }
-                else if(e.type==ENTITY_CRAWLER){ e.speed=5.0f; e.detectionRange=15.0f; e.attackRange=1.5f; e.pos.y=-0.8f; }
-                else if(e.type==ENTITY_SHADOW){ e.speed=0.5f; e.detectionRange=8.0f; e.attackRange=2.0f; }
-                entityMgr.entities.push_back(e);
-            }
-        }
-    }else{
-        processHostInteractRequests();
-        updateCoopObjectiveHost();
-        hostUpdateItems();
-        updateRoamEventsHost();
-        if(stateSyncTimer>=0.12f){
-            stateSyncTimer = 0;
-            NetEntitySnapshotEntry snap[MAX_SYNC_ENTITIES];
-            int c = 0;
-            for(auto& e:entityMgr.entities){
-                if(c>=MAX_SYNC_ENTITIES) break;
-                snap[c].id = c;
-                snap[c].type = (int)e.type;
-                snap[c].pos = e.pos;
-                snap[c].yaw = e.yaw;
-                snap[c].state = (int)e.state;
-                snap[c].active = e.active;
-                c++;
-            }
-            netMgr.sendEntitySnapshot(snap, c);
-            hostSyncFeatureState();
-        }
-    }
+    drawUiParityPath();
 }
+#endif
+
+inline void drawUI(){
+    gUiReducedMotion = settings.reducedMotion;
+#if BR_UI_COMPILE_ALLOW_LEGACY && BR_UI_COMPILE_ALLOW_NEW
+    if(useNewUiMigrationPath()) drawNewUI();
+    else drawLegacyUI();
+#elif BR_UI_COMPILE_ALLOW_NEW
+    drawNewUI();
+#else
+    drawLegacyUI();
+#endif
+}
+
+#include "hud_multiplayer.h"

@@ -25,6 +25,62 @@ inline int firstPressedKeyboardKey(GLFWwindow* w) {
     return -1;
 }
 
+inline bool menuHasGamepad(GLFWgamepadstate* stateOut = nullptr) {
+    GLFWgamepadstate state{};
+    if (!glfwJoystickIsGamepad(GLFW_JOYSTICK_1)) return false;
+    if (glfwGetGamepadState(GLFW_JOYSTICK_1, &state) != GLFW_TRUE) return false;
+    if (stateOut) *stateOut = state;
+    return true;
+}
+
+inline bool menuGamepadUp() {
+    GLFWgamepadstate state{};
+    if (!menuHasGamepad(&state)) return false;
+    return state.buttons[GLFW_GAMEPAD_BUTTON_DPAD_UP] == GLFW_PRESS || state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y] <= -0.55f;
+}
+
+inline bool menuGamepadDown() {
+    GLFWgamepadstate state{};
+    if (!menuHasGamepad(&state)) return false;
+    return state.buttons[GLFW_GAMEPAD_BUTTON_DPAD_DOWN] == GLFW_PRESS || state.axes[GLFW_GAMEPAD_AXIS_LEFT_Y] >= 0.55f;
+}
+
+inline bool menuGamepadLeft() {
+    GLFWgamepadstate state{};
+    if (!menuHasGamepad(&state)) return false;
+    return state.buttons[GLFW_GAMEPAD_BUTTON_DPAD_LEFT] == GLFW_PRESS || state.axes[GLFW_GAMEPAD_AXIS_LEFT_X] <= -0.55f;
+}
+
+inline bool menuGamepadRight() {
+    GLFWgamepadstate state{};
+    if (!menuHasGamepad(&state)) return false;
+    return state.buttons[GLFW_GAMEPAD_BUTTON_DPAD_RIGHT] == GLFW_PRESS || state.axes[GLFW_GAMEPAD_AXIS_LEFT_X] >= 0.55f;
+}
+
+inline bool menuGamepadConfirm() {
+    GLFWgamepadstate state{};
+    if (!menuHasGamepad(&state)) return false;
+    return state.buttons[GLFW_GAMEPAD_BUTTON_A] == GLFW_PRESS || state.buttons[GLFW_GAMEPAD_BUTTON_START] == GLFW_PRESS;
+}
+
+inline bool menuGamepadBack() {
+    GLFWgamepadstate state{};
+    if (!menuHasGamepad(&state)) return false;
+    return state.buttons[GLFW_GAMEPAD_BUTTON_B] == GLFW_PRESS || state.buttons[GLFW_GAMEPAD_BUTTON_BACK] == GLFW_PRESS;
+}
+
+inline bool menuGamepadTabToggle() {
+    GLFWgamepadstate state{};
+    if (!menuHasGamepad(&state)) return false;
+    return state.buttons[GLFW_GAMEPAD_BUTTON_X] == GLFW_PRESS;
+}
+
+inline bool menuGamepadModeToggle() {
+    GLFWgamepadstate state{};
+    if (!menuHasGamepad(&state)) return false;
+    return state.buttons[GLFW_GAMEPAD_BUTTON_Y] == GLFW_PRESS;
+}
+
 inline void pushNicknameChar(char c) {
     char next[PLAYER_NAME_BUF_LEN + 1] = {};
     int len = (int)strlen(multiNickname);

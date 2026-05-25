@@ -31,8 +31,10 @@ struct SoundState {
     bool uiMoveTrig=false;
     bool uiAdjustTrig=false;
     bool uiConfirmTrig=false;
+    bool uiBackTrig=false;
     float uiMovePitch=1.0f;
     float uiAdjustPitch=1.0f;
+    float uiBackPitch=1.0f;
     bool scannerBeepTrig=false;
     float scannerBeepPitch=1.0f;
     float scannerBeepVol=0.5f;
@@ -47,25 +49,7 @@ struct SoundState {
 extern SoundState sndState;
 extern std::atomic<bool> audioRunning;
 extern HANDLE hEvent;
-inline float carpetStep(float t) {
-    float thud = sinf(t * 55.0f) * expf(-t * 35.0f) * 1.2f;
-    float rustle = sinf(t * 30.0f) * expf(-t * 50.0f) * 0.4f;
-    return (thud + rustle) * 0.5f;
-}
-
-inline float clamp01Audio(float v) {
-    if (v < 0.0f) return 0.0f;
-    if (v > 1.0f) return 1.0f;
-    return v;
-}
-inline void updateGameplayAudioState(float moveIntensity, float sprintIntensity, float staminaNorm, float monsterProximity, float monsterMenace, float monsterType=0.0f) {
-    sndState.moveIntensity = clamp01Audio(moveIntensity);
-    sndState.sprintIntensity = clamp01Audio(sprintIntensity);
-    sndState.lowStamina = 1.0f - clamp01Audio(staminaNorm);
-    sndState.monsterProximity = clamp01Audio(monsterProximity);
-    sndState.monsterMenace = clamp01Audio(monsterMenace);
-    sndState.monsterType = clamp01Audio(monsterType);
-}
+#include "audio_inline_helpers.h"
 
 inline void fillAudio(short* buf, int len) {
     static float globalPhase = 0;
@@ -73,6 +57,8 @@ inline void fillAudio(short* buf, int len) {
     static float uiMoveTime = -1.0f;
     static float uiAdjustTime = -1.0f;
     static float uiConfirmTime = -1.0f;
+    static float uiBackTime = -1.0f;
+    static float uiPriorityEnv = 0.0f;
     static float pipeTime = -1.0f, pipePitch = 92.0f, pipeDrift = 0.0f;
     static float ventTime = -1.0f, ventPitch = 36.0f, ventNoise = 0.0f;
     static float buzzTime = -1.0f, buzzPitch = 1220.0f;
@@ -289,6 +275,10 @@ inline void fillAudio(short* buf, int len) {
             uiConfirmTime = 0.0f;
             sndState.uiConfirmTrig = false;
         }
+        if(sndState.uiBackTrig){
+            uiBackTime = 0.0f;
+            sndState.uiBackTrig = false;
+        }
         if(sndState.scannerBeepTrig){
             scannerTime = 0.0f;
             scannerPitch = sndState.scannerBeepPitch;
@@ -301,6 +291,7 @@ inline void fillAudio(short* buf, int len) {
             float t = uiMoveTime;
             float attack = (t < 0.006f) ? (t / 0.006f) : 1.0f;
             float env = attack * expf(-t * 18.0f);
+            if(env > uiPriorityEnv) uiPriorityEnv = env * 0.36f;
             float pitch = sndState.uiMovePitch;
             if(pitch < 0.8f) pitch = 0.8f;
             if(pitch > 1.2f) pitch = 1.2f;
@@ -318,6 +309,7 @@ inline void fillAudio(short* buf, int len) {
             float t = uiAdjustTime;
             float attack = (t < 0.004f) ? (t / 0.004f) : 1.0f;
             float env = attack * expf(-t * 22.0f);
+            if(env > uiPriorityEnv) uiPriorityEnv = env * 0.46f;
             float pitch = sndState.uiAdjustPitch;
             if(pitch < 0.85f) pitch = 0.85f;
             if(pitch > 1.15f) pitch = 1.15f;
@@ -332,6 +324,7 @@ inline void fillAudio(short* buf, int len) {
             float t = uiConfirmTime;
             float attack = (t < 0.008f) ? (t / 0.008f) : 1.0f;
             float env = attack * expf(-t * 10.0f);
+            if(env > uiPriorityEnv) uiPriorityEnv = env * 0.74f;
             float lerpT = t / 0.25f;
             if(lerpT > 1.0f) lerpT = 1.0f;
             float f1 = 340.0f + (240.0f - 340.0f) * lerpT;
@@ -340,6 +333,22 @@ inline void fillAudio(short* buf, int len) {
             uiConfirm += sinf(twoPi * 65.0f * t) * expf(-t * 15.0f) * 0.18f;
             uiConfirmTime += dt;
             if(uiConfirmTime > 0.25f) uiConfirmTime = -1.0f;
+        }
+        float uiBack = 0.0f;
+        if(uiBackTime >= 0.0f){
+            float t = uiBackTime;
+            float attack = (t < 0.006f) ? (t / 0.006f) : 1.0f;
+            float env = attack * expf(-t * 11.0f);
+            if(env > uiPriorityEnv) uiPriorityEnv = env * 0.62f;
+            float pitch = sndState.uiBackPitch;
+            if(pitch < 0.85f) pitch = 0.85f;
+            if(pitch > 1.15f) pitch = 1.15f;
+            float f1 = 300.0f * pitch;
+            float f2 = 190.0f * pitch;
+            uiBack = (sinf(twoPi * f1 * t) * 0.18f + sinf(twoPi * f2 * t) * 0.29f) * env;
+            uiBack += sinf(twoPi * 78.0f * pitch * t) * expf(-t * 18.0f) * 0.15f;
+            uiBackTime += dt;
+            if(uiBackTime > 0.22f) uiBackTime = -1.0f;
         }
         float scannerBeep = 0.0f;
         if(scannerTime >= 0.0f){
@@ -482,9 +491,19 @@ inline void fillAudio(short* buf, int len) {
         lastDeathMode = sndState.deathMode;
         float ambienceMix = hum*sndState.humVol + amb + distant + roomEventsAmb;
         float sfxMix = step + runBed + scare + flashlightSwitch + flashlightLoop + roomEventsSfx + scannerBeep;
-        float uiMix = (uiMove + uiAdjust + uiConfirm) * (0.45f + 0.55f * sndState.sfxVol);
+        float uiMix = (uiMove + uiAdjust + uiConfirm + uiBack) * (0.45f + 0.55f * sndState.sfxVol);
         float voiceMix = insane + breath;
         float musicMix = sndState.deathMode ? deathTone : (creepy + monsterTone);
+        float uiPriority = clamp01Audio(uiPriorityEnv);
+        float sceneIntensity = clamp01Audio(sndState.monsterProximity * 0.45f + sndState.monsterMenace * 0.35f + sndState.dangerLevel * 0.20f);
+        float uiDuckStrength = uiPriority * (0.22f + sceneIntensity * 0.30f);
+        if(sndState.scareVol > 0.35f || sndState.deathMode) {
+            if(uiDuckStrength > 0.18f) uiDuckStrength = 0.18f;
+        }
+        ambienceMix *= (1.0f - uiDuckStrength * 0.50f);
+        sfxMix *= (1.0f - uiDuckStrength * 0.18f);
+        musicMix *= (1.0f - uiDuckStrength * 0.58f);
+        uiPriorityEnv *= 0.9965f;
         if(sndState.deathMode){
             ambienceMix *= 0.15f;
             sfxMix *= 0.12f;
@@ -502,20 +521,4 @@ inline void fillAudio(short* buf, int len) {
         buf[i]=(short)(v*32767);
     }
 }
-inline void triggerScare(float vol=0.8f, float timer=0.0f) { sndState.scareVol = vol; sndState.scareTimer = timer; }
-inline void triggerMenuNavigateSound() {
-    static int noteStep = 0;
-    const float scale[6] = {1.0f, 1.059f, 1.122f, 1.189f, 1.122f, 1.059f};
-    sndState.uiMovePitch = scale[noteStep % 6];
-    noteStep++;
-    sndState.uiMoveTrig = true;
-}
-inline void triggerMenuAdjustSound() {
-    static int noteStep = 0;
-    const float scale[5] = {0.944f, 1.0f, 1.059f, 1.122f, 1.189f};
-    sndState.uiAdjustPitch = scale[noteStep % 5];
-    noteStep++;
-    sndState.uiAdjustTrig = true;
-}
-inline void triggerMenuConfirmSound() { sndState.uiConfirmTrig = true; }
 void audioThread();

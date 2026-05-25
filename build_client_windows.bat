@@ -1,5 +1,5 @@
 @echo off
 setlocal
 cd /d "%~dp0"
-call build.bat
+call build.bat %*
 exit /b %errorlevel%

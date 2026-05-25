@@ -122,8 +122,7 @@ int main(){
                         netMgr.init();
                         netMgr.joinGame(lastSession.hostIP);
                     }else{
-                        reconnectInProgress = false;
-                        restoreAfterReconnect = false;
+                        resetReconnectState(true);
                         multiState = MULTI_NONE;
                         gameState = STATE_MULTI;
                         menuSel = 1;
@@ -136,8 +135,7 @@ int main(){
                 genWorld();buildGeom();
                 if(restoreAfterReconnect){
                     restoreSessionSnapshot();
-                    reconnectInProgress = false;
-                    restoreAfterReconnect = false;
+                    resetReconnectState(true);
                     gameState=STATE_GAME;
                     glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_DISABLED);
                     firstMouse=true;

@@ -14,6 +14,58 @@ echo.
 
 cd /d "%~dp0"
 
+set "BR_BUILD_PROFILE_ARG=%~1"
+if not "%BR_BUILD_PROFILE_ARG%"=="" set "BR_BUILD_PROFILE=%BR_BUILD_PROFILE_ARG%"
+if "%BR_BUILD_PROFILE%"=="" set "BR_BUILD_PROFILE=local-dev"
+
+set "BR_UI_COMPILE_ALLOW_LEGACY="
+set "BR_UI_COMPILE_ALLOW_NEW="
+set "BR_UI_COMPILE_DEFAULT_NEW="
+
+if /I "%BR_BUILD_PROFILE%"=="local-dev" (
+    set "BR_UI_COMPILE_ALLOW_LEGACY=1"
+    set "BR_UI_COMPILE_ALLOW_NEW=1"
+    set "BR_UI_COMPILE_DEFAULT_NEW=1"
+) else if /I "%BR_BUILD_PROFILE%"=="qa-test" (
+    set "BR_UI_COMPILE_ALLOW_LEGACY=1"
+    set "BR_UI_COMPILE_ALLOW_NEW=1"
+    set "BR_UI_COMPILE_DEFAULT_NEW=1"
+) else if /I "%BR_BUILD_PROFILE%"=="staging-rc" (
+    set "BR_UI_COMPILE_ALLOW_LEGACY=1"
+    set "BR_UI_COMPILE_ALLOW_NEW=1"
+    set "BR_UI_COMPILE_DEFAULT_NEW=1"
+) else if /I "%BR_BUILD_PROFILE%"=="production-stable" (
+    set "BR_UI_COMPILE_ALLOW_LEGACY=1"
+    set "BR_UI_COMPILE_ALLOW_NEW=1"
+    set "BR_UI_COMPILE_DEFAULT_NEW=0"
+) else if /I "%BR_BUILD_PROFILE%"=="production-new-default" (
+    set "BR_UI_COMPILE_ALLOW_LEGACY=1"
+    set "BR_UI_COMPILE_ALLOW_NEW=1"
+    set "BR_UI_COMPILE_DEFAULT_NEW=1"
+) else if /I "%BR_BUILD_PROFILE%"=="emergency-legacy-only" (
+    set "BR_UI_COMPILE_ALLOW_LEGACY=1"
+    set "BR_UI_COMPILE_ALLOW_NEW=0"
+    set "BR_UI_COMPILE_DEFAULT_NEW=0"
+) else if /I "%BR_BUILD_PROFILE%"=="post-migration-new-only" (
+    set "BR_UI_COMPILE_ALLOW_LEGACY=0"
+    set "BR_UI_COMPILE_ALLOW_NEW=1"
+    set "BR_UI_COMPILE_DEFAULT_NEW=1"
+) else (
+    echo Unknown build profile: %BR_BUILD_PROFILE%
+    echo Supported profiles:
+    echo   local-dev
+    echo   qa-test
+    echo   staging-rc
+    echo   production-stable
+    echo   production-new-default
+    echo   emergency-legacy-only
+    echo   post-migration-new-only
+    exit /b 1
+)
+
+echo Build profile: %BR_BUILD_PROFILE%
+echo UI migration defines: BR_UI_COMPILE_ALLOW_LEGACY=%BR_UI_COMPILE_ALLOW_LEGACY% BR_UI_COMPILE_ALLOW_NEW=%BR_UI_COMPILE_ALLOW_NEW% BR_UI_COMPILE_DEFAULT_NEW=%BR_UI_COMPILE_DEFAULT_NEW%
+
 powershell -NoProfile -ExecutionPolicy Bypass -File "tools\check_lines.ps1" -SrcPath "src" -MaxLines 500
 if errorlevel 1 (
     echo.
@@ -26,6 +78,9 @@ if not exist "build" mkdir build
 echo.
 echo Compiling...
 g++ -std=c++17 -O2 -Wall -Wno-unused-result -Wno-unknown-pragmas -mwindows -static -static-libgcc -static-libstdc++ ^
+    -DBR_UI_COMPILE_ALLOW_LEGACY=%BR_UI_COMPILE_ALLOW_LEGACY% ^
+    -DBR_UI_COMPILE_ALLOW_NEW=%BR_UI_COMPILE_ALLOW_NEW% ^
+    -DBR_UI_COMPILE_DEFAULT_NEW=%BR_UI_COMPILE_DEFAULT_NEW% ^
     -I"deps/include" ^
     -o "build/backrooms.exe" ^
     "src/game.cpp" ^

@@ -5,6 +5,7 @@
 #include "upscaler_settings.h"
 #include "keybinds.h"
 #include "progression.h"
+#include "ui_style_tokens.h"
 
 const unsigned char FONT_DATA[96][7] = {
     {0,0,0,0,0,0,0},{4,4,4,4,0,4,0},{10,10,0,0,0,0,0},{10,31,10,31,10,0,0},{4,15,20,14,5,30,4},{24,25,2,4,8,19,3},{8,20,20,8,21,18,13},{4,4,0,0,0,0,0},
@@ -45,6 +46,7 @@ struct Settings {
     float rtxDenoiseStrength=0.65f;
     int frameGenMode=FRAME_GEN_MODE_OFF;
     bool vsync=true;
+    bool reducedMotion=false;
     bool debugMode=false;
     GameplayBinds binds = {};
 };
@@ -57,9 +59,9 @@ enum SettingsTab {
 };
 inline int settingsTab = SETTINGS_TAB_VIDEO;
 
-inline int settingsItemsForTab(int tab) { if(tab==SETTINGS_TAB_AUDIO) return 7; if(tab==SETTINGS_TAB_EFFECTS) return 8; if(tab==SETTINGS_TAB_BINDS) return 4; return 11; }
+inline int settingsItemsForTab(int tab) { if(tab==SETTINGS_TAB_AUDIO) return 7; if(tab==SETTINGS_TAB_EFFECTS) return 8; if(tab==SETTINGS_TAB_BINDS) return 4; return 12; }
 inline int settingsBindsIndexForTab(int tab) { return (tab == SETTINGS_TAB_BINDS) ? 2 : -1; }
-inline int settingsBackIndexForTab(int tab) { if(tab==SETTINGS_TAB_AUDIO) return 6; if(tab==SETTINGS_TAB_EFFECTS) return 7; if(tab==SETTINGS_TAB_BINDS) return 3; return 10; }
+inline int settingsBackIndexForTab(int tab) { if(tab==SETTINGS_TAB_AUDIO) return 6; if(tab==SETTINGS_TAB_EFFECTS) return 7; if(tab==SETTINGS_TAB_BINDS) return 3; return 11; }
 
 inline int clampSettingsSelection(int tab, int idx) {
     int cnt = settingsItemsForTab(tab);
@@ -317,6 +319,11 @@ inline void drawSlider(float x,float y,float w,float val,float r,float g,float b
 }
 
 inline void drawMenuAtmosphere(float tm) {
+    if (uiReducedMotionEnabled()) {
+        drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-1.0f + UiSpacing::kMenuAtmosphereEdgeBandNdc,UiColor::kOverlayBase.r,UiColor::kOverlayBase.g,UiColor::kOverlayBase.b,UiDepth::kMenuAtmosphereEdgeAlphaBase);
+        drawOverlayRectNdc(-1.0f,1.0f - UiSpacing::kMenuAtmosphereEdgeBandNdc,1.0f,1.0f,UiColor::kOverlayBase.r,UiColor::kOverlayBase.g,UiColor::kOverlayBase.b,UiDepth::kMenuAtmosphereEdgeAlphaBase);
+        return;
+    }
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     glUseProgram(menuFxShader);
@@ -325,8 +332,11 @@ inline void drawMenuAtmosphere(float tm) {
     glDrawArrays(GL_TRIANGLES,0,6);
     glDisable(GL_BLEND);
     float drift = 0.5f + 0.5f * sinf(tm * 0.28f);
-    drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.94f,0.03f,0.03f,0.03f,0.03f + drift * 0.01f);
-    drawOverlayRectNdc(-1.0f,0.94f,1.0f,1.0f,0.03f,0.03f,0.03f,0.03f + (1.0f - drift) * 0.01f);
+    const float edgeBand = UiSpacing::kMenuAtmosphereEdgeBandNdc;
+    const float edgeAlphaA = UiDepth::kMenuAtmosphereEdgeAlphaBase + drift * UiDepth::kMenuAtmosphereEdgeAlphaPulse;
+    const float edgeAlphaB = UiDepth::kMenuAtmosphereEdgeAlphaBase + (1.0f - drift) * UiDepth::kMenuAtmosphereEdgeAlphaPulse;
+    drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-1.0f + edgeBand,UiColor::kOverlayBase.r,UiColor::kOverlayBase.g,UiColor::kOverlayBase.b,edgeAlphaA);
+    drawOverlayRectNdc(-1.0f,1.0f - edgeBand,1.0f,1.0f,UiColor::kOverlayBase.r,UiColor::kOverlayBase.g,UiColor::kOverlayBase.b,edgeAlphaB);
 }
 
 inline void drawMenu(float tm) {
@@ -334,23 +344,24 @@ inline void drawMenu(float tm) {
     drawMainMenuBackdrop(tm);
     drawMenuAtmosphere(tm);
     // Keep corridor visible while adding warm grade
-    drawFullscreenOverlay(0.02f,0.02f,0.02f,0.08f);
-    drawFullscreenOverlay(0.17f,0.13f,0.08f,0.015f);
-    float p=0.82f+0.06f*sinf(tm*2.0f);
-    float gl = sinf(tm * 0.7f) * 0.0016f;
-    drawTextCentered("BACKROOMS: VOID SHIFT",0.0f+gl,0.5f,3.4f,0.9f,0.85f,0.4f,p);
+    drawFullscreenOverlay(UiColor::kOverlayBase.r,UiColor::kOverlayBase.g,UiColor::kOverlayBase.b,UiDepth::kAlphaOverlayBase);
+    drawFullscreenOverlay(UiColor::kOverlayWarm.r,UiColor::kOverlayWarm.g,UiColor::kOverlayWarm.b,UiDepth::kAlphaOverlayWarm);
+    float p = UiDepth::kAlphaTitleBase + uiMotionAmplitude(UiDepth::kAlphaTitlePulse) * sinf(tm * UiMotion::kPulseTitleRate);
+    float gl = sinf(tm * uiMotionRate(UiMotion::kDriftAmbientRate)) * uiMotionAmplitude(UiSpacing::kTitleDriftNdc);
+    drawTextCentered("BACKROOMS: VOID SHIFT",0.0f+gl,0.5f,UiTypography::kScaleTitle,UiColor::kTextPrimary.r,UiColor::kTextPrimary.g,UiColor::kTextPrimary.b,p);
     char levelBuf[32];
     buildLevelLabel(gCurrentLevel, levelBuf, 32);
-    drawTextCentered(levelBuf,0.0f,0.35f,2.5f,0.7f,0.65f,0.3f,0.8f);
+    drawTextCentered(levelBuf,0.0f,0.35f,UiTypography::kScaleSubtitle,UiColor::kTextSecondary.r,UiColor::kTextSecondary.g,UiColor::kTextSecondary.b,UiDepth::kMenuSubtitleAlpha);
     const char* it[]={"START CONTRACT","MULTIPLAYER","SETTINGS","GUIDE","QUIT"};
     for(int i=0;i<5;i++){
-        float s=(menuSel==i)?1.0f:0.5f; float y=0.10f-i*0.11f;
-        float baseX = -measureTextWidthNdc(it[i], 2.0f) * 0.5f;
-        if(menuSel==i)drawText(">", baseX - 0.08f, y, 2.0f, 0.9f*s,0.85f*s,0.4f*s);
-        drawText(it[i], baseX, y, 2.0f,0.9f*s,0.85f*s,0.4f*s);
+        float s=(menuSel==i)?UiDepth::kStateSelected:UiDepth::kStateIdle;
+        float y=UiSpacing::kMenuStartY-i*UiSpacing::kMenuItemStepY;
+        float baseX = -measureTextWidthNdc(it[i], UiTypography::kScaleMenuItem) * 0.5f;
+        if(menuSel==i)drawText(">", baseX - UiSpacing::kMenuChevronGapNdc, y, UiTypography::kScaleMenuItem, UiColor::kTextPrimary.r*s,UiColor::kTextPrimary.g*s,UiColor::kTextPrimary.b*s);
+        drawText(it[i], baseX, y, UiTypography::kScaleMenuItem,UiColor::kTextPrimary.r*s,UiColor::kTextPrimary.g*s,UiColor::kTextPrimary.b*s);
     }
-    drawTextCentered("UP/DOWN - SELECT    ENTER - CONFIRM",0.0f,-0.6f,1.5f,0.5f,0.5f,0.4f,0.6f);
-    drawTextCentered("v1.0.0",0.0f,-0.72f,1.2f,0.64f,0.62f,0.54f,0.75f);
+    drawTextCentered("UP/DOWN - SELECT    ENTER - CONFIRM",0.0f,-0.6f,UiTypography::kScaleHint,UiColor::kTextHint.r,UiColor::kTextHint.g,UiColor::kTextHint.b,UiDepth::kAlphaHint);
+    drawTextCentered("v1.0.0",0.0f,-0.72f,UiTypography::kScaleMeta,UiColor::kTextMuted.r,UiColor::kTextMuted.g,UiColor::kTextMuted.b,UiDepth::kAlphaMeta);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 
@@ -426,7 +437,7 @@ inline void drawSettings(bool fp) {
             else if(ci==1){ drawText("OPEN BIND MENU",-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s); drawTextCentered("ENTER",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s); }
             else if(ci==2){ drawText("BACK",-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s); }
         }else{
-            const char* lb[]={"VHS EFFECT","UPSCALER","RESOLUTION","FSR SHARPNESS","ANTI-ALIASING","FAST MATH","FRAME GEN","V-SYNC","DEBUG MODE","BACK"};
+            const char* lb[]={"VHS EFFECT","UPSCALER","RESOLUTION","FSR SHARPNESS","ANTI-ALIASING","FAST MATH","FRAME GEN","V-SYNC","REDUCED MOTION","DEBUG MODE","BACK"};
             int vi = i - 1;
             drawText(lb[vi],-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             if(vi==0 || vi==3){
@@ -441,7 +452,8 @@ inline void drawSettings(bool fp) {
             }else if(vi==5){ drawTextCentered(settings.fastMath?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==6){ drawTextCentered(frameGenModeLabel(settings.frameGenMode),rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
             }else if(vi==7){ drawTextCentered(settings.vsync?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            }else if(vi==8){ drawTextCentered(settings.debugMode?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s); }
+            }else if(vi==8){ drawTextCentered(settings.reducedMotion?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
+            }else if(vi==9){ drawTextCentered(settings.debugMode?"ON":"OFF",rightColCenterX,y,1.7f,0.9f*s,0.85f*s,0.4f*s); }
         }
     }
     // Show numeric input overlay if active

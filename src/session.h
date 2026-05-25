@@ -275,6 +275,14 @@ bool restoreAfterReconnect = false;
 float reconnectAttemptTimer = 0.0f;
 int reconnectAttempts = 0;
 
+inline void resetReconnectState(bool clearSnapshot){
+    reconnectInProgress = false;
+    restoreAfterReconnect = false;
+    reconnectAttemptTimer = 0.0f;
+    reconnectAttempts = 0;
+    if(clearSnapshot) lastSession.valid = false;
+}
+
 inline void captureSessionSnapshot(){
     if(multiState!=MULTI_IN_GAME || netMgr.isHost) return;
     lastSession.valid = true;

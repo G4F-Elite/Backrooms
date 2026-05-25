@@ -1,10 +1,15 @@
 #pragma once
 #include "progression.h"
-inline void menuInput(GLFWwindow* w) {
-    bool esc = glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS;
-    bool up = glfwGetKey(w, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS;
-    bool down = glfwGetKey(w, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS;
-    bool enter = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_SPACE) == GLFW_PRESS;
+#include "ui_migration_toggle.h"
+
+void resetReconnectState(bool clearSnapshot);
+
+#if BR_UI_COMPILE_ALLOW_LEGACY || BR_UI_COMPILE_ALLOW_NEW
+inline void menuInputParityPath(GLFWwindow* w) {
+    bool esc = glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS || menuGamepadBack();
+    bool up = glfwGetKey(w, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS || menuGamepadUp();
+    bool down = glfwGetKey(w, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS || menuGamepadDown();
+    bool enter = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_SPACE) == GLFW_PRESS || menuGamepadConfirm();
     
     if (gameState == STATE_MENU) {
         // Main menu: START GAME, MULTIPLAYER, SETTINGS, GUIDE, QUIT (5 items: 0-4)
@@ -41,7 +46,8 @@ inline void menuInput(GLFWwindow* w) {
     } 
     else if (gameState == STATE_GUIDE) {
         if ((esc && !escPressed) || (enter && !enterPressed)) {
-            triggerMenuConfirmSound();
+            if (esc && !escPressed) triggerMenuBackSound();
+            else triggerMenuConfirmSound();
             if(guideReturnToPause){
                 gameState = STATE_PAUSE;
                 menuSel = (multiState == MULTI_IN_GAME) ? 3 : 2;
@@ -56,7 +62,7 @@ inline void menuInput(GLFWwindow* w) {
             if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 5; triggerMenuNavigateSound(); }
             if (down && !downPressed) { menuSel++; if (menuSel > 5) menuSel = 0; triggerMenuNavigateSound(); }
             if (esc && !escPressed) { 
-                triggerMenuConfirmSound();
+                triggerMenuBackSound();
                 gameState = STATE_GAME; 
                 glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED); 
                 firstMouse = true; 
@@ -100,7 +106,7 @@ inline void menuInput(GLFWwindow* w) {
             if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 4; triggerMenuNavigateSound(); }
             if (down && !downPressed) { menuSel++; if (menuSel > 4) menuSel = 0; triggerMenuNavigateSound(); }
             if (esc && !escPressed) { 
-                triggerMenuConfirmSound();
+                triggerMenuBackSound();
                 gameState = STATE_GAME; 
                 glfwSetInputMode(w, GLFW_CURSOR, GLFW_CURSOR_DISABLED); 
                 firstMouse = true; 
@@ -139,10 +145,10 @@ inline void menuInput(GLFWwindow* w) {
     else if (gameState == STATE_MULTI) {
         static bool tabPressed = false;
         static bool modeSwitchPressed = false;
-        bool tabNow = glfwGetKey(w, GLFW_KEY_TAB) == GLFW_PRESS;
-        bool leftNow = glfwGetKey(w, GLFW_KEY_LEFT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_A) == GLFW_PRESS;
-        bool rightNow = glfwGetKey(w, GLFW_KEY_RIGHT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_D) == GLFW_PRESS;
-        bool modeSwitchNow = glfwGetKey(w, GLFW_KEY_T) == GLFW_PRESS || leftNow || rightNow;
+        bool tabNow = glfwGetKey(w, GLFW_KEY_TAB) == GLFW_PRESS || menuGamepadTabToggle();
+        bool leftNow = glfwGetKey(w, GLFW_KEY_LEFT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_A) == GLFW_PRESS || menuGamepadLeft();
+        bool rightNow = glfwGetKey(w, GLFW_KEY_RIGHT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_D) == GLFW_PRESS || menuGamepadRight();
+        bool modeSwitchNow = glfwGetKey(w, GLFW_KEY_T) == GLFW_PRESS || menuGamepadModeToggle() || leftNow || rightNow;
         if (tabNow && !tabPressed) multiEditingNickname = !multiEditingNickname;
         if (modeSwitchNow && !modeSwitchPressed) {
             multiNetworkMode = (multiNetworkMode == 0) ? 1 : 0;
@@ -154,7 +160,7 @@ inline void menuInput(GLFWwindow* w) {
 
         if (multiEditingNickname) {
             handleNicknameInput(w);
-            bool confirmNick = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS;
+            bool confirmNick = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS || menuGamepadConfirm();
             if (confirmNick && !enterPressed) multiEditingNickname = false;
             if (esc && !escPressed) multiEditingNickname = false;
             escPressed = esc;
@@ -168,7 +174,7 @@ inline void menuInput(GLFWwindow* w) {
         if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 2; triggerMenuNavigateSound(); }
         if (down && !downPressed) { menuSel++; if (menuSel > 2) menuSel = 0; triggerMenuNavigateSound(); }
         if (esc && !escPressed) { 
-            triggerMenuConfirmSound();
+            triggerMenuBackSound();
             gameState = STATE_MENU; 
             menuSel = 1;  // Back to Multiplayer option
         }
@@ -203,6 +209,7 @@ inline void menuInput(GLFWwindow* w) {
             }
             else { 
                 // Back
+                triggerMenuBackSound();
                 gameState = STATE_MENU;
                 menuSel = 1;
             }
@@ -213,7 +220,7 @@ inline void menuInput(GLFWwindow* w) {
         if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 1; triggerMenuNavigateSound(); }
         if (down && !downPressed) { menuSel++; if (menuSel > 1) menuSel = 0; triggerMenuNavigateSound(); }
         if (esc && !escPressed) { 
-            triggerMenuConfirmSound();
+            triggerMenuBackSound();
             netMgr.shutdown();
             lanDiscovery.stop();
             multiState = MULTI_NONE;
@@ -237,6 +244,7 @@ inline void menuInput(GLFWwindow* w) {
             }
             else { 
                 // Back - shutdown hosting
+                triggerMenuBackSound();
                 netMgr.shutdown();
                 lanDiscovery.stop();
                 multiState = MULTI_NONE;
@@ -253,7 +261,7 @@ inline void menuInput(GLFWwindow* w) {
         if (up && !upPressed) { menuSel--; if (menuSel < 0) menuSel = 1; triggerMenuNavigateSound(); }
         if (down && !downPressed) { menuSel++; if (menuSel > 1) menuSel = 0; triggerMenuNavigateSound(); }
         if (esc && !escPressed) { 
-            triggerMenuConfirmSound();
+            triggerMenuBackSound();
             if (multiNetworkMode == 0) lanDiscovery.stop();
             else dedicatedDirectory.stop();
             gameState = STATE_MULTI; 
@@ -263,10 +271,10 @@ inline void menuInput(GLFWwindow* w) {
         // TAB to switch between IP and Port fields
         static bool tabPressed = false;
         static bool modeSwitchPressed = false;
-        bool tabNow = glfwGetKey(w, GLFW_KEY_TAB) == GLFW_PRESS;
-        bool leftNow = glfwGetKey(w, GLFW_KEY_LEFT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_A) == GLFW_PRESS;
-        bool rightNow = glfwGetKey(w, GLFW_KEY_RIGHT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_D) == GLFW_PRESS;
-        bool modeSwitchNow = glfwGetKey(w, GLFW_KEY_T) == GLFW_PRESS || leftNow || rightNow;
+        bool tabNow = glfwGetKey(w, GLFW_KEY_TAB) == GLFW_PRESS || menuGamepadTabToggle();
+        bool leftNow = glfwGetKey(w, GLFW_KEY_LEFT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_A) == GLFW_PRESS || menuGamepadLeft();
+        bool rightNow = glfwGetKey(w, GLFW_KEY_RIGHT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_D) == GLFW_PRESS || menuGamepadRight();
+        bool modeSwitchNow = glfwGetKey(w, GLFW_KEY_T) == GLFW_PRESS || menuGamepadModeToggle() || leftNow || rightNow;
         if (tabNow && !tabPressed) {
             multiInputField = (multiInputField == 0) ? 1 : 0;
         }
@@ -461,6 +469,7 @@ inline void menuInput(GLFWwindow* w) {
             }
             else { 
                 // Back
+                triggerMenuBackSound();
                 lanDiscovery.stop();
                 dedicatedDirectory.stop();
                 gameState = STATE_MULTI;
@@ -471,10 +480,11 @@ inline void menuInput(GLFWwindow* w) {
     else if (gameState == STATE_MULTI_WAIT) {
         // Waiting for host to start
         if (esc && !escPressed) {
-            triggerMenuConfirmSound();
+            triggerMenuBackSound();
             netMgr.shutdown();
             lanDiscovery.stop();
             dedicatedDirectory.stop();
+            resetReconnectState(true);
             multiState = MULTI_NONE;
             gameState = STATE_MULTI;
             menuSel = 1;
@@ -486,6 +496,7 @@ inline void menuInput(GLFWwindow* w) {
             if (sincePacket > 6.0f) {
                 netMgr.shutdown();
                 lanDiscovery.stop();
+                resetReconnectState(true);
                 multiState = MULTI_NONE;
                 gameState = STATE_MULTI_JOIN;
                 menuSel = 0;
@@ -499,4 +510,28 @@ inline void menuInput(GLFWwindow* w) {
     upPressed = up; 
     downPressed = down; 
     enterPressed = enter;
+}
+#endif
+
+#if BR_UI_COMPILE_ALLOW_LEGACY
+inline void menuInputLegacy(GLFWwindow* w) {
+    menuInputParityPath(w);
+}
+#endif
+
+#if BR_UI_COMPILE_ALLOW_NEW
+inline void menuInputNew(GLFWwindow* w) {
+    menuInputParityPath(w);
+}
+#endif
+
+inline void menuInput(GLFWwindow* w) {
+#if BR_UI_COMPILE_ALLOW_LEGACY && BR_UI_COMPILE_ALLOW_NEW
+    if (useNewUiMigrationPath()) menuInputNew(w);
+    else menuInputLegacy(w);
+#elif BR_UI_COMPILE_ALLOW_NEW
+    menuInputNew(w);
+#else
+    menuInputLegacy(w);
+#endif
 }

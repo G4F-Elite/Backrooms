@@ -1,10 +1,10 @@
 #pragma once
 inline void keybindsInput(GLFWwindow* w, bool fromPause) {
     static bool waitRelease = false;
-    bool esc = glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS;
-    bool up = glfwGetKey(w, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS;
-    bool down = glfwGetKey(w, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS;
-    bool enter = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS;
+    bool esc = glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS || menuGamepadBack();
+    bool up = glfwGetKey(w, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS || menuGamepadUp();
+    bool down = glfwGetKey(w, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS || menuGamepadDown();
+    bool enter = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_SPACE) == GLFW_PRESS || menuGamepadConfirm();
 
     if (keybindCaptureIndex >= 0) {
         if (waitRelease) {

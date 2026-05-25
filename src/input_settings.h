@@ -52,13 +52,13 @@ inline void applySliderInputValue() {
 }
 
 inline void settingsInput(GLFWwindow* w, bool fromPause) {
-    bool esc = glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS;
-    bool up = glfwGetKey(w, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS;
-    bool down = glfwGetKey(w, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS;
-    bool left = glfwGetKey(w, GLFW_KEY_LEFT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_A) == GLFW_PRESS;
-    bool right = glfwGetKey(w, GLFW_KEY_RIGHT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_D) == GLFW_PRESS;
-    bool tab = glfwGetKey(w, GLFW_KEY_TAB) == GLFW_PRESS;
-    bool enter = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_KP_ENTER) == GLFW_PRESS;
+    bool esc = glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS || menuGamepadBack();
+    bool up = glfwGetKey(w, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS || menuGamepadUp();
+    bool down = glfwGetKey(w, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS || menuGamepadDown();
+    bool left = glfwGetKey(w, GLFW_KEY_LEFT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_A) == GLFW_PRESS || menuGamepadLeft();
+    bool right = glfwGetKey(w, GLFW_KEY_RIGHT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_D) == GLFW_PRESS || menuGamepadRight();
+    bool tab = glfwGetKey(w, GLFW_KEY_TAB) == GLFW_PRESS || menuGamepadTabToggle();
+    bool enter = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_KP_ENTER) == GLFW_PRESS || menuGamepadConfirm();
     const double now = glfwGetTime();
     static int adjustHoldDir = 0;
     static double nextAdjustTime = 0.0;
@@ -101,6 +101,7 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
         }
         // Esc cancels
         if(esc && !escPressed) {
+            triggerMenuBackSound();
             sliderInputActive = false;
             sliderInputLen = 0;
         }
@@ -145,7 +146,8 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
         if(vi==5){ settings.fastMath=!settings.fastMath; return true; }
         if(vi==6){ settings.frameGenMode=stepFrameGenMode(settings.frameGenMode,dir); return true; }
         if(vi==7){ settings.vsync=!settings.vsync; return true; }
-        if(vi==8){ settings.debugMode=!settings.debugMode; return true; }
+        if(vi==8){ settings.reducedMotion=!settings.reducedMotion; return true; }
+        if(vi==9){ settings.debugMode=!settings.debugMode; return true; }
         return false;
     };
     auto controlsAdjust = [&](int idx, int dir) {
@@ -226,7 +228,7 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
 
     if (enter && !enterPressed) {
         if (menuSel == backIndex) {
-            triggerMenuConfirmSound();
+            triggerMenuBackSound();
             gameState = fromPause ? STATE_PAUSE : STATE_MENU;
             menuSel = fromPause ? 1 : 2;
         } else if (menuSel != bindsIndex) {
@@ -244,7 +246,7 @@ inline void settingsInput(GLFWwindow* w, bool fromPause) {
     }
     
     if (esc && !escPressed) { 
-        triggerMenuConfirmSound();
+        triggerMenuBackSound();
         gameState = fromPause ? STATE_PAUSE : STATE_MENU; 
         menuSel = fromPause ? 1 : 2;
     }
