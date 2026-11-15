@@ -136,16 +136,6 @@ float conferenceCallPulse = 0.0f;
 float corridorShiftTimer = 0.0f;
 bool corridorShiftArmed = false;
 float blackoutSectorTimer = 0.0f;
-int craftedNoiseLure = 0;
-int craftedBeacon = 0;
-int craftedFlashLamp = 0;
-int craftedButtonFixator = 0;
-float craftedFixatorTimer = 0.0f;
-bool recipeNoiseLureUnlocked = false;
-bool recipeBeaconUnlocked = false;
-bool recipeFlashLampUnlocked = false;
-bool recipeFixatorUnlocked = false;
-int markerStyleIndex = 0;
 float paperclipSwarmTimer = 0.0f;
 float oilSlipTimer = 0.0f;
 float headlightExposureTimer = 0.0f;
@@ -165,8 +155,6 @@ int resonatorMode = RESONATOR_SCAN;
 float resonatorBattery = 100.0f;
 float attentionLevel = 0.0f;
 float attentionEventCooldown = 0.0f;
-float coLevel = 0.0f;
-bool ventilationOnline = false;
 
 bool echoRecording = false;
 bool echoPlayback = false;
@@ -198,15 +186,8 @@ Vec3 level2BatteryNode(0, 0, 0);
 Vec3 level2FuseNodes[3];
 bool level2FuseDone[3] = {false, false, false};
 Vec3 level2AccessNode(0, 0, 0);
-Vec3 level2VentNode(0, 0, 0);
-bool level2VentDone = false;
 Vec3 level2LiftNode(0, 0, 0);
 Vec3 level2PowerNode(0, 0, 0);
-Vec3 level2CameraNode(0, 0, 0);
-Vec3 level2DroneNode(0, 0, 0);
-bool level2CameraOnline = false;
-bool level2DroneReprogrammed = false;
-float level2DroneAssistTimer = 0.0f;
 
 int archivePoints = 0;
 int archiveTier = 0;
@@ -219,10 +200,7 @@ enum SideContractType {
     SIDE_COLLECT_BADGES = 1,
     SIDE_SCAN_WALLS = 2,
     SIDE_STABILIZE_RIFTS = 3,
-    SIDE_RESCUE_SURVIVOR = 4,
-    SIDE_ENABLE_VENT = 5,
-    SIDE_RESTORE_CAMERAS = 6,
-    SIDE_REPROGRAM_DRONE = 7
+    SIDE_RESCUE_SURVIVOR = 4
 };
 
 int sideContractType = SIDE_NONE;
@@ -230,17 +208,9 @@ int sideContractProgress = 0;
 int sideContractTarget = 0;
 bool sideContractCompleted = false;
 
-Vec3 npcCartographerPos(0, 0, 0);
-bool npcCartographerActive = false;
-Vec3 npcDispatcherPhonePos(0, 0, 0);
-bool npcDispatcherActive = false;
 Vec3 npcLostSurvivorPos(0, 0, 0);
 bool npcLostSurvivorActive = false;
 bool npcLostSurvivorEscorted = false;
-float dispatcherCallCooldown = 0.0f;
-float cartographerTrust = 65.0f;
-float dispatcherTrust = 60.0f;
-int dispatcherCodeword = 0;
 
 TrapCorridorState trapCorridor = {};
 DebugToolsState debugTools = {};
@@ -479,9 +449,6 @@ inline void initLevel2PuzzleStages();
 inline bool processLevel2Step(const Vec3& playerPos);
 inline bool buildLevel2ActionPrompt(const Vec3& playerPos, char* out, int outSize);
 inline bool isLevel2HoldMaintained();
-inline bool processLevel2SideTechStep(const Vec3& playerPos);
-inline bool buildLevel2SideTechPrompt(const Vec3& playerPos, char* out, int outSize);
-inline void updateLevel2DroneAssist(float dt);
 inline void initVoidShiftSetpieces();
 inline void triggerConferenceCallSetpiece(float duration);
 inline void triggerCorridorShiftSetpiece(float duration);
@@ -489,24 +456,12 @@ inline void triggerBlackoutSetpiece(float duration);
 inline void updateVoidShiftSetpieces(float dt);
 inline void updateVoidShiftHoldPhases(float dt);
 inline void updateVoidShiftEnemyEffects(float dt);
-inline void initNpcTrustState();
-inline void updateNpcTrustState(float dt);
-inline void applyCartographerInteractionOutcome();
-inline void applyDispatcherInteractionOutcome();
-inline void unlockMetaRewardsFromTier();
-inline void tryCraftNoiseLure();
-inline void tryCraftBeacon();
-inline void tryCraftFlashLamp();
-inline void tryCraftFixator();
 
 #include "void_shift_runtime.h"
 #include "void_shift_puzzles_ext.h"
 #include "void_shift_level2_ext.h"
-#include "void_shift_side_tech_ext.h"
 #include "void_shift_setpieces_ext.h"
 #include "void_shift_enemy_effects_ext.h"
-#include "void_shift_crafting_ext.h"
-#include "void_shift_npc_trust_ext.h"
 
 inline int storyNotesRequired(){
     if (isParkingLevel(gCurrentLevel)) return 3;

@@ -30,7 +30,6 @@ struct NetInteractRequest {
 
 struct NetVoidShiftState {
     float attentionLevel;
-    float coLevel;
     float resonatorBattery;
     float level1HoldTimer;
     float level2HoldTimer;
@@ -49,16 +48,8 @@ struct NetVoidShiftState {
     bool level2FusePanelPowered;
     bool level2HoldActive;
     bool level2ContractComplete;
-    bool level2VentDone;
-    bool level2CameraOnline;
-    bool level2DroneReprogrammed;
-    bool ventilationOnline;
-    bool npcCartographerActive;
-    bool npcDispatcherActive;
     bool npcLostSurvivorActive;
     bool npcLostSurvivorEscorted;
-    Vec3 npcCartographerPos;
-    Vec3 npcDispatcherPhonePos;
     Vec3 npcLostSurvivorPos;
 };
 

@@ -8,7 +8,6 @@ inline bool tryHandleVoidShiftInteract(const Vec3& playerPos);
 
 inline void captureVoidShiftState(NetVoidShiftState& out){
     out.attentionLevel = attentionLevel;
-    out.coLevel = coLevel;
     out.resonatorBattery = resonatorBattery;
     out.level1HoldTimer = level1HoldTimer;
     out.level2HoldTimer = level2HoldTimer;
@@ -27,22 +26,13 @@ inline void captureVoidShiftState(NetVoidShiftState& out){
     out.level2FusePanelPowered = level2FusePanelPowered;
     out.level2HoldActive = level2HoldActive;
     out.level2ContractComplete = level2ContractComplete;
-    out.level2VentDone = level2VentDone;
-    out.level2CameraOnline = level2CameraOnline;
-    out.level2DroneReprogrammed = level2DroneReprogrammed;
-    out.ventilationOnline = ventilationOnline;
-    out.npcCartographerActive = npcCartographerActive;
-    out.npcDispatcherActive = npcDispatcherActive;
     out.npcLostSurvivorActive = npcLostSurvivorActive;
     out.npcLostSurvivorEscorted = npcLostSurvivorEscorted;
-    out.npcCartographerPos = npcCartographerPos;
-    out.npcDispatcherPhonePos = npcDispatcherPhonePos;
     out.npcLostSurvivorPos = npcLostSurvivorPos;
 }
 
 inline void applyVoidShiftState(const NetVoidShiftState& state){
     attentionLevel = state.attentionLevel;
-    coLevel = state.coLevel;
     resonatorBattery = state.resonatorBattery;
     level1HoldTimer = state.level1HoldTimer;
     level2HoldTimer = state.level2HoldTimer;
@@ -61,16 +51,8 @@ inline void applyVoidShiftState(const NetVoidShiftState& state){
     level2FusePanelPowered = state.level2FusePanelPowered;
     level2HoldActive = state.level2HoldActive;
     level2ContractComplete = state.level2ContractComplete;
-    level2VentDone = state.level2VentDone;
-    level2CameraOnline = state.level2CameraOnline;
-    level2DroneReprogrammed = state.level2DroneReprogrammed;
-    ventilationOnline = state.ventilationOnline;
-    npcCartographerActive = state.npcCartographerActive;
-    npcDispatcherActive = state.npcDispatcherActive;
     npcLostSurvivorActive = state.npcLostSurvivorActive;
     npcLostSurvivorEscorted = state.npcLostSurvivorEscorted;
-    npcCartographerPos = state.npcCartographerPos;
-    npcDispatcherPhonePos = state.npcDispatcherPhonePos;
     npcLostSurvivorPos = state.npcLostSurvivorPos;
 }
 

@@ -91,11 +91,7 @@ void drawUI(){
                 buildVoidShiftSupportLine(supportBuf, 128);
                 drawHudText(supportBuf,-0.95f,0.85f,0.98f,0.78f,0.88f,0.74f,0.90f);
                 char attBuf[96];
-                if(isParkingLevel(gCurrentLevel)){
-                    snprintf(attBuf,96,"ATTENTION %.0f%%  CO %.0f%%  RESO %.0f%%",attentionLevel,coLevel,resonatorBattery);
-                }else{
-                    snprintf(attBuf,96,"ATTENTION %.0f%%  RESO %.0f%%",attentionLevel,resonatorBattery);
-                }
+                snprintf(attBuf,96,"ATTENTION %.0f%%  RESO %.0f%%",attentionLevel,resonatorBattery);
                 drawHudText(attBuf,-0.95f,0.79f,1.02f,0.78f,0.86f,0.76f,0.92f);
             }
             if(activeDeviceSlot == 2){
@@ -148,7 +144,7 @@ void drawUI(){
                     blockY -= 0.06f;
                     drawHudText(isStoryExitReady()?"EXIT READY":"EXIT LOCKED",blockX,blockY,1.08f,0.72f,0.86f,0.90f,0.93f);
                     blockY -= 0.06f;
-                    drawHudText(level2VentDone?"ACTION: CONTRACT + VENT ONLINE":"ACTION: COMPLETE CONTRACT STEPS",blockX,blockY,1.00f,0.82f,0.86f,0.62f,0.90f);
+                    drawHudText("ACTION: COMPLETE CONTRACT STEPS",blockX,blockY,1.00f,0.82f,0.86f,0.62f,0.90f);
                     blockY -= 0.06f;
                 }
                 char phaseBuf[64];
@@ -206,14 +202,6 @@ void drawUI(){
 
                 if(settings.debugMode){
                     float sx = 0.0f, sy = 0.0f;
-                    Vec3 cartLbl = npcCartographerPos + Vec3(0,1.7f,0);
-                    if(npcCartographerActive && hasLabelLineOfSight(cartLbl) && projectToScreen(cartLbl, sx, sy)){
-                        drawHudTextCentered("CARTOGRAPHER", sx, sy, 1.0f, 0.76f, 0.90f, 0.74f, 0.92f);
-                    }
-                    Vec3 dispLbl = npcDispatcherPhonePos + Vec3(0,1.7f,0);
-                    if(npcDispatcherActive && hasLabelLineOfSight(dispLbl) && projectToScreen(dispLbl, sx, sy)){
-                        drawHudTextCentered("DISPATCH", sx, sy, 1.0f, 0.78f, 0.84f, 0.96f, 0.92f);
-                    }
                     Vec3 survLbl = npcLostSurvivorPos + Vec3(0,1.7f,0);
                     if(npcLostSurvivorActive && hasLabelLineOfSight(survLbl) && projectToScreen(survLbl, sx, sy)){
                         drawHudTextCentered("LOST SURVIVOR", sx, sy, 1.0f, 0.92f, 0.78f, 0.64f, 0.92f);

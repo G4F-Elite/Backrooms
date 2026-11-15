@@ -85,15 +85,8 @@ inline void executeDebugAction(int action){
         return;
     }
     if(action==DEBUG_ACT_TP_ECHO){
-        Vec3 target = npcCartographerPos;
-        if(isLevelZero(gCurrentLevel)){
-            if(npcDispatcherActive) target = npcDispatcherPhonePos;
-            if(npcLostSurvivorActive && !npcLostSurvivorEscorted) target = npcLostSurvivorPos;
-        }else{
-            if(!level2CameraOnline) target = level2CameraNode;
-            else if(!level2DroneReprogrammed) target = level2DroneNode;
-            else if(npcDispatcherActive) target = npcDispatcherPhonePos;
-        }
+        Vec3 target = coop.doorPos;
+        if(npcLostSurvivorActive && !npcLostSurvivorEscorted) target = npcLostSurvivorPos;
         debugTeleportTo(target, "DEBUG: TELEPORTED TO TARGET");
         return;
     }
@@ -125,7 +118,6 @@ inline void executeDebugAction(int action){
                 level2AccessReady = true;
                 level2HoldActive = false;
                 level2HoldTimer = 0.0f;
-                level2VentDone = true;
                 level2ContractComplete = true;
                 coop.doorOpen = true;
                 setTrapStatus("DEBUG: L2 CONTRACT FORCED COMPLETE");

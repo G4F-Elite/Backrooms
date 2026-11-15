@@ -7,8 +7,6 @@ inline void clampVoidShiftValues() {
     if (resonatorBattery > 100.0f) resonatorBattery = 100.0f;
     if (attentionLevel < 0.0f) attentionLevel = 0.0f;
     if (attentionLevel > 100.0f) attentionLevel = 100.0f;
-    if (coLevel < 0.0f) coLevel = 0.0f;
-    if (coLevel > 100.0f) coLevel = 100.0f;
 }
 
 inline void addAttention(float amount) {
@@ -29,9 +27,7 @@ inline void awardArchivePoints(int amount, const char* reason) {
     } else if (reason) {
         setEchoStatus(reason);
     }
-    unlockMetaRewardsFromTier();
-    saveArchiveMetaProgress(archivePoints, archiveTier, perkQuietSteps, perkFastHands, perkEchoBuffer,
-                            recipeNoiseLureUnlocked, recipeBeaconUnlocked, recipeFlashLampUnlocked, recipeFixatorUnlocked, markerStyleIndex);
+    saveArchiveMetaProgress(archivePoints, archiveTier, perkQuietSteps, perkFastHands, perkEchoBuffer);
 }
 
 inline const char* sideContractName(int type) {
@@ -39,25 +35,19 @@ inline const char* sideContractName(int type) {
     if (type == SIDE_SCAN_WALLS) return "SCAN WALL PATTERNS";
     if (type == SIDE_STABILIZE_RIFTS) return "SEAL RESONANCE RIFTS";
     if (type == SIDE_RESCUE_SURVIVOR) return "RESCUE LOST SURVIVOR";
-    if (type == SIDE_ENABLE_VENT) return "ENABLE PARKING VENT";
-    if (type == SIDE_RESTORE_CAMERAS) return "RESTORE CAMERAS";
-    if (type == SIDE_REPROGRAM_DRONE) return "REPROGRAM DRONE";
     return "NO SIDE CONTRACT";
 }
 
 inline void initSideContractForLevel() {
     sideContractProgress = 0;
     sideContractCompleted = false;
-    if (isLevelZero(gCurrentLevel)) {
-        int roll = (int)(rng() % 4);
-        sideContractType = roll == 0 ? SIDE_COLLECT_BADGES : (roll == 1 ? SIDE_SCAN_WALLS : (roll == 2 ? SIDE_STABILIZE_RIFTS : SIDE_RESCUE_SURVIVOR));
-        if (sideContractType == SIDE_RESCUE_SURVIVOR && !npcLostSurvivorActive) sideContractType = SIDE_SCAN_WALLS;
-        sideContractTarget = sideContractType == SIDE_COLLECT_BADGES ? 6 : (sideContractType == SIDE_SCAN_WALLS ? 3 : (sideContractType == SIDE_STABILIZE_RIFTS ? 2 : 1));
-    } else {
-        int roll = (int)(rng() % 3);
-        sideContractType = roll == 0 ? SIDE_ENABLE_VENT : (roll == 1 ? SIDE_RESTORE_CAMERAS : SIDE_REPROGRAM_DRONE);
-        sideContractTarget = sideContractType == SIDE_ENABLE_VENT ? 1 : (sideContractType == SIDE_RESTORE_CAMERAS ? 1 : 1);
-    }
+    int roll = (int)(rng() % 4);
+    sideContractType = roll == 0 ? SIDE_COLLECT_BADGES : (roll == 1 ? SIDE_SCAN_WALLS : (roll == 2 ? SIDE_STABILIZE_RIFTS : SIDE_RESCUE_SURVIVOR));
+    if (sideContractType == SIDE_STABILIZE_RIFTS && !isLevelZero(gCurrentLevel)) sideContractType = SIDE_COLLECT_BADGES;
+    if (sideContractType == SIDE_RESCUE_SURVIVOR && !npcLostSurvivorActive) sideContractType = SIDE_SCAN_WALLS;
+    // Wall scans are logged by squad pings, which only exist in co-op.
+    if (sideContractType == SIDE_SCAN_WALLS && multiState != MULTI_IN_GAME) sideContractType = SIDE_COLLECT_BADGES;
+    sideContractTarget = sideContractType == SIDE_COLLECT_BADGES ? 6 : (sideContractType == SIDE_SCAN_WALLS ? 3 : (sideContractType == SIDE_STABILIZE_RIFTS ? 2 : 1));
 }
 
 inline void progressSideContract(int amount, const char* statusMsg) {
@@ -74,19 +64,12 @@ inline void progressSideContract(int amount, const char* statusMsg) {
 }
 
 inline void initVoidShiftNpcSpots(const Vec3& spawnPos, const Vec3& exitDoorPos) {
-    npcCartographerPos = Vec3(spawnPos.x + CS * 1.0f, 0.0f, spawnPos.z + CS * 2.0f);
-    npcDispatcherPhonePos = Vec3(spawnPos.x - CS * 2.0f, 0.0f, spawnPos.z + CS * 3.0f);
     npcLostSurvivorPos = Vec3(spawnPos.x + CS * 8.0f, 0.0f, spawnPos.z - CS * 3.0f);
     if (!isLevelZero(gCurrentLevel)) {
-        npcCartographerPos = Vec3(spawnPos.x - CS * 2.0f, 0.0f, spawnPos.z + CS * 1.0f);
-        npcDispatcherPhonePos = Vec3(spawnPos.x + CS * 3.0f, 0.0f, spawnPos.z - CS * 2.0f);
         npcLostSurvivorPos = Vec3(spawnPos.x - CS * 7.0f, 0.0f, spawnPos.z + CS * 5.0f);
     }
-    npcCartographerActive = true;
-    npcDispatcherActive = true;
     npcLostSurvivorActive = ((rng() % 100) < 45);
     npcLostSurvivorEscorted = false;
-    dispatcherCallCooldown = 8.0f;
     (void)exitDoorPos;
 }
 
@@ -95,8 +78,6 @@ inline void resetVoidShiftState(const Vec3& spawnPos, const Vec3& exitDoorPos) {
     resonatorBattery = 100.0f;
     attentionLevel = 0.0f;
     attentionEventCooldown = 0.0f;
-    coLevel = 0.0f;
-    ventilationOnline = false;
     echoRecording = false;
     echoPlayback = false;
     echoRecordTimer = 0.0f;
@@ -122,25 +103,17 @@ inline void resetVoidShiftState(const Vec3& spawnPos, const Vec3& exitDoorPos) {
     level2HoldActive = false;
     level2HoldTimer = 15.0f;
     level2ContractComplete = false;
-    level2VentDone = false;
     for (int i = 0; i < 3; i++) level2FuseDone[i] = false;
     level2BatteryNode = Vec3(spawnPos.x + CS * 6.0f, 0.0f, spawnPos.z - CS * 2.0f);
     level2FuseNodes[0] = Vec3(spawnPos.x - CS * 2.0f, 0.0f, spawnPos.z + CS * 6.0f);
     level2FuseNodes[1] = Vec3(spawnPos.x + CS * 7.0f, 0.0f, spawnPos.z + CS * 4.0f);
     level2FuseNodes[2] = Vec3(spawnPos.x - CS * 6.0f, 0.0f, spawnPos.z - CS * 1.0f);
     level2AccessNode = Vec3(spawnPos.x + CS * 1.0f, 0.0f, spawnPos.z - CS * 7.0f);
-    level2VentNode = Vec3(spawnPos.x - CS * 7.0f, 0.0f, spawnPos.z + CS * 2.0f);
     level2LiftNode = exitDoorPos;
     level2PowerNode = Vec3(spawnPos.x + CS * 5.0f, 0.0f, spawnPos.z + CS * 1.0f);
-    level2CameraNode = Vec3(spawnPos.x - CS * 4.0f, 0.0f, spawnPos.z - CS * 5.0f);
-    level2DroneNode = Vec3(spawnPos.x + CS * 2.0f, 0.0f, spawnPos.z + CS * 7.0f);
-    level2CameraOnline = false;
-    level2DroneReprogrammed = false;
-    level2DroneAssistTimer = 0.0f;
 
     initVoidShiftNpcSpots(spawnPos, exitDoorPos);
     initSideContractForLevel(); initLevel2PuzzleStages(); initVoidShiftSetpieces();
-    initNpcTrustState();
 }
 
 inline void startEchoRecordingTrack() {
@@ -245,14 +218,6 @@ inline void buildVoidShiftInteractPrompt(const Vec3& playerPos, char* out, int o
     if (!out || outSize < 2) return;
     out[0] = '\0';
 
-    if (npcCartographerActive && nearPoint2D(playerPos, npcCartographerPos, 2.2f)) {
-        std::snprintf(out, outSize, "[E] TRADE WITH CARTOGRAPHER");
-        return;
-    }
-    if (npcDispatcherActive && nearPoint2D(playerPos, npcDispatcherPhonePos, 2.2f)) {
-        std::snprintf(out, outSize, "[E] ANSWER DISPATCH CALL");
-        return;
-    }
     if (npcLostSurvivorActive && !npcLostSurvivorEscorted && nearPoint2D(playerPos, npcLostSurvivorPos, 2.2f)) {
         std::snprintf(out, outSize, "[E] ESCORT LOST SURVIVOR");
         return;
@@ -274,7 +239,6 @@ inline void buildVoidShiftInteractPrompt(const Vec3& playerPos, char* out, int o
     }
 
     if (buildLevel2ActionPrompt(playerPos, out, outSize)) return;
-    if (buildLevel2SideTechPrompt(playerPos, out, outSize)) return;
     for (int i = 0; i < 3; i++) {
         if (level2FuseDone[i]) continue;
         if (nearPoint2D(playerPos, level2FuseNodes[i], 2.4f)) {
@@ -288,10 +252,6 @@ inline void buildVoidShiftInteractPrompt(const Vec3& playerPos, char* out, int o
     }
     if (!level2AccessReady && nearPoint2D(playerPos, level2AccessNode, 2.4f)) {
         std::snprintf(out, outSize, "[E] AUTHORIZE SECURITY ACCESS");
-        return;
-    }
-    if (!level2VentDone && nearPoint2D(playerPos, level2VentNode, 2.4f)) {
-        std::snprintf(out, outSize, "[E] ENABLE VENTILATION");
         return;
     }
     if (!level2HoldActive && !level2ContractComplete && level2BatteryInstalled && level2FuseCount >= 3 && level2AccessReady && nearPoint2D(playerPos, level2LiftNode, 2.6f)) {
@@ -315,14 +275,14 @@ inline void buildVoidShiftObjectiveLine(char* out, int outSize) {
     }
 
     if (!level2BatteryInstalled || level2FuseCount < 3 || !level2AccessReady) {
-        std::snprintf(out, outSize, "CONTRACT L2: BAT %d(%d) FUSE %d/3 PWR %d ACCESS %d CAM %d DRN %d", level2BatteryInstalled ? 1 : 0, level2BatteryStage, level2FuseCount, level2FusePanelPowered ? 1 : 0, level2AccessReady ? 1 : 0, level2CameraOnline ? 1 : 0, level2DroneReprogrammed ? 1 : 0);
+        std::snprintf(out, outSize, "CONTRACT L2: BAT %d(%d) FUSE %d/3 PWR %d ACCESS %d", level2BatteryInstalled ? 1 : 0, level2BatteryStage, level2FuseCount, level2FusePanelPowered ? 1 : 0, level2AccessReady ? 1 : 0);
         return;
     }
     if (level2HoldActive) {
         std::snprintf(out, outSize, "CONTRACT L2: HOLD LIFT %.0fs", level2HoldTimer);
         return;
     }
-    std::snprintf(out, outSize, level2VentDone ? "CONTRACT L2 COMPLETE: LIFT READY + VENT" : "CONTRACT L2 COMPLETE: LIFT READY");
+    std::snprintf(out, outSize, "CONTRACT L2 COMPLETE: LIFT READY");
 }
 
 inline void buildVoidShiftSupportLine(char* out, int outSize) {
@@ -332,33 +292,13 @@ inline void buildVoidShiftSupportLine(char* out, int outSize) {
         return;
     }
     if (sideContractCompleted) {
-        std::snprintf(out, outSize, "SIDE +35 CRAFT F%d/X%d TRUST C%.0f D%.0f", craftedFlashLamp, craftedButtonFixator, cartographerTrust, dispatcherTrust);
+        std::snprintf(out, outSize, "SIDE COMPLETE +35  ARCHIVE %d T%d", archivePoints, archiveTier);
         return;
     }
-    std::snprintf(out, outSize, "ARCH %d T%d CRAFT N%d B%d F%d X%d TR %.0f/%.0f", archivePoints, archiveTier, craftedNoiseLure, craftedBeacon, craftedFlashLamp, craftedButtonFixator, cartographerTrust, dispatcherTrust);
+    std::snprintf(out, outSize, "ARCHIVE %d T%d", archivePoints, archiveTier);
 }
 
 inline bool tryHandleVoidShiftInteract(const Vec3& playerPos) {
-    if (npcCartographerActive && nearPoint2D(playerPos, npcCartographerPos, 2.2f)) {
-        awardArchivePoints(10, "CARTOGRAPHER TRADE COMPLETE");
-        if (isParkingLevel(gCurrentLevel)) { craftedButtonFixator++; craftedFlashLamp++; }
-        else { craftedNoiseLure++; craftedBeacon++; }
-        applyCartographerInteractionOutcome();
-        if (isLevelZero(gCurrentLevel) && !sideContractCompleted && sideContractType == SIDE_SCAN_WALLS) {
-            progressSideContract(1, "SIDE: CARTOGRAPHER LOGGED A PATTERN");
-        }
-        return true;
-    }
-
-    if (npcDispatcherActive && nearPoint2D(playerPos, npcDispatcherPhonePos, 2.2f)) {
-        applyDispatcherInteractionOutcome();
-        dispatcherCallCooldown = 25.0f;
-        if (!isLevelZero(gCurrentLevel) && sideContractType == SIDE_RESTORE_CAMERAS) {
-            progressSideContract(1, "SIDE: CAMERAS RESTORED");
-        }
-        return true;
-    }
-
     if (npcLostSurvivorActive && !npcLostSurvivorEscorted && nearPoint2D(playerPos, npcLostSurvivorPos, 2.2f)) {
         npcLostSurvivorEscorted = true;
         npcLostSurvivorActive = false;
@@ -388,7 +328,7 @@ inline bool tryHandleVoidShiftInteract(const Vec3& playerPos) {
         return false;
     }
 
-    if (processLevel2Step(playerPos) || processLevel2SideTechStep(playerPos)) return true;
+    if (processLevel2Step(playerPos)) return true;
     for (int i = 0; i < 3; i++) {
         if (level2FuseDone[i]) continue;
         if (!nearPoint2D(playerPos, level2FuseNodes[i], 2.4f)) continue;
@@ -408,20 +348,11 @@ inline bool tryHandleVoidShiftInteract(const Vec3& playerPos) {
         setTrapStatus("SECURITY ACCESS ACCEPTED");
         return true;
     }
-    if (!level2VentDone && nearPoint2D(playerPos, level2VentNode, 2.4f)) {
-        level2VentDone = true;
-        ventilationOnline = true;
-        addAttention(6.0f);
-        setTrapStatus("VENTILATION ONLINE");
-        if (sideContractType == SIDE_ENABLE_VENT) progressSideContract(1, "SIDE: VENTILATION OBJECTIVE DONE");
-        return true;
-    }
     if (!level2HoldActive && !level2ContractComplete && level2BatteryInstalled && level2FuseCount >= 3 && level2AccessReady && nearPoint2D(playerPos, level2LiftNode, 2.6f)) {
         level2HoldActive = true;
         level2HoldTimer = 15.0f;
         addAttention(15.0f);
         setTrapStatus("LIFT HOLD STARTED");
-        if (sideContractType == SIDE_REPROGRAM_DRONE) progressSideContract(1, "SIDE: DRONE REPROGRAMMED");
         return true;
     }
     return false;
@@ -464,30 +395,7 @@ inline void updateVoidShiftSystems(float dt, bool sprinting, bool flashlightActi
 
     updateLevel1SyncSwitchProgress(dt); updateVoidShiftSetpieces(dt);
 
-    if (isParkingLevel(gCurrentLevel)) {
-        coLevel += dt * (ventilationOnline ? -3.2f : 2.6f);
-        float coDamage = coLevel / 100.0f;
-        playerStamina -= dt * coDamage * 4.0f;
-        if (playerStamina < 0.0f) playerStamina = 0.0f;
-        if (level2VentDone && coLevel <= 20.0f) {
-            setEchoStatus("CO STABLE: ROUTE SAFER");
-        }
-    } else {
-        coLevel = 0.0f;
-    }
-
-    updateNpcTrustState(dt);
-
-    updateLevel2DroneAssist(dt);
     updateVoidShiftEnemyEffects(dt);
-
-    if (dispatcherCallCooldown > 0.0f) {
-        dispatcherCallCooldown -= dt;
-        if (dispatcherCallCooldown < 0.0f) dispatcherCallCooldown = 0.0f;
-    } else if (npcDispatcherActive && (rng() % 1000) < 3) {
-        setEchoStatus("DISPATCHER: CHECK PHONE NODE");
-        dispatcherCallCooldown = 16.0f;
-    }
 
     if (npcLostSurvivorActive && !npcLostSurvivorEscorted) {
         Vec3 toDoor = coop.doorPos - npcLostSurvivorPos;
