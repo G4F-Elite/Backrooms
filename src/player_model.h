@@ -5,62 +5,115 @@
 #include "math.h"
 #include "interpolation.h"
 #include "net_types.h"
+#include "creature_mesh.h"
+#include "creature_texture.h"
+#include "creature_anim.h"
 
-// Multiplayer player models are drawn with the main shader, so we must ensure
-// the correct texture is bound (otherwise the last-held item texture bleeds onto players).
-extern GLuint playerTex;
+// Teammates use their own body texture (bound in renderPlayers) so held-item
+// textures never bleed onto them.
+inline GLuint playerBodyTex = 0;
 
+// Muted per-player coverall tints: enough to tell people apart, never toy-coloured.
 const float PLAYER_COLORS[4][3] = {
-    {0.72f, 0.72f, 0.72f},
-    {0.68f, 0.68f, 0.68f},
-    {0.78f, 0.78f, 0.78f},
-    {0.64f, 0.64f, 0.64f}
+    {0.86f, 0.82f, 0.70f},
+    {0.70f, 0.78f, 0.84f},
+    {0.84f, 0.72f, 0.68f},
+    {0.72f, 0.82f, 0.72f}
 };
 
-inline void addColorBox(std::vector<float>& v, float x, float y, float z,
-    float sx, float sy, float sz, float r, float g, float b) {
-    (void)r; (void)g; (void)b;
-    float hx = sx / 2, hy = sy / 2, hz = sz / 2;
-    float faces[6][48] = {
-        {x-hx,y-hy,z+hz,0,0,0,0,1, x+hx,y-hy,z+hz,1,0,0,0,1, x+hx,y+hy,z+hz,1,1,0,0,1,
-         x-hx,y-hy,z+hz,0,0,0,0,1, x+hx,y+hy,z+hz,1,1,0,0,1, x-hx,y+hy,z+hz,0,1,0,0,1},
-        {x+hx,y-hy,z-hz,0,0,0,0,-1, x-hx,y-hy,z-hz,1,0,0,0,-1, x-hx,y+hy,z-hz,1,1,0,0,-1,
-         x+hx,y-hy,z-hz,0,0,0,0,-1, x-hx,y+hy,z-hz,1,1,0,0,-1, x+hx,y+hy,z-hz,0,1,0,0,-1},
-        {x-hx,y-hy,z-hz,0,0,-1,0,0, x-hx,y-hy,z+hz,1,0,-1,0,0, x-hx,y+hy,z+hz,1,1,-1,0,0,
-         x-hx,y-hy,z-hz,0,0,-1,0,0, x-hx,y+hy,z+hz,1,1,-1,0,0, x-hx,y+hy,z-hz,0,1,-1,0,0},
-        {x+hx,y-hy,z+hz,0,0,1,0,0, x+hx,y-hy,z-hz,1,0,1,0,0, x+hx,y+hy,z-hz,1,1,1,0,0,
-         x+hx,y-hy,z+hz,0,0,1,0,0, x+hx,y+hy,z-hz,1,1,1,0,0, x+hx,y+hy,z+hz,0,1,1,0,0},
-        {x-hx,y+hy,z+hz,0,0,0,1,0, x+hx,y+hy,z+hz,1,0,0,1,0, x+hx,y+hy,z-hz,1,1,0,1,0,
-         x-hx,y+hy,z+hz,0,0,0,1,0, x+hx,y+hy,z-hz,1,1,0,1,0, x-hx,y+hy,z-hz,0,1,0,1,0},
-        {x-hx,y-hy,z-hz,0,0,0,-1,0, x+hx,y-hy,z-hz,1,0,0,-1,0, x+hx,y-hy,z+hz,1,1,0,-1,0,
-         x-hx,y-hy,z-hz,0,0,0,-1,0, x+hx,y-hy,z+hz,1,1,0,-1,0, x-hx,y-hy,z+hz,0,1,0,-1,0}
+// Plain worker in a coverall: same faceted language as the entities, but with sane proportions.
+inline void buildPlayerModel(CreatureMesh& m) {
+    m = CreatureMesh();
+    m.strips = 4;
+    m.vScale = 1.0f;
+    const int SKIN = 0, SUIT = 1, DARK = 2, GEAR = 3;
+
+    int root = m.beginPart(CJ_ROOT, -1, Vec3(0, 0.93f, 0));
+    m.strip = SUIT;
+    CreatureRing pelvis[3] = {
+        {Vec3(0, 0.82f, 0.0f), 0.145f, 0.100f},
+        {Vec3(0, 0.95f, 0.0f), 0.160f, 0.105f},
+        {Vec3(0, 1.09f, 0.0f), 0.142f, 0.096f}
     };
-    for (int f = 0; f < 6; f++) for (int i = 0; i < 48; i++) v.push_back(faces[f][i]);
+    m.tube(pelvis, 3, 8);
+
+    int spine = m.beginPart(CJ_SPINE, root, Vec3(0, 1.08f, 0));
+    CreatureRing chest[5] = {
+        {Vec3(0, 1.06f, 0.000f), 0.144f, 0.098f},
+        {Vec3(0, 1.25f, 0.005f), 0.165f, 0.105f},
+        {Vec3(0, 1.42f, 0.010f), 0.185f, 0.110f},
+        {Vec3(0, 1.50f, 0.010f), 0.170f, 0.095f},
+        {Vec3(0, 1.56f, 0.010f), 0.070f, 0.060f}
+    };
+    m.tube(chest, 5, 8);
+    m.strip = DARK;
+    CreatureRing belt[2] = { {Vec3(0, 1.055f, 0), 0.150f, 0.103f}, {Vec3(0, 1.095f, 0), 0.148f, 0.101f} };
+    m.tube(belt, 2, 8, false, false);
+    m.strip = GEAR;
+    m.box(Vec3(0, 1.30f, -0.145f), 0.25f, 0.32f, 0.10f);
+    m.strip = SKIN;
+    m.limb(Vec3(0, 1.54f, 0.010f), Vec3(0, 1.63f, 0.015f), 0.046f, 0.044f, 6);
+
+    m.beginPart(CJ_HEAD, spine, Vec3(0, 1.60f, 0.015f));
+    m.ovoid(Vec3(0, 1.575f, 0.018f), Vec3(0, 1.815f, 0.022f), 0.084f, 0.098f, 8);
+    m.strip = DARK;
+    m.ovoid(Vec3(0, 1.690f, -0.016f), Vec3(0, 1.832f, 0.004f), 0.090f, 0.098f, 8, 0.4f);
+
+    for (int s = -1; s <= 1; s += 2) {
+        float fs = (float)s;
+        Vec3 shoulder(fs * 0.212f, 1.44f, 0.010f);
+        Vec3 elbow(fs * 0.238f, 1.16f, 0.000f);
+        Vec3 wrist(fs * 0.238f, 0.915f, 0.030f);
+        int arm = m.beginPart(s < 0 ? CJ_ARM_L : CJ_ARM_R, spine, shoulder);
+        m.strip = SUIT;
+        m.limb(shoulder, elbow, 0.052f, 0.043f, 6);
+        m.beginPart(s < 0 ? CJ_FOREARM_L : CJ_FOREARM_R, arm, elbow);
+        m.limb(elbow, wrist, 0.041f, 0.034f, 6);
+        m.strip = DARK;
+        m.ovoid(Vec3(wrist.x, 0.925f, 0.030f), Vec3(wrist.x, 0.800f, 0.042f), 0.030f, 0.040f, 6);
+        if (s > 0) {
+            // Flashlight held along the forearm, so raising the arm aims it.
+            m.strip = GEAR;
+            m.limb(Vec3(wrist.x, 0.870f, 0.075f), Vec3(wrist.x, 0.735f, 0.082f), 0.019f, 0.019f, 6);
+            m.limb(Vec3(wrist.x, 0.745f, 0.082f), Vec3(wrist.x, 0.700f, 0.084f), 0.022f, 0.030f, 6);
+        }
+    }
+
+    for (int s = -1; s <= 1; s += 2) {
+        float fs = (float)s;
+        Vec3 hip(fs * 0.085f, 0.90f, 0.0f);
+        Vec3 knee(fs * 0.090f, 0.49f, 0.015f);
+        Vec3 ankle(fs * 0.090f, 0.10f, -0.010f);
+        int leg = m.beginPart(s < 0 ? CJ_LEG_L : CJ_LEG_R, root, hip);
+        m.strip = SUIT;
+        m.limb(hip, knee, 0.080f, 0.060f, 6);
+        m.beginPart(s < 0 ? CJ_SHIN_L : CJ_SHIN_R, leg, knee);
+        m.limb(knee, ankle, 0.057f, 0.047f, 6);
+        m.strip = DARK;
+        m.limb(Vec3(ankle.x, 0.20f, -0.008f), Vec3(ankle.x, 0.06f, -0.012f), 0.052f, 0.052f, 6);
+        CreatureRing boot[3] = {
+            {Vec3(ankle.x, 0.052f, -0.095f), 0.048f, 0.050f},
+            {Vec3(ankle.x, 0.050f, 0.040f), 0.054f, 0.046f},
+            {Vec3(ankle.x, 0.036f, 0.175f), 0.046f, 0.030f}
+        };
+        m.tube(boot, 3, 5);
+    }
+    m.finish();
 }
 
-inline void buildPlayerModel(std::vector<float>& v, int colorId) {
-    float r = PLAYER_COLORS[colorId][0];
-    float g = PLAYER_COLORS[colorId][1];
-    float b = PLAYER_COLORS[colorId][2];
-    addColorBox(v, 0, 1.0f, 0, 0.45f, 0.55f, 0.22f, r, g, b);
-    addColorBox(v, 0.41f, 0.80f, 0.16f, 0.20f, 0.06f, 0.06f, 0.08f, 0.08f, 0.09f);
-    addColorBox(v, 0.49f, 0.80f, 0.16f, 0.08f, 0.07f, 0.07f, 0.14f, 0.14f, 0.15f);
-    addColorBox(v, 0.54f, 0.80f, 0.16f, 0.03f, 0.05f, 0.05f, 0.92f, 0.92f, 0.78f);
-    addColorBox(v, 0.37f, 0.72f, 0.16f, 0.05f, 0.16f, 0.05f, 0.09f, 0.09f, 0.10f);
-    addColorBox(v, 0, 1.5f, 0, 0.28f, 0.28f, 0.28f, 0.85f, 0.75f, 0.65f);
-    addColorBox(v, 0, 1.67f, 0, 0.30f, 0.08f, 0.30f, 0.15f, 0.1f, 0.05f);
-    addColorBox(v, -0.06f, 1.52f, 0.14f, 0.05f, 0.03f, 0.02f, 0.1f, 0.1f, 0.1f);
-    addColorBox(v, 0.06f, 1.52f, 0.14f, 0.05f, 0.03f, 0.02f, 0.1f, 0.1f, 0.1f);
-    addColorBox(v, -0.1f, 0.35f, 0, 0.14f, 0.65f, 0.14f, 0.15f, 0.2f, 0.35f);
-    addColorBox(v, 0.1f, 0.35f, 0, 0.14f, 0.65f, 0.14f, 0.15f, 0.2f, 0.35f);
-    addColorBox(v, -0.1f, 0.05f, 0.02f, 0.14f, 0.1f, 0.18f, 0.1f, 0.1f, 0.1f);
-    addColorBox(v, 0.1f, 0.05f, 0.02f, 0.14f, 0.1f, 0.18f, 0.1f, 0.1f, 0.1f);
-    addColorBox(v, -0.32f, 1.0f, 0, 0.1f, 0.45f, 0.1f, r*0.8f, g*0.8f, b*0.8f);
-    addColorBox(v, 0.32f, 1.0f, 0, 0.1f, 0.45f, 0.1f, r*0.8f, g*0.8f, b*0.8f);
-    addColorBox(v, -0.32f, 0.72f, 0, 0.08f, 0.1f, 0.08f, 0.85f, 0.75f, 0.65f);
-    addColorBox(v, 0.32f, 0.72f, 0, 0.08f, 0.1f, 0.08f, 0.85f, 0.75f, 0.65f);
-    addColorBox(v, 0, 1.0f, -0.18f, 0.3f, 0.4f, 0.12f, 0.2f, 0.15f, 0.1f);
+inline void genPlayerTexture(unsigned char* data, int w, int h) {
+    const CreatureStripStyle st[4] = {
+        {176.0f, 150.0f, 128.0f, 7.0f, CREATURE_PAT_PLAIN},
+        {116.0f, 116.0f, 112.0f, 8.0f, CREATURE_PAT_WEAVE},
+        {34.0f, 33.0f, 34.0f, 5.0f, CREATURE_PAT_PLAIN},
+        {72.0f, 70.0f, 64.0f, 6.0f, CREATURE_PAT_WEAVE}
+    };
+    genCreatureTexture(st, 4, data, w, h, 53u);
 }
+
+inline std::vector<CreaturePart> playerParts;
+inline float playerMoveBlend[MAX_PLAYERS] = {0};
+inline double playerAnimClock = 0.0;
 
 inline GLuint playerVAOs[MAX_PLAYERS] = {0};
 inline GLuint playerVBOs[MAX_PLAYERS] = {0};
@@ -74,9 +127,11 @@ inline bool playerInterpReady[MAX_PLAYERS] = {false};
 
 inline void initPlayerModels() {
     for (int i = 0; i < MAX_PLAYERS; i++) {
-        std::vector<float> v;
-        buildPlayerModel(v, i);
-        playerVCs[i] = (int)v.size() / 8;
+        CreatureMesh mesh;
+        buildPlayerModel(mesh);
+        const std::vector<float>& v = mesh.v;
+        if (i == 0) playerParts = mesh.parts;
+        playerVCs[i] = mesh.vertexCount();
         glGenVertexArrays(1, &playerVAOs[i]);
         glGenBuffers(1, &playerVBOs[i]);
         glBindVertexArray(playerVAOs[i]);
@@ -94,6 +149,14 @@ inline void initPlayerModels() {
         playerRenderPitch[i] = 0.0f;
         playerInterpReady[i] = false;
     }
+    const int texSize = 128;
+    std::vector<unsigned char> td((size_t)texSize * texSize * 4);
+    genPlayerTexture(td.data(), texSize, texSize);
+    glGenTextures(1, &playerBodyTex);
+    glBindTexture(GL_TEXTURE_2D, playerBodyTex);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, texSize, texSize, 0, GL_RGBA, GL_UNSIGNED_BYTE, td.data());
 }
 
 inline void resetPlayerInterpolation() {
@@ -103,6 +166,7 @@ inline void resetPlayerInterpolation() {
         playerRenderYaw[i] = 0.0f;
         playerRenderPitch[i] = 0.0f;
         playerAnimPhase[i] = 0.0f;
+        playerMoveBlend[i] = 0.0f;
         playerInterpReady[i] = false;
     }
 }
@@ -156,9 +220,15 @@ inline void renderPlayers(GLuint shader, Mat4& proj, Mat4& view, int myId) {
     glUniformMatrix4fv(glGetUniformLocation(shader, "P"), 1, GL_FALSE, proj.m);
     glUniformMatrix4fv(glGetUniformLocation(shader, "V"), 1, GL_FALSE, view.m);
 
-    // Ensure a stable texture for players.
-    glBindTexture(GL_TEXTURE_2D, playerTex);
+    glBindTexture(GL_TEXTURE_2D, playerBodyTex);
     GLint tintLoc = glGetUniformLocation(shader, "modelTint");
+    GLint modelLoc = glGetUniformLocation(shader, "M");
+
+    double now = glfwGetTime();
+    float dt = (float)(now - playerAnimClock);
+    playerAnimClock = now;
+    if (dt < 0.0005f) dt = 0.0005f;
+    if (dt > 0.1f) dt = 0.1f;
 
     for (int i = 0; i < MAX_PLAYERS; i++) {
         if (i == myId || !netMgr.players[i].active || !netMgr.players[i].hasValidPos) continue;
@@ -166,26 +236,31 @@ inline void renderPlayers(GLuint shader, Mat4& proj, Mat4& view, int myId) {
 
         if(tintLoc >= 0) glUniform3f(tintLoc, PLAYER_COLORS[i][0], PLAYER_COLORS[i][1], PLAYER_COLORS[i][2]);
         Vec3 pos = playerRenderPos[i];
-        float yaw = playerRenderYaw[i];
         Vec3 delta = pos - playerLastPos[i];
         delta.y = 0;
         float moved = sqrtf(delta.x * delta.x + delta.z * delta.z);
-        if (moved > 0.01f) playerAnimPhase[i] += moved * 8.0f;
+        if (moved > 3.0f) moved = 0.0f; // teleport / respawn, not a step
         playerLastPos[i] = pos;
-        float bobY = sinf(playerAnimPhase[i]) * 0.02f;
-        float px = pos.x;
-        float py = pos.y - 1.7f + bobY;
-        float pz = pos.z;
-        float c = cosf(yaw);
-        float s = sinf(yaw);
-        Mat4 model;
-        model.m[0] = c;    model.m[4] = 0;  model.m[8] = s;   model.m[12] = px;
-        model.m[1] = 0;    model.m[5] = 1;  model.m[9] = 0;   model.m[13] = py;
-        model.m[2] = -s;   model.m[6] = 0;  model.m[10] = c;  model.m[14] = pz;
-        model.m[3] = 0;    model.m[7] = 0;  model.m[11] = 0;  model.m[15] = 1;
-        glUniformMatrix4fv(glGetUniformLocation(shader, "M"), 1, GL_FALSE, model.m);
+        // One full stride cycle every 1.4 m keeps the feet from sliding.
+        playerAnimPhase[i] += moved * (3.14159265f / 0.7f);
+        if (playerAnimPhase[i] > 6283.0f) playerAnimPhase[i] -= 6283.185f;
+        float target = clamp01((moved / dt) / 1.2f);
+        playerMoveBlend[i] += (target - playerMoveBlend[i]) * clamp01(dt * 9.0f);
+
+        // Eye height drops from 1.7 to 0.9 when crouching; keep the boots on the floor.
+        float crouch = 0.0f;
+        if (pos.y > 0.6f && pos.y < 1.7f) crouch = clamp01((1.7f - pos.y) / 0.8f);
+        Vec3 base(pos.x, pos.y - 1.7f + crouch * 0.8f, pos.z);
+
+        CreaturePose pose = playerPose(playerAnimPhase[i], playerMoveBlend[i], crouch, playerRenderPitch[i],
+                                       netMgr.players[i].flashlightOn, (float)now + (float)i * 1.7f);
+        Mat4 mats[CREATURE_MAX_PARTS];
+        creaturePartMatrices(playerParts, pose, creatureWorldMatrix(base, playerRenderYaw[i]), mats);
         glBindVertexArray(playerVAOs[i]);
-        glDrawArrays(GL_TRIANGLES, 0, playerVCs[i]);
+        for (size_t k = 0; k < playerParts.size() && k < (size_t)CREATURE_MAX_PARTS; k++) {
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, mats[k].m);
+            glDrawArrays(GL_TRIANGLES, playerParts[k].first, playerParts[k].count);
+        }
     }
 
     // Restore default tint for subsequent draws.

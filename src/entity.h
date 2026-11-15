@@ -7,6 +7,7 @@
 #include <glad/glad.h>
 #include "entity_types.h"
 #include "entity_model.h"
+#include "creature_anim.h"
 #include "world.h"
 #include "progression.h"
 
@@ -19,6 +20,8 @@ public:
     std::vector<Entity> entities;
     GLuint entityVAO[4], entityVBO[4], entityTex[4];
     int entityVC[4];
+    std::vector<CreaturePart> entityParts[4];
+    float animClock = 0.0f; // drives idle motion; walk cycles come from travelled distance
     float spawnTimer, maxEntities, dangerLevel;
     Vec3 lastPlayerPos;
     bool hasLastPlayerPos;
@@ -45,33 +48,30 @@ public:
     }
     
     void init() {
-        auto buildForType = [&](EntityType type, void (*builder)(std::vector<float>&)) {
-            std::vector<float> verts;
-            builder(verts);
-            int ti = (int)type;
-            entityVC[ti] = (int)verts.size() / 8;
+        for(int ti = (int)ENTITY_STALKER; ti <= (int)ENTITY_SHADOW; ti++) {
+            EntityType type = (EntityType)ti;
+            CreatureMesh mesh;
+            buildEntityModel(type, mesh);
+            entityVC[ti] = mesh.vertexCount();
+            entityParts[ti] = mesh.parts;
             glGenVertexArrays(1, &entityVAO[ti]);
             glGenBuffers(1, &entityVBO[ti]);
             glBindVertexArray(entityVAO[ti]);
             glBindBuffer(GL_ARRAY_BUFFER, entityVBO[ti]);
-            glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), verts.data(), GL_STATIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, mesh.v.size() * sizeof(float), mesh.v.data(), GL_STATIC_DRAW);
             glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,32,(void*)0); glEnableVertexAttribArray(0);
             glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,32,(void*)12); glEnableVertexAttribArray(1);
             glVertexAttribPointer(2,3,GL_FLOAT,GL_FALSE,32,(void*)20); glEnableVertexAttribArray(2);
 
-            unsigned char* td = new unsigned char[64 * 64 * 4];
-            genEntityTextureByType(type, td, 64, 64);
+            const int texSize = 128;
+            std::vector<unsigned char> td((size_t)texSize * texSize * 4);
+            genEntityTextureByType(type, td.data(), texSize, texSize);
             glGenTextures(1, &entityTex[ti]);
             glBindTexture(GL_TEXTURE_2D, entityTex[ti]);
             glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
             glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-            glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,64,64,0,GL_RGBA,GL_UNSIGNED_BYTE,td);
-            delete[] td;
-        };
-
-        buildForType(ENTITY_STALKER, buildStalkerModel);
-        buildForType(ENTITY_CRAWLER, buildCrawlerModel);
-        buildForType(ENTITY_SHADOW, buildShadowModel);
+            glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA,texSize,texSize,0,GL_RGBA,GL_UNSIGNED_BYTE,td.data());
+        }
     }
     
     void spawnEntity(EntityType type, Vec3 pos, int maze[][30], int mzw, int mzh) {
@@ -99,6 +99,8 @@ public:
     void update(float dt, Vec3 localPos, float localYaw, int maze[][30], int mzw, int mzh, float cs) {
         (void)maze; (void)mzw; (void)mzh; (void)cs;
         dangerLevel = 0;
+        animClock += dt;
+        if(animClock > 3600.0f) animClock -= 3600.0f;
         float playerMove = 0.0f;
         if(hasLastPlayerPos){
             Vec3 pm = localPos - lastPlayerPos;
@@ -384,96 +386,26 @@ public:
         glUseProgram(shader);
         glUniformMatrix4fv(glGetUniformLocation(shader,"P"),1,GL_FALSE,proj.m);
         glUniformMatrix4fv(glGetUniformLocation(shader,"V"),1,GL_FALSE,view.m);
+        GLint modelLoc = glGetUniformLocation(shader,"M");
+        int index = 0;
         for(auto& e : entities) {
+            index++;
             if(!e.active || !e.visible) continue;
-            Mat4 model; float c=mCos(e.yaw), s=mSin(e.yaw);
-            model.m[0]=c; model.m[2]=s; model.m[8]=-s; model.m[10]=c;
-            float bobAmp = 0.02f;
-            float yOffset = e.pos.y;
-            float scaleX=1.0f, scaleY=1.0f, scaleZ=1.0f;
-            float tiltX=0.0f, tiltZ=0.0f;
-
-            if(e.type==ENTITY_STALKER){
-                // Menacing sway — subtle body lean that shifts side to side
-                bobAmp = 0.025f;
-                tiltZ = mSin(e.animPhase * 1.2f) * 0.06f; // lateral sway
-                tiltX = mSin(e.animPhase * 0.8f) * 0.03f; // forward hunch pulse
-                // Breathing effect — subtle chest expansion
-                scaleY = 1.0f + mSin(e.animPhase * 1.5f) * 0.012f;
-                scaleX = 1.0f + mSin(e.animPhase * 1.5f + 1.57f) * 0.008f;
-            }else if(e.type==ENTITY_CRAWLER){
-                // Skittering — rapid lateral jitter + body squirm
-                bobAmp = 0.04f;
-                float squirm = mSin(e.animPhase * 4.0f) * 0.04f;
-                tiltZ = squirm;
-                scaleX = 1.0f + mSin(e.animPhase * 3.5f) * 0.05f;
-                scaleZ = 1.0f + mSin(e.animPhase * 3.5f + 1.57f) * 0.05f;
-                // Faster bob when chasing
-                if(e.state == ENT_CHASING || e.state == ENT_ATTACKING){
-                    bobAmp = 0.06f;
-                    tiltZ *= 1.8f;
-                }
-                model.m[0] = c * 0.95f;
-                model.m[2] = s * 0.95f;
-                model.m[8] = -s * 1.15f;
-                model.m[10] = c * 1.15f;
-            }else if(e.type==ENTITY_SHADOW){
-                // Ethereal pulse — scale breathing + rotation wobble
-                bobAmp = 0.06f;
-                yOffset += 0.08f * mSin(e.animPhase * 0.7f);
-                float pulse = 1.0f + mSin(e.animPhase * 1.5f) * 0.08f;
-                scaleX = pulse;
-                scaleY = pulse + mSin(e.animPhase * 2.0f) * 0.05f;
-                scaleZ = pulse;
-                // Ghostly rotation wobble
-                tiltX = mSin(e.animPhase * 0.9f) * 0.08f;
-                tiltZ = mSin(e.animPhase * 1.1f) * 0.06f;
-                // Lateral drift
-                model.m[12] = e.pos.x + mSin(e.animPhase * 0.5f) * 0.12f;
-                model.m[14] = e.pos.z + mCos(e.animPhase * 0.7f) * 0.08f;
-            }
-
-            // Apply scale to rotation matrix columns
-            model.m[0] *= scaleX; model.m[1] *= scaleY; model.m[2] *= scaleZ;
-            model.m[4] *= scaleX; model.m[5] *= scaleY; model.m[6] *= scaleZ;
-            model.m[8] *= scaleX; model.m[9] *= scaleY; model.m[10] *= scaleZ;
-
-            // Apply tilt (rotation perturbation)
-            if(tiltX != 0.0f || tiltZ != 0.0f){
-                float cx2 = mCos(tiltX), sx2 = mSin(tiltX);
-                float cz2 = mCos(tiltZ), sz2 = mSin(tiltZ);
-                // Compose tilt into model matrix
-                float m0=model.m[0], m1=model.m[1], m2=model.m[2];
-                float m4=model.m[4], m5=model.m[5], m6=model.m[6];
-                float m9=model.m[9], m10=model.m[10];
-                // Z tilt
-                model.m[0] = m0*cz2 + m4*sz2;
-                model.m[1] = m1*cz2 + m5*sz2;
-                model.m[2] = m2*cz2 + m6*sz2;
-                model.m[4] = m4*cz2 - m0*sz2;
-                model.m[5] = m5*cz2 - m1*sz2;
-                model.m[6] = m6*cz2 - m2*sz2;
-                // X tilt
-                m1=model.m[1]; m2=model.m[2];
-                m9=model.m[9]; m10=model.m[10];
-                model.m[1] = m1*cx2 + m9*sx2;
-                model.m[2] = m2*cx2 + m10*sx2;
-                model.m[9] = m9*cx2 - m1*sx2;
-                model.m[10] = m10*cx2 - m2*sx2;
-            }
-
-            if(e.type != ENTITY_SHADOW){
-                model.m[12] = e.pos.x + mSin(e.animPhase) * bobAmp;
-                model.m[14] = e.pos.z;
-            }
-            model.m[13] = yOffset;
-
-            glUniformMatrix4fv(glGetUniformLocation(shader,"M"),1,GL_FALSE,model.m);
             int ti = (int)e.type;
-            if(ti < 0 || ti > 3 || entityVC[ti] <= 0) continue;
+            if(ti < 1 || ti > 3 || entityVC[ti] <= 0) continue;
+            // Models stand on the floor; the crawler's logical height is not a render offset.
+            Vec3 base(e.pos.x, e.type == ENTITY_CRAWLER ? 0.0f : e.pos.y, e.pos.z);
+            // Offset idle motion per entity so two of a kind never move in sync.
+            CreaturePose pose = entityPose(e, animClock + (float)index * 2.3f);
+            const std::vector<CreaturePart>& parts = entityParts[ti];
+            Mat4 mats[CREATURE_MAX_PARTS];
+            creaturePartMatrices(parts, pose, creatureWorldMatrix(base, e.yaw), mats);
             glBindTexture(GL_TEXTURE_2D, entityTex[ti]);
             glBindVertexArray(entityVAO[ti]);
-            glDrawArrays(GL_TRIANGLES, 0, entityVC[ti]);
+            for(size_t k = 0; k < parts.size() && k < (size_t)CREATURE_MAX_PARTS; k++) {
+                glUniformMatrix4fv(modelLoc,1,GL_FALSE,mats[k].m);
+                glDrawArrays(GL_TRIANGLES, parts[k].first, parts[k].count);
+            }
         }
     }
     
