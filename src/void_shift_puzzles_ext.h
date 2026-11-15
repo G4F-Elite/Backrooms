@@ -8,8 +8,6 @@ inline void initLevel1PuzzleStages() {
     level1NodeGoal[1] = 2; // phone sync pulses
     level1NodeGoal[2] = 3; // resonance lock pulses
     level1SyncTimer = 0.0f;
-    level1SyncSwitches[0] = Vec3(level1Nodes[1].x + CS * 0.75f, 0.0f, level1Nodes[1].z);
-    level1SyncSwitches[1] = Vec3(level1Nodes[1].x - CS * 0.75f, 0.0f, level1Nodes[1].z);
 }
 
 inline bool isLevel1SwitchHeld(int idx) {
@@ -60,20 +58,12 @@ inline bool processLevel1NodeStage(int nodeIndex) {
     if (nodeIndex < 0 || nodeIndex > 2 || level1NodeDone[nodeIndex]) return false;
 
     if (nodeIndex == 0) {
-        if (resonatorMode != RESONATOR_SCAN) {
-            setTrapStatus("NODE A NEEDS SCAN MODE");
-            return true;
-        }
         level1NodeStage[nodeIndex]++;
         setTrapStatus("NODE A: BREAKER CALIBRATING");
     } else if (nodeIndex == 1) {
-        if (resonatorMode != RESONATOR_PING) {
-            setTrapStatus("NODE B NEEDS PING MODE");
-            return true;
-        }
         level1NodeStage[nodeIndex] = 1;
-        setTrapStatus("NODE B: HOLD BOTH SYNC SWITCHES");
-        setEchoStatus("USE ECHO OR TEAMMATE FOR SECOND SWITCH");
+        setTrapStatus("NODE B: STAND ON BOTH SYNC SWITCHES");
+        setEchoStatus("SOLO: RECORD AN ECHO [R] ON ONE SWITCH, PLAY IT [P]");
     } else {
         if (attentionLevel > 70.0f) {
             setTrapStatus("NODE C UNSTABLE: LOWER ATTENTION");

@@ -43,7 +43,11 @@ inline void updateVoidShiftSetpieces(float dt) {
         corridorShiftTimer -= dt;
         if (corridorShiftArmed && corridorShiftTimer <= 7.0f) {
             corridorShiftArmed = false;
-            reshuffleBehind(cam.pos.x, cam.pos.z, cam.yaw);
+            if (multiState != MULTI_IN_GAME) {
+                reshuffleBehind(cam.pos.x, cam.pos.z, cam.yaw);
+                reopenObjectiveCells();
+                buildGeom();
+            }
             setTrapStatus("SETPIECE: CORRIDOR TOPOLOGY SHIFTED");
         }
     }

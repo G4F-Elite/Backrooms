@@ -22,7 +22,19 @@ public:
     float spawnTimer, maxEntities, dangerLevel;
     Vec3 lastPlayerPos;
     bool hasLastPlayerPos;
-    
+    // Co-op hunt targets (host fills these each frame). Empty = hunt the local player.
+    Vec3 targetPos[8];
+    float targetYaw[8];
+    int targetCount = 0;
+    bool ignoreLocal = false; // local player is a ghost / protected while downed
+
+    void addTarget(const Vec3& pos, float yaw) {
+        if(targetCount >= 8) return;
+        targetPos[targetCount] = pos;
+        targetYaw[targetCount] = yaw;
+        targetCount++;
+    }
+
     EntityManager() : spawnTimer(0), maxEntities(3), dangerLevel(0), lastPlayerPos(0,0,0), hasLastPlayerPos(false) {
         for(int i=0;i<4;i++){
             entityVAO[i] = 0;
@@ -84,20 +96,32 @@ public:
         entities.push_back(e);
     }
     
-    void update(float dt, Vec3 pPos, float pYaw, int maze[][30], int mzw, int mzh, float cs) {
+    void update(float dt, Vec3 localPos, float localYaw, int maze[][30], int mzw, int mzh, float cs) {
         (void)maze; (void)mzw; (void)mzh; (void)cs;
         dangerLevel = 0;
         float playerMove = 0.0f;
         if(hasLastPlayerPos){
-            Vec3 pm = pPos - lastPlayerPos;
+            Vec3 pm = localPos - lastPlayerPos;
             pm.y = 0.0f;
             playerMove = pm.len();
         }
         hasLastPlayerPos = true;
-        lastPlayerPos = pPos;
+        lastPlayerPos = localPos;
         for(auto& e : entities) {
             if(!e.active) continue;
             EntityState prevState = e.state;
+            // Each entity hunts its nearest target; danger feedback stays relative to the local player.
+            Vec3 pPos = localPos;
+            float pYaw = localYaw;
+            float bestSq = 1e30f;
+            if(targetCount == 0 && ignoreLocal) pPos = localPos + Vec3(4000.0f, 0.0f, 4000.0f); // nobody to hunt: roam
+            for(int t=0;t<targetCount;t++){
+                float tx = targetPos[t].x - e.pos.x, tz = targetPos[t].z - e.pos.z;
+                float dsq = tx*tx + tz*tz;
+                if(dsq < bestSq){ bestSq = dsq; pPos = targetPos[t]; pYaw = targetYaw[t]; }
+            }
+            Vec3 toLocal = localPos - e.pos; toLocal.y = 0;
+            float distLocal = toLocal.len();
             Vec3 toP = pPos - e.pos; toP.y = 0;
             float dist = sqrtf(toP.x*toP.x + toP.z*toP.z);
 
@@ -113,8 +137,8 @@ public:
             float toEL = sqrtf(toE.x*toE.x + toE.z*toE.z);
             if(toEL > 0.01f) { toE.x /= toEL; toE.z /= toEL; }
             bool looking = (look.x*toE.x + look.z*toE.z) > 0.85f && dist < effectiveDetect;
-            if(dist < effectiveDetect + 5.0f) {
-                float prox = 1.0f - dist/(effectiveDetect + 5.0f);
+            if(distLocal < effectiveDetect + 5.0f) {
+                float prox = 1.0f - distLocal/(effectiveDetect + 5.0f);
                 if(prox > dangerLevel) dangerLevel = prox;
             }
 

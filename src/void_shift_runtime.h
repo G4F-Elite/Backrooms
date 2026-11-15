@@ -113,6 +113,7 @@ inline void resetVoidShiftState(const Vec3& spawnPos, const Vec3& exitDoorPos) {
     level2PowerNode = Vec3(spawnPos.x + CS * 5.0f, 0.0f, spawnPos.z + CS * 1.0f);
 
     initVoidShiftNpcSpots(spawnPos, exitDoorPos);
+    snapVoidShiftObjectives(spawnPos);
     initSideContractForLevel(); initLevel2PuzzleStages(); initVoidShiftSetpieces();
 }
 
@@ -140,6 +141,7 @@ inline void startEchoPlaybackTrack() {
     echoPlayback = true;
     echoGhostActive = true;
     echoPlaybackIndex = 0;
+    echoRecordTimer = 0.0f;
     echoGhostPos = echoTrack[0];
     resonatorBattery -= 12.0f;
     addAttention(10.0f);
@@ -230,10 +232,6 @@ inline void buildVoidShiftInteractPrompt(const Vec3& playerPos, char* out, int o
                 buildLevel1NodeActionPrompt(i, out, outSize);
                 return;
             }
-        }
-        if (level1HoldActive && nearPoint2D(playerPos, coop.doorPos, 2.5f)) {
-            std::snprintf(out, outSize, "[E] EXIT TO PARKING");
-            return;
         }
         return;
     }
@@ -383,8 +381,11 @@ inline void updateVoidShiftSystems(float dt, bool sprinting, bool flashlightActi
     }
 
     if (echoPlayback) {
+        // Replays at the recording rate (one sample per 0.1s) regardless of frame rate.
+        echoRecordTimer += dt;
+        while (echoRecordTimer >= 0.10f) { echoRecordTimer -= 0.10f; echoPlaybackIndex++; }
         if (echoPlaybackIndex < (int)echoTrack.size()) {
-            echoGhostPos = echoTrack[echoPlaybackIndex++];
+            echoGhostPos = echoTrack[echoPlaybackIndex];
             echoGhostActive = true;
         } else {
             echoPlayback = false;

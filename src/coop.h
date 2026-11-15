@@ -5,6 +5,7 @@
 #include "item_types.h"
 
 inline bool tryHandleVoidShiftInteract(const Vec3& playerPos);
+void genWorld();
 
 inline void captureVoidShiftState(NetVoidShiftState& out){
     out.attentionLevel = attentionLevel;
@@ -29,6 +30,24 @@ inline void captureVoidShiftState(NetVoidShiftState& out){
     out.npcLostSurvivorActive = npcLostSurvivorActive;
     out.npcLostSurvivorEscorted = npcLostSurvivorEscorted;
     out.npcLostSurvivorPos = npcLostSurvivorPos;
+
+    out.level = gCurrentLevel;
+    out.seed = worldSeed;
+    out.spawn = netMgr.spawnPos;
+    out.runComplete = gRunComplete;
+    out.doorOpen = coop.doorOpen;
+    out.doorPos = coop.doorPos;
+    for(int i=0;i<2;i++) out.doorSwitches[i] = coop.switches[i];
+    for(int i=0;i<3;i++) out.level1Nodes[i] = level1Nodes[i];
+    for(int i=0;i<2;i++) out.level1SyncSwitches[i] = level1SyncSwitches[i];
+    for(int i=0;i<3;i++) out.level1NodeStage[i] = level1NodeStage[i];
+    out.level2Nodes[0] = level2BatteryNode;
+    for(int i=0;i<3;i++) out.level2Nodes[1 + i] = level2FuseNodes[i];
+    out.level2Nodes[4] = level2AccessNode;
+    out.level2Nodes[5] = level2LiftNode;
+    out.level2Nodes[6] = level2PowerNode;
+    out.statusSeq = gStatusSeq;
+    snprintf(out.status, sizeof(out.status), "%s", trapStatusText);
 }
 
 inline void applyVoidShiftState(const NetVoidShiftState& state){
@@ -54,6 +73,44 @@ inline void applyVoidShiftState(const NetVoidShiftState& state){
     npcLostSurvivorActive = state.npcLostSurvivorActive;
     npcLostSurvivorEscorted = state.npcLostSurvivorEscorted;
     npcLostSurvivorPos = state.npcLostSurvivorPos;
+
+    bool doorMoved = !nearPoint2D(coop.doorPos, state.doorPos, 0.1f) || coop.doorOpen != state.doorOpen;
+    coop.doorOpen = state.doorOpen;
+    coop.doorPos = state.doorPos;
+    for(int i=0;i<2;i++) coop.switches[i] = state.doorSwitches[i];
+    for(int i=0;i<3;i++) level1Nodes[i] = state.level1Nodes[i];
+    for(int i=0;i<2;i++) level1SyncSwitches[i] = state.level1SyncSwitches[i];
+    for(int i=0;i<3;i++) level1NodeStage[i] = state.level1NodeStage[i];
+    level2BatteryNode = state.level2Nodes[0];
+    for(int i=0;i<3;i++) level2FuseNodes[i] = state.level2Nodes[1 + i];
+    level2AccessNode = state.level2Nodes[4];
+    level2LiftNode = state.level2Nodes[5];
+    level2PowerNode = state.level2Nodes[6];
+    if(doorMoved) buildGeom();
+
+    static int lastHostStatusSeq = -1;
+    if(state.statusSeq != lastHostStatusSeq){
+        if(lastHostStatusSeq != -1 && state.status[0] != '\0'){
+            snprintf(trapStatusText, sizeof(trapStatusText), "%s", state.status);
+            trapStatusTimer = 4.0f;
+        }
+        lastHostStatusSeq = state.statusSeq;
+    }
+    if(state.runComplete && !gRunComplete){
+        gRunComplete = true;
+        playerEscaped = true;
+        glfwSetInputMode(gWin, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
+}
+
+// The host owns level flow: when its level or seed changes, clients rebuild the same world.
+inline void clientFollowHostLevel(const NetVoidShiftState& state){
+    if(state.level == gCurrentLevel && state.seed == worldSeed) return;
+    gCurrentLevel = state.level;
+    netMgr.worldSeed = state.seed;
+    netMgr.spawnPos = state.spawn;
+    genWorld();
+    buildGeom();
 }
 
 inline void updateCoopObjectiveHost(){
@@ -66,7 +123,8 @@ inline void updateCoopObjectiveHost(){
         }
         coop.switchOn[s] = on;
     }
-    coop.doorOpen = coop.switchOn[0] && coop.switchOn[1];
+    // Latches: with two players nobody could reach the door while both stood on switches.
+    if(coop.switchOn[0] && coop.switchOn[1] && !coop.doorOpen){ coop.doorOpen = true; buildGeom(); setTrapStatus("EXIT DOOR UNLOCKED"); }
 }
 
 inline bool collideCoopDoor(float x, float z, float r){
@@ -93,7 +151,6 @@ inline void syncCoopFromNetwork(){
     netMgr.objectiveStateReceived = false;
     coop.switchOn[0] = netMgr.objectiveSwitches[0];
     coop.switchOn[1] = netMgr.objectiveSwitches[1];
-    coop.doorOpen = netMgr.objectiveDoorOpen;
 }
 
 inline void hostSpawnItem(int type, const Vec3& around){
@@ -166,6 +223,9 @@ inline void processHostInteractRequests(){
                 }
                 break;
             }
+        }else if(type==REQ_EXIT_LEVEL){
+            bool nearDoor = pid>=0 && pid<MAX_PLAYERS && netMgr.players[pid].hasValidPos && nearPoint2D(netMgr.players[pid].pos, coop.doorPos, 4.0f);
+            if(nearDoor) gHostExitRequested = true;
         }else if(type==REQ_TOGGLE_SWITCH){
             if(target>=0 && target<2) coop.switchOn[target] = !coop.switchOn[target];
         }else if(type==REQ_DEBUG_SPAWN_STALKER || type==REQ_DEBUG_SPAWN_CRAWLER || type==REQ_DEBUG_SPAWN_SHADOW){
@@ -235,6 +295,7 @@ inline void clientApplyFeatureState(){
     }
     if(netMgr.voidShiftStateReceived){
         netMgr.voidShiftStateReceived = false;
+        clientFollowHostLevel(netMgr.voidShiftState);
         applyVoidShiftState(netMgr.voidShiftState);
     }
     syncCoopFromNetwork();
@@ -247,7 +308,9 @@ inline void applyRoamEvent(int type, int a, int b, float duration){
         buildGeom();
     }else if(type==ROAM_GEOM_SHIFT){
         (void)a; (void)b;
+        if(multiState==MULTI_IN_GAME) return;
         reshuffleBehind(cam.pos.x, cam.pos.z, cam.yaw);
+        reopenObjectiveCells();
         updateMapContent(playerChunkX, playerChunkZ);
         buildGeom();
     }else if(type==ROAM_FALSE_DOOR){

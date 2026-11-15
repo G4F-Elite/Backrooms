@@ -25,6 +25,8 @@ inline void drawEyeMarker(float sx, float sy, float scale, float alpha) {
     drawOverlayRectNdc(sx - w * 0.10f, sy - h * 0.20f, sx + w * 0.10f, sy + h * 0.20f, 0.90f, 0.30f, 0.24f, alpha);
 }
 
+#include "hud_gameplay.h"
+
 void drawUI(){
     if(gameState==STATE_MENU) drawMenu(vhsTime);
     else if(gameState==STATE_GUIDE) drawGuideScreen();
@@ -77,12 +79,6 @@ void drawUI(){
             drawStaminaBar(playerStamina);
             if(flashlightBattery<100)drawFlashlightBattery(flashlightBattery,flashlightOn);
             else drawRightBarPanel();  // Always visible when flashlight bar not drawn
-            if(playerDowned){
-                char downBuf[64];
-                snprintf(downBuf,64,"DOWNED %.0fs",playerDownedTimer);
-                drawHudText(downBuf,-0.20f,-0.22f,1.45f,0.96f,0.52f,0.44f,0.95f);
-                drawHudTextCentered("[E] USE PLUSH TO SELF-REVIVE",0.0f,-0.30f,1.2f,0.90f,0.72f,0.62f,0.92f);
-            }
             {
                 char contractBuf[128];
                 buildVoidShiftObjectiveLine(contractBuf, 128);
@@ -165,58 +161,7 @@ void drawUI(){
                 }
             }
 
-            if(multiState==MULTI_IN_GAME && !coop.doorOpen){
-                if(settings.debugMode){
-                    if(nearPoint2D(cam.pos, coop.switches[0], 2.6f)||nearPoint2D(cam.pos, coop.switches[1], 2.6f))
-                        drawHudTextCentered("HOLD SWITCH POSITION",0.0f,-0.35f,1.4f,0.75f,0.8f,0.55f,0.90f);
-                }
-            }
-            if(multiState!=MULTI_IN_GAME){
-                bool nearExit = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
-                if(nearExit && settings.debugMode){
-                    if(isStoryExitReady()) drawHudTextCentered("[E] EXIT LEVEL",0.0f,-0.35f,1.4f,0.75f,0.88f,0.70f,0.95f);
-                    else drawHudTextCentered("COMPLETE CONTRACT TO UNLOCK EXIT",0.0f,-0.35f,1.2f,0.88f,0.72f,0.58f,0.93f);
-                }
-            }else{
-                bool nearExit = nearPoint2D(cam.pos, coop.doorPos, 2.4f);
-                if(nearExit && settings.debugMode){
-                    if(coop.doorOpen && isStoryExitReady()) drawHudTextCentered("[E] EXIT LEVEL",0.0f,-0.35f,1.4f,0.75f,0.88f,0.70f,0.95f);
-                    else drawHudTextCentered("OPEN DOOR + COMPLETE CONTRACT TO EXIT",0.0f,-0.35f,1.25f,0.88f,0.72f,0.58f,0.93f);
-                }
-            }
-            if(nearbyWorldItemId>=0 && settings.debugMode){
-                drawHudTextCentered(worldItemPickupPrompt(nearbyWorldItemType),0.0f,-0.43f,1.4f,0.8f,0.8f,0.55f,0.9f);
-            }
-            if(multiState!=MULTI_IN_GAME){
-                Vec3 resonancePos(0,0,0);
-                if(getVoidShiftResonanceTarget(resonancePos)){
-                    Vec3 d = resonancePos - cam.pos;
-                    d.y = 0;
-                    float dist = d.len();
-                    if(settings.debugMode){
-                        char echoBuf[72];
-                        snprintf(echoBuf,72,"RESONANCE %.0fm",dist);
-                        drawHudText(echoBuf,-0.95f,0.50f,1.18f,0.62f,0.85f,0.86f,0.90f);
-                    }
-                }
-
-                if(settings.debugMode){
-                    float sx = 0.0f, sy = 0.0f;
-                    Vec3 survLbl = npcLostSurvivorPos + Vec3(0,1.7f,0);
-                    if(npcLostSurvivorActive && hasLabelLineOfSight(survLbl) && projectToScreen(survLbl, sx, sy)){
-                        drawHudTextCentered("LOST SURVIVOR", sx, sy, 1.0f, 0.92f, 0.78f, 0.64f, 0.92f);
-                    }
-                }
-
-                char actionPrompt[96];
-                buildVoidShiftInteractPrompt(cam.pos, actionPrompt, 96);
-                if(actionPrompt[0] != '\0'){
-                    drawHudTextCentered(actionPrompt,0.0f,-0.43f,1.28f,0.8f,0.84f,0.62f,0.92f);
-                }
-            }
-            if(settings.debugMode && multiState!=MULTI_IN_GAME && echoStatusTimer>0.0f){
-                drawHudTextCentered(echoStatusText,0.0f,0.62f,1.18f,0.7f,0.86f,0.9f,0.92f);
-            }
+            drawGameplayGuidance();
             if(minimapEnabled) drawMinimapOverlay();
             if(storyMgr.hasHallucinations())drawHallucinationEffect((50.0f-playerSanity)/50.0f);
             if(multiState==MULTI_IN_GAME)drawMultiHUD(netMgr.getPlayerCount(),netMgr.isHost);

@@ -55,6 +55,8 @@ struct NetPlayer {
     bool isHost;
     bool hasValidPos;    // True when player has sent at least one position update
     bool flashlightOn;   // Is flashlight on
+    unsigned char flags; // PLAYER_FLAG_* bits from the last state packet
+    unsigned char reviveTarget; // (player id + 1) this player is reviving, 0 if none
     char name[32];
     float lastUpdate;
     unsigned long addr;

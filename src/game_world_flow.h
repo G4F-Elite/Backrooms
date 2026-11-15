@@ -178,7 +178,9 @@ void genWorld(){
     if(multiState==MULTI_IN_GAME && !netMgr.isHost){
         worldSeed=netMgr.worldSeed;
     }else{
+        unsigned int prevSeed = worldSeed;
         worldSeed=(unsigned int)time(nullptr);
+        if(worldSeed==prevSeed) worldSeed++; // a restart must always look like a new world to clients
         if(multiState==MULTI_IN_GAME) netMgr.worldSeed = worldSeed;
     }
     
@@ -197,7 +199,7 @@ void genWorld(){
             sp=netMgr.spawnPos;
             coopBase = netMgr.spawnPos;
         }
-        if(netMgr.myId > 0) sp = findSpawnPos(sp, 2.2f + (float)netMgr.myId * 0.7f);
+        if(netMgr.myId > 0) sp = squadSpawnSlot(sp, netMgr.myId);
     }
     
     cam.pos=Vec3(sp.x,PH,sp.z);cam.yaw=cam.pitch=0;
@@ -211,44 +213,12 @@ void genWorld(){
     entityMgr.reset();storyMgr.init();
     initTrapCorridor(sp);
 
-    // Spawn abyss location away from player spawn
-    {
-        int spawnWX = (int)floorf(sp.x / CS);
-        int spawnWZ = (int)floorf(sp.z / CS);
-        abyss.radius = 3 + (int)(rng() % 3); // radius 3-5 cells
-        int attempts = 0;
-        abyss.active = false;
-        while(attempts < 60 && !abyss.active){
-            attempts++;
-            int offX = 20 + (int)(rng() % 20) - 10; // 10-30 cells away
-            int offZ = 20 + (int)(rng() % 20) - 10;
-            if(rng() % 2) offX = -offX;
-            if(rng() % 2) offZ = -offZ;
-            int cx = spawnWX + offX;
-            int cz = spawnWZ + offZ;
-            // Verify center and some cells around it are open
-            bool valid = true;
-            for(int dx = -1; dx <= 1 && valid; dx++)
-                for(int dz = -1; dz <= 1 && valid; dz++)
-                    if(getCellWorld(cx+dx, cz+dz) != 0) valid = false;
-            if(!valid) continue;
-            abyss.centerX = cx;
-            abyss.centerZ = cz;
-            abyss.active = true;
-            // Carve out the abyss area (ensure open cells)
-            for(int dx = -abyss.radius - 1; dx <= abyss.radius + 1; dx++){
-                for(int dz = -abyss.radius - 1; dz <= abyss.radius + 1; dz++){
-                    if(dx*dx + dz*dz <= (abyss.radius+1)*(abyss.radius+1)){
-                        setCellWorld(cx+dx, cz+dz, 0);
-                    }
-                }
-            }
-        }
-    }
-
     resetPlayerInterpolation();
     initCoopObjectives(coopBase);
-    resetVoidShiftState(cam.pos, coop.doorPos);
+    // Objectives hang off the shared squad spawn (cam.pos differs per player in co-op).
+    resetVoidShiftState(coopBase, coop.doorPos);
+    placeAbyss(coopBase);
+    resetCoopRunState(); resetPoiRuntime();
     {
         Vec3 d = cam.pos - coop.doorPos;
         d.y = 0.0f;
@@ -287,7 +257,6 @@ void genWorld(){
     playerFalling = false;
     fallVelocity = 0.0f;
     fallTimer = 0.0f;
-    abyss = {};
     lastSpawnedNote=-1;noteSpawnTimer=8.0f;
 }
 

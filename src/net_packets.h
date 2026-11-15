@@ -38,7 +38,7 @@ inline void NetworkManager::sendPlayerState(Vec3 pos, float yaw, float pitch, bo
     memcpy(buf + 2, &pos, sizeof(Vec3));
     memcpy(buf + 14, &yaw, 4);
     memcpy(buf + 18, &pitch, 4);
-    buf[22] = flashlight ? 1 : 0;
+    buf[22] = (char)((flashlight ? PLAYER_FLAG_FLASHLIGHT : 0) | localFlags); buf[23] = (char)localReviveTarget;
     broadcast(buf, 32);
 }
 
@@ -411,7 +411,7 @@ inline void NetworkManager::handlePlayerState(char* buf) {
     memcpy(&players[id].pos, buf + 2, sizeof(Vec3));
     memcpy(&players[id].yaw, buf + 14, 4);
     memcpy(&players[id].pitch, buf + 18, 4);
-    players[id].flashlightOn = buf[22] != 0;
+    players[id].flashlightOn = (buf[22] & PLAYER_FLAG_FLASHLIGHT) != 0; players[id].flags = (unsigned char)buf[22]; players[id].reviveTarget = (unsigned char)buf[23];
     players[id].active = true;
     players[id].hasValidPos = true;
     players[id].lastUpdate = (float)glfwGetTime();

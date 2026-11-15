@@ -5,6 +5,7 @@ struct GLFWwindow;
 #include "consumable_slot.h"
 #include "debug_actions.h"
 #include "game_mouse_input.h"
+#include "player_vitals.h"
 void gameInput(GLFWwindow*w){
     static bool debugTogglePressed = false;
     static bool debugEnterPressed = false;
@@ -66,15 +67,6 @@ void gameInput(GLFWwindow*w){
 
         vmUpPressed=num8; vmDownPressed=num2; vmLeftPressed=num4; vmRightPressed=num6;
         vmFwdPressed=num9; vmBackPressed=num3; vmShakeUpPressed=numAdd; vmShakeDownPressed=numSub;
-
-        static float vmPrintTimer = 0.0f;
-        vmPrintTimer -= dTime;
-        if(vmPrintTimer <= 0.0f){
-            char buf[96];
-            snprintf(buf, sizeof(buf), "VM fwd=%.2f side=%.2f up=%.2f shake=%.2f", vmHandFwd, vmHandSide, vmHandUp, vmShake);
-            setTrapStatus(buf);
-            vmPrintTimer = 0.35f;
-        }
     }
 
     if(!settings.debugMode && debugTools.open){
@@ -127,7 +119,7 @@ void gameInput(GLFWwindow*w){
     }
     flashlightPressed=fNow;
     
-    bool eNow=glfwGetKey(w,settings.binds.interact)==GLFW_PRESS;
+    bool eNow=glfwGetKey(w,settings.binds.interact)==GLFW_PRESS && !gCoopDead; // ghosts cannot interact
     if(playerDowned && eNow && !interactPressed && invPlush > 0){ invPlush--; playerDowned=false; playerDownedTimer=0.0f; playerHealth=45.0f; playerSanity+=20.0f; if(playerSanity>100.0f) playerSanity=100.0f; setEchoStatus("SELF-REVIVE SUCCESS"); }
     nearbyWorldItemId = -1;
     nearbyWorldItemType = -1;
@@ -173,9 +165,7 @@ void gameInput(GLFWwindow*w){
             if(netMgr.isHost) contractHandled = tryHandleVoidShiftInteract(cam.pos);
             else { char prompt[96]; buildVoidShiftInteractPrompt(cam.pos, prompt, 96); if(prompt[0] != '\0') { netMgr.sendInteractRequest(REQ_VOID_SHIFT_INTERACT, 0); contractHandled = true; } }
         }
-        if(!contractHandled && nearExitDoor && exitReady){
-            playerEscaped=true; glfwSetInputMode(w,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
-        }
+        if(!contractHandled && nearExitDoor && exitReady) requestLevelExit();
     }
     interactPressed=eNow;
     
@@ -363,7 +353,7 @@ void gameInput(GLFWwindow*w){
     
     float rawSignal = 0.0f;
     Vec3 resonanceTarget(0, 0, 0);
-    bool scannerHasTarget = (activeDeviceSlot == 2 && multiState!=MULTI_IN_GAME && getVoidShiftResonanceTarget(resonanceTarget));
+    bool scannerHasTarget = (activeDeviceSlot == 2 && getVoidShiftResonanceTarget(resonanceTarget));
     if(scannerHasTarget){
         Vec3 toEcho = resonanceTarget - cam.pos;
         float dist = toEcho.len();

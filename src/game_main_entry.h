@@ -36,7 +36,6 @@ int main(){
     int cachedRefreshRateHz = detectActiveRefreshRateHz(gWin);
     gPerfRefreshHz = cachedRefreshRateHz;
     double nextRefreshProbeTime = 0.0;
-    float sanityCollapseTimer = 0.0f;
     initFrameTimeHistory(gPerfFrameTimeHistory, PERF_GRAPH_SAMPLES, 16.6f);
     gPerfFrameTimeHead = PERF_GRAPH_SAMPLES - 1;
     while(!glfwWindowShouldClose(gWin)){
@@ -81,6 +80,8 @@ int main(){
         sndState.deathMode = isPlayerDead;
 
         netMgr.updatePingMarkTtl(dTime);
+        // Keep the session alive while this player sits in pause/settings/intro (a paused host used to time everyone out).
+        if(multiState==MULTI_IN_GAME && gameState!=STATE_GAME) updateMultiplayer();
 
         gPlayerNoise = fastClamp01(sndState.moveIntensity * 0.45f + sndState.sprintIntensity * 0.85f);
         if(isSmileSilenceActive()){ sndState.musicVol*=0.08f; sndState.ambienceVol*=0.02f; sndState.voiceVol*=0.12f; }
@@ -151,23 +152,18 @@ int main(){
                         glfwGetKey(gWin,GLFW_KEY_SPACE)==GLFW_PRESS;
                 bool esN=glfwGetKey(gWin,GLFW_KEY_ESCAPE)==GLFW_PRESS;
                 if(eN&&!enterPressed){
-                    if(isLevelZero(gCurrentLevel)){ gCurrentLevel = 1; gCompletedLevels++; genWorld(); buildGeom(); gameState=STATE_INTRO; }
-                    else{ gCompletedLevels++; gCurrentLevel = 0; gameState=STATE_MENU; menuSel=0; glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL); }
+                    if(multiState==MULTI_IN_GAME) leaveRunToMenu();
+                    else if(isLevelZero(gCurrentLevel)){ gCurrentLevel = 1; gCompletedLevels++; genWorld(); buildGeom(); gameState=STATE_INTRO; }
+                    else{ gCompletedLevels++; leaveRunToMenu(); }
                 }
-                if(esN&&!escPressed){
-                    gameState=STATE_MENU;menuSel=0;
-                    glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
-                }
+                if(esN&&!escPressed) leaveRunToMenu();
                 enterPressed=eN;escPressed=esN;
             }else if(isPlayerDead){
                 bool eN=glfwGetKey(gWin,GLFW_KEY_ENTER)==GLFW_PRESS||
                         glfwGetKey(gWin,GLFW_KEY_SPACE)==GLFW_PRESS;
                 bool esN=glfwGetKey(gWin,GLFW_KEY_ESCAPE)==GLFW_PRESS;
                 if(eN&&!enterPressed){genWorld();buildGeom();gameState=STATE_INTRO;}
-                if(esN&&!escPressed){
-                    gameState=STATE_MENU;menuSel=0;
-                    glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
-                }
+                if(esN&&!escPressed) leaveRunToMenu();
                 enterPressed=eN;escPressed=esN;
             }else{
                 if(lightsOutTimer>0){
@@ -183,7 +179,7 @@ int main(){
                 updateFloorHoles();
                 gameInput(gWin);
                 updatePoiRuntime();
-                if(multiState!=MULTI_IN_GAME) updateRoamEventsHost();
+                if(multiState!=MULTI_IN_GAME){ updateRoamEventsHost(); hostUpdateItems(); }
                 int holeCountNow = (int)floorHoles.size();
                 if(holeCountNow != lastHoleCount){
                     buildGeom();
@@ -205,13 +201,15 @@ int main(){
                 }
                 nearNoteId=-1;
                 bool canSpawnEnt = (multiState!=MULTI_IN_GAME || netMgr.isHost);
+                collectEntityTargets();
                 entitySpawnTimer-=dTime;
                 int maxEnt = computeEntityCap(survivalTime);
                 maxEnt += levelEntityCapBonus(gCurrentLevel);
                 if(maxEnt > 8) maxEnt = 8;
                 if(canSpawnEnt && entitySpawnTimer<=0&&(int)entityMgr.entities.size()<maxEnt){
                     EntityType type = chooseSpawnEntityType(survivalTime, (int)rng(), (int)rng());
-                    Vec3 spawnP = findSpawnPos(cam.pos,25.0f);
+                    Vec3 huntAround = entityMgr.targetCount>0 ? entityMgr.targetPos[rng()%(unsigned)entityMgr.targetCount] : cam.pos;
+                    Vec3 spawnP = findSpawnPos(huntAround,25.0f);
                     if(!hasEntityNearPos(entityMgr.entities, spawnP, 14.0f)){
                         entityMgr.spawnEntity(type,spawnP,nullptr,0,0);
                     }
@@ -247,93 +245,19 @@ int main(){
                 if(reshuffleChance>80.0f)reshuffleChance=80.0f;
                 float reshuffleDelay=25.0f-survivalTime*0.03f;
                 if(reshuffleDelay<5.0f)reshuffleDelay=5.0f;
-                bool canReshuffle = (multiState!=MULTI_IN_GAME || netMgr.isHost);
+                // Walls only shift in solo: in co-op teammates would watch them pop and peers would desync.
+                bool canReshuffle = (multiState!=MULTI_IN_GAME);
                 bool frontReshuffle=survivalTime>300&&rng()%100<20;
                 if(canReshuffle && reshuffleTimer<=0&&rng()%100<(int)reshuffleChance){
                     if(frontReshuffle||reshuffleBehind(cam.pos.x,cam.pos.z,cam.yaw)){
+                        reopenObjectiveCells();
                         updateMapContent(playerChunkX,playerChunkZ);
                         buildGeom();
-                        if(multiState==MULTI_IN_GAME && netMgr.isHost){
-                            netMgr.sendReshuffle(playerChunkX, playerChunkZ, worldSeed);
-                        }
                     }
                     reshuffleTimer=reshuffleDelay+(rng()%10);
                 }else if(reshuffleTimer<=0)reshuffleTimer=8.0f+(rng()%8);
                 
-                float levelDanger = levelDangerScale(gCurrentLevel);
-                if(activeDeviceSlot==3 && heldConsumableType==ITEM_PLUSH_TOY) playerSanity += 3.8f*dTime; else playerSanity -= sanityPassiveDrainPerSec(levelDanger) * dTime;
-                if(entityMgr.dangerLevel>0.1f) playerSanity -= entityMgr.dangerLevel*(8.0f * levelDanger)*dTime; else playerSanity += sanityRecoveryPerSec(true, playerSanity) * dTime;
-                playerSanity=playerSanity>100?100:(playerSanity<0?0:playerSanity);
-                int cellX = (int)floorf(cam.pos.x / CS);
-                int cellZ = (int)floorf(cam.pos.z / CS);
-                if(!playerFalling && isFallCell(cellX, cellZ)){
-                    float cellCenterX = (cellX + 0.5f) * CS;
-                    float cellCenterZ = (cellZ + 0.5f) * CS;
-                    float dx = cam.pos.x - cellCenterX;
-                    float dz = cam.pos.z - cellCenterZ;
-                    float distFromCenter = sqrtf(dx*dx + dz*dz);
-                    if(distFromCenter < CS * 0.35f){
-                        playerFalling = true;
-                        fallVelocity = 0.0f;
-                        fallTimer = 0.0f;
-                        if(isAbyssCell(cellX, cellZ))
-                            setTrapStatus("THE VOID SWALLOWS YOU.");
-                        else
-                            setTrapStatus("FLOOR COLLAPSE. YOU FELL.");
-                    }
-                }
-                if(playerSanity<=0.0f && !isPlayerDead){
-                    sanityCollapseTimer += dTime;
-                    if(sanityCollapseTimer>=2.3f){
-                        if(!playerDowned){
-                            playerDowned = true;
-                            playerDownedTimer = 60.0f;
-                            snprintf(gDeathReason,sizeof(gDeathReason),"DOWNED: COGNITIVE OVERLOAD");
-                            setEchoStatus("DOWNED: USE PLUSH TO STABILIZE");
-                        }else{
-                            isPlayerDead=true;playerHealth=0;snprintf(gDeathReason,sizeof(gDeathReason),"CAUSE: COGNITIVE OVERLOAD"); glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
-                        }
-                    }
-                }else if(!isPlayerDead){
-                    sanityCollapseTimer -= dTime * 1.7f;
-                    if(sanityCollapseTimer < 0.0f) sanityCollapseTimer = 0.0f;
-                }
-                EntityType attackerType = entityMgr.getAttackingType(cam.pos);
-                if(attackerType != ENTITY_NONE){
-                    MonsterAttackProfile attack = monsterAttackProfile(attackerType);
-                    playerHealth-=attack.healthDps*dTime;playerSanity-=attack.sanityDps*dTime;
-                    if(attack.hitShake > camShake) camShake = attack.hitShake; if(attack.hitFlash > damageFlash) damageFlash = attack.hitFlash;
-                    if(multiState==MULTI_IN_GAME){
-                        netMgr.sendScare(netMgr.myId);
-                        if(netMgr.isHost) triggerScare(attack.scareVol);
-                    }else{
-                        triggerScare(attack.scareVol);
-                    }
-                    if(playerHealth<=0){
-                        if(!playerDowned){
-                            playerDowned = true;
-                            playerDownedTimer = 60.0f;
-                            playerHealth = 15.0f;
-                            snprintf(gDeathReason,sizeof(gDeathReason),"DOWNED: HOSTILE CONTACT");
-                            setEchoStatus("DOWNED: SELF-REVIVE WITH PLUSH");
-                        }else{
-                            isPlayerDead=true;playerHealth=0;snprintf(gDeathReason,sizeof(gDeathReason),"CAUSE: HOSTILE CONTACT");
-                            glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
-                        }
-                    }
-                }
-                if(playerDowned && !isPlayerDead){
-                    playerDownedTimer -= dTime;
-                    playerStamina -= dTime * 14.0f;
-                    if(playerStamina < 0.0f) playerStamina = 0.0f;
-                    if(playerDownedTimer <= 0.0f){
-                        playerDownedTimer = 0.0f;
-                        isPlayerDead = true;
-                        playerHealth = 0.0f;
-                        snprintf(gDeathReason,sizeof(gDeathReason),"CAUSE: BLEED OUT");
-                        glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
-                    }
-                }
+                updatePlayerVitals();
                 camShake*=0.9f;damageFlash*=0.92f;survivalTime+=dTime;
                 if(multiState==MULTI_IN_GAME && !netMgr.isHost) captureSessionSnapshot();
                 updateMultiplayer();
@@ -386,7 +310,7 @@ int main(){
             vhsRtxDenoiseOnLoc=glGetUniformLocation(vhsShader,"rtxDenoiseOn"); vhsRtxDenoiseStrengthLoc=glGetUniformLocation(vhsShader,"rtxDenoiseStrength");
             vhsDeathFxLoc=glGetUniformLocation(vhsShader,"deathFx");
         }
-        float preDeathFx = sanityCollapseTimer / 2.3f; if(preDeathFx < 0.0f) preDeathFx = 0.0f; if(preDeathFx > 1.0f) preDeathFx = 1.0f;
+        float preDeathFx = gSanityCollapseTimer / 2.3f; if(preDeathFx < 0.0f) preDeathFx = 0.0f; if(preDeathFx > 1.0f) preDeathFx = 1.0f;
         float deathFxUniform = (gameState==STATE_GAME || gameState==STATE_PAUSE) ? (isPlayerDead ? (0.55f + 0.45f * sinf(vhsTime * 2.9f)) : preDeathFx) : (isPlayerDead ? 1.0f : 0.0f);
         static int prevAaMode = -1;
         int aaMode = clampAaMode(settings.aaMode);

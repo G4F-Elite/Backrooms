@@ -49,7 +49,8 @@ enum InteractRequestType {
     REQ_DEBUG_SPAWN_STALKER = 3,
     REQ_DEBUG_SPAWN_CRAWLER = 4,
     REQ_DEBUG_SPAWN_SHADOW = 5,
-    REQ_VOID_SHIFT_INTERACT = 6
+    REQ_VOID_SHIFT_INTERACT = 6,
+    REQ_EXIT_LEVEL = 7
 };
 
 enum RoamEventType {
@@ -297,8 +298,11 @@ inline void initCoopObjectives(const Vec3& basePos){
     };
 
     auto openCell = [](int wx, int wz) { return getCellWorld(wx, wz) == 0; };
+    // The exit door spans one corridor cell: floor in front and behind, walls on both sides.
+    // (The old footprint check also demanded open side cells, which can never hold together
+    // with the wall test, so the door always fell back onto the spawn cell.)
     auto validDoorCell = [](int wx, int wz) {
-        if (!isDoorFootprintClear(wx, wz, [](int cx, int cz) { return getCellWorld(cx, cz); })) return false;
+        if (getCellWorld(wx, wz) != 0) return false;
         bool frontOpen = getCellWorld(wx, wz + 1) == 0;
         bool backOpen = getCellWorld(wx, wz - 1) == 0;
         bool leftWall = getCellWorld(wx - 1, wz) == 1;
@@ -418,9 +422,31 @@ inline void setEchoStatus(const char* msg){
     echoStatusTimer = 4.0f;
 }
 
+// Squad-wide status line: the host mirrors it to every client (see captureVoidShiftState).
+inline int gStatusSeq = 0;
+
 inline void setTrapStatus(const char* msg){
     snprintf(trapStatusText, sizeof(trapStatusText), "%s", msg);
     trapStatusTimer = 4.0f;
+    gStatusSeq++;
+}
+
+inline void tickStatusTimers(float dt){
+    if(trapStatusTimer > 0.0f) trapStatusTimer -= dt;
+    if(echoStatusTimer > 0.0f) echoStatusTimer -= dt;
+}
+
+// Co-op run flow. A dead co-op player stays in the session as a ghost until the next level.
+inline bool gCoopDead = false;
+inline bool gRunComplete = false;
+inline bool gHostExitRequested = false;
+
+inline void resetCoopRunState(){
+    gCoopDead = false;
+    gRunComplete = false;
+    gHostExitRequested = false;
+    netMgr.localFlags = 0;
+    netMgr.localReviveTarget = 0;
 }
 
 // === Viewmodel tuning (runtime) ===
@@ -453,6 +479,8 @@ inline bool processLevel2Step(const Vec3& playerPos);
 inline bool buildLevel2ActionPrompt(const Vec3& playerPos, char* out, int outSize);
 inline bool isLevel2HoldMaintained();
 inline void initVoidShiftSetpieces();
+inline void snapVoidShiftObjectives(const Vec3& base);
+inline void reopenObjectiveCells();
 inline void triggerConferenceCallSetpiece(float duration);
 inline void triggerCorridorShiftSetpiece(float duration);
 inline void triggerBlackoutSetpiece(float duration);
@@ -465,6 +493,7 @@ inline void updateVoidShiftEnemyEffects(float dt);
 #include "void_shift_level2_ext.h"
 #include "void_shift_setpieces_ext.h"
 #include "void_shift_enemy_effects_ext.h"
+#include "objective_layout.h"
 
 inline int storyNotesRequired(){
     if (isParkingLevel(gCurrentLevel)) return 3;

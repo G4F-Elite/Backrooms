@@ -51,6 +51,26 @@ struct NetVoidShiftState {
     bool npcLostSurvivorActive;
     bool npcLostSurvivorEscorted;
     Vec3 npcLostSurvivorPos;
+    // Run flow + layout are host-authoritative so late joiners and level changes stay in sync.
+    int level;
+    unsigned int seed;
+    Vec3 spawn;
+    bool runComplete;
+    bool doorOpen;
+    Vec3 doorPos;
+    Vec3 doorSwitches[2];
+    Vec3 level1Nodes[3];
+    Vec3 level1SyncSwitches[2];
+    int level1NodeStage[3];
+    Vec3 level2Nodes[7];
+    int statusSeq;
+    char status[64];
+};
+
+enum PlayerStateFlag {
+    PLAYER_FLAG_FLASHLIGHT = 1,
+    PLAYER_FLAG_DOWNED = 2,
+    PLAYER_FLAG_DEAD = 4
 };
 
 class NetworkManager {
@@ -102,6 +122,8 @@ public:
 
     NetVoidShiftState voidShiftState;
     bool voidShiftStateReceived;
+    unsigned char localFlags = 0;      // PLAYER_FLAG_DOWNED / PLAYER_FLAG_DEAD for the local player
+    unsigned char localReviveTarget = 0; // (player id + 1), 0 if none
 
     // Coop ping marker (simple broadcast marker)
     bool pingMarkReceived;
