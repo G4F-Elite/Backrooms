@@ -222,6 +222,116 @@ void testNonPushablePropDoesNotMove() {
     assert(mapProps[0].pos.x == 10.0f);
 }
 
+void resetAll(unsigned int seed) {
+    chunks.clear();
+    lights.clear();
+    pillars.clear();
+    resetMapContent();
+    worldSeed = seed;
+}
+
+// Solid props stand on open floor only and never intersect each other.
+void testPropsDoNotOverlapWallsOrEachOther() {
+    const unsigned int seeds[] = {11u, 1337u, 8088u, 555555u};
+    for (unsigned int seed : seeds) {
+        resetAll(seed);
+        generateArea(0, 0);
+        for (size_t i = 0; i < mapProps.size(); i++) {
+            const MapProp& a = mapProps[i];
+            if (a.type == MAP_PROP_PUDDLE) continue;
+            float ahx = 0.0f, ahz = 0.0f;
+            mapPropHalfExtents(a, ahx, ahz);
+            const float corners[4][2] = {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}};
+            for (const auto& c : corners) {
+                int wx = (int)floorf((a.pos.x + c[0] * ahx) / CS);
+                int wz = (int)floorf((a.pos.z + c[1] * ahz) / CS);
+                assert(getCellWorld(wx, wz) == 0);
+            }
+            assert(doorwayAxisAt((int)floorf(a.pos.x / CS), (int)floorf(a.pos.z / CS)) == 0);
+            for (size_t j = i + 1; j < mapProps.size(); j++) {
+                const MapProp& b = mapProps[j];
+                if (b.type == MAP_PROP_PUDDLE) continue;
+                float bhx = 0.0f, bhz = 0.0f;
+                mapPropHalfExtents(b, bhx, bhz);
+                bool overlap = fabsf(a.pos.x - b.pos.x) < ahx + bhx && fabsf(a.pos.z - b.pos.z) < ahz + bhz;
+                assert(!overlap);
+            }
+        }
+    }
+}
+
+// Lockers, cabinets and desks stand with their back flush against a wall.
+void testWallPropsStandFlushAgainstWall() {
+    const unsigned int seeds[] = {3u, 1337u, 424242u, 90210u};
+    int checked = 0;
+    for (unsigned int seed : seeds) {
+        resetAll(seed);
+        generateArea(0, 0);
+        for (const auto& p : mapProps) {
+            if (!isMapPropWallType(p.type)) continue;
+            float bx = 0.0f, bz = 0.0f;
+            mapPropBaseExtents(p.type, bx, bz);
+            float backX = -sinf(p.yaw);
+            float backZ = -cosf(p.yaw);
+            float reach = bz * p.scale;
+            Vec3 justBehind(p.pos.x + backX * (reach + 0.08f), 0.0f, p.pos.z + backZ * (reach + 0.08f));
+            Vec3 backFace(p.pos.x + backX * (reach - 0.01f), 0.0f, p.pos.z + backZ * (reach - 0.01f));
+            assert(getCellWorld((int)floorf(justBehind.x / CS), (int)floorf(justBehind.z / CS)) == 1);
+            assert(getCellWorld((int)floorf(backFace.x / CS), (int)floorf(backFace.z / CS)) == 0);
+            checked++;
+        }
+    }
+    assert(checked > 5);
+}
+
+// POI sets back onto a wall, block the player, and leave the cell centre free for loot.
+void testPoiSetsBackOntoWall() {
+    const unsigned int seeds[] = {7u, 1337u, 777001u, 129001u, 31337u};
+    int checked = 0;
+    for (unsigned int seed : seeds) {
+        resetAll(seed);
+        generateArea(0, 0);
+        for (const auto& poi : mapPois) {
+            int dx = 0, dz = 0;
+            mapPoiWallDir(poi, dx, dz);
+            Vec3 anchor = mapPoiAnchor(poi);
+            int wallX = (int)floorf((anchor.x + dx * 0.1f) / CS);
+            int wallZ = (int)floorf((anchor.z + dz * 0.1f) / CS);
+            assert(getCellWorld(wallX, wallZ) == 1);
+            float minX, maxX, minZ, maxZ;
+            mapPoiFootprint(poi, minX, maxX, minZ, maxZ);
+            assert(collideMapProps((minX + maxX) * 0.5f, (minZ + maxZ) * 0.5f, 0.1f));
+            assert(!collideMapPois(poi.pos.x, poi.pos.z, 0.3f));
+            for (const auto& p : mapProps) {
+                if (p.type == MAP_PROP_PUDDLE) continue;
+                float hx = 0.0f, hz = 0.0f;
+                mapPropHalfExtents(p, hx, hz);
+                bool overlap = p.pos.x + hx > minX && p.pos.x - hx < maxX && p.pos.z + hz > minZ && p.pos.z - hz < maxZ;
+                assert(!overlap);
+            }
+            checked++;
+        }
+    }
+    assert(checked > 3);
+}
+
+// Refreshing content (or leaving and coming back) must not stack duplicates.
+void testRepopulationDoesNotDuplicate() {
+    resetAll(606060);
+    generateArea(0, 0);
+    auto first = makeSnapshot();
+    size_t pois = mapPois.size();
+    updateMapContent(0, 0);
+    updateMapContent(0, 0);
+    assert(makeSnapshot() == first);
+    assert(mapPois.size() == pois);
+
+    generateArea(4, 0);
+    generateArea(0, 0);
+    assert(makeSnapshot() == first);
+    assert(mapPois.size() == pois);
+}
+
 int main() {
     testDeterministicPlacementBySeed();
     testGeneratesVariedProps();
@@ -231,6 +341,10 @@ int main() {
     testPoisNeverInsideWalls();
     testPushablePropCanMove();
     testNonPushablePropDoesNotMove();
+    testPropsDoNotOverlapWallsOrEachOther();
+    testWallPropsStandFlushAgainstWall();
+    testPoiSetsBackOntoWall();
+    testRepopulationDoesNotDuplicate();
     std::cout << "All map content tests passed.\n";
     return 0;
 }

@@ -3,6 +3,7 @@
 #include <vector>
 #include <random>
 #include <algorithm>
+#include <unordered_set>
 
 #include "world.h"
 #include "progression.h"
@@ -23,6 +24,7 @@ enum MapPropType {
     MAP_PROP_LOCKER_BANK = 12
 };
 
+// pos = centre of the footprint on the floor, yaw = facing (local +Z is the front).
 struct MapProp {
     Vec3 pos;
     int type;
@@ -37,6 +39,7 @@ enum MapPoiType {
     MAP_POI_RESTROOM = 3
 };
 
+// pos = centre of the POI cell. The built set stands against that cell's wall.
 struct MapPoi {
     Vec3 pos;
     int type;
@@ -47,29 +50,13 @@ struct MapPoi {
 extern std::vector<MapProp> mapProps;
 extern std::vector<MapPoi> mapPois;
 
-inline unsigned int chunkMapContentSeed(int cx, int cz, unsigned int salt) {
-    unsigned int s = worldSeed ^ (unsigned int)(cx * 92837111) ^ (unsigned int)(cz * 689287499);
-    return s ^ salt;
-}
+// Chunks whose props/POIs were already placed (keeps pushed props from respawning).
+inline std::unordered_set<long long> mapContentChunks;
 
-inline bool hasMapPropNear(const Vec3& p, float radius) {
-    float r2 = radius * radius;
-    for (const auto& it : mapProps) {
-        float dx = it.pos.x - p.x;
-        float dz = it.pos.z - p.z;
-        if (dx * dx + dz * dz < r2) return true;
-    }
-    return false;
-}
-
-inline bool hasMapPoiNear(const Vec3& p, float radius) {
-    float r2 = radius * radius;
-    for (const auto& it : mapPois) {
-        float dx = it.pos.x - p.x;
-        float dz = it.pos.z - p.z;
-        if (dx * dx + dz * dz < r2) return true;
-    }
-    return false;
+inline void resetMapContent() {
+    mapProps.clear();
+    mapPois.clear();
+    mapContentChunks.clear();
 }
 
 inline bool isMapPropPushableType(int type) {
@@ -78,21 +65,38 @@ inline bool isMapPropPushableType(int type) {
            type == MAP_PROP_BOX_PALLET;
 }
 
+inline bool isMapPropWallType(int type) {
+    return type == MAP_PROP_DESK ||
+           type == MAP_PROP_CABINET ||
+           type == MAP_PROP_LOCKER_BANK;
+}
+
+// Unscaled, unrotated half extents of the model footprint (see prop_models.h).
+inline void mapPropBaseExtents(int type, float& hx, float& hz) {
+    if (type == MAP_PROP_CRATE_STACK) { hx = 0.50f; hz = 0.50f; return; }
+    if (type == MAP_PROP_CONE_CLUSTER) { hx = 0.50f; hz = 0.50f; return; }
+    if (type == MAP_PROP_BARRIER) { hx = 0.80f; hz = 0.24f; return; }
+    if (type == MAP_PROP_CABLE_REEL) { hx = 0.50f; hz = 0.50f; return; }
+    if (type == MAP_PROP_PUDDLE) { hx = 0.0f; hz = 0.0f; return; }
+    if (type == MAP_PROP_DEBRIS) { hx = 0.60f; hz = 0.50f; return; }
+    if (type == MAP_PROP_DESK) { hx = 0.70f; hz = 0.35f; return; }
+    if (type == MAP_PROP_CHAIR) { hx = 0.25f; hz = 0.25f; return; }
+    if (type == MAP_PROP_CABINET) { hx = 0.25f; hz = 0.30f; return; }
+    if (type == MAP_PROP_PARTITION) { hx = 0.75f; hz = 0.14f; return; }
+    if (type == MAP_PROP_BOX_PALLET) { hx = 0.60f; hz = 0.50f; return; }
+    if (type == MAP_PROP_DRUM_STACK) { hx = 0.60f; hz = 0.56f; return; }
+    if (type == MAP_PROP_LOCKER_BANK) { hx = 0.57f; hz = 0.23f; return; }
+    hx = 0.5f; hz = 0.5f;
+}
+
+// World-space AABB half extents of the rotated, scaled footprint.
 inline void mapPropHalfExtents(const MapProp& p, float& hx, float& hz) {
-    float s = p.scale;
-    if (p.type == MAP_PROP_CONE_CLUSTER) { hx = 0.62f * s; hz = 0.62f * s; return; }
-    if (p.type == MAP_PROP_BARRIER) { hx = 0.82f * s; hz = 0.28f * s; return; }
-    if (p.type == MAP_PROP_CABLE_REEL) { hx = 0.54f * s; hz = 0.54f * s; return; }
-    if (p.type == MAP_PROP_PUDDLE) { hx = 0.0f; hz = 0.0f; return; }
-    if (p.type == MAP_PROP_DEBRIS) { hx = 0.76f * s; hz = 0.72f * s; return; }
-    if (p.type == MAP_PROP_DESK) { hx = 0.62f * s; hz = 0.46f * s; return; }
-    if (p.type == MAP_PROP_CHAIR) { hx = 0.32f * s; hz = 0.32f * s; return; }
-    if (p.type == MAP_PROP_CABINET) { hx = 0.40f * s; hz = 0.34f * s; return; }
-    if (p.type == MAP_PROP_PARTITION) { hx = 0.72f * s; hz = 0.18f * s; return; }
-    if (p.type == MAP_PROP_BOX_PALLET) { hx = 0.68f * s; hz = 0.60f * s; return; }
-    if (p.type == MAP_PROP_DRUM_STACK) { hx = 0.52f * s; hz = 0.52f * s; return; }
-    if (p.type == MAP_PROP_LOCKER_BANK) { hx = 0.66f * s; hz = 0.30f * s; return; }
-    hx = 0.80f * s; hz = 0.74f * s;
+    float bx = 0.0f, bz = 0.0f;
+    mapPropBaseExtents(p.type, bx, bz);
+    float c = fabsf(cosf(p.yaw));
+    float s = fabsf(sinf(p.yaw));
+    hx = (bx * c + bz * s) * p.scale;
+    hz = (bx * s + bz * c) * p.scale;
 }
 
 inline float mapPropCollisionRadius(const MapProp& p) {
@@ -101,16 +105,84 @@ inline float mapPropCollisionRadius(const MapProp& p) {
     return hx > hz ? hx : hz;
 }
 
+// ---------------------------------------------------------------------------
+// POI sets
+// ---------------------------------------------------------------------------
+
+// Direction from the POI cell towards the wall its set stands against.
+inline void mapPoiWallDir(const MapPoi& poi, int& dx, int& dz) {
+    int wx = (int)floorf(poi.pos.x / CS);
+    int wz = (int)floorf(poi.pos.z / CS);
+    dx = 0;
+    dz = -1;
+    if (getCellWorld(wx, wz - 1) == 1) return;
+    if (getCellWorld(wx, wz + 1) == 1) { dz = 1; return; }
+    if (getCellWorld(wx - 1, wz) == 1) { dx = -1; dz = 0; return; }
+    if (getCellWorld(wx + 1, wz) == 1) { dx = 1; dz = 0; return; }
+}
+
+// Width along the wall and depth out of the wall of each built set (see poi_models.h).
+inline void mapPoiSetSize(int type, float& width, float& depth) {
+    if (type == MAP_POI_OFFICE) { width = 2.60f; depth = 0.80f; return; }
+    if (type == MAP_POI_SERVER) { width = 2.10f; depth = 0.95f; return; }
+    if (type == MAP_POI_STORAGE) { width = 2.40f; depth = 0.60f; return; }
+    width = 2.20f;
+    depth = 0.60f;
+}
+
+// Yaw that makes the set's local +Z point away from the wall.
+inline float mapPoiYaw(const MapPoi& poi) {
+    int dx = 0, dz = 0;
+    mapPoiWallDir(poi, dx, dz);
+    return atan2f((float)-dx, (float)-dz);
+}
+
+// Local origin of the set: on the wall face, centred on the cell.
+inline Vec3 mapPoiAnchor(const MapPoi& poi) {
+    int dx = 0, dz = 0;
+    mapPoiWallDir(poi, dx, dz);
+    return Vec3(poi.pos.x + (float)dx * CS * 0.5f, 0.0f, poi.pos.z + (float)dz * CS * 0.5f);
+}
+
+inline void mapPoiFootprint(const MapPoi& poi, float& minX, float& maxX, float& minZ, float& maxZ) {
+    int dx = 0, dz = 0;
+    mapPoiWallDir(poi, dx, dz);
+    float width = 0.0f, depth = 0.0f;
+    mapPoiSetSize(poi.type, width, depth);
+    float cx = poi.pos.x + (float)dx * (CS * 0.5f - depth * 0.5f);
+    float cz = poi.pos.z + (float)dz * (CS * 0.5f - depth * 0.5f);
+    float hx = (dx != 0) ? depth * 0.5f : width * 0.5f;
+    float hz = (dx != 0) ? width * 0.5f : depth * 0.5f;
+    minX = cx - hx;
+    maxX = cx + hx;
+    minZ = cz - hz;
+    maxZ = cz + hz;
+}
+
+inline bool collideMapPois(float x, float z, float pr) {
+    for (const auto& poi : mapPois) {
+        if (fabsf(poi.pos.x - x) > CS || fabsf(poi.pos.z - z) > CS) continue;
+        float minX, maxX, minZ, maxZ;
+        mapPoiFootprint(poi, minX, maxX, minZ, maxZ);
+        if (x > minX - pr && x < maxX + pr && z > minZ - pr && z < maxZ + pr) return true;
+    }
+    return false;
+}
+
+// ---------------------------------------------------------------------------
+// Collision / pushing
+// ---------------------------------------------------------------------------
+
 inline bool collideMapPropsEx(float x, float z, float pr, int ignoreIndex) {
-    for (const auto& p : mapProps) {
-        int idx = (int)(&p - &mapProps[0]);
+    for (int idx = 0; idx < (int)mapProps.size(); idx++) {
         if (idx == ignoreIndex) continue;
+        const MapProp& p = mapProps[idx];
         float hx = 0.0f, hz = 0.0f;
         mapPropHalfExtents(p, hx, hz);
         if (hx <= 0.001f || hz <= 0.001f) continue;
         if (fabsf(x - p.pos.x) < (hx + pr) && fabsf(z - p.pos.z) < (hz + pr)) return true;
     }
-    return false;
+    return collideMapPois(x, z, pr);
 }
 
 inline bool collideMapProps(float x, float z, float pr) {
@@ -163,240 +235,252 @@ inline bool tryPushMapProps(float playerX, float playerZ, float pr, float moveX,
     return true;
 }
 
-inline int countOpenNeighbors(const Chunk& c, int lx, int lz) {
-    int open = 0;
-    if (lx > 0 && c.cells[lx - 1][lz] == 0) open++;
-    if (lx < CHUNK_SIZE - 1 && c.cells[lx + 1][lz] == 0) open++;
-    if (lz > 0 && c.cells[lx][lz - 1] == 0) open++;
-    if (lz < CHUNK_SIZE - 1 && c.cells[lx][lz + 1] == 0) open++;
-    return open;
-}
+// ---------------------------------------------------------------------------
+// Placement
+// ---------------------------------------------------------------------------
 
-inline int countWallNeighbors(const Chunk& c, int lx, int lz) {
+inline int countWallNeighborsWorld(int wx, int wz) {
     int walls = 0;
-    if (lx > 0 && c.cells[lx - 1][lz] == 1) walls++;
-    if (lx < CHUNK_SIZE - 1 && c.cells[lx + 1][lz] == 1) walls++;
-    if (lz > 0 && c.cells[lx][lz - 1] == 1) walls++;
-    if (lz < CHUNK_SIZE - 1 && c.cells[lx][lz + 1] == 1) walls++;
+    if (getCellWorld(wx - 1, wz) == 1) walls++;
+    if (getCellWorld(wx + 1, wz) == 1) walls++;
+    if (getCellWorld(wx, wz - 1) == 1) walls++;
+    if (getCellWorld(wx, wz + 1) == 1) walls++;
     return walls;
 }
 
+// Cells next to chunk-view edges are skipped (lx/lz 1..14) so a missing neighbour chunk
+// is never mistaken for a wall.
 inline bool isMapPropCellValid(const Chunk& c, int lx, int lz) {
-    if (lx < 2 || lx > CHUNK_SIZE - 3 || lz < 2 || lz > CHUNK_SIZE - 3) return false;
+    if (lx < 1 || lx > CHUNK_SIZE - 2 || lz < 1 || lz > CHUNK_SIZE - 2) return false;
     if (c.cells[lx][lz] != 0) return false;
-    int open = countOpenNeighbors(c, lx, lz);
-    if (open < 2) return false;
-    int walls = countWallNeighbors(c, lx, lz);
-    return walls >= 1;
+    int wx = c.cx * CHUNK_SIZE + lx;
+    int wz = c.cz * CHUNK_SIZE + lz;
+    if (doorwayAxisAt(wx, wz) != 0) return false;
+    return countWallNeighborsWorld(wx, wz) <= 2;
 }
 
-inline void pushMapPropUnique(int cx, int cz, int lx, int lz, int type, float scale, float yaw) {
-    Vec3 base(
-        ((float)(cx * CHUNK_SIZE + lx) + 0.5f) * CS,
-        0.0f,
-        ((float)(cz * CHUNK_SIZE + lz) + 0.5f) * CS
-    );
-    Vec3 wp = base;
-    bool foundValid = false;
-    MapProp probe{};
-    probe.type = type;
-    probe.scale = scale;
-    probe.yaw = yaw;
-    float propRadius = mapPropCollisionRadius(probe) * 0.86f;
-    const float jitter = CS * 0.22f;
-    for (int attempt = 0; attempt < 3; attempt++) {
-        float mul = (attempt == 0) ? 1.0f : (attempt == 1 ? 0.6f : 0.3f);
-        float ox = sinf(yaw * 1.37f + (float)attempt * 0.91f) * jitter * mul;
-        float oz = cosf(yaw * 1.61f + (float)attempt * 1.23f) * jitter * mul;
-        Vec3 cand(base.x + ox, 0.0f, base.z + oz);
-        int wx = (int)floorf(cand.x / CS);
-        int wz = (int)floorf(cand.z / CS);
-        if (getCellWorld(wx, wz) != 0) continue;
-        if (propRadius > 0.001f && collideWorld(cand.x, cand.z, propRadius)) continue;
-        wp = cand;
-        foundValid = true;
-        break;
+// True when the footprint touches a wall cell, a doorway, a pillar, a prop or a POI set.
+inline bool isMapPropSpotBlocked(const MapProp& pr) {
+    float hx = 0.0f, hz = 0.0f;
+    mapPropHalfExtents(pr, hx, hz);
+    int x0 = (int)floorf((pr.pos.x - hx) / CS), x1 = (int)floorf((pr.pos.x + hx) / CS);
+    int z0 = (int)floorf((pr.pos.z - hz) / CS), z1 = (int)floorf((pr.pos.z + hz) / CS);
+    for (int wx = x0; wx <= x1; wx++) {
+        for (int wz = z0; wz <= z1; wz++) {
+            if (getCellWorld(wx, wz) != 0) return true;
+            if (doorwayAxisAt(wx, wz) != 0) return true;
+        }
     }
-    if (!foundValid) return;
-    if (hasMapPropNear(wp, CS * (0.40f + scale * 0.22f))) return;
+    const float gap = 0.06f;
+    for (const auto& p : pillars) {
+        float half = PILLAR_SIZE * 0.5f + gap;
+        if (fabsf(p.x - pr.pos.x) < hx + half && fabsf(p.z - pr.pos.z) < hz + half) return true;
+    }
+    for (const auto& other : mapProps) {
+        float ox = 0.0f, oz = 0.0f;
+        mapPropHalfExtents(other, ox, oz);
+        if (other.type == MAP_PROP_PUDDLE || pr.type == MAP_PROP_PUDDLE) {
+            if (other.type != pr.type) continue;
+            ox = oz = hx = hz = 1.0f;
+        }
+        if (fabsf(other.pos.x - pr.pos.x) < hx + ox + gap && fabsf(other.pos.z - pr.pos.z) < hz + oz + gap) return true;
+    }
+    for (const auto& poi : mapPois) {
+        float minX, maxX, minZ, maxZ;
+        mapPoiFootprint(poi, minX, maxX, minZ, maxZ);
+        if (pr.pos.x + hx + gap > minX && pr.pos.x - hx - gap < maxX &&
+            pr.pos.z + hz + gap > minZ && pr.pos.z - hz - gap < maxZ) return true;
+    }
+    return false;
+}
+
+inline bool addMapProp(const Vec3& pos, int type, float scale, float yaw) {
     MapProp pr{};
-    pr.pos = wp;
+    pr.pos = Vec3(pos.x, 0.0f, pos.z);
     pr.type = type;
     pr.scale = scale;
     pr.yaw = yaw;
+    if (isMapPropSpotBlocked(pr)) return false;
     mapProps.push_back(pr);
+    return true;
 }
 
-inline void spawnChunkProps(const Chunk& c) {
-    std::mt19937 cr(chunkMapContentSeed(c.cx, c.cz, 0xA18F331u));
-    int baseCount = isParkingLevel(gCurrentLevel) ? (2 + (int)(cr() % 3)) : (2 + (int)(cr() % 2));
-    int maxAttempts = 44;
+inline Vec3 cellCenter(int wx, int wz) {
+    return Vec3(((float)wx + 0.5f) * CS, 0.0f, ((float)wz + 0.5f) * CS);
+}
 
-    for (int i = 0; i < baseCount && maxAttempts > 0; i++) {
-        int lx = 2 + (int)(cr() % (CHUNK_SIZE - 4));
-        int lz = 2 + (int)(cr() % (CHUNK_SIZE - 4));
-        if (!isMapPropCellValid(c, lx, lz)) {
-            maxAttempts--;
-            continue;
-        }
-        int wallsNear = countWallNeighbors(c, lx, lz);
-        int wallRejectChance = isParkingLevel(gCurrentLevel) ? 90 : 68;
-        if (wallsNear < 2 && (cr() % 100) < wallRejectChance) {
-            maxAttempts--;
-            continue;
-        }
-        int weighted = (int)(cr() % 100);
-        int type = MAP_PROP_CRATE_STACK;
-        if (isParkingLevel(gCurrentLevel)) {
-            if (weighted < 24) type = MAP_PROP_BARRIER;
-            else if (weighted < 43) type = MAP_PROP_CONE_CLUSTER;
-            else if (weighted < 62) type = MAP_PROP_DRUM_STACK;
-            else if (weighted < 76) type = MAP_PROP_CABLE_REEL;
-            else if (weighted < 88) type = MAP_PROP_LOCKER_BANK;
-            else if (weighted < 96) type = MAP_PROP_DEBRIS;
-            else type = MAP_PROP_PUDDLE;
-        } else {
-            if (weighted < 36) type = MAP_PROP_CRATE_STACK;
-            else if (weighted < 60) type = MAP_PROP_BOX_PALLET;
-            else if (weighted < 70) type = MAP_PROP_BARRIER;
-            else if (weighted < 80) type = MAP_PROP_CABLE_REEL;
-            else if (weighted < 87) type = MAP_PROP_DRUM_STACK;
-            else if (weighted < 93) type = MAP_PROP_DEBRIS;
-            else if (weighted < 97) type = MAP_PROP_LOCKER_BANK;
-            else if (weighted < 99) type = MAP_PROP_CABINET;
-            else type = MAP_PROP_PUDDLE;
-        }
-        float scale = 0.78f + ((float)(cr() % 45) / 100.0f);
-        float yaw = ((float)(cr() % 628) / 100.0f);
-        pushMapPropUnique(c.cx, c.cz, lx, lz, type, scale, yaw);
+inline float rand01(std::mt19937& r) {
+    return (float)(r() % 10000u) / 10000.0f;
+}
+
+// Picks one of the walls around the cell. Returns false when the cell has none.
+inline bool pickWallSide(int wx, int wz, std::mt19937& r, int& dx, int& dz) {
+    const int dirs[4][2] = {{-1, 0}, {1, 0}, {0, -1}, {0, 1}};
+    int found[4];
+    int n = 0;
+    for (int i = 0; i < 4; i++) {
+        if (getCellWorld(wx + dirs[i][0], wz + dirs[i][1]) == 1) found[n++] = i;
     }
+    if (n == 0) return false;
+    int pick = found[r() % (unsigned)n];
+    dx = dirs[pick][0];
+    dz = dirs[pick][1];
+    return true;
 }
 
-inline void spawnChunkPoiClusters(const Chunk& c) {
-    std::mt19937 cr(chunkMapContentSeed(c.cx, c.cz, 0x39BC21u));
-    int clusterCount = (int)(cr() % 2);
+// Puts the prop flush against the wall at (dx, dz), facing the room. `slide` moves it
+// along the wall (metres from the cell centre).
+inline bool placePropOnWall(int wx, int wz, int dx, int dz, int type, float scale, float slide, float out = 0.0f) {
+    float bx = 0.0f, bz = 0.0f;
+    mapPropBaseExtents(type, bx, bz);
+    float maxSlide = CS * 0.5f - bx * scale - 0.12f;
+    if (slide > maxSlide) slide = maxSlide;
+    if (slide < -maxSlide) slide = -maxSlide;
+    float reach = CS * 0.5f - bz * scale - 0.02f - out;
+    Vec3 c = cellCenter(wx, wz);
+    Vec3 pos(c.x + (float)dx * reach - (float)dz * slide, 0.0f, c.z + (float)dz * reach + (float)dx * slide);
+    return addMapProp(pos, type, scale, atan2f((float)-dx, (float)-dz));
+}
 
-    for (int cl = 0; cl < clusterCount; cl++) {
-        int centerX = 3 + (int)(cr() % (CHUNK_SIZE - 6));
-        int centerZ = 3 + (int)(cr() % (CHUNK_SIZE - 6));
-        if (!isMapPropCellValid(c, centerX, centerZ)) continue;
-
-        int theme = (int)(cr() % 3);
-        int inCluster = 2 + (int)(cr() % 2);
-        for (int j = 0; j < inCluster; j++) {
-            int ox = (int)(cr() % 5) - 2;
-            int oz = (int)(cr() % 5) - 2;
-            int lx = centerX + ox;
-            int lz = centerZ + oz;
-            if (!isMapPropCellValid(c, lx, lz)) continue;
-
-            int type = MAP_PROP_DEBRIS;
-            if (theme == 0) type = (j % 2 == 0) ? MAP_PROP_CRATE_STACK : MAP_PROP_BOX_PALLET;
-            if (theme == 1) type = (j % 2 == 0) ? MAP_PROP_CABLE_REEL : MAP_PROP_DRUM_STACK;
-            if (theme == 2) type = (j % 2 == 0) ? MAP_PROP_CABINET : MAP_PROP_LOCKER_BANK;
-            float scale = 0.88f + ((float)(cr() % 35) / 100.0f);
-            float yaw = ((float)(cr() % 628) / 100.0f);
-            pushMapPropUnique(c.cx, c.cz, lx, lz, type, scale, yaw);
-        }
+inline bool placePropLoose(int wx, int wz, int type, float scale, std::mt19937& r) {
+    Vec3 c = cellCenter(wx, wz);
+    for (int attempt = 0; attempt < 3; attempt++) {
+        float reach = CS * (0.30f - 0.08f * (float)attempt);
+        Vec3 pos(c.x + (rand01(r) * 2.0f - 1.0f) * reach, 0.0f, c.z + (rand01(r) * 2.0f - 1.0f) * reach);
+        float yaw = rand01(r) * 6.2831853f;
+        if (type == MAP_PROP_PARTITION || type == MAP_PROP_BARRIER) yaw = (r() & 1u) ? 0.0f : 1.5707963f;
+        if (addMapProp(pos, type, scale, yaw)) return true;
     }
+    return false;
 }
 
-inline bool isLikelyOfficeChunk(const Chunk& c) {
-    int stripWalls = 0;
-    for (int x = 2; x < CHUNK_SIZE - 2; x++) {
-        int w = 0;
-        for (int z = 2; z < CHUNK_SIZE - 2; z++) {
-            if (c.cells[x][z] == 1) w++;
-        }
-        if (w >= CHUNK_SIZE - 6) stripWalls++;
+inline bool placeProp(int wx, int wz, int type, std::mt19937& r) {
+    if (isMapPropWallType(type)) {
+        int dx = 0, dz = 0;
+        if (!pickWallSide(wx, wz, r, dx, dz)) return false;
+        return placePropOnWall(wx, wz, dx, dz, type, 1.0f, (rand01(r) - 0.5f) * 3.0f);
     }
-    return stripWalls >= 2;
+    float scale = 1.0f;
+    if (type == MAP_PROP_CRATE_STACK || type == MAP_PROP_DEBRIS || type == MAP_PROP_BOX_PALLET || type == MAP_PROP_PUDDLE) {
+        scale = 0.88f + rand01(r) * 0.24f;
+    }
+    return placePropLoose(wx, wz, type, scale, r);
 }
 
-inline void spawnOfficeFurniture(const Chunk& c) {
-    if (isParkingLevel(gCurrentLevel)) return;
-    if (!isLikelyOfficeChunk(c)) return;
-    std::mt19937 cr(chunkMapContentSeed(c.cx, c.cz, 0xB44231u));
-    int rows = 3 + (int)(cr() % 4);
-    for (int i = 0; i < rows; i++) {
-        int lx = 2 + (int)(cr() % (CHUNK_SIZE - 4));
-        int lz = 2 + (int)(cr() % (CHUNK_SIZE - 4));
+inline int chooseChunkPropType(int weighted) {
+    if (isParkingLevel(gCurrentLevel)) {
+        if (weighted < 24) return MAP_PROP_BARRIER;
+        if (weighted < 43) return MAP_PROP_CONE_CLUSTER;
+        if (weighted < 62) return MAP_PROP_DRUM_STACK;
+        if (weighted < 76) return MAP_PROP_CABLE_REEL;
+        if (weighted < 88) return MAP_PROP_LOCKER_BANK;
+        if (weighted < 96) return MAP_PROP_DEBRIS;
+        return MAP_PROP_PUDDLE;
+    }
+    if (weighted < 26) return MAP_PROP_CRATE_STACK;
+    if (weighted < 46) return MAP_PROP_BOX_PALLET;
+    if (weighted < 56) return MAP_PROP_BARRIER;
+    if (weighted < 66) return MAP_PROP_CABLE_REEL;
+    if (weighted < 74) return MAP_PROP_DRUM_STACK;
+    if (weighted < 82) return MAP_PROP_DEBRIS;
+    if (weighted < 90) return MAP_PROP_LOCKER_BANK;
+    if (weighted < 96) return MAP_PROP_CABINET;
+    return MAP_PROP_PUDDLE;
+}
+
+inline void spawnChunkProps(const Chunk& c, std::mt19937& r) {
+    int want = isParkingLevel(gCurrentLevel) ? (3 + (int)(r() % 3u)) : (3 + (int)(r() % 2u));
+    int placed = 0;
+    for (int attempt = 0; attempt < 40 && placed < want; attempt++) {
+        int lx = 1 + (int)(r() % (unsigned)(CHUNK_SIZE - 2));
+        int lz = 1 + (int)(r() % (unsigned)(CHUNK_SIZE - 2));
+        int type = chooseChunkPropType((int)(r() % 100u));
         if (!isMapPropCellValid(c, lx, lz)) continue;
-
-        pushMapPropUnique(c.cx, c.cz, lx, lz, MAP_PROP_DESK, 0.95f, 0.0f);
-        if (isMapPropCellValid(c, lx + 1, lz)) {
-            pushMapPropUnique(c.cx, c.cz, lx + 1, lz, MAP_PROP_CHAIR, 0.9f, 0.0f);
-        }
-        if (isMapPropCellValid(c, lx - 1, lz)) {
-            pushMapPropUnique(c.cx, c.cz, lx - 1, lz, MAP_PROP_CHAIR, 0.88f, 0.0f);
-        }
-        if (isMapPropCellValid(c, lx, lz + 1) && (cr() % 100) < 55) {
-            pushMapPropUnique(c.cx, c.cz, lx, lz + 1, MAP_PROP_CABINET, 0.95f, 0.0f);
-        }
-        if (isMapPropCellValid(c, lx - 1, lz) && (cr() % 100) < 45) {
-            pushMapPropUnique(c.cx, c.cz, lx - 1, lz, MAP_PROP_PARTITION, 1.0f, 0.0f);
-        }
-        if (isMapPropCellValid(c, lx + 1, lz + 1) && (cr() % 100) < 62) {
-            pushMapPropUnique(c.cx, c.cz, lx + 1, lz + 1, MAP_PROP_CHAIR, 0.92f, 0.0f);
-        }
-        if (isMapPropCellValid(c, lx - 1, lz - 1) && (cr() % 100) < 56) {
-            pushMapPropUnique(c.cx, c.cz, lx - 1, lz - 1, MAP_PROP_LOCKER_BANK, 0.90f, 0.0f);
-        }
-        if (isMapPropCellValid(c, lx, lz - 1) && (cr() % 100) < 52) {
-            pushMapPropUnique(c.cx, c.cz, lx, lz - 1, MAP_PROP_PARTITION, 0.92f, 0.0f);
-        }
+        if (placeProp(c.cx * CHUNK_SIZE + lx, c.cz * CHUNK_SIZE + lz, type, r)) placed++;
     }
 }
 
-inline void pushMapPoiUnique(int cx, int cz, int lx, int lz, int type, float radius) {
-    Vec3 p(
-        ((float)(cx * CHUNK_SIZE + lx) + 0.5f) * CS,
-        0.0f,
-        ((float)(cz * CHUNK_SIZE + lz) + 0.5f) * CS
-    );
-    int wx = (int)floorf(p.x / CS);
-    int wz = (int)floorf(p.z / CS);
-    if (getCellWorld(wx, wz) != 0) return;
-    if (hasMapPoiNear(p, CS * 4.0f)) return;
-    MapPoi poi{};
-    poi.pos = p;
-    poi.type = type;
-    poi.radius = radius;
-    poi.id = (cx * 73856093) ^ (cz * 19349663) ^ (lx * 83492791) ^ (lz * 297121507);
-    mapPois.push_back(poi);
+// A themed pile: several related props sharing one corner of a room.
+inline void spawnChunkCluster(const Chunk& c, std::mt19937& r) {
+    if ((r() % 100u) >= 55u) return;
+    const int themes[3][2] = {
+        {MAP_PROP_CRATE_STACK, MAP_PROP_BOX_PALLET},
+        {MAP_PROP_CABLE_REEL, MAP_PROP_DRUM_STACK},
+        {MAP_PROP_BOX_PALLET, MAP_PROP_DEBRIS}
+    };
+    int theme = (int)(r() % 3u);
+    for (int attempt = 0; attempt < 12; attempt++) {
+        int lx = 1 + (int)(r() % (unsigned)(CHUNK_SIZE - 2));
+        int lz = 1 + (int)(r() % (unsigned)(CHUNK_SIZE - 2));
+        if (!isMapPropCellValid(c, lx, lz)) continue;
+        int wx = c.cx * CHUNK_SIZE + lx;
+        int wz = c.cz * CHUNK_SIZE + lz;
+        if (countWallNeighborsWorld(wx, wz) == 0) continue;
+        int count = 3 + (int)(r() % 2u);
+        for (int j = 0; j < count; j++) placeProp(wx, wz, themes[theme][j % 2], r);
+        return;
+    }
 }
 
-inline void spawnChunkPoiRooms(const Chunk& c) {
-    std::mt19937 cr(chunkMapContentSeed(c.cx, c.cz, 0x71D9A3u));
-    int spawnRoll = (int)(cr() % 100);
-    if (spawnRoll > 45) return;
-    int tries = 10;
-    while (tries-- > 0) {
-        int lx = 3 + (int)(cr() % (CHUNK_SIZE - 6));
-        int lz = 3 + (int)(cr() % (CHUNK_SIZE - 6));
+// Work spots: desk against a wall, chair pulled up to it, cabinet beside it.
+inline void spawnOfficeFurniture(const Chunk& c, std::mt19937& r) {
+    if (chunkStyleAt(c.cx, c.cz) != CHUNK_STYLE_OFFICE) return;
+    int want = 5 + (int)(r() % 4u);
+    int placed = 0;
+    for (int attempt = 0; attempt < 60 && placed < want; attempt++) {
+        int lx = 1 + (int)(r() % (unsigned)(CHUNK_SIZE - 2));
+        int lz = 1 + (int)(r() % (unsigned)(CHUNK_SIZE - 2));
         if (!isMapPropCellValid(c, lx, lz)) continue;
-        int open = countOpenNeighbors(c, lx, lz);
-        if (open < 3) continue;
-        int typeRoll = (int)(cr() % 100);
-        int type = MAP_POI_OFFICE;
+        int wx = c.cx * CHUNK_SIZE + lx;
+        int wz = c.cz * CHUNK_SIZE + lz;
+        int dx = 0, dz = 0;
+        if (!pickWallSide(wx, wz, r, dx, dz)) continue;
+
+        float slide = (rand01(r) - 0.5f) * 1.2f;
+        if (!placePropOnWall(wx, wz, dx, dz, MAP_PROP_DESK, 1.0f, slide)) continue;
+        placed++;
+        const MapProp desk = mapProps.back();
+        Vec3 front(sinf(desk.yaw), 0.0f, cosf(desk.yaw));
+        Vec3 chairPos = desk.pos + front * (0.35f + 0.38f + rand01(r) * 0.25f);
+        addMapProp(chairPos, MAP_PROP_CHAIR, 1.0f, desk.yaw + 3.1415927f + (rand01(r) - 0.5f) * 0.9f);
+        float side = (r() & 1u) ? 1.0f : -1.0f;
+        if ((r() % 100u) < 60u) placePropOnWall(wx, wz, dx, dz, MAP_PROP_CABINET, 1.0f, slide + side * 1.08f);
+        if ((r() % 100u) < 35u) placePropOnWall(wx, wz, dx, dz, MAP_PROP_LOCKER_BANK, 1.0f, slide - side * 1.45f);
+        if ((r() % 100u) < 30u) placePropLoose(wx, wz, MAP_PROP_PARTITION, 1.0f, r);
+    }
+}
+
+inline void spawnChunkPoi(const Chunk& c, std::mt19937& r) {
+    if ((int)(r() % 100u) > 45) return;
+    for (int tries = 0; tries < 14; tries++) {
+        int lx = 2 + (int)(r() % (unsigned)(CHUNK_SIZE - 4));
+        int lz = 2 + (int)(r() % (unsigned)(CHUNK_SIZE - 4));
+        int typeRoll = (int)(r() % 100u);
+        if (!isMapPropCellValid(c, lx, lz)) continue;
+        int wx = c.cx * CHUNK_SIZE + lx;
+        int wz = c.cz * CHUNK_SIZE + lz;
+        // Exactly one wall behind the set, open floor on the other three sides.
+        if (countWallNeighborsWorld(wx, wz) != 1) continue;
+        int type = MAP_POI_RESTROOM;
         if (typeRoll < 46) type = MAP_POI_OFFICE;
         else if (typeRoll < 66) type = MAP_POI_SERVER;
         else if (typeRoll < 86) type = MAP_POI_STORAGE;
-        else type = MAP_POI_RESTROOM;
-        pushMapPoiUnique(c.cx, c.cz, lx, lz, type, CS * 1.8f);
-        break;
+        MapPoi poi{};
+        poi.pos = cellCenter(wx, wz);
+        poi.type = type;
+        poi.radius = CS * 1.8f;
+        poi.id = (c.cx * 73856093) ^ (c.cz * 19349663) ^ (lx * 83492791) ^ (lz * 297121507);
+        mapPois.push_back(poi);
+        return;
     }
 }
 
 inline void rebuildChunkMapContent(const Chunk& c) {
-    spawnChunkProps(c);
-    spawnChunkPoiClusters(c);
-    spawnOfficeFurniture(c);
-    spawnChunkPoiRooms(c);
-}
-
-inline bool isMapPropTooFar(const MapProp& p, float cx, float cz, float md) {
-    return fabsf(p.pos.x - cx) > md || fabsf(p.pos.z - cz) > md;
+    std::mt19937 r(hashCell(c.cx, c.cz, 0xA18F331u));
+    spawnChunkPoi(c, r);
+    spawnOfficeFurniture(c, r);
+    spawnChunkCluster(c, r);
+    spawnChunkProps(c, r);
 }
 
 inline bool isMapPropOnWall(const MapProp& p) {
@@ -405,22 +489,20 @@ inline bool isMapPropOnWall(const MapProp& p) {
     return getCellWorld(wx, wz) == 1;
 }
 
-inline bool isMapPropEmbeddedInWall(const MapProp& p) {
-    float r = mapPropCollisionRadius(p) * 0.86f;
-    if (r <= 0.001f) return false;
-    return collideWorld(p.pos.x, p.pos.z, r);
+inline bool isChunkInView(float x, float z, int pcx, int pcz) {
+    int cx = (int)floorf(x / (CS * CHUNK_SIZE));
+    int cz = (int)floorf(z / (CS * CHUNK_SIZE));
+    return abs(cx - pcx) <= VIEW_CHUNKS && abs(cz - pcz) <= VIEW_CHUNKS;
 }
 
 inline void updateMapContent(int pcx, int pcz) {
-    float cx = (pcx + 0.5f) * CHUNK_SIZE * CS;
-    float cz = (pcz + 0.5f) * CHUNK_SIZE * CS;
-    float md = (VIEW_CHUNKS + 1) * CHUNK_SIZE * CS;
+    if (mapProps.empty() && mapPois.empty()) mapContentChunks.clear();
 
     mapProps.erase(
         std::remove_if(
             mapProps.begin(),
             mapProps.end(),
-            [&](const MapProp& p) { return isMapPropTooFar(p, cx, cz, md) || isMapPropOnWall(p); }
+            [&](const MapProp& p) { return !isChunkInView(p.pos.x, p.pos.z, pcx, pcz) || isMapPropOnWall(p); }
         ),
         mapProps.end()
     );
@@ -429,47 +511,30 @@ inline void updateMapContent(int pcx, int pcz) {
             mapPois.begin(),
             mapPois.end(),
             [&](const MapPoi& p) {
-                if (fabsf(p.pos.x - cx) > md || fabsf(p.pos.z - cz) > md) return true;
-                int wx = (int)floorf(p.pos.x / CS);
-                int wz = (int)floorf(p.pos.z / CS);
-                return getCellWorld(wx, wz) == 1;
+                if (!isChunkInView(p.pos.x, p.pos.z, pcx, pcz)) return true;
+                return getCellWorld((int)floorf(p.pos.x / CS), (int)floorf(p.pos.z / CS)) == 1;
             }
         ),
         mapPois.end()
     );
-
-    for (int dcx = -VIEW_CHUNKS; dcx <= VIEW_CHUNKS; dcx++) {
-        for (int dcz = -VIEW_CHUNKS; dcz <= VIEW_CHUNKS; dcz++) {
-            auto it = chunks.find(chunkKey(pcx + dcx, pcz + dcz));
-            if (it == chunks.end()) continue;
-            rebuildChunkMapContent(it->second);
-        }
+    for (auto it = mapContentChunks.begin(); it != mapContentChunks.end();) {
+        int cx = (int)(*it >> 32);
+        int cz = (int)(*it & 0xFFFFFFFF);
+        if (abs(cx - pcx) > VIEW_CHUNKS || abs(cz - pcz) > VIEW_CHUNKS) it = mapContentChunks.erase(it);
+        else ++it;
     }
 
-    if (!isParkingLevel(gCurrentLevel) && mapProps.size() < 8) {
-        std::mt19937 fillRng(worldSeed ^ (unsigned)(pcx * 911382323) ^ (unsigned)(pcz * 972663749));
-        int tries = 180;
-        while (mapProps.size() < 8 && tries-- > 0) {
-            int dcx = (int)(fillRng() % (VIEW_CHUNKS * 2 + 1)) - VIEW_CHUNKS;
-            int dcz = (int)(fillRng() % (VIEW_CHUNKS * 2 + 1)) - VIEW_CHUNKS;
-            auto it = chunks.find(chunkKey(pcx + dcx, pcz + dcz));
-            if (it == chunks.end()) continue;
-            int lx = 2 + (int)(fillRng() % (CHUNK_SIZE - 4));
-            int lz = 2 + (int)(fillRng() % (CHUNK_SIZE - 4));
-            if (!isMapPropCellValid(it->second, lx, lz)) continue;
-            int weighted = (int)(fillRng() % 100);
-            int type = MAP_PROP_CRATE_STACK;
-            if (weighted < 24) type = MAP_PROP_BOX_PALLET;
-            else if (weighted < 38) type = MAP_PROP_CABLE_REEL;
-            else if (weighted < 50) type = MAP_PROP_DRUM_STACK;
-            else if (weighted < 61) type = MAP_PROP_DEBRIS;
-            else if (weighted < 72) type = MAP_PROP_CABINET;
-            else if (weighted < 82) type = MAP_PROP_LOCKER_BANK;
-            else if (weighted < 91) type = MAP_PROP_BARRIER;
-            else type = MAP_PROP_PUDDLE;
-            float scale = 0.82f + ((float)(fillRng() % 34) / 100.0f);
-            float yaw = ((float)(fillRng() % 628) / 100.0f);
-            pushMapPropUnique(it->second.cx, it->second.cz, lx, lz, type, scale, yaw);
+    // Inner chunks first: their neighbours exist, so wall lookups are exact.
+    for (int ring = 0; ring <= VIEW_CHUNKS; ring++) {
+        for (int dcx = -ring; dcx <= ring; dcx++) {
+            for (int dcz = -ring; dcz <= ring; dcz++) {
+                if (abs(dcx) != ring && abs(dcz) != ring) continue;
+                long long key = chunkKey(pcx + dcx, pcz + dcz);
+                auto it = chunks.find(key);
+                if (it == chunks.end()) continue;
+                if (!mapContentChunks.insert(key).second) continue;
+                rebuildChunkMapContent(it->second);
+            }
         }
     }
 }

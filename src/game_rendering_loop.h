@@ -136,7 +136,7 @@ void renderScene(){
     glBindVertexArray(pillarVAO);glDrawArrays(GL_TRIANGLES,0,pillarVC);
     if(decorVC>0){
         glDisable(GL_CULL_FACE);
-        glBindTexture(GL_TEXTURE_2D,propTex);
+        glBindTexture(GL_TEXTURE_2D,decorTex);
         glBindVertexArray(decorVAO);glDrawArrays(GL_TRIANGLES,0,decorVC);
         glEnable(GL_CULL_FACE);
     }

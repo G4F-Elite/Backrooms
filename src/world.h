@@ -12,6 +12,7 @@ extern unsigned int worldSeed;
 
 const int CHUNK_SIZE = 16;
 const int VIEW_CHUNKS = 2;
+const float PILLAR_SIZE = 0.6f;
 
 struct Chunk { int cx, cz, cells[CHUNK_SIZE][CHUNK_SIZE]; bool gen; };
 struct Light { Vec3 pos; float sizeX, sizeZ, intensity; bool on; };
@@ -62,126 +63,7 @@ inline int countWallsAround(const Chunk& c, int x, int z) {
     return walls;
 }
 
-inline void removeDeadEnds(Chunk& c, std::mt19937& cr) {
-    bool changed = true;
-    int iterations = 0;
-    while (changed && iterations < 7) {
-        changed = false;
-        iterations++;
-        for (int x = 1; x < CHUNK_SIZE - 1; x++) {
-            for (int z = 1; z < CHUNK_SIZE - 1; z++) {
-                if (c.cells[x][z] != 0) continue;
-                
-                int walls = countWallsAround(c, x, z);
-                if (walls >= 3) {
-                    if (cr() % 100 < 88) {
-                        std::vector<std::pair<int,int>> wallDirs;
-                        if (x > 1 && c.cells[x-1][z] == 1) wallDirs.push_back({x-1, z});
-                        if (x < CHUNK_SIZE-2 && c.cells[x+1][z] == 1) wallDirs.push_back({x+1, z});
-                        if (z > 1 && c.cells[x][z-1] == 1) wallDirs.push_back({x, z-1});
-                        if (z < CHUNK_SIZE-2 && c.cells[x][z+1] == 1) wallDirs.push_back({x, z+1});
-                        
-                        if (!wallDirs.empty()) {
-                            auto& w = wallDirs[cr() % wallDirs.size()];
-                            c.cells[w.first][w.second] = 0;
-                            changed = true;
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-inline void addExtraConnections(Chunk& c, std::mt19937& cr) {
-    int connections = 2 + cr() % 3;
-    for (int i = 0; i < connections; i++) {
-        int x = 2 + cr() % (CHUNK_SIZE - 4);
-        int z = 2 + cr() % (CHUNK_SIZE - 4);
-        
-        if (c.cells[x][z] == 1) {
-            bool hasOpenH = (x > 0 && c.cells[x-1][z] == 0) && (x < CHUNK_SIZE-1 && c.cells[x+1][z] == 0);
-            bool hasOpenV = (z > 0 && c.cells[x][z-1] == 0) && (z < CHUNK_SIZE-1 && c.cells[x][z+1] == 0);
-            if (hasOpenH || hasOpenV) {
-                c.cells[x][z] = 0;
-            }
-        }
-    }
-}
-
-inline void applyAtriumPattern(Chunk& c, std::mt19937& cr) {
-    int x0 = 2 + (int)(cr() % 2);
-    int z0 = 2 + (int)(cr() % 2);
-    int w = CHUNK_SIZE - 4 - (int)(cr() % 2);
-    int h = CHUNK_SIZE - 4 - (int)(cr() % 2);
-    carveRect(c, x0, z0, w, h);
-
-    int cx = CHUNK_SIZE / 2;
-    int cz = CHUNK_SIZE / 2;
-    fillRect(c, cx - 1, cz - 1, 3, 3);
-    c.cells[cx][cz] = 0;
-    c.cells[cx - 2][cz] = 0;
-    c.cells[cx + 2][cz] = 0;
-    c.cells[cx][cz - 2] = 0;
-    c.cells[cx][cz + 2] = 0;
-}
-
-inline void applyOfficePattern(Chunk& c, std::mt19937& cr) {
-    carveRect(c, 1, 1, CHUNK_SIZE - 2, CHUNK_SIZE - 2);
-
-    int step = 3 + (int)(cr() % 2);
-    for (int x = 3; x < CHUNK_SIZE - 3; x += step) {
-        for (int z = 2; z < CHUNK_SIZE - 2; z++) {
-            c.cells[x][z] = 1;
-        }
-        // Add more doors per wall section
-        int numDoors = 2 + cr() % 2;
-        for (int d = 0; d < numDoors; d++) {
-            int doorZ = 2 + (int)(cr() % (CHUNK_SIZE - 4));
-            c.cells[x][doorZ] = 0;
-            if (doorZ + 1 < CHUNK_SIZE - 1) c.cells[x][doorZ + 1] = 0;
-        }
-    }
-}
-
-inline void applyServicePattern(Chunk& c, std::mt19937& cr) {
-    carveRect(c, 1, 1, CHUNK_SIZE - 2, CHUNK_SIZE - 2);
-    int laneA = 3 + (int)(cr() % 3);
-    int laneB = CHUNK_SIZE - 4 - (int)(cr() % 3);
-    for (int z = 2; z < CHUNK_SIZE - 2; z++) {
-        c.cells[laneA][z] = 1;
-        c.cells[laneB][z] = 1;
-    }
-    for (int i = 0; i < 6; i++) {
-        int gate = 2 + (int)(cr() % (CHUNK_SIZE - 4));
-        c.cells[laneA][gate] = 0;
-        c.cells[laneB][gate] = 0;
-    }
-    for (int i = 0; i < 3; i++) {
-        int bx = 2 + (int)(cr() % (CHUNK_SIZE - 4));
-        int bz = 2 + (int)(cr() % (CHUNK_SIZE - 4));
-        fillRect(c, bx, bz, 2, 2);
-    }
-}
-
-inline void applyRampRoutePattern(Chunk& c, std::mt19937& cr);
-inline void applyParkingPattern(Chunk& c, std::mt19937& cr);
-
-inline void applyChunkArchitecturePattern(Chunk& c, std::mt19937& cr) {
-    int p = (int)(cr() % 100);
-    if (isLevelZero(gCurrentLevel)) {
-        if (p < 20) applyAtriumPattern(c, cr);
-        else if (p < 40) applyOfficePattern(c, cr);
-        else if (p < 58) applyServicePattern(c, cr);
-        else if (p < 78) applyRampRoutePattern(c, cr);
-        else applyAtriumPattern(c, cr);
-        return;
-    }
-    if (p < 56) applyParkingPattern(c, cr);
-    else if (p < 78) applyServicePattern(c, cr);
-    else if (p < 93) applyOfficePattern(c, cr);
-    else applyParkingPattern(c, cr);
-}
+#include "world_layout.h"
 
 inline int getCellWorld(int wx, int wz) {
     int cx = wx >= 0 ? wx / CHUNK_SIZE : (wx - CHUNK_SIZE + 1) / CHUNK_SIZE;
@@ -202,60 +84,11 @@ inline void setCellWorld(int wx, int wz, int val) {
 inline void generateChunk(int cx, int cz) {
     long long key = chunkKey(cx, cz);
     if (chunks.find(key) != chunks.end()) return;
-    Chunk c; c.cx = cx; c.cz = cz; c.gen = true;
-    unsigned int seed = worldSeed ^ (unsigned)(cx * 73856093) ^ (unsigned)(cz * 19349663);
-    std::mt19937 cr(seed);
-    for (int x = 0; x < CHUNK_SIZE; x++) for (int z = 0; z < CHUNK_SIZE; z++) c.cells[x][z] = 1;
-    
-    std::vector<std::pair<int,int>> stk;
-    int sx = 1 + cr() % (CHUNK_SIZE-2), sz = 1 + cr() % (CHUNK_SIZE-2);
-    c.cells[sx][sz] = 0; stk.push_back({sx, sz});
-    int dx[] = {0,0,2,-2}, dz[] = {2,-2,0,0};
-    while (!stk.empty()) {
-        int x = stk.back().first, z = stk.back().second;
-        std::vector<int> dirs;
-        for (int d = 0; d < 4; d++) { 
-            int nx = x+dx[d], nz = z+dz[d];
-            if (nx > 0 && nx < CHUNK_SIZE-1 && nz > 0 && nz < CHUNK_SIZE-1 && c.cells[nx][nz] == 1) 
-                dirs.push_back(d); 
-        }
-        if (dirs.empty()) stk.pop_back();
-        else { 
-            int d = dirs[cr() % dirs.size()]; 
-            c.cells[x+dx[d]/2][z+dz[d]/2] = 0; 
-            c.cells[x+dx[d]][z+dz[d]] = 0; 
-            stk.push_back({x+dx[d], z+dz[d]}); 
-        }
-    }
-    
-    applyChunkArchitecturePattern(c, cr);
-    
-    for (int i = 0; i < 3 + cr() % 2; i++) { 
-        int rx = 1+cr()%(CHUNK_SIZE-4), rz = 1+cr()%(CHUNK_SIZE-4);
-        int rw = 2+cr()%3, rh = 2+cr()%3;
-        for (int x = rx; x < rx+rw && x < CHUNK_SIZE-1; x++) 
-            for (int z = rz; z < rz+rh && z < CHUNK_SIZE-1; z++) 
-                c.cells[x][z] = 0; 
-    }
-    
-    for (int x = 1; x < CHUNK_SIZE-1; x++) 
-        for (int z = 1; z < CHUNK_SIZE-1; z++) 
-            if (c.cells[x][z] == 1 && cr()%100 < 14) 
-                c.cells[x][z] = 0;
-    
-    removeDeadEnds(c, cr);
-    
-    addExtraConnections(c, cr);
-    
-    for (int i = 1; i < CHUNK_SIZE-1; i += 2) { 
-        c.cells[0][i] = 0; 
-        c.cells[CHUNK_SIZE-1][i] = 0; 
-        c.cells[i][0] = 0; 
-        c.cells[i][CHUNK_SIZE-1] = 0; 
-    }
-    
-    if (countOpenCells(c) < 50) carveRect(c, 2, 2, CHUNK_SIZE - 4, CHUNK_SIZE - 4);
-    
+    Chunk c{};
+    c.cx = cx;
+    c.cz = cz;
+    c.gen = true;
+    buildChunkLayout(c);
     chunks[key] = c;
 }
 
@@ -267,50 +100,6 @@ inline void updateVisibleChunks(float px, float pz) {
     playerChunkX = pcx; playerChunkZ = pcz;
 }
 
-inline void applyRampRoutePattern(Chunk& c, std::mt19937& cr) {
-    carveRect(c, 1, 1, CHUNK_SIZE - 2, CHUNK_SIZE - 2);
-    int laneA = 3 + (int)(cr() % 2);
-    int laneB = CHUNK_SIZE - 4 - (int)(cr() % 2);
-    for (int x = 2; x < CHUNK_SIZE - 2; x++) {
-        c.cells[x][laneA] = 0;
-        c.cells[x][laneB] = 0;
-    }
-    int r0 = 3 + (int)(cr() % 5);
-    int r1 = r0 + 3;
-    for (int x = 2; x < CHUNK_SIZE - 2; x++) {
-        if ((x % 4) < 2) {
-            c.cells[x][r0] = 0;
-            c.cells[x][r1] = 0;
-        }
-    }
-    for (int z = 2; z < CHUNK_SIZE - 2; z++) {
-        if ((z % 5) == 0) {
-            c.cells[3][z] = 0;
-            c.cells[CHUNK_SIZE - 4][z] = 0;
-        }
-    }
-}
-
-inline void applyParkingPattern(Chunk& c, std::mt19937& cr) {
-    carveRect(c, 1, 1, CHUNK_SIZE - 2, CHUNK_SIZE - 2);
-    int laneL = 4 + (int)(cr() % 2);
-    int laneR = CHUNK_SIZE - 5 - (int)(cr() % 2);
-    for (int z = 2; z < CHUNK_SIZE - 2; z++) {
-        c.cells[laneL][z] = 1;
-        c.cells[laneR][z] = 1;
-    }
-    for (int z = 3; z < CHUNK_SIZE - 3; z += 2) {
-        c.cells[laneL][z] = 0;
-        c.cells[laneR][z] = 0;
-    }
-    for (int x = 2; x < CHUNK_SIZE - 2; x++) {
-        if ((x % 3) == 0) {
-            c.cells[x][2] = 1;
-            c.cells[x][CHUNK_SIZE - 3] = 1;
-        }
-    }
-}
-
 inline bool circleOverlapsAabb2D(float x, float z, float r, float minX, float maxX, float minZ, float maxZ) {
     float clx = x < minX ? minX : (x > maxX ? maxX : x);
     float clz = z < minZ ? minZ : (z > maxZ ? maxZ : z);
@@ -319,63 +108,72 @@ inline bool circleOverlapsAabb2D(float x, float z, float r, float minX, float ma
     return dx * dx + dz * dz < r * r;
 }
 
-inline bool collideDoorFrameAtCell(float x, float z, float r, int wx, int wz) {
-    if (getCellWorld(wx, wz) != 0) return false;
+// Exit portal cells: always framed, passage along Z.
+inline std::vector<std::pair<int, int>> forcedDoorways;
 
+inline bool isForcedDoorway(int wx, int wz) {
+    for (const auto& d : forcedDoorways) {
+        if (d.first == wx && d.second == wz) return true;
+    }
+    return false;
+}
+
+// 0 = no doorway, 1 = passage runs along Z (frame spans X), 2 = passage runs along X.
+// Only single-cell holes in a wall line get a frame; stretches of corridor do not.
+inline int doorwayAxisAt(int wx, int wz) {
+    if (isForcedDoorway(wx, wz)) return 1;
+    if (getCellWorld(wx, wz) != 0) return 0;
     bool wallL = getCellWorld(wx - 1, wz) == 1;
     bool wallR = getCellWorld(wx + 1, wz) == 1;
     bool wallB = getCellWorld(wx, wz - 1) == 1;
     bool wallF = getCellWorld(wx, wz + 1) == 1;
-    bool corridorZ = wallL && wallR && !wallB && !wallF;
-    bool corridorX = wallB && wallF && !wallL && !wallR;
-    if (!corridorZ && !corridorX) return false;
-
-    unsigned int doorHash = (unsigned int)(wx * 73856093u) ^ (unsigned int)(wz * 19349663u) ^ (worldSeed * 83492791u);
-    if ((doorHash % 100u) >= 7u) return false;
-
-    float px = wx * CS;
-    float pz = wz * CS;
-    float cxCell = px + CS * 0.5f;
-    float czCell = pz + CS * 0.5f;
-    float openingHalf = CS * 0.23f;
-    float edgeHalf = CS * 0.49f;
-    float sideFillW = edgeHalf - openingHalf;
-    float sideFillCenter = (edgeHalf + openingHalf) * 0.5f;
-    float postW = CS * 0.06f;
-    float frameT = CS * 0.10f;
-    float wallFillT = frameT * 0.92f;
-    float postHalfW = postW * 0.5f;
-    float frameHalfT = frameT * 0.5f;
-
-    if (corridorZ) {
-        if (circleOverlapsAabb2D(x, z, r,
-            cxCell - sideFillCenter - sideFillW * 0.5f, cxCell - sideFillCenter + sideFillW * 0.5f,
-            czCell - wallFillT * 0.5f, czCell + wallFillT * 0.5f)) return true;
-        if (circleOverlapsAabb2D(x, z, r,
-            cxCell + sideFillCenter - sideFillW * 0.5f, cxCell + sideFillCenter + sideFillW * 0.5f,
-            czCell - wallFillT * 0.5f, czCell + wallFillT * 0.5f)) return true;
-        if (circleOverlapsAabb2D(x, z, r,
-            cxCell - openingHalf - postHalfW, cxCell - openingHalf + postHalfW,
-            czCell - frameHalfT, czCell + frameHalfT)) return true;
-        if (circleOverlapsAabb2D(x, z, r,
-            cxCell + openingHalf - postHalfW, cxCell + openingHalf + postHalfW,
-            czCell - frameHalfT, czCell + frameHalfT)) return true;
-        return false;
+    bool alongZ = wallL && wallR && !wallB && !wallF;
+    bool alongX = wallB && wallF && !wallL && !wallR;
+    if (!alongZ && !alongX) return 0;
+    if (alongZ) {
+        if (getCellWorld(wx - 1, wz - 1) == 1 && getCellWorld(wx + 1, wz - 1) == 1) return 0;
+        if (getCellWorld(wx - 1, wz + 1) == 1 && getCellWorld(wx + 1, wz + 1) == 1) return 0;
+    } else {
+        if (getCellWorld(wx - 1, wz - 1) == 1 && getCellWorld(wx - 1, wz + 1) == 1) return 0;
+        if (getCellWorld(wx + 1, wz - 1) == 1 && getCellWorld(wx + 1, wz + 1) == 1) return 0;
     }
+    if ((hashCell(wx, wz, 0xD00Au) % 100u) >= 60u) return 0;
+    return alongZ ? 1 : 2;
+}
 
-    if (circleOverlapsAabb2D(x, z, r,
-        cxCell - wallFillT * 0.5f, cxCell + wallFillT * 0.5f,
-        czCell - sideFillCenter - sideFillW * 0.5f, czCell - sideFillCenter + sideFillW * 0.5f)) return true;
-    if (circleOverlapsAabb2D(x, z, r,
-        cxCell - wallFillT * 0.5f, cxCell + wallFillT * 0.5f,
-        czCell + sideFillCenter - sideFillW * 0.5f, czCell + sideFillCenter + sideFillW * 0.5f)) return true;
+// Shared by collision and by the mesh builder so they can never drift apart.
+struct DoorwayDims {
+    float openingHalf;  // half width of the walkable opening
+    float openingH;     // height of the opening
+    float postW;        // door post width
+    float frameT;       // frame depth along the passage
+    float fillT;        // depth of the wall infill around the frame
+};
 
-    if (circleOverlapsAabb2D(x, z, r,
-        cxCell - frameHalfT, cxCell + frameHalfT,
-        czCell - openingHalf - postHalfW, czCell - openingHalf + postHalfW)) return true;
-    if (circleOverlapsAabb2D(x, z, r,
-        cxCell - frameHalfT, cxCell + frameHalfT,
-        czCell + openingHalf - postHalfW, czCell + openingHalf + postHalfW)) return true;
+inline DoorwayDims doorwayDims() {
+    DoorwayDims d;
+    d.openingHalf = CS * 0.23f;
+    d.openingH = WH * 0.62f;
+    d.postW = CS * 0.06f;
+    d.frameT = CS * 0.10f;
+    d.fillT = CS * 0.092f;
+    return d;
+}
+
+inline bool collideDoorFrameAtCell(float x, float z, float r, int wx, int wz) {
+    int axis = doorwayAxisAt(wx, wz);
+    if (axis == 0) return false;
+    DoorwayDims d = doorwayDims();
+    float cxCell = (wx + 0.5f) * CS;
+    float czCell = (wz + 0.5f) * CS;
+    // Work in a frame where `a` runs across the opening and `b` along the passage.
+    float a = (axis == 1) ? (x - cxCell) : (z - czCell);
+    float b = (axis == 1) ? (z - czCell) : (x - cxCell);
+    float inner = d.openingHalf - d.postW * 0.5f;
+    float half = CS * 0.5f;
+    float frameHalf = d.frameT * 0.5f;
+    if (circleOverlapsAabb2D(a, b, r, -half, -inner, -frameHalf, frameHalf)) return true;
+    if (circleOverlapsAabb2D(a, b, r, inner, half, -frameHalf, frameHalf)) return true;
     return false;
 }
 
@@ -392,7 +190,7 @@ inline bool collideWorld(float x, float z, float PR) {
         int chkx = wx + ddx, chkz = wz + ddz;
         if (collideDoorFrameAtCell(x, z, PR, chkx, chkz)) return true;
     }
-    for (const auto& p : pillars) if (fabsf(x-p.x) < 0.5f+PR && fabsf(z-p.z) < 0.5f+PR) return true;
+    for (const auto& p : pillars) if (fabsf(x-p.x) < PILLAR_SIZE*0.5f+PR && fabsf(z-p.z) < PILLAR_SIZE*0.5f+PR) return true;
     return false;
 }
 
@@ -429,6 +227,7 @@ inline bool reshuffleBehind(float camX, float camZ, float camYaw) {
     while (changed < 4 && att < 50) { att++; int rx = px+(int)((rng()%16)-8), rz = pz+(int)((rng()%16)-8);
         float ddx=(float)(rx-px), ddz=(float)(rz-pz), dist=sqrtf(ddx*ddx+ddz*ddz); if(dist<3||dist>10) continue;
         if((ddx*fx+ddz*fz)/dist>-0.4f) continue; if(abs(rx-px)<=1&&abs(rz-pz)<=1) continue;
+        if(isForcedDoorway(rx,rz)||isForcedDoorway(rx-1,rz)||isForcedDoorway(rx+1,rz)) continue;
         int ov=getCellWorld(rx,rz), nv=(ov==0)?1:0; setCellWorld(rx,rz,nv);
         if(countReachLocal(px,pz,12)<minR){ setCellWorld(rx,rz,ov); continue; } changed++; }
     if(changed==0) return false;
@@ -437,30 +236,14 @@ inline bool reshuffleBehind(float camX, float camZ, float camYaw) {
     return true;
 }
 
-inline bool isCorridor(const Chunk& chunk, int lx, int lz) {
-    bool wallLeft = (lx > 0) ? chunk.cells[lx-1][lz] == 1 : true;
-    bool wallRight = (lx < CHUNK_SIZE-1) ? chunk.cells[lx+1][lz] == 1 : true;
-    bool wallUp = (lz > 0) ? chunk.cells[lx][lz-1] == 1 : true;
-    bool wallDown = (lz < CHUNK_SIZE-1) ? chunk.cells[lx][lz+1] == 1 : true;
-    
-    if (wallUp && wallDown) return true;
-    if (wallLeft && wallRight) return true;
-    
-    return false;
-}
-
-inline bool wouldBlockPassage(const Chunk& chunk, int lx, int lz) {
-    if (isCorridor(chunk, lx, lz)) return true;
-
-    int openSides = 0;
-    if (lx > 0 && chunk.cells[lx-1][lz] == 0) openSides++;
-    if (lx < CHUNK_SIZE-1 && chunk.cells[lx+1][lz] == 0) openSides++;
-    if (lz > 0 && chunk.cells[lx][lz-1] == 0) openSides++;
-    if (lz < CHUNK_SIZE-1 && chunk.cells[lx][lz+1] == 0) openSides++;
-    
-    if (openSides < 3) return true;
-    
-    return false;
+// True when the cell and all 8 neighbours are open (inside a hall, not a passage).
+inline bool isOpenHallCell(int wx, int wz) {
+    for (int dx = -1; dx <= 1; dx++) {
+        for (int dz = -1; dz <= 1; dz++) {
+            if (getCellWorld(wx + dx, wz + dz) != 0) return false;
+        }
+    }
+    return true;
 }
 
 inline void updateLightsAndPillars(int pcx, int pcz) {
@@ -476,7 +259,7 @@ inline void updateLightsAndPillars(int pcx, int pcz) {
         auto it = chunks.find(chunkKey(pcx+dcx, pcz+dcz)); if (it==chunks.end()) continue;
         unsigned int seed = worldSeed ^ (unsigned)((pcx+dcx)*12345+(pcz+dcz)*67890);
         std::mt19937 lr(seed);
-        for (int lx=1; lx<CHUNK_SIZE-1; lx++) for (int lz=1; lz<CHUNK_SIZE-1; lz++) {
+        for (int lx=0; lx<CHUNK_SIZE; lx++) for (int lz=0; lz<CHUNK_SIZE; lz++) {
             int gwx = (pcx + dcx) * CHUNK_SIZE + lx;
             int gwz = (pcz + dcz) * CHUNK_SIZE + lz;
             if ((gwx & 1) != 0 || (gwz & 1) != 0) continue;
@@ -490,22 +273,14 @@ inline void updateLightsAndPillars(int pcx, int pcz) {
     }
     for (int dcx=-VIEW_CHUNKS; dcx<=VIEW_CHUNKS; dcx++) for (int dcz=-VIEW_CHUNKS; dcz<=VIEW_CHUNKS; dcz++) {
         auto it = chunks.find(chunkKey(pcx+dcx, pcz+dcz)); if (it==chunks.end()) continue;
-        unsigned int seed = worldSeed ^ (unsigned)((pcx+dcx)*9871+(pcz+dcz)*4231);
-        std::mt19937 pr(seed);
-        for (int lx=2; lx<CHUNK_SIZE-2; lx++) for (int lz=2; lz<CHUNK_SIZE-2; lz++) {
-            if (it->second.cells[lx][lz]!=0) continue;
-            
-            if (wouldBlockPassage(it->second, lx, lz)) continue;
-            
-            int wallAdj = 0;
-            if (it->second.cells[lx-1][lz]==1) wallAdj++;
-            if (it->second.cells[lx+1][lz]==1) wallAdj++;
-            if (it->second.cells[lx][lz-1]==1) wallAdj++;
-            if (it->second.cells[lx][lz+1]==1) wallAdj++;
-            if (wallAdj < 2) continue;
-            if (pr()%100 >= 6) continue;
-            float wx = ((pcx+dcx)*CHUNK_SIZE+lx+0.5f)*CS;
-            float wz = ((pcz+dcz)*CHUNK_SIZE+lz+0.5f)*CS;
+        if (!layoutRulesFor(chunkStyleAt(pcx+dcx, pcz+dcz)).pillars) continue;
+        for (int lx=0; lx<CHUNK_SIZE; lx++) for (int lz=0; lz<CHUNK_SIZE; lz++) {
+            int gwx = (pcx + dcx) * CHUNK_SIZE + lx;
+            int gwz = (pcz + dcz) * CHUNK_SIZE + lz;
+            if (!isPillarLatticeCell(gwx, gwz)) continue;
+            if (!isOpenHallCell(gwx, gwz)) continue;
+            float wx = (gwx+0.5f)*CS;
+            float wz = (gwz+0.5f)*CS;
             bool ex=false; for(auto& p:pillars) if(fabsf(p.x-wx)<0.1f&&fabsf(p.z-wz)<0.1f){ex=true;break;}
             if(!ex) pillars.push_back(Vec3(wx,0,wz));
         }

@@ -3,59 +3,8 @@
 #include "coop.h"
 #include "map_content.h"
 #include "device_models.h"
-inline void mkClosedBox(std::vector<float>& v, float cx, float y0, float cz, float sx, float sy, float sz) {
-    float hx = sx * 0.5f;
-    float hz = sz * 0.5f;
-    float y1 = y0 + sy;
-    const float tile = 2.4f;
-    float uvX = sx / tile;
-    float uvY = sy / tile;
-    float uvZ = sz / tile;
-    if (uvX < 0.6f) uvX = 0.6f;
-    if (uvY < 0.6f) uvY = 0.6f;
-    if (uvZ < 0.6f) uvZ = 0.6f;
-    auto pushQuad = [&](Vec3 a, Vec3 b, Vec3 c, Vec3 d, Vec3 n, float uMax, float vMax) {
-        float vv[] = {
-            a.x, a.y, a.z, 0, 0, n.x, n.y, n.z,
-            b.x, b.y, b.z, uMax, 0, n.x, n.y, n.z,
-            c.x, c.y, c.z, uMax, vMax, n.x, n.y, n.z,
-            a.x, a.y, a.z, 0, 0, n.x, n.y, n.z,
-            c.x, c.y, c.z, uMax, vMax, n.x, n.y, n.z,
-            d.x, d.y, d.z, 0, vMax, n.x, n.y, n.z
-        };
-        v.insert(v.end(), vv, vv + 48);
-    };
-    pushQuad(
-        Vec3(cx - hx, y0, cz + hz), Vec3(cx + hx, y0, cz + hz),
-        Vec3(cx + hx, y1, cz + hz), Vec3(cx - hx, y1, cz + hz),
-        Vec3(0, 0, 1), uvX, uvY
-    );
-    pushQuad(
-        Vec3(cx + hx, y0, cz - hz), Vec3(cx - hx, y0, cz - hz),
-        Vec3(cx - hx, y1, cz - hz), Vec3(cx + hx, y1, cz - hz),
-        Vec3(0, 0, -1), uvX, uvY
-    );
-    pushQuad(
-        Vec3(cx + hx, y0, cz + hz), Vec3(cx + hx, y0, cz - hz),
-        Vec3(cx + hx, y1, cz - hz), Vec3(cx + hx, y1, cz + hz),
-        Vec3(1, 0, 0), uvZ, uvY
-    );
-    pushQuad(
-        Vec3(cx - hx, y0, cz - hz), Vec3(cx - hx, y0, cz + hz),
-        Vec3(cx - hx, y1, cz + hz), Vec3(cx - hx, y1, cz - hz),
-        Vec3(-1, 0, 0), uvZ, uvY
-    );
-    pushQuad(
-        Vec3(cx - hx, y1, cz + hz), Vec3(cx + hx, y1, cz + hz),
-        Vec3(cx + hx, y1, cz - hz), Vec3(cx - hx, y1, cz - hz),
-        Vec3(0, 1, 0), uvX, uvZ
-    );
-    pushQuad(
-        Vec3(cx - hx, y0, cz - hz), Vec3(cx + hx, y0, cz - hz),
-        Vec3(cx + hx, y0, cz + hz), Vec3(cx - hx, y0, cz + hz),
-        Vec3(0, -1, 0), uvX, uvZ
-    );
-}
+#include "structure_models.h"
+#include "decor_atlas.h"
 
 void buildGeom(){
     std::vector<float>wv,fv,cv,pv,lv,lvOff,dv;
@@ -99,164 +48,41 @@ void buildGeom(){
                     if(wallB)mkWall(wv,px+CS,pz,-CS,0,WH,CS,WH);
                     if(wallF)mkWall(wv,px,pz+CS,CS,0,WH,CS,WH);
 
-                    if(!hasHole){
-                        bool corridorZ = wallL && wallR && !wallB && !wallF;
-                        bool corridorX = wallB && wallF && !wallL && !wallR;
-                        float cxCell = px + CS * 0.5f;
-                        float czCell = pz + CS * 0.5f;
-                        unsigned int doorHash = (unsigned int)(wx * 73856093u) ^ (unsigned int)(wz * 19349663u) ^ (worldSeed * 83492791u);
-                        bool spawnDoorway = (doorHash % 100u) < 7u;
-                        if(spawnDoorway && (corridorZ || corridorX)){
-                            std::vector<float>& doorV = isParkingLevel(gCurrentLevel) ? cv : dv;
-                            float openingH = WH * 0.62f;
-                            float postH = openingH;
-                            float postW = CS * 0.06f;
-                            float frameT = CS * 0.10f;
-                            float openingHalf = CS * 0.23f;
-                            float edgeHalf = CS * 0.49f;
-                            float sideFillW = (edgeHalf - openingHalf);
-                            float sideFillCenter = (edgeHalf + openingHalf) * 0.5f;
-                            float topFillH = WH - openingH;
-                            float wallFillT = frameT * 0.92f;
-                            if(corridorZ){
-                                mkBox(doorV, cxCell - openingHalf, 0.0f, czCell, postW, postH, frameT);
-                                mkBox(doorV, cxCell + openingHalf, 0.0f, czCell, postW, postH, frameT);
-                                mkBox(doorV, cxCell, openingH, czCell, openingHalf * 2.0f + postW * 2.0f, CS * 0.08f, frameT);
-                                mkBox(doorV, cxCell - sideFillCenter, 0.0f, czCell, sideFillW, WH, wallFillT);
-                                mkBox(doorV, cxCell + sideFillCenter, 0.0f, czCell, sideFillW, WH, wallFillT);
-                                mkBox(doorV, cxCell, openingH, czCell, openingHalf * 2.0f, topFillH, wallFillT);
-                            }else{
-                                mkBox(doorV, cxCell, 0.0f, czCell - openingHalf, frameT, postH, postW);
-                                mkBox(doorV, cxCell, 0.0f, czCell + openingHalf, frameT, postH, postW);
-                                mkBox(doorV, cxCell, openingH, czCell, frameT, CS * 0.08f, openingHalf * 2.0f + postW * 2.0f);
-                                mkBox(doorV, cxCell, 0.0f, czCell - sideFillCenter, wallFillT, WH, sideFillW);
-                                mkBox(doorV, cxCell, 0.0f, czCell + sideFillCenter, wallFillT, WH, sideFillW);
-                                mkBox(doorV, cxCell, openingH, czCell, wallFillT, topFillH, openingHalf * 2.0f);
-                            }
-                        }
-
-                        // Wooden stair steps disabled
+                    int doorAxis = doorwayAxisAt(wx,wz);
+                    if(doorAxis!=0) buildDoorwayModel(dv,wx,wz,doorAxis);
+                }
+            }
+        }
+    }
+    bool parkingLevel = isParkingLevel(gCurrentLevel);
+    for(auto&p:pillars){
+        mkPillar(pv,p.x,p.z,PILLAR_SIZE,WH);
+        buildPillarTrimModel(dv,p,parkingLevel);
+    }
+    for(const auto& pr:mapProps) buildMapPropModel(dv,pr);
+    for(const auto& poi:mapPois) buildMapPoiModel(dv,poi);
+    if(parkingLevel){
+        // Bay lines are laid per open cell of parking halls, so they stop at walls.
+        for(int dcx=-VIEW_CHUNKS;dcx<=VIEW_CHUNKS;dcx++){
+            for(int dcz=-VIEW_CHUNKS;dcz<=VIEW_CHUNKS;dcz++){
+                if(chunkStyleAt(pcx+dcx,pcz+dcz)!=CHUNK_STYLE_PARKING) continue;
+                if(chunks.find(chunkKey(pcx+dcx,pcz+dcz))==chunks.end()) continue;
+                for(int lx=0;lx<CHUNK_SIZE;lx++){
+                    for(int lz=0;lz<CHUNK_SIZE;lz+=3){
+                        int wx=(pcx+dcx)*CHUNK_SIZE+lx, wz=(pcz+dcz)*CHUNK_SIZE+lz;
+                        if(getCellWorld(wx,wz)!=0 || isFloorHoleCell(wx,wz) || isAbyssCell(wx,wz)) continue;
+                        DecorBuilder line(dv,((float)wx+0.5f)*CS,((float)wz+0.5f)*CS,0.0f,1.0f);
+                        line.decal(0.0f,0.012f,0.0f,CS,0.16f,DECOR_MAT_WHITE);
                     }
                 }
             }
         }
     }
-    for(auto&p:pillars){
-        mkPillar(pv,p.x,p.z,0.6f,WH);
-        if(isParkingLevel(gCurrentLevel)){
-            mkBox(dv, p.x, 0.0f, p.z, 0.90f, 0.10f, 0.90f);
-            mkBox(dv, p.x, 0.32f, p.z, 0.78f, 0.08f, 0.78f);
-            mkBox(dv, p.x, 0.62f, p.z, 0.66f, 0.08f, 0.66f);
-        }
-    }
-    for(auto&pr:mapProps){
-        if(pr.type==MAP_PROP_CRATE_STACK){
-            float b = 1.05f * pr.scale;
-            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, b, 0.82f * pr.scale, b);
-            mkBox(dv, pr.pos.x + 0.36f, 0.0f, pr.pos.z - 0.30f, 0.70f * pr.scale, 0.62f * pr.scale, 0.70f * pr.scale);
-        }else if(pr.type==MAP_PROP_CONE_CLUSTER){
-            float base = 0.42f * pr.scale;
-            mkBox(dv, pr.pos.x - 0.35f, 0.0f, pr.pos.z, base, 0.45f * pr.scale, base);
-            mkBox(dv, pr.pos.x + 0.28f, 0.0f, pr.pos.z + 0.25f, base, 0.42f * pr.scale, base);
-            mkBox(dv, pr.pos.x + 0.10f, 0.0f, pr.pos.z - 0.32f, base, 0.38f * pr.scale, base);
-        }else if(pr.type==MAP_PROP_BARRIER){
-            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, 1.55f * pr.scale, 0.74f * pr.scale, 0.42f * pr.scale);
-        }else if(pr.type==MAP_PROP_CABLE_REEL){
-            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, 0.92f * pr.scale, 0.45f * pr.scale, 0.92f * pr.scale);
-            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, 0.30f * pr.scale, 0.78f * pr.scale, 0.30f * pr.scale);
-        }else if(pr.type==MAP_PROP_PUDDLE){
-            mkFloorDecal(dv, pr.pos.x, 0.02f, pr.pos.z, 1.7f * pr.scale, 1.3f * pr.scale);
-        }else if(pr.type==MAP_PROP_DESK){
-            mkBox(dv, pr.pos.x, 0.72f * pr.scale, pr.pos.z, 1.05f * pr.scale, 0.14f * pr.scale, 0.70f * pr.scale);
-            mkBox(dv, pr.pos.x - 0.42f * pr.scale, 0.0f, pr.pos.z - 0.24f * pr.scale, 0.12f * pr.scale, 0.72f * pr.scale, 0.12f * pr.scale);
-            mkBox(dv, pr.pos.x + 0.42f * pr.scale, 0.0f, pr.pos.z - 0.24f * pr.scale, 0.12f * pr.scale, 0.72f * pr.scale, 0.12f * pr.scale);
-            mkBox(dv, pr.pos.x - 0.42f * pr.scale, 0.0f, pr.pos.z + 0.24f * pr.scale, 0.12f * pr.scale, 0.72f * pr.scale, 0.12f * pr.scale);
-            mkBox(dv, pr.pos.x + 0.42f * pr.scale, 0.0f, pr.pos.z + 0.24f * pr.scale, 0.12f * pr.scale, 0.72f * pr.scale, 0.12f * pr.scale);
-        }else if(pr.type==MAP_PROP_CHAIR){
-            mkBox(dv, pr.pos.x, 0.36f * pr.scale, pr.pos.z, 0.48f * pr.scale, 0.10f * pr.scale, 0.48f * pr.scale);
-            mkBox(dv, pr.pos.x, 0.46f * pr.scale, pr.pos.z - 0.18f * pr.scale, 0.48f * pr.scale, 0.42f * pr.scale, 0.10f * pr.scale);
-            mkBox(dv, pr.pos.x - 0.18f * pr.scale, 0.0f, pr.pos.z + 0.18f * pr.scale, 0.10f * pr.scale, 0.36f * pr.scale, 0.10f * pr.scale);
-            mkBox(dv, pr.pos.x + 0.18f * pr.scale, 0.0f, pr.pos.z + 0.18f * pr.scale, 0.10f * pr.scale, 0.36f * pr.scale, 0.10f * pr.scale);
-            mkBox(dv, pr.pos.x - 0.18f * pr.scale, 0.0f, pr.pos.z - 0.18f * pr.scale, 0.10f * pr.scale, 0.36f * pr.scale, 0.10f * pr.scale);
-            mkBox(dv, pr.pos.x + 0.18f * pr.scale, 0.0f, pr.pos.z - 0.18f * pr.scale, 0.10f * pr.scale, 0.36f * pr.scale, 0.10f * pr.scale);
-        }else if(pr.type==MAP_PROP_CABINET){
-            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, 0.64f * pr.scale, 1.55f * pr.scale, 0.52f * pr.scale);
-            mkBox(dv, pr.pos.x, 1.52f * pr.scale, pr.pos.z, 0.70f * pr.scale, 0.08f * pr.scale, 0.58f * pr.scale);
-        }else if(pr.type==MAP_PROP_PARTITION){
-            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, 1.35f * pr.scale, 1.22f * pr.scale, 0.12f * pr.scale);
-        }else if(pr.type==MAP_PROP_BOX_PALLET){
-            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, 1.22f * pr.scale, 0.34f * pr.scale, 1.02f * pr.scale);
-            mkBox(dv, pr.pos.x, 0.34f * pr.scale, pr.pos.z, 1.10f * pr.scale, 0.78f * pr.scale, 0.96f * pr.scale);
-            mkBox(dv, pr.pos.x, 1.12f * pr.scale, pr.pos.z, 0.88f * pr.scale, 0.50f * pr.scale, 0.82f * pr.scale);
-        }else if(pr.type==MAP_PROP_DRUM_STACK){
-            mkBox(dv, pr.pos.x - 0.22f * pr.scale, 0.0f, pr.pos.z, 0.48f * pr.scale, 1.12f * pr.scale, 0.48f * pr.scale);
-            mkBox(dv, pr.pos.x + 0.22f * pr.scale, 0.0f, pr.pos.z, 0.48f * pr.scale, 1.06f * pr.scale, 0.48f * pr.scale);
-            mkBox(dv, pr.pos.x, 1.06f * pr.scale, pr.pos.z, 0.44f * pr.scale, 0.44f * pr.scale, 0.44f * pr.scale);
-        }else if(pr.type==MAP_PROP_LOCKER_BANK){
-            mkBox(dv, pr.pos.x, 0.0f, pr.pos.z, 1.18f * pr.scale, 1.74f * pr.scale, 0.46f * pr.scale);
-            mkBox(dv, pr.pos.x - 0.30f * pr.scale, 0.0f, pr.pos.z + 0.22f * pr.scale, 0.04f * pr.scale, 1.62f * pr.scale, 0.04f * pr.scale);
-            mkBox(dv, pr.pos.x + 0.30f * pr.scale, 0.0f, pr.pos.z + 0.22f * pr.scale, 0.04f * pr.scale, 1.62f * pr.scale, 0.04f * pr.scale);
-        }else{
-            mkBox(dv, pr.pos.x - 0.42f, 0.0f, pr.pos.z + 0.24f, 0.68f * pr.scale, 0.35f * pr.scale, 0.68f * pr.scale);
-            mkBox(dv, pr.pos.x + 0.28f, 0.0f, pr.pos.z - 0.22f, 0.56f * pr.scale, 0.28f * pr.scale, 0.56f * pr.scale);
-        }
-    }
-    for(const auto& poi:mapPois){
-        if(poi.type==MAP_POI_OFFICE){
-            mkBox(dv, poi.pos.x, 0.0f, poi.pos.z, 1.00f, 0.22f, 1.00f);
-            mkBox(dv, poi.pos.x, 0.22f, poi.pos.z - 0.32f, 0.92f, 0.62f, 0.10f);
-            mkBox(dv, poi.pos.x - 0.52f, 0.0f, poi.pos.z + 0.42f, 0.62f, 0.84f, 0.40f);
-            mkBox(dv, poi.pos.x + 0.52f, 0.0f, poi.pos.z + 0.42f, 0.62f, 0.84f, 0.40f);
-            mkBox(dv, poi.pos.x, 0.84f, poi.pos.z + 0.12f, 0.52f, 0.08f, 0.18f);
-            mkBox(dv, poi.pos.x - 0.22f, 0.0f, poi.pos.z - 0.68f, 0.18f, 0.64f, 0.18f);
-            mkBox(dv, poi.pos.x + 0.22f, 0.0f, poi.pos.z - 0.68f, 0.18f, 0.64f, 0.18f);
-        }else if(poi.type==MAP_POI_SERVER){
-            mkBox(dv, poi.pos.x - 0.32f, 0.0f, poi.pos.z, 0.26f, 1.45f, 0.26f);
-            mkBox(dv, poi.pos.x + 0.32f, 0.0f, poi.pos.z, 0.26f, 1.45f, 0.26f);
-            mkBox(dv, poi.pos.x, 1.42f, poi.pos.z, 0.74f, 0.08f, 0.32f);
-        }else if(poi.type==MAP_POI_STORAGE){
-            mkBox(dv, poi.pos.x, 0.0f, poi.pos.z, 1.18f, 0.42f, 1.02f);
-            mkBox(dv, poi.pos.x, 0.42f, poi.pos.z, 1.04f, 0.52f, 0.88f);
-        }else{
-            mkBox(dv, poi.pos.x, 0.0f, poi.pos.z, 0.82f, 0.20f, 0.82f);
-            mkBox(dv, poi.pos.x, 0.20f, poi.pos.z, 0.54f, 0.12f, 0.54f);
-        }
-    }
-    if(isParkingLevel(gCurrentLevel)){
-        for(int dcx=-VIEW_CHUNKS;dcx<=VIEW_CHUNKS;dcx++){
-            for(int dcz=-VIEW_CHUNKS;dcz<=VIEW_CHUNKS;dcz++){
-                int bx = (pcx+dcx) * CHUNK_SIZE;
-                int bz = (pcz+dcz) * CHUNK_SIZE;
-                for(int row=2; row<CHUNK_SIZE-2; row+=3){
-                    float lineZ = ((float)bz + (float)row + 0.5f) * CS;
-                    float x0 = ((float)bx + 1.5f) * CS;
-                    float x1 = ((float)bx + (float)CHUNK_SIZE - 1.5f) * CS;
-                    float cx = (x0 + x1) * 0.5f;
-                    float sx = x1 - x0;
-                    mkFloorDecal(dv, cx, 0.018f, lineZ, sx, 0.36f);
-                }
-            }
-        }
-    }
     if(coop.initialized){
-        for(int s=0;s<2;s++){
-            const Vec3 sp = coop.switches[s];
-            mkBox(dv, sp.x, 0.0f, sp.z, 0.84f, 0.22f, 0.84f);
-            mkBox(dv, sp.x, 0.22f, sp.z, 0.20f, 0.82f, 0.20f);
-            float leverX = sp.x + (coop.switchOn[s] ? 0.14f : -0.14f);
-            mkBox(dv, leverX, 0.88f, sp.z, 0.28f, 0.10f, 0.10f);
-        }
+        for(int s=0;s<2;s++) buildSwitchModel(dv,coop.switches[s],coop.switchOn[s]);
         bool storyExitReady = isStoryExitReady();
         bool doorOpenVisual = (multiState==MULTI_IN_GAME) ? coop.doorOpen : storyExitReady;
-        const Vec3 dp = coop.doorPos;
-        mkBox(dv, dp.x - CS * 0.58f, 0.0f, dp.z, 0.16f, 2.82f, 0.36f);
-        mkBox(dv, dp.x + CS * 0.58f, 0.0f, dp.z, 0.16f, 2.82f, 0.36f);
-        mkBox(dv, dp.x, 2.72f, dp.z, CS * 1.18f, 0.14f, 0.36f);
-        if(!doorOpenVisual){
-            mkBox(dv, dp.x, 0.0f, dp.z, CS * 1.06f, 2.62f, 0.20f);
-        }else{
-            mkBox(dv, dp.x, 0.0f, dp.z + 0.18f, CS * 1.06f, 0.10f, 0.54f);
-        }
+        buildExitDoorModel(dv,coop.doorPos,doorOpenVisual);
     }
     for(auto&l:lights){
         if(l.on)mkLight(lv,l.pos,l.sizeX,l.sizeZ);
@@ -340,10 +166,12 @@ void genWorld(){
         if(ceilTex) glDeleteTextures(1, &ceilTex);
         if(lampTex) glDeleteTextures(1, &lampTex);
         if(propTex) glDeleteTextures(1, &propTex);
+        if(decorTex) glDeleteTextures(1, &decorTex);
         if(deviceTex) glDeleteTextures(1, &deviceTex);
         if(plushTex) glDeleteTextures(1, &plushTex);
         wallTex=genTex(0); floorTex=genTex(1); ceilTex=genTex(2); lampTex=genTex(4); propTex=genTex(5);
         deviceTex=genTex(6); plushTex=genTex(7);
+        decorTex=genDecorAtlasTex();
         lastTextureLevel = gCurrentLevel;
     }
 
@@ -354,7 +182,7 @@ void genWorld(){
         if(multiState==MULTI_IN_GAME) netMgr.worldSeed = worldSeed;
     }
     
-    chunks.clear();lights.clear();pillars.clear();mapProps.clear();mapPois.clear();
+    chunks.clear();lights.clear();pillars.clear();resetMapContent();forcedDoorways.clear();
     g_lightStates.clear();
     updateVisibleChunks(0,0);
     updateLightsAndPillars(0,0);

@@ -337,6 +337,9 @@ inline void initCoopObjectives(const Vec3& basePos){
     coop.switchOn[0] = false;
     coop.switchOn[1] = false;
     coop.doorPos = Vec3((doorWX + 0.5f) * CS, 0, (doorWZ + 0.5f) * CS);
+    // The exit portal reuses the standard doorway frame (mesh + collision).
+    forcedDoorways.clear();
+    forcedDoorways.push_back({doorWX, doorWZ});
     coop.doorOpen = false;
     coop.initialized = true;
 }

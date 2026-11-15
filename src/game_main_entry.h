@@ -21,6 +21,7 @@ int main(){
     loadArchiveMetaProgress(archivePoints, archiveTier, perkQuietSteps, perkFastHands, perkEchoBuffer);
     wallTex=genTex(0);floorTex=genTex(1);ceilTex=genTex(2);lightTex=genTex(3);lampTex=genTex(4);propTex=genTex(5);
     deviceTex=genTex(6);
+    if(!decorTex) decorTex=genDecorAtlasTex();
     plushTex=genTex(7);
     playerTex=propTex; // players use a stable texture so held-item textures don't bleed
     mainShader=mkShader(mainVS,mainFS);lightShader=mkShader(lightVS,lightFS);vhsShader=mkShader(vhsVS,vhsFS);
