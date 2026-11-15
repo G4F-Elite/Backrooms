@@ -25,6 +25,19 @@ inline void initTrapCorridor(const Vec3& spawnPos){
     trapCorridor.gateX = trapCorridor.startX - 1;
     trapCorridor.gateZ = trapCorridor.startZ;
 
+    // The corridor is stamped over finished rooms, so remember what it overwrites: if its
+    // walls would seal off the area around the spawn, the stamp is undone and the trap skipped.
+    struct SavedCell { int x, z, v; };
+    std::vector<SavedCell> saved;
+    int endX = trapCorridor.startX + trapCorridor.length + 1;
+    int minX = (sx < trapCorridor.gateX ? sx : trapCorridor.gateX);
+    int minZ = (sz < trapCorridor.startZ ? sz : trapCorridor.startZ) - 1;
+    int maxZ = (sz > trapCorridor.startZ ? sz : trapCorridor.startZ) + 1;
+    for(int x=minX; x<=endX; x++){
+        for(int z=minZ; z<=maxZ; z++) saved.push_back({x, z, getCellWorld(x, z)});
+    }
+    int reachBefore = countReachLocal(sx, sz, 14);
+
     carveLineAxisAligned(sx, sz, trapCorridor.gateX, trapCorridor.gateZ);
     for(int i=0;i<=trapCorridor.length;i++){
         int x = trapCorridor.startX + i;
@@ -33,8 +46,13 @@ inline void initTrapCorridor(const Vec3& spawnPos){
         setCellWorld(x, z - 1, 1);
         setCellWorld(x, z + 1, 1);
     }
-    setCellWorld(trapCorridor.startX + trapCorridor.length + 1, trapCorridor.startZ, 1);
+    setCellWorld(endX, trapCorridor.startZ, 1);
     setCellWorld(trapCorridor.gateX, trapCorridor.gateZ, 0);
+
+    if(countReachLocal(sx, sz, 14) < (reachBefore * 3) / 4){
+        for(const auto& c : saved) setCellWorld(c.x, c.z, c.v);
+        return;
+    }
 
     trapCorridor.active = true;
     trapCorridor.triggered = false;

@@ -6,7 +6,44 @@
 #include "structure_models.h"
 #include "decor_atlas.h"
 
+// World mutations (trap corridor, exit portal, floor holes, reshuffles) can leave decor inside
+// a wall, in the exit doorway or above a pit. Drop it before meshing.
+inline bool isDecorSpotLost(float x, float z){
+    int wx=(int)floorf(x/CS), wz=(int)floorf(z/CS);
+    return getCellWorld(wx,wz)!=0 || isForcedDoorway(wx,wz) || isFallCell(wx,wz);
+}
+
+// Objectives are placed after the props, so a prop may end up on top of one.
+inline bool isPropOnObjective(const MapProp& p){
+    float hx=0.0f, hz=0.0f;
+    mapPropHalfExtents(p,hx,hz);
+    const float clearance=0.45f;
+    auto hit=[&](const Vec3& o){ return fabsf(o.x-p.pos.x)<hx+clearance && fabsf(o.z-p.pos.z)<hz+clearance; };
+    // a player spawned inside a prop could not move at all
+    if(fabsf(cam.pos.x-p.pos.x)<hx+0.2f && fabsf(cam.pos.z-p.pos.z)<hz+0.2f) return true;
+    if(!coop.initialized) return false;
+    for(int i=0;i<2;i++) if(hit(coop.switches[i]) || hit(level1SyncSwitches[i])) return true;
+    for(int i=0;i<3;i++) if(hit(level1Nodes[i]) || hit(level2FuseNodes[i])) return true;
+    return hit(level2BatteryNode) || hit(level2AccessNode) || hit(level2LiftNode) || hit(level2PowerNode);
+}
+
+inline void pruneInvalidDecor(){
+    mapProps.erase(std::remove_if(mapProps.begin(),mapProps.end(),[](const MapProp& p){
+        if(isDecorSpotLost(p.pos.x,p.pos.z)) return true;
+        if(p.type==MAP_PROP_PUDDLE) return false;
+        if(isPropOnObjective(p)) return true;
+        return doorwayAxisAt((int)floorf(p.pos.x/CS),(int)floorf(p.pos.z/CS))!=0;
+    }),mapProps.end());
+    mapPois.erase(std::remove_if(mapPois.begin(),mapPois.end(),[](const MapPoi& p){
+        return isDecorSpotLost(p.pos.x,p.pos.z);
+    }),mapPois.end());
+    pillars.erase(std::remove_if(pillars.begin(),pillars.end(),[](const Vec3& p){
+        return isDecorSpotLost(p.x,p.z);
+    }),pillars.end());
+}
+
 void buildGeom(){
+    pruneInvalidDecor();
     std::vector<float>wv,fv,cv,pv,lv,lvOff,dv;
     int pcx=playerChunkX,pcz=playerChunkZ;
     for(int dcx=-VIEW_CHUNKS;dcx<=VIEW_CHUNKS;dcx++){
