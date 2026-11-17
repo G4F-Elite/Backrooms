@@ -1,4 +1,5 @@
 #pragma once
+#include "post_fx.h"
 inline Mat4 composeModelMatrix(const Vec3& pos, float yaw, float pitch, const Vec3& scale);
 
 void renderScene(){
@@ -116,8 +117,10 @@ void renderScene(){
     // Gather nearest lights - fade is now computed in shader based on distance
     float lpos[SCENE_LIGHT_LIMIT * 3] = {0};
     int nl = gatherNearestSceneLights(lights, cam.pos, lpos);
+    nl = rigInjectLight(lpos, nl, SCENE_LIGHT_LIMIT);
     glUniform1i(mu.nl,nl);
     if(nl>0) glUniform3fv(mu.lp,nl,lpos);
+    postFxCaptureScene(proj,view,lpos,nl);
 
     // If we have a held flashlight, update flashPos BEFORE the world geometry draw.
     // This ensures the shader uses flashlight origin, not camera origin.
@@ -176,16 +179,29 @@ void renderScene(){
             itemTint = Vec3(0.74f,0.88f,0.80f);
             yBase = 0.13f;
         }
+        int heistMesh = heistItemMeshIndex(wi.type);
+        if(heistMesh >= 0){
+            itemVAO = heistItemVAO[heistMesh];
+            itemVC = heistItemVC[heistMesh];
+            itemTex = decorTex;
+            itemScale = Vec3(1.0f,1.0f,1.0f);
+            itemTint = wi.type == itemTypeFromLoot(LOOT_CORE) ? Vec3(1.0f,1.25f,1.2f) * (1.1f + 0.5f * sinf(vhsTime * 6.0f)) : Vec3(1.12f,1.10f,1.02f);
+            yBase = 0.02f;
+        }
         if(itemVC <= 0 || itemVAO == 0) continue;
-        float bob = sinf(vhsTime * 2.4f + (float)wi.id * 0.51f) * 0.035f;
-        float yaw = vhsTime * 0.95f + (float)wi.id * 0.67f;
+        bool spins = heistMesh < 0 || heistItemSpins(wi.type);
+        float bob = spins ? sinf(vhsTime * 2.4f + (float)wi.id * 0.51f) * 0.035f + (heistMesh >= 0 ? 0.035f : 0.0f) : 0.0f;
+        float yaw = (spins ? vhsTime * 0.95f : 0.0f) + (float)wi.id * 0.67f;
         Mat4 itemModel = composeModelMatrix(Vec3(wi.pos.x, yBase + bob, wi.pos.z), yaw, 0.0f, itemScale);
         glUniformMatrix4fv(mu.M,1,GL_FALSE,itemModel.m);
         if(mu.tint >= 0) glUniform3f(mu.tint,itemTint.x,itemTint.y,itemTint.z);
         glBindTexture(GL_TEXTURE_2D,itemTex);
         glBindVertexArray(itemVAO);
+        if(heistMesh >= 0) glDisable(GL_CULL_FACE); // decor meshes are two-sided
         glDrawArrays(GL_TRIANGLES,0,itemVC);
+        if(heistMesh >= 0) glEnable(GL_CULL_FACE);
     }
+    renderRig(mu.M, mu.tint);
     glUniformMatrix4fv(mu.M,1,GL_FALSE,model.m);
     if(mu.tint >= 0) glUniform3f(mu.tint,1.0f,1.0f,1.0f);
 

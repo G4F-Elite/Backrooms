@@ -1,9 +1,10 @@
 #pragma once
+#include "hud_icons.h"
 
 extern float vhsTime;
 
 // === Visual HUD Bar Constants ===
-static const float BAR_LEFT = -0.95f;
+static const float BAR_LEFT = -0.925f;
 static const float BAR_RIGHT = -0.50f;
 static const float BAR_W = BAR_RIGHT - BAR_LEFT;
 static const float BAR_H = 0.032f;
@@ -74,7 +75,7 @@ inline void drawRightBarPanel() {
 }
 
 // Generic visual bar: background track + colored fill + label + percentage + border + ticks
-inline void drawVisualBar(float yCenter, const char* label, float frac,
+inline void drawVisualBar(float yCenter, int icon, float frac,
     float fr, float fg, float fb, float lr, float lg, float lb) {
     float left = BAR_LEFT, right = BAR_RIGHT, w = BAR_W;
     float labelX = BAR_LABEL_X, pctX = BAR_PCT_X;
@@ -96,12 +97,9 @@ inline void drawVisualBar(float yCenter, const char* label, float frac,
     }
     // Border frame around bar track
     drawBorderRect(left, yBot, right, yTop, 0.40f, 0.36f, 0.30f, 0.85f, 0.004f);
-    // Label text
-    drawText(label, labelX, yCenter - 0.004f, BAR_TEXT_SC, lr, lg, lb, 0.85f);
-    // Percentage text
-    char pct[8];
-    snprintf(pct, 8, "%d", (int)(frac * 100.0f + 0.5f));
-    drawText(pct, pctX, yCenter - 0.004f, BAR_TEXT_SC, lr, lg, lb, 0.7f);
+    // Pictogram instead of a label; the fill itself is the number
+    (void)labelX; (void)pctX;
+    drawIcon(icon, left - 0.012f, yCenter, 0.046f, lr, lg, lb, 0.9f);
 }
 
 inline void drawHealthBar(float hp) {
@@ -114,7 +112,7 @@ inline void drawHealthBar(float hp) {
     } else {
         fr = 0.7f; fg = 0.15f; fb = 0.1f;
     }
-    drawVisualBar(-0.88f, "HP", frac, fr, fg, fb, 0.65f, 0.6f, 0.5f);
+    drawVisualBar(-0.88f, HUD_ICON_HEART, frac, fr, fg, fb, 0.65f, 0.6f, 0.5f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 
@@ -128,7 +126,7 @@ inline void drawSanityBar(float sn) {
     } else {
         fr = 0.35f; fg = 0.2f; fb = 0.55f;
     }
-    drawVisualBar(-0.93f, "SN", frac, fr, fg, fb, 0.65f, 0.6f, 0.5f);
+    drawVisualBar(-0.93f, HUD_ICON_SANITY, frac, fr, fg, fb, 0.65f, 0.6f, 0.5f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 
@@ -157,7 +155,7 @@ inline void drawStaminaBar(float st) {
     } else {
         fr = 0.2f; fg = 0.5f; fb = 0.2f;
     }
-    drawVisualBar(-0.82f, "ST", frac, fr, fg, fb, 0.65f, 0.6f, 0.5f);
+    drawVisualBar(-0.82f, HUD_ICON_STAMINA, frac, fr, fg, fb, 0.65f, 0.6f, 0.5f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 
@@ -168,7 +166,7 @@ inline void drawFlashlightBattery(float battery, bool isOn) {
     float fr, fg, fb;
     if (isOn) { fr = 0.8f; fg = 0.75f; fb = 0.2f; }
     else { fr = 0.3f; fg = 0.3f; fb = 0.3f; }
-    float fLeft = 0.50f, fRight = 0.95f;
+    float fLeft = 0.525f, fRight = 0.95f;
     float fW = fRight - fLeft;
     float yBot = -0.93f - BAR_HALF_H;
     float yTop = -0.93f + BAR_HALF_H;
@@ -188,35 +186,7 @@ inline void drawFlashlightBattery(float battery, bool isOn) {
     }
     // Border frame around bar track
     drawBorderRect(fLeft, yBot, fRight, yTop, 0.40f, 0.36f, 0.30f, 0.85f, 0.004f);
-    // Label
-    drawText("FL", 0.51f, -0.934f, BAR_TEXT_SC, 0.65f, 0.6f, 0.5f, 0.85f);
-    // Percentage
-    char pct[8];
-    snprintf(pct, 8, "%d", (int)(frac * 100.0f + 0.5f));
-    drawText(pct, 0.93f, -0.934f, BAR_TEXT_SC, 0.65f, 0.6f, 0.5f, 0.7f);
-    glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
-}
-
-inline void drawContractCounter(int count) {
-    glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    char b[20]; snprintf(b, 20, "CONTRACT: %d/3", count);
-    drawText(b, -0.95f, -0.66f, 1.5f, 0.72f, 0.68f, 0.46f, 0.84f);
-    glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
-}
-
-inline void drawPhaseIndicator(int phase) {
-    glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    const char* pn[] = { "EXPLORATION","TENSION","PURSUIT","ESCAPE" };
-    if (phase >= 0 && phase < 4) {
-        drawText("PHASE:", 0.49f, 0.85f, 1.25f, 0.80f, 0.75f, 0.52f, 0.88f);
-        drawText(pn[phase], 0.60f, 0.82f, 1.35f, 0.86f, 0.80f, 0.56f, 0.92f);
-    }
-    glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
-}
-
-inline void drawInteractPrompt() {
-    glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    drawText("[E] INTERACT", -0.15f, -0.4f, 1.8f, 0.8f, 0.75f, 0.5f, 0.8f);
+    drawIcon(HUD_ICON_FLASHLIGHT, fLeft - 0.012f, -0.93f, 0.046f, 0.65f, 0.6f, 0.5f, 0.9f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 

@@ -8,23 +8,7 @@ enum GamePhase { PHASE_INTRO, PHASE_EXPLORATION, PHASE_SURVIVAL, PHASE_DESPERATI
 enum HallucinationType { HALLUC_NONE, HALLUC_FLICKER, HALLUC_SHADOW, HALLUC_STEPS, HALLUC_WHISPER };
 struct Hallucination { Vec3 pos; HallucinationType type; float timer, duration; bool active; };
 
-const char* NOTE_TITLES[] = {"Contract Brief","Signal Noise","Contact Log","Clock Drift","Crew Fragment","Hunter Pattern","Crawler Route","Shadow Zone","System Distort","Blocked Route","Archive Trace","Last Uplink"};
-const char* NOTE_CONTENTS[] = {
-    "Shift team entered Level 1.\nObjective: stabilize 3 nodes\nand hold the grid.",
-    "Fluorescent hum maps to\nresonance drift. Use scanner\nonly when route is clear.",
-    "Hostile silhouette tracked\nfrom maintenance branch.\nNoise attracts it fast.",
-    "Clock drift confirmed.\nArchive timer is more stable\nthan local watches.",
-    "Found old crew badge near\nservice vent. No body, no\ntransponder response.",
-    "Hunter tracks movement\nbreaks. Close doors, then\nrotate routes.",
-    "Crawler path loops around\nwet corridor. Use light burst\nif grab starts.",
-    "Shadow zone expands at\nhigh ATTENTION. Keep team\nspread and pings short.",
-    "Echo playback desync seen\nat critical threat levels.\nDo not spam replay.",
-    "Parking lift blocked until\nbattery, fuses, and access\nline are confirmed.",
-    "Archive traces imply prior\nshift attempts reached this\nphase and failed extraction.",
-    "If this log remains: finish\nthe contract cycle, return to\nBreakroom, report upstream."
-};
-const char* INTRO_LINES[] = {"ARCHIVE UPLINK ONLINE.","SHIFT TEAM STATUS: DEPLOYING.","PRIMARY TASK: STABILIZE REALITY.","CONTRACT FEED RECEIVED.","LEVEL 1: YELLOW ROOMS.","LEVEL 2: PARKING.","USE RESONATOR TO TRACK NODES.","RECORD ECHO IF SOLO.","MANAGE ATTENTION AND LIGHT.","EXTRACT AFTER CONTRACT COMPLETE.","","VOID SHIFT v1.0.0"};
-const int INTRO_LINE_COUNT = 12;
+// The story is told by the world and the HUD pictograms: there are no notes or briefings to read.
 
 class StoryManager {
 public:
@@ -38,7 +22,7 @@ public:
         introComplete=false; introLine=0; introTimer=0; readingNote=false; currentNote=-1; currentPhase=PHASE_INTRO; hallucinationTimer=0; }
     void spawnNote(Vec3 pos, int id) { if(id>=12||notesCollected[id])return; Note n; n.pos=pos; n.id=id; n.collected=false; n.active=true; n.bobPhase=(float)(rand()%100)/10.0f; notes.push_back(n); }
     void update(float dt, float survivalTime, float sanity, std::mt19937& rng) {
-        if(!introComplete) { introTimer+=dt; if(introTimer>=introLineTime) { introTimer=0; introLine++; if(introLine>=INTRO_LINE_COUNT)introComplete=true; }}
+        introComplete=true;
         if(survivalTime<60.0f)currentPhase=PHASE_INTRO; else if(survivalTime<180.0f)currentPhase=PHASE_EXPLORATION; else if(survivalTime<300.0f)currentPhase=PHASE_SURVIVAL; else currentPhase=PHASE_DESPERATION;
         for(auto&n:notes) { if(!n.active||n.collected)continue; n.bobPhase+=dt*2.0f; }
         if(sanity<50.0f) { hallucinationTimer+=dt; float spawnChance=(50.0f-sanity)/50.0f; nextHallucination=10.0f+20.0f*(1.0f-spawnChance);

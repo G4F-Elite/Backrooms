@@ -5,6 +5,7 @@
 #include "coop_flow.h"
 #include "sanity_balance.h"
 #include "monster_profiles.h"
+#include "ai_targets.h"
 
 inline constexpr float DOWNED_SECONDS = 60.0f;
 inline constexpr float DOWNED_GRACE_SECONDS = 4.0f;
@@ -23,7 +24,7 @@ inline void killLocalPlayer(const char* reason) {
     playerHealth = 0.0f;
     if (multiState == MULTI_IN_GAME) {
         gCoopDead = true;
-        setEchoStatus("YOU DIED. YOU ARE A GHOST UNTIL THE SQUAD MOVES ON.");
+        setEchoStatus("YOU ARE DEAD. BACK ON THE CLOCK AT THE NEXT DRILL LAMP");
         return;
     }
     isPlayerDead = true;
@@ -86,20 +87,20 @@ inline void updateSanity() {
     // Leave a sliver of sanity so the downed player does not collapse again on the next frame.
     playerSanity = 12.0f;
     gSanityCollapseTimer = 0.0f;
-    setEchoStatus("DOWNED: COGNITIVE OVERLOAD");
+    setEchoStatus("DOWNED: MORALE HIT ZERO. SOMEBODY HUG THIS PERSON");
 }
 
 inline void updateFloorFall() {
     int cellX = (int)floorf(cam.pos.x / CS);
     int cellZ = (int)floorf(cam.pos.z / CS);
-    if (playerFalling || !isFallCell(cellX, cellZ)) return;
+    if (playerFalling || !isFallCell(cellX, cellZ) || rigPosInCabin(cam.pos)) return; // the rig bridges holes
     float dx = cam.pos.x - (cellX + 0.5f) * CS;
     float dz = cam.pos.z - (cellZ + 0.5f) * CS;
     if (sqrtf(dx * dx + dz * dz) >= CS * 0.35f) return;
     playerFalling = true;
     fallVelocity = 0.0f;
     fallTimer = 0.0f;
-    setEchoStatus(isAbyssCell(cellX, cellZ) ? "THE VOID SWALLOWS YOU." : "FLOOR COLLAPSE. YOU FELL.");
+    setEchoStatus(isAbyssCell(cellX, cellZ) ? "THAT PIT WAS NOT ON THE FLOOR PLAN" : "THE FLOOR QUIT. YOU WENT WITH IT");
 }
 
 inline void updateMonsterDamage() {
@@ -108,15 +109,12 @@ inline void updateMonsterDamage() {
 
     MonsterAttackProfile attack = monsterAttackProfile(attackerType);
     playerHealth -= attack.healthDps * dTime;
+    entityMgr.pendingDamage += attack.healthDps * dTime; // the director watches how rough it gets
     playerSanity -= attack.sanityDps * dTime;
     if (attack.hitShake > camShake) camShake = attack.hitShake;
     if (attack.hitFlash > damageFlash) damageFlash = attack.hitFlash;
-    if (multiState == MULTI_IN_GAME) {
-        netMgr.sendScare(netMgr.myId);
-        if (netMgr.isHost) triggerScare(attack.scareVol);
-    } else {
-        triggerScare(attack.scareVol);
-    }
+    if (multiState == MULTI_IN_GAME) netMgr.sendScare(netMgr.myId);
+    triggerMonsterHit();
 
     if (playerHealth > 0.0f) return;
     if (playerDowned) {
@@ -125,7 +123,7 @@ inline void updateMonsterDamage() {
     }
     downLocalPlayer("DOWNED: HOSTILE CONTACT");
     playerHealth = 15.0f;
-    setEchoStatus("DOWNED: HOSTILE CONTACT");
+    setEchoStatus("DOWNED: WORKPLACE INJURY. A COWORKER CAN PICK YOU UP");
 }
 
 inline bool isTeammateRevivingMe() {
@@ -169,7 +167,7 @@ inline void updateDownedAndRevive() {
     }
     if (beingRevived) {
         gReviveProgress += dTime / REVIVE_SECONDS;
-        if (gReviveProgress >= 1.0f) reviveLocalPlayer("REVIVED BY TEAMMATE");
+        if (gReviveProgress >= 1.0f) reviveLocalPlayer("A COWORKER PICKED YOU UP. YOU OWE THEM ONE");
         return;
     }
     gReviveProgress -= dTime * 0.5f;
@@ -206,32 +204,3 @@ inline void updatePlayerVitals() {
     updateCoopFlowHost(dTime);
 }
 
-// Monsters hunt the nearest standing squad member, not just the host.
-inline void collectEntityTargets() {
-    entityMgr.targetCount = 0;
-    entityMgr.ignoreLocal = false;
-    if (multiState != MULTI_IN_GAME) return;
-    if (!netMgr.isHost) {
-        // Clients simulate monsters between snapshots against themselves only. Mirror the host rule:
-        // ghosts are never hunted, the downed only once no teammate is left standing.
-        bool teammateStanding = false;
-        for (int p = 0; p < MAX_PLAYERS; p++) if (isRemotePlayerStanding(p)) teammateStanding = true;
-        entityMgr.ignoreLocal = gCoopDead || (playerDowned && teammateStanding);
-        return;
-    }
-    entityMgr.ignoreLocal = gCoopDead || playerDowned;
-    if (!gCoopDead && !playerDowned) entityMgr.addTarget(cam.pos, cam.yaw);
-    for (int p = 0; p < MAX_PLAYERS; p++) {
-        if (!isRemotePlayerStanding(p) || !netMgr.players[p].hasValidPos) continue;
-        entityMgr.addTarget(netMgr.players[p].pos, netMgr.players[p].yaw);
-    }
-    if (entityMgr.targetCount > 0) return;
-
-    // Nobody is standing: finish off the downed.
-    if (playerDowned && !gCoopDead) entityMgr.addTarget(cam.pos, cam.yaw);
-    for (int p = 0; p < MAX_PLAYERS; p++) {
-        if (p == netMgr.myId || !netMgr.players[p].active || !netMgr.players[p].hasValidPos) continue;
-        if ((netMgr.players[p].flags & PLAYER_FLAG_DEAD) != 0) continue;
-        entityMgr.addTarget(netMgr.players[p].pos, netMgr.players[p].yaw);
-    }
-}

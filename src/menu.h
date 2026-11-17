@@ -323,11 +323,8 @@ inline void drawMenu(float tm) {
     drawFullscreenOverlay(0.17f,0.13f,0.08f,0.015f);
     float p=0.82f+0.06f*sinf(tm*2.0f);
     float gl = sinf(tm * 0.7f) * 0.0016f;
-    drawTextCentered("BACKROOMS: VOID SHIFT",0.0f+gl,0.5f,3.4f,0.9f,0.85f,0.4f,p);
-    char levelBuf[32];
-    buildLevelLabel(gCurrentLevel, levelBuf, 32);
-    drawTextCentered(levelBuf,0.0f,0.35f,2.5f,0.7f,0.65f,0.3f,0.8f);
-    const char* it[]={"START CONTRACT","MULTIPLAYER","SETTINGS","GUIDE","QUIT"};
+    drawTextCentered("BACKROOMS: SEED ROUND",0.0f+gl,0.5f,3.4f,0.9f,0.85f,0.4f,p);
+    const char* it[]={"START","MULTIPLAYER","SETTINGS","TUTORIAL","QUIT"};
     for(int i=0;i<5;i++){
         float s=(menuSel==i)?1.0f:0.5f; float y=0.10f-i*0.11f;
         float baseX = -measureTextWidthNdc(it[i], 2.0f * 0.5f);
@@ -337,26 +334,6 @@ inline void drawMenu(float tm) {
     drawTextCentered("UP/DOWN - SELECT    ENTER - CONFIRM",0.0f,-0.6f,1.5f,0.5f,0.5f,0.4f,0.6f);
     drawTextCentered("v1.0.0",0.0f,-0.72f,1.2f,0.64f,0.62f,0.54f,0.75f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
-}
-
-inline void drawGuideScreen() {
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    drawFullscreenOverlay(0.02f,0.02f,0.03f,0.80f);
-    drawTextCentered("VOID SHIFT GUIDE",0.0f,0.58f,3.0f,0.9f,0.85f,0.4f,0.96f);
-    drawTextCentered("GOAL: COMPLETE CONTRACTS, STABILIZE REALITY, THEN EXTRACT",0.0f,0.40f,1.56f,0.82f,0.86f,0.64f,0.94f);
-    drawTextCentered("RESONATOR MODES: SCAN / RECORD / PLAYBACK / PING",0.0f,0.30f,1.46f,0.72f,0.84f,0.86f,0.92f);
-    drawTextCentered("ECHO RECORDING: HOLD R TO RECORD, RELEASE TO SAVE, P TO PLAY",0.0f,0.22f,1.40f,0.76f,0.74f,0.86f,0.92f);
-    drawTextCentered("ATTENTION RISES FROM NOISE/LIGHT/ECHO. STAY IN CONTROL",0.0f,0.12f,1.44f,0.92f,0.66f,0.50f,0.94f);
-    drawTextCentered("LEVEL 1: STABILIZE 3 NODES + HOLD 90s",0.0f,0.04f,1.42f,0.90f,0.72f,0.64f,0.92f);
-    drawTextCentered("LEVEL 2: BATTERY + 3 FUSES + ACCESS + LIFT HOLD",0.0f,-0.06f,1.42f,0.82f,0.86f,0.64f,0.92f);
-    drawTextCentered("NPCS: CARTOGRAPHER / DISPATCHER / LOST SURVIVOR",0.0f,-0.16f,1.34f,0.78f,0.84f,0.70f,0.90f);
-    drawTextCentered("SIDE CONTRACTS GRANT ARCHIVE POINTS + PERKS",0.0f,-0.24f,1.30f,0.76f,0.84f,0.72f,0.90f);
-    drawTextCentered("CONTROLS: WASD MOVE, SHIFT SPRINT, C CROUCH, E INTERACT",0.0f,-0.32f,1.36f,0.70f,0.76f,0.66f,0.90f);
-    drawTextCentered("ESC OR ENTER - BACK",0.0f,-0.70f,1.52f,0.56f,0.62f,0.50f,0.82f);
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
 }
 
 inline void drawSettings(bool fp) {
@@ -473,102 +450,6 @@ inline void drawPause() {
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
 
-inline void drawDeath(float tm, const char* deathReason) {
-    glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    bool isCognitive = (deathReason && strstr(deathReason, "COGNITIVE OVERLOAD") != nullptr);
-    float fl=(rand()%100<28)?0.25f:1.0f, p=0.68f+0.22f*sinf(tm*4.2f);
-    float deathPulse = 0.5f + 0.5f * sinf(tm * 2.8f), ch = 0.0015f + deathPulse * 0.0045f;
-    if (isCognitive) {
-        float postDeath = (tm > 2.3f) ? (tm - 2.3f) : 0.0f, intensity = fminf(tm, 2.3f) / 2.3f;
-        if (tm < 2.3f) {
-            float ha = intensity * 0.6f;
-            drawOverlayRectNdc(-1.0f,0.82f,1.0f,1.0f,0.35f,0.0f,0.45f,ha);
-            drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.82f,0.35f,0.0f,0.45f,ha);
-            drawOverlayRectNdc(-1.0f,-1.0f,-0.82f,1.0f,0.35f,0.0f,0.45f,ha*0.8f);
-            drawOverlayRectNdc(0.82f,-1.0f,1.0f,1.0f,0.35f,0.0f,0.45f,ha*0.8f);
-            float cab = 0.002f + intensity * 0.012f;
-            drawOverlayRectNdc(-1.0f+cab,-1.0f,1.0f+cab,1.0f,0.9f,0.0f,0.0f,0.12f*intensity);
-            drawOverlayRectNdc(-1.0f-cab,-1.0f,1.0f-cab,1.0f,0.0f,0.0f,0.9f,0.12f*intensity);
-            for (int i = 0; i < 4; i++) {
-                float by=-1.0f+(i/4.0f)*2.0f, ta=intensity*0.18f*(0.5f+0.5f*sinf(tm*22.0f+i*3.1f));
-                if (ta > 0.01f) drawOverlayRectNdc(-1.0f+sinf(tm*18.0f+i*2.3f)*0.04f*intensity,by,1.0f+sinf(tm*18.0f+i*2.3f)*0.04f*intensity,by+0.08f+sinf(tm*14.0f+i*1.7f)*0.03f,0.15f,0.0f,0.2f,ta);
-            }
-            drawOverlayRectNdc(-1.0f+sinf(tm*20.0f)*0.03f*intensity,-1.0f,1.0f+sinf(tm*20.0f)*0.03f*intensity,1.0f,0.02f,0.0f,0.02f,0.3f*intensity);
-            drawFullscreenOverlay(0.01f,0.0f,0.01f,0.3f+intensity*0.5f);
-            float va = 0.1f + intensity * 0.4f;
-            drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.86f,0.4f,0.0f,0.05f,va);
-            drawOverlayRectNdc(-1.0f,0.86f,1.0f,1.0f,0.4f,0.0f,0.05f,va);
-            drawOverlayRectNdc(-1.0f,-1.0f,1.0f,1.0f,0.2f,0.0f,0.02f,intensity*0.15f);
-        }
-        if (postDeath > 0.0f) {
-            drawFullscreenOverlay(0.005f,0.0f,0.008f,0.88f+fminf(postDeath/1.5f,1.0f)*0.12f);
-            float ce = fminf(postDeath*0.6f,1.0f);
-            for (int i = 0; i < 8; i++) {
-                float a=(i/8.0f)*3.14159f+0.15f*sinf((float)i*2.7f), ca=cosf(a), sa=sinf(a);
-                float ex=ca*ce*2.2f, ey=sa*ce*2.2f, px=-sa*(0.001f+ce*0.004f), py=ca*(0.001f+ce*0.004f);
-                float lx=fminf(0.0f,ex), ly=fminf(0.05f,ey), rx=fmaxf(0.0f,ex), ry=fmaxf(0.05f,ey);
-                float cra=0.7f+0.3f*sinf(postDeath*3.0f+i);
-                drawOverlayRectNdc(lx+px,ly+py,rx-px,ry-py,0.0f,0.0f,0.0f,cra*0.9f);
-                drawOverlayRectNdc(lx+px*2.0f,ly+py*2.0f,rx-px*2.0f,ry-py*2.0f,0.2f,0.0f,0.25f,cra*0.25f);
-            }
-            float inward=fminf(postDeath*0.08f,0.35f), sa2=fminf(postDeath*0.5f,0.85f);
-            const float sil[4][4]={{-1.0f,-0.1f,0.12f,0.55f},{1.0f,0.0f,0.14f,0.6f},{-0.85f,0.6f,0.10f,0.45f},{0.85f,-0.5f,0.11f,0.5f}};
-            for (int i = 0; i < 4; i++) {
-                float sx=sil[i][0], sy=sil[i][1], sw=sil[i][2], sh=sil[i][3];
-                sx+=(sx>0.0f)?-inward:((sx<0.0f)?inward:0.0f); sy+=(sy>0.0f)?-inward:((sy<0.0f)?inward:0.0f);
-                drawOverlayRectNdc(sx-sw*0.5f,sy-sh*0.5f,sx+sw*0.5f,sy+sh*0.5f,0.0f,0.0f,0.0f,sa2);
-                drawOverlayRectNdc(sx-sw*0.3f,sy+sh*0.35f,sx+sw*0.3f,sy+sh*0.55f,0.0f,0.0f,0.0f,sa2);
-            }
-            drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.86f,0.32f,0.02f,0.02f,0.55f);
-            drawOverlayRectNdc(-1.0f,0.86f,1.0f,1.0f,0.32f,0.02f,0.02f,0.55f);
-            drawOverlayRectNdc(-1.0f,-1.0f,1.0f,1.0f,0.18f,0.02f,0.02f,0.06f+deathPulse*0.08f);
-            float go=(postDeath<0.5f)?(0.5f-postDeath)*0.02f:0.0f, ta2=fminf(postDeath*2.0f,1.0f), gr=(postDeath<0.5f)?sinf(postDeath*60.0f)*go:0.0f, gb=(postDeath<0.5f)?cosf(postDeath*55.0f)*go:0.0f;
-            drawTextCentered("YOU DIED",0.0f-ch+gr,0.2f,4.2f,0.88f*fl,0.10f*fl,0.10f*fl,p*0.82f*ta2);
-            drawTextCentered("YOU DIED",0.0f+ch+gb,0.2f,4.2f,0.22f*fl,0.12f*fl,0.88f*fl,p*0.72f*ta2);
-            drawTextCentered("YOU DIED",0.0f,0.2f,4.2f,0.9f*fl,0.08f*fl,0.08f*fl,p*ta2);
-            drawTextCentered("MIND FRACTURED",0.0f,0.01f,2.1f,0.72f,0.12f,0.12f,0.76f*ta2);
-            drawTextCentered(deathReason,0.0f,-0.05f,1.55f,0.78f,0.62f,0.52f,0.82f*ta2);
-            int m=(int)(gSurvivalTime/60),s=(int)gSurvivalTime%60;
-            char tb[32]; snprintf(tb,32,"SURVIVED: %d:%02d",m,s);
-            drawTextCentered(tb,0.0f,-0.16f,2.0f,0.7f,0.6f,0.3f,0.8f*ta2);
-            float pa = fminf((postDeath-0.8f)*1.5f,1.0f);
-            if (pa > 0.0f) {
-                drawTextCentered("PRESS ENTER TO RESTART",0.0f,-0.35f,1.8f,0.5f,0.4f,0.35f,0.6f*pa);
-                drawTextCentered("PRESS ESC FOR MAIN MENU",0.0f,-0.47f,1.8f,0.5f,0.4f,0.35f,0.6f*pa);
-            }
-        }
-    } else {
-        drawFullscreenOverlay(0.01f,0.0f,0.0f,0.88f);
-        drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.86f,0.32f,0.02f,0.02f,0.55f);
-        drawOverlayRectNdc(-1.0f,0.86f,1.0f,1.0f,0.32f,0.02f,0.02f,0.55f);
-        drawOverlayRectNdc(-1.0f,-1.0f,1.0f,1.0f,0.18f,0.02f,0.02f,0.06f+deathPulse*0.08f);
-        drawTextCentered("YOU DIED",0.0f-ch,0.2f,4.2f,0.88f*fl,0.10f*fl,0.10f*fl,p*0.82f);
-        drawTextCentered("YOU DIED",0.0f+ch,0.2f,4.2f,0.22f*fl,0.12f*fl,0.88f*fl,p*0.72f);
-        drawTextCentered("YOU DIED",0.0f,0.2f,4.2f,0.9f*fl,0.08f*fl,0.08f*fl,p);
-        drawTextCentered("CONTRACT FAILED",0.0f,0.01f,2.1f,0.72f,0.12f,0.12f,0.76f);
-        drawTextCentered(deathReason,0.0f,-0.05f,1.55f,0.78f,0.62f,0.52f,0.82f);
-        int m=(int)(gSurvivalTime/60),s=(int)gSurvivalTime%60;
-        char tb[32]; snprintf(tb,32,"SURVIVED: %d:%02d",m,s);
-        drawTextCentered(tb,0.0f,-0.16f,2.0f,0.7f,0.6f,0.3f,0.8f);
-        drawTextCentered("PRESS ENTER TO RESTART",0.0f,-0.35f,1.8f,0.5f,0.4f,0.35f,0.6f);
-        drawTextCentered("PRESS ESC FOR MAIN MENU",0.0f,-0.47f,1.8f,0.5f,0.4f,0.35f,0.6f);
-    }
-    glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
-}
-
-inline void drawEscape(float tm) {
-    glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    float p=0.76f+0.12f*sinf(tm*2.4f);
-    drawTextCentered("YOU ESCAPED",0.0f,0.2f,4.0f,0.75f,0.9f,0.75f,p);
-    drawTextCentered("EXTRACTION ROUTE UNLOCKED.",0.0f,0.02f,2.0f,0.62f,0.78f,0.62f,0.84f);
-    int m=(int)(gSurvivalTime/60),s=(int)gSurvivalTime%60;
-    char tb[32]; snprintf(tb,32,"SURVIVED: %d:%02d",m,s);
-    drawTextCentered(tb,0.0f,-0.12f,2.0f,0.7f,0.8f,0.68f,0.86f);
-    drawTextCentered("PRESS ENTER TO CONTINUE",0.0f,-0.35f,1.8f,0.55f,0.64f,0.54f,0.7f);
-    drawTextCentered("PRESS ESC FOR MAIN MENU",0.0f,-0.47f,1.8f,0.55f,0.64f,0.54f,0.7f);
-    glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
-}
-
 inline void drawSurvivalTime(float t) {
     glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     int m=(int)(t/60),s=(int)t%60; char b[16]; snprintf(b,16,"%d:%02d",m,s);
@@ -597,8 +478,3 @@ inline void drawKeybindsMenu(bool fromPause, int selected, int captureIndex) {
     if(fromPause) drawTextCentered("APPLIES IN CURRENT RUN",0.0f,-0.92f,1.1f,0.5f,0.55f,0.45f,0.7f);
     glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }
-
-// Split out some rarely-touched menu pages to keep this header under the 500-line limit enforced by build.bat.
-#define BR_MENU_INTERNAL
-#include "menu_pages.h"
-#undef BR_MENU_INTERNAL

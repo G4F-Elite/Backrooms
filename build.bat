@@ -23,6 +23,23 @@ if errorlevel 1 (
 
 if not exist "build" mkdir build
 
+REM Z-fight check: every model and sample worlds go through the engine's z-fight guard
+REM (src\zfight_guard.h). No build while two faces still flicker through each other.
+echo.
+echo Checking for z-fighting...
+g++ -std=c++17 -O1 -I"deps/include" -o "build/zfight_check.exe" "tools/zfight_check.cpp"
+if errorlevel 1 (
+    echo.
+    echo Build cancelled: tools\zfight_check.cpp does not compile.
+    exit /b 1
+)
+"build\zfight_check.exe"
+if errorlevel 1 (
+    echo.
+    echo Build cancelled.
+    exit /b 1
+)
+
 echo.
 echo Compiling...
 g++ -std=c++17 -O2 -Wall -Wno-unused-result -Wno-unknown-pragmas -mwindows -static -static-libgcc -static-libstdc++ ^

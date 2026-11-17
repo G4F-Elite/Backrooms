@@ -3,6 +3,8 @@
 #include "net_types.h"
 #include "net_sync_codec.h"
 #include "player_name.h"
+#include "squad_fx.h"
+#include "heist_net.h"
 #include <cstring>
 
 struct NetEntitySnapshotEntry {
@@ -28,44 +30,19 @@ struct NetInteractRequest {
     bool valid;
 };
 
+// Host -> clients: run flow, layout and the whole heist state. The host owns all of it, so
+// late joiners and level changes stay in sync.
 struct NetVoidShiftState {
     float attentionLevel;
-    float resonatorBattery;
-    float level1HoldTimer;
-    float level2HoldTimer;
-    int sideContractType;
-    int sideContractProgress;
-    int sideContractTarget;
-    int level2BatteryStage;
-    int level2FuseCount;
-    bool sideContractCompleted;
-    bool level1NodeDone[3];
-    bool level1HoldActive;
-    bool level1ContractComplete;
-    bool level2BatteryInstalled;
-    bool level2FuseDone[3];
-    bool level2AccessReady;
-    bool level2FusePanelPowered;
-    bool level2HoldActive;
-    bool level2ContractComplete;
-    bool npcLostSurvivorActive;
-    bool npcLostSurvivorEscorted;
-    Vec3 npcLostSurvivorPos;
-    // Run flow + layout are host-authoritative so late joiners and level changes stay in sync.
     int level;
     unsigned int seed;
     Vec3 spawn;
     bool runComplete;
-    bool doorOpen;
-    Vec3 doorPos;
-    Vec3 doorSwitches[2];
-    Vec3 level1Nodes[3];
-    Vec3 level1SyncSwitches[2];
-    int level1NodeStage[3];
-    Vec3 level2Nodes[7];
     int statusSeq;
     char status[64];
+    NetHeistState heist;
 };
+static_assert(sizeof(NetVoidShiftState) < PACKET_SIZE, "void shift state must fit one packet");
 
 enum PlayerStateFlag {
     PLAYER_FLAG_FLASHLIGHT = 1,
@@ -430,5 +407,12 @@ public:
     void handleInteractRequest(char* buf, int len);
     void handleRoamEvent(char* buf, int len);
     void handlePingMark(char* buf, int len);
+    // Squad banter (squad_fx.h): events queue up for the game loop, stats land in the table.
+    SquadFxEvent fxQueue[SQUAD_FX_QUEUE_LEN];
+    int fxQueueCount = 0;
+    ShiftStats squadStats[MAX_PLAYERS] = {};
+    void sendSquadFx(const SquadFxEvent& fx, const ShiftStats& stats);
+    void handleSquadFx(char* buf, int len);
+    void relayToClients(char* buf, int len, int exceptId);
     void handleVoidShiftState(char* buf, int len);
 };

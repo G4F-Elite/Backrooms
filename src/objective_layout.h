@@ -1,6 +1,6 @@
 #pragma once
-// Objective layout: keeps contract objectives on reachable floor cells, keeps them
-// open after world mutations, and places the abyss away from them.
+// Objective layout: finds reachable floor cells for the built sets (drill, kiosk, lesson
+// spots), keeps them open after world mutations, and places the abyss away from them.
 
 #include <vector>
 #include <random>
@@ -86,44 +86,24 @@ inline Vec3 snapObjectiveToFloor(ObjectiveGrid& grid, const Vec3& want) {
     return want;
 }
 
+// Every spot a built set stands on: wall shifts and pits must leave these alone.
 template <typename Fn>
 inline void forEachObjectivePos(Fn fn) {
-    fn(coop.doorPos);
-    for (int i = 0; i < 2; i++) fn(coop.switches[i]);
-    for (int i = 0; i < 3; i++) fn(level1Nodes[i]);
-    for (int i = 0; i < 2; i++) fn(level1SyncSwitches[i]);
-    fn(level2BatteryNode);
-    fn(level2PowerNode);
-    fn(level2AccessNode);
-    for (int i = 0; i < 3; i++) fn(level2FuseNodes[i]);
-}
-
-inline void snapVoidShiftObjectives(const Vec3& base) {
-    ObjectiveGrid grid;
-    buildObjectiveGrid(grid, base, true);
-
-    // Keep the spawn cell and both sides of the exit door free of objectives.
-    for (int side = -1; side <= 1; side++) {
-        markObjectiveCellUsed(grid, Vec3(coop.doorPos.x, 0.0f, coop.doorPos.z + CS * (float)side));
-    }
-    markObjectiveCellUsed(grid, base);
-    for (int i = 0; i < 2; i++) coop.switches[i] = snapObjectiveToFloor(grid, coop.switches[i]);
-
-    for (int i = 0; i < 3; i++) level1Nodes[i] = snapObjectiveToFloor(grid, level1Nodes[i]);
-    level1SyncSwitches[0] = snapObjectiveToFloor(grid, Vec3(level1Nodes[1].x + CS, 0.0f, level1Nodes[1].z));
-    level1SyncSwitches[1] = snapObjectiveToFloor(grid, Vec3(level1Nodes[1].x - CS, 0.0f, level1Nodes[1].z));
-
-    level2BatteryNode = snapObjectiveToFloor(grid, level2BatteryNode);
-    level2PowerNode = snapObjectiveToFloor(grid, level2PowerNode);
-    level2AccessNode = snapObjectiveToFloor(grid, level2AccessNode);
-    for (int i = 0; i < 3; i++) level2FuseNodes[i] = snapObjectiveToFloor(grid, level2FuseNodes[i]);
-    npcLostSurvivorPos = snapObjectiveToFloor(grid, npcLostSurvivorPos);
+    fn(heist.drillPos);
+    if (heist.hasKiosk) fn(heist.kioskPos);
+    if (!heist.hasGarage) return;
+    for (int dz = -3; dz <= 0; dz++) fn(Vec3(((float)heist.baseX + 0.5f) * CS, 0.0f, ((float)(heist.baseZ + dz) + 0.5f) * CS));
+    for (int i = 0; i < HEIST_TUTORIAL_LOOT; i++) fn(heist.lessonPos[i]);
+    fn(heist.corePos);
 }
 
 // Wall reshuffles may close a cell an objective stands on; reopen those cells.
 inline void reopenObjectiveCells() {
-    forEachObjectivePos([](const Vec3& p) {
-        setCellWorld(objectiveCellCoord(p.x), objectiveCellCoord(p.z), 0);
+    bool portalOpen = heistStageIsSafe(heist.stage);
+    forEachObjectivePos([&](const Vec3& p) {
+        int wx = objectiveCellCoord(p.x), wz = objectiveCellCoord(p.z);
+        if (!portalOpen && heist.hasGarage && wx == heist.baseX && wz == heist.baseZ - 3) return;
+        setCellWorld(wx, wz, 0);
     });
 }
 
@@ -140,6 +120,7 @@ inline bool isNearAnyObjective(int wx, int wz, int cellMargin) {
 // The abyss is seeded from the world seed so every peer carves the same pit.
 inline void placeAbyss(const Vec3& base) {
     abyss = {};
+    if (isLevelZero(gCurrentLevel)) return; // the first floor is the tutorial: no bottomless pits
     std::mt19937 pitRng(worldSeed ^ 0x0AB155u);
     int baseX = objectiveCellCoord(base.x);
     int baseZ = objectiveCellCoord(base.z);

@@ -11,7 +11,7 @@ const int NET_DISCOVERY_PORT = 27016;
 const int MAX_PLAYERS = 4;
 const int PACKET_SIZE = 512;
 const int MAX_SYNC_ENTITIES = 16;
-const int MAX_SYNC_ITEMS = 24;
+const int MAX_SYNC_ITEMS = 32;
 
 // Packet types
 enum PacketType {
@@ -43,7 +43,8 @@ enum PacketType {
     PKT_INTERACT_REQ,    // Client -> host interaction request
     PKT_ROAM_EVENT,      // Host -> clients roaming event trigger
     PKT_PING_MARK,       // Player -> others: ping marker for minimap/HUD
-    PKT_VOID_SHIFT_STATE // Host -> clients: authoritative contract/runtime state
+    PKT_VOID_SHIFT_STATE, // Host -> clients: authoritative contract/runtime state
+    PKT_SQUAD_FX         // Player -> squad: shove / squeak / callout / shift stats
 };
 
 // Network player data

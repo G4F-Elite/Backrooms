@@ -29,8 +29,9 @@ void testGameplayAudioStateClamps() {
 }
 
 void testGameplayCuesIncreaseSignalEnergy() {
-    short base[1024] = {};
-    short stressed[1024] = {};
+    const int samples = 1024 * AUDIO_CHANNELS;
+    short base[samples] = {};
+    short stressed[samples] = {};
 
     sndState.masterVol = 0.9f;
     sndState.ambienceVol = 0.7f;
@@ -43,7 +44,7 @@ void testGameplayCuesIncreaseSignalEnergy() {
     sndState.stepTrig = false;
     updateGameplayAudioState(0.0f, 0.0f, 1.0f, 0.0f, 0.0f);
     fillAudio(base, 1024);
-    float baseRms = rms(base, 1024);
+    float baseRms = rms(base, samples);
 
     sndState.dangerLevel = 0.7f;
     sndState.sanityLevel = 0.4f;
@@ -51,7 +52,7 @@ void testGameplayCuesIncreaseSignalEnergy() {
     sndState.stepTrig = true;
     updateGameplayAudioState(1.0f, 1.0f, 0.2f, 0.9f, 1.0f);
     fillAudio(stressed, 1024);
-    float stressedRms = rms(stressed, 1024);
+    float stressedRms = rms(stressed, samples);
 
     assert(stressedRms > baseRms);
 }

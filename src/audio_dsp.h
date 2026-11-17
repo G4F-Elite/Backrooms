@@ -7,17 +7,6 @@
 // Uses fast math approximations when g_fastMathEnabled is true
 // ============================================================================
 
-struct AudioSafetyState {
-    float humNoise = 0.0f;
-    float staticNoise = 0.0f;
-    float whisperNoise = 0.0f;
-    float flashlightEnv = 0.0f;
-    float uiMoveEnv = 0.0f;
-    float uiConfirmEnv = 0.0f;
-    float insaneBurst = 0.0f;
-    float limiterEnv = 0.0f;
-};
-
 // ============================================================================
 // FAST TANH APPROXIMATION
 // For soft clipping / saturation effects
@@ -105,27 +94,24 @@ inline float waveShape(float x, float asymmetry) {
 // DYNAMICS PROCESSING
 // ============================================================================
 
-// Apply limiter with envelope following
-inline float applyLimiter(float x, float& env) {
-    float absX = fastAbs(x);
+// Limiter gain for a peak level, with envelope following.
+// Stereo callers pass max(|L|, |R|) and apply the same gain to both sides.
+inline float limiterGain(float absX, float& env) {
     const float attack = 0.35f;
     const float release = 0.0015f;
-    
-    // Envelope follower
     if (absX > env) {
         env += (absX - env) * attack;
     } else {
         env += (absX - env) * release;
     }
-    
-    // Gain reduction
-    float gain = 1.0f;
+
     const float ceiling = 0.92f;
-    if (env > ceiling && env > 0.0001f) {
-        gain = ceiling / env;
-    }
-    
-    return x * gain;
+    if (env > ceiling && env > 0.0001f) return ceiling / env;
+    return 1.0f;
+}
+
+inline float applyLimiter(float x, float& env) {
+    return x * limiterGain(fastAbs(x), env);
 }
 
 // Compressor with knee
@@ -343,9 +329,11 @@ inline float brownNoise(float& prev) {
 // ============================================================================
 // SCANNER BEEP HELPER
 // ============================================================================
+// Handheld scanner: a dry piezo chirp, higher and louder the closer the signal.
 inline float scannerBeepSample(float t, float pitch, float vol) {
-    float atk = (t < 0.01f) ? (t / 0.01f) : 1.0f;
-    float env = atk * expf(-t * 10.5f);
-    float f = 260.0f + pitch * 220.0f;
-    return (sinf(MATH_TAU * f * t) * 0.26f + sinf(MATH_TAU * f * 2.0f * t) * 0.08f) * vol * env;
+    float atk = (t < 0.003f) ? (t / 0.003f) : 1.0f;
+    float env = atk * expf(-t * 24.0f);
+    float f = 520.0f + pitch * 520.0f;
+    float tone = sinf(MATH_TAU * f * t) * 0.24f + sinf(MATH_TAU * f * 3.0f * t) * 0.05f;
+    return tone * vol * env;
 }

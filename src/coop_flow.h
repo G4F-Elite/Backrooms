@@ -15,36 +15,39 @@ inline void leaveRunToMenu() {
     glfwSetInputMode(gWin, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 }
 
+// Retries and level changes drop straight back into play; the briefing only runs on first deploy.
+inline void reloadLevelAndResume(const char* status) {
+    genWorld();
+    buildGeom();
+    storyMgr.introComplete = true;
+    gameState = STATE_GAME;
+    glfwSetInputMode(gWin, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    firstMouse = true;
+    if (status) setTrapStatus(status);
+}
+
 // Host only. Clients follow through the level/seed carried in the void shift state.
+// restartRun: the squad was wiped. The floor starts over and half the wallet is gone.
 inline void hostAdvanceLevel(bool restartRun) {
     if (restartRun) {
-        gCurrentLevel = 0;
-    } else if (isLevelZero(gCurrentLevel)) {
-        gCurrentLevel = 1;
-        gCompletedLevels++;
+        heist.cash = cashAfterWipe(heist.cash);
     } else {
+        gCurrentLevel++;
         gCompletedLevels++;
-        gRunComplete = true;
-        playerEscaped = true;
-        for (int i = 0; i < 3; i++) hostSyncFeatureState();
-        glfwSetInputMode(gWin, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-        return;
     }
     genWorld();
     buildGeom();
     firstMouse = true;
-    setTrapStatus(restartRun ? "SQUAD LOST. SHIFT RESTARTED." : "DESCENDING: LEVEL 2 - PARKING");
 }
 
-// Called when the local player presses interact at an unlocked exit.
-inline void requestLevelExit() {
-    if (multiState != MULTI_IN_GAME) {
-        playerEscaped = true;
-        glfwSetInputMode(gWin, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-        return;
+// The rivals winched the squad out: the run is over, show the report.
+inline void hostFinishRun() {
+    gRunComplete = true;
+    playerEscaped = true;
+    if (multiState == MULTI_IN_GAME) {
+        for (int i = 0; i < 3; i++) hostSyncFeatureState();
     }
-    if (netMgr.isHost) gHostExitRequested = true;
-    else netMgr.sendInteractRequest(REQ_EXIT_LEVEL, 0);
+    glfwSetInputMode(gWin, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 }
 
 inline bool isRemotePlayerStanding(int p) {
@@ -57,14 +60,6 @@ inline void updateCoopFlowHost(float dt) {
     if (multiState != MULTI_IN_GAME || !netMgr.isHost || gRunComplete) {
         wipeTimer = 0.0f;
         return;
-    }
-
-    if (gHostExitRequested) {
-        gHostExitRequested = false;
-        if (coop.doorOpen && isStoryExitReady()) {
-            hostAdvanceLevel(false);
-            return;
-        }
     }
 
     bool anyStanding = !gCoopDead && !playerDowned;
@@ -83,3 +78,5 @@ inline void updateCoopFlowHost(float dt) {
         hostAdvanceLevel(true);
     }
 }
+
+#include "heist_host.h"

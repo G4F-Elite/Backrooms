@@ -79,6 +79,13 @@ inline void saveArchiveMetaProgress(int points, int tier, bool perkQuiet, bool p
 inline int gCurrentLevel = 0;
 inline int gCompletedLevels = 0;
 
+// The first shift is a tutorial (garage, portal, the accident). Once a player has seen it,
+// new runs start right after it, at the drill.
+inline bool gHeistSkipTutorial = false;
+inline bool gHeistTutorialSeen = false;
+// Scripted dev run (see dev_selftest.h): must not touch the save files.
+inline bool gSelftest = false;
+
 inline bool isLevelZero(int level) {
     return level <= 0;
 }
@@ -104,16 +111,9 @@ inline float levelDangerScale(int level) {
     return s;
 }
 
+// Floors are just numbered: B1 is right under the garage.
 inline void buildLevelLabel(int level, char* out, int outSize) {
     if (!out || outSize < 2) return;
     if (level < 0) level = 0;
-    if (level == 0) {
-        std::snprintf(out, outSize, "LEVEL 1 - YELLOW ROOMS");
-        return;
-    }
-    if (level == 1) {
-        std::snprintf(out, outSize, "LEVEL 2 - PARKING");
-        return;
-    }
-    std::snprintf(out, outSize, "LEVEL %d - VOID SHIFT", level + 1);
+    std::snprintf(out, outSize, "B%d", level + 1);
 }

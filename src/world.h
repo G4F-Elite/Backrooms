@@ -73,6 +73,11 @@ inline int getCellWorld(int wx, int wz) {
     return (it == chunks.end()) ? 1 : it->second.cells[lx][lz];
 }
 
+// Persistent cell edits (stamped rooms, broken walls). Chunks are dropped and rebuilt as the
+// squad moves, so anything that must survive that is replayed on top of the fresh layout.
+inline long long cellKey(int wx, int wz) { return ((long long)wx << 32) | (wz & 0xFFFFFFFF); }
+inline std::unordered_map<long long, int> gCellOverrides;
+
 inline void setCellWorld(int wx, int wz, int val) {
     int cx = wx >= 0 ? wx / CHUNK_SIZE : (wx - CHUNK_SIZE + 1) / CHUNK_SIZE;
     int cz = wz >= 0 ? wz / CHUNK_SIZE : (wz - CHUNK_SIZE + 1) / CHUNK_SIZE;
@@ -89,7 +94,20 @@ inline void generateChunk(int cx, int cz) {
     c.cz = cz;
     c.gen = true;
     buildChunkLayout(c);
+    if (!gCellOverrides.empty()) {
+        for (int lx = 0; lx < CHUNK_SIZE; lx++) {
+            for (int lz = 0; lz < CHUNK_SIZE; lz++) {
+                auto ov = gCellOverrides.find(cellKey(cx * CHUNK_SIZE + lx, cz * CHUNK_SIZE + lz));
+                if (ov != gCellOverrides.end()) c.cells[lx][lz] = ov->second;
+            }
+        }
+    }
     chunks[key] = c;
+}
+
+inline void setCellPersistent(int wx, int wz, int val) {
+    gCellOverrides[cellKey(wx, wz)] = val;
+    setCellWorld(wx, wz, val);
 }
 
 inline void updateVisibleChunks(float px, float pz) {
@@ -118,11 +136,15 @@ inline bool isForcedDoorway(int wx, int wz) {
     return false;
 }
 
+// Cells that must never get a door frame (the heist rig drives through its lane).
+inline bool (*gDoorwayVeto)(int, int) = nullptr;
+
 // 0 = no doorway, 1 = passage runs along Z (frame spans X), 2 = passage runs along X.
 // Only single-cell holes in a wall line get a frame; stretches of corridor do not.
 inline int doorwayAxisAt(int wx, int wz) {
     if (isForcedDoorway(wx, wz)) return 1;
     if (getCellWorld(wx, wz) != 0) return 0;
+    if (gDoorwayVeto && gDoorwayVeto(wx, wz)) return 0;
     bool wallL = getCellWorld(wx - 1, wz) == 1;
     bool wallR = getCellWorld(wx + 1, wz) == 1;
     bool wallB = getCellWorld(wx, wz - 1) == 1;
@@ -228,6 +250,7 @@ inline bool reshuffleBehind(float camX, float camZ, float camYaw) {
         float ddx=(float)(rx-px), ddz=(float)(rz-pz), dist=sqrtf(ddx*ddx+ddz*ddz); if(dist<3||dist>10) continue;
         if((ddx*fx+ddz*fz)/dist>-0.4f) continue; if(abs(rx-px)<=1&&abs(rz-pz)<=1) continue;
         if(isForcedDoorway(rx,rz)||isForcedDoorway(rx-1,rz)||isForcedDoorway(rx+1,rz)) continue;
+        if(gCellOverrides.count(cellKey(rx,rz))) continue; // stamped sets and broken walls stay as they are
         int ov=getCellWorld(rx,rz), nv=(ov==0)?1:0; setCellWorld(rx,rz,nv);
         if(countReachLocal(px,pz,12)<minR){ setCellWorld(rx,rz,ov); continue; } changed++; }
     if(changed==0) return false;

@@ -1,6 +1,7 @@
 #pragma once
 #include "decor_builder.h"
 #include "map_content.h"
+#include "props_library.h"
 
 // ============================================================================
 // PROP MODELS
@@ -169,4 +170,5 @@ inline void buildMapPropModel(std::vector<float>& v, const MapProp& pr) {
     else if (pr.type == MAP_PROP_BOX_PALLET) buildBoxPalletModel(b);
     else if (pr.type == MAP_PROP_DRUM_STACK) buildDrumStackModel(b);
     else if (pr.type == MAP_PROP_LOCKER_BANK) buildLockerBankModel(b);
+    else buildLibraryPropModel(b, pr.type);
 }

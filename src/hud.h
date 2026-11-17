@@ -26,6 +26,7 @@ inline void drawEyeMarker(float sx, float sy, float scale, float alpha) {
 }
 
 #include "hud_gameplay.h"
+#include "hud_shift_report.h"
 
 void drawUI(){
     if(gameState==STATE_MENU) drawMenu(vhsTime);
@@ -39,15 +40,14 @@ void drawUI(){
         else drawPause();
     }else if(gameState==STATE_SETTINGS||gameState==STATE_SETTINGS_PAUSE) drawSettings(gameState==STATE_SETTINGS_PAUSE);
     else if(gameState==STATE_KEYBINDS||gameState==STATE_KEYBINDS_PAUSE) drawKeybindsMenu(gameState==STATE_KEYBINDS_PAUSE, menuSel, keybindCaptureIndex);
-    else if(gameState==STATE_INTRO) drawIntro(storyMgr.introLine,storyMgr.introTimer,storyMgr.introLineTime,INTRO_LINES);
-    else if(gameState==STATE_NOTE&&storyMgr.readingNote&&storyMgr.currentNote>=0)
-        drawNote(storyMgr.currentNote,NOTE_TITLES[storyMgr.currentNote],NOTE_CONTENTS[storyMgr.currentNote]);
     else if(gameState==STATE_GAME){
         gSurvivalTime=survivalTime;
-        if(playerEscaped) drawEscape(vhsTime);
-        else if(isPlayerDead) drawDeath(vhsTime, gDeathReason);
+        if(playerEscaped) drawShiftReportScreen(vhsTime);
+        else if(isPlayerDead) drawHeistDeathScreen(vhsTime);
         else{
-            drawDamageOverlay(damageFlash,playerHealth);
+            // Ghosts watch the shift through a clean lens: no hurt vignette, no empty health bar.
+            float hudHealth = gCoopDead ? 100.0f : playerHealth;
+            drawDamageOverlay(damageFlash,hudHealth);
             drawSurvivalTime(survivalTime);
 
             // === DEBUG MODE: FPS/telemetry overlay ===
@@ -74,39 +74,18 @@ void drawUI(){
             }
 
             drawLeftBarPanel();  // Always visible
-            if(playerHealth<100)drawHealthBar(playerHealth);
+            if(hudHealth<100)drawHealthBar(hudHealth);
             if(playerSanity<100)drawSanityBar(playerSanity);
             drawStaminaBar(playerStamina);
             if(flashlightBattery<100)drawFlashlightBattery(flashlightBattery,flashlightOn);
             else drawRightBarPanel();  // Always visible when flashlight bar not drawn
-            {
-                char contractBuf[128];
-                buildVoidShiftObjectiveLine(contractBuf, 128);
-                drawHudText(contractBuf,-0.95f,0.88f,1.08f,0.88f,0.90f,0.72f,0.95f);
-                char supportBuf[128];
-                buildVoidShiftSupportLine(supportBuf, 128);
-                drawHudText(supportBuf,-0.95f,0.85f,0.98f,0.78f,0.88f,0.74f,0.90f);
-                char attBuf[96];
-                snprintf(attBuf,96,"ATTENTION %.0f%%  RESO %.0f%%",attentionLevel,resonatorBattery);
-                drawHudText(attBuf,-0.95f,0.79f,1.02f,0.78f,0.86f,0.76f,0.92f);
-            }
             if(activeDeviceSlot == 2){
-                float y = -0.70f;
-                drawOverlayRectNdc(0.48f, y - 0.14f, 0.95f, y + 0.07f, 0.04f, 0.09f, 0.10f, 0.42f);
-                drawOverlayRectNdc(0.49f, y - 0.13f, 0.94f, y + 0.06f, 0.08f, 0.18f, 0.20f, 0.18f);
-                drawHudText("SCANNER",0.52f,y,1.15f,0.55f,0.82f,0.86f,0.92f);
-                if(scannerOverheated){
-                    drawHudText("OVERHEAT",0.52f,y-0.06f,1.05f,0.92f,0.44f,0.30f,0.92f);
-                }else if(scannerHeat > 0.02f){
-                    float h = scannerHeat;
-                    if(h<0.0f) h=0.0f;
-                    if(h>1.0f) h=1.0f;
-                    drawSlider(0.66f,y-0.06f,0.30f,h,0.95f,0.62f,0.20f);
-                }
-                float sig = scannerSignal;
-                if(sig < 0.0f) sig = 0.0f;
-                if(sig > 1.0f) sig = 1.0f;
-                drawSlider(0.66f,y,0.30f,sig,0.45f,0.85f,0.95f);
+                // scanner: signal strength, and heat while it is locked on
+                float y = -0.78f;
+                float sig = scannerSignal < 0.0f ? 0.0f : (scannerSignal > 1.0f ? 1.0f : scannerSignal);
+                drawIconC(HUD_ICON_SCANNER, 0.53f, y, 0.085f, scannerOverheated ? HUD_BAD : HUD_COOL);
+                drawGauge(0.58f, y + 0.004f, 0.95f, y + 0.034f, sig, HUD_COOL.r, HUD_COOL.g, HUD_COOL.b);
+                drawGauge(0.58f, y - 0.034f, 0.95f, y - 0.012f, scannerOverheated ? 1.0f : scannerHeat, HUD_BAD.r, HUD_BAD.g, HUD_BAD.b);
             }
 
             // === DEBUG MODE: full objective block (top-right) ===
@@ -119,30 +98,14 @@ void drawUI(){
                 if(phaseIdx > 3) phaseIdx = 3;
                 drawHudText("OBJECTIVE",blockX,blockY,1.28f,0.90f,0.94f,0.72f,0.97f);
                 blockY -= 0.07f;
-                if(multiState==MULTI_IN_GAME){
-                    int switchCount = (coop.switchOn[0]?1:0)+(coop.switchOn[1]?1:0);
-                    char objProgress[64];
-                    snprintf(objProgress,64,"SWITCHES %d/2",switchCount);
-                    drawHudText(objProgress,blockX,blockY,1.18f,0.86f,0.90f,0.68f,0.95f);
-                    blockY -= 0.06f;
-                    drawHudText(coop.doorOpen?"DOOR OPEN":"DOOR LOCKED",blockX,blockY,1.16f,0.88f,0.84f,0.62f,0.95f);
-                    blockY -= 0.06f;
-                    if(!coop.doorOpen) drawHudText("ACTION HOLD 2 SWITCHES",blockX,blockY,1.02f,0.82f,0.86f,0.62f,0.90f);
-                    blockY -= 0.06f;
-                }else{
-                    char contractLine[96];
-                    buildVoidShiftObjectiveLine(contractLine, 96);
-                    drawHudText(contractLine,blockX,blockY,1.02f,0.86f,0.90f,0.68f,0.95f);
-                    blockY -= 0.06f;
-                    char sideLine[96];
-                    buildVoidShiftSupportLine(sideLine, 96);
-                    drawHudText(sideLine,blockX,blockY,0.98f,0.78f,0.88f,0.74f,0.91f);
-                    blockY -= 0.06f;
-                    drawHudText(isStoryExitReady()?"EXIT READY":"EXIT LOCKED",blockX,blockY,1.08f,0.72f,0.86f,0.90f,0.93f);
-                    blockY -= 0.06f;
-                    drawHudText("ACTION: COMPLETE CONTRACT STEPS",blockX,blockY,1.00f,0.82f,0.86f,0.62f,0.90f);
-                    blockY -= 0.06f;
-                }
+                char stageBuf[96];
+                snprintf(stageBuf,96,"HEIST STAGE %d  QUOTA %d/%d  CASH %d",heist.stage,heist.quotaHave,heist.quotaNeed,heist.cash);
+                drawHudText(stageBuf,blockX,blockY,1.02f,0.86f,0.90f,0.68f,0.95f);
+                blockY -= 0.06f;
+                char attBuf[64];
+                snprintf(attBuf,64,"ATTENTION %.0f%%",attentionLevel);
+                drawHudText(attBuf,blockX,blockY,1.02f,0.78f,0.86f,0.76f,0.92f);
+                blockY -= 0.06f;
                 char phaseBuf[64];
                 snprintf(phaseBuf,64,"PHASE %s",phaseNames[phaseIdx]);
                 drawHudText(phaseBuf,blockX,blockY,1.14f,0.86f,0.80f,0.56f,0.94f);
@@ -164,7 +127,8 @@ void drawUI(){
             drawGameplayGuidance();
             if(minimapEnabled) drawMinimapOverlay();
             if(storyMgr.hasHallucinations())drawHallucinationEffect((50.0f-playerSanity)/50.0f);
-            if(multiState==MULTI_IN_GAME)drawMultiHUD(netMgr.getPlayerCount(),netMgr.isHost);
+            if(multiState==MULTI_IN_GAME){ drawIconC(HUD_ICON_GROUP,0.80f,0.80f,0.06f,HUD_DIM); drawHudNumber(netMgr.getPlayerCount(),0.83f,0.785f,1.4f,HUD_DIM.r,HUD_DIM.g,HUD_DIM.b); }
+            drawHeistFlash();
             if(squadCalloutTimer > 0.0f) drawHudTextCentered(squadCalloutText,0.0f,-0.52f,1.08f,0.88f,0.84f,0.62f,0.92f);
             if(multiState==MULTI_IN_GAME){
                 for(int i=0;i<MAX_PLAYERS;i++){
@@ -181,16 +145,6 @@ void drawUI(){
                 }
 
                 netMgr.updatePingMarkTtl(dTime);
-                if(netMgr.pingMarkReceived && netMgr.pingMarkTtl > 0.0f){
-                    float psx = 0.0f, psy = 0.0f;
-                    Vec3 pmark = netMgr.pingMarkPos + Vec3(0, 1.5f, 0);
-                    if(projectToScreen(pmark, psx, psy)){
-                        float alpha = 0.35f + 0.6f * (netMgr.pingMarkTtl / 6.0f);
-                        if(alpha > 0.95f) alpha = 0.95f;
-                        drawHudTextCentered("PING", psx, psy, 1.22f, 0.90f, 0.85f, 0.50f, alpha);
-                        drawHudTextCentered("+", psx, psy - 0.04f, 1.35f, 0.96f, 0.88f, 0.58f, alpha);
-                    }
-                }
             }
             // === DEBUG MODE: trap status text, floor hazards, anomaly lock, minimap state, perf graph ===
             if(settings.debugMode){
@@ -223,7 +177,7 @@ void drawUI(){
                 }
             }
             if(multiState==MULTI_IN_GAME && netMgr.connectionUnstable((float)glfwGetTime())){
-                drawHudTextCentered("NETWORK UNSTABLE - RECONNECTING MAY OCCUR",0.0f,0.74f,1.12f,0.95f,0.64f,0.44f,0.95f);
+                drawIconC(HUD_ICON_WARNING,0.0f,0.80f,0.09f,HUD_BAD,0.6f+0.35f*hudPulse(6.0f));
             }
             // === DEBUG MODE: debug tools panel (F10) ===
             if(settings.debugMode && debugTools.open){
@@ -233,9 +187,9 @@ void drawUI(){
                     float y = 0.47f - i*0.08f;
                     float s = (debugTools.selectedAction==i)?1.0f:0.65f;
                     const char* lbl = debugActionLabel(i);
-                    if(i==DEBUG_ACT_TP_NOTE) lbl = isLevelZero(gCurrentLevel) ? "TP L1 OBJECTIVE" : "TP L2 OBJECTIVE";
-                    else if(i==DEBUG_ACT_TP_ECHO) lbl = isLevelZero(gCurrentLevel) ? "TP L1 NPC" : "TP L2 NPC";
-                    else if(i==DEBUG_ACT_TP_EXIT) lbl = isLevelZero(gCurrentLevel) ? "TP L1 EXIT" : "TP L2 LIFT";
+                    if(i==DEBUG_ACT_TP_NOTE) lbl = "TP NEAREST LOOT";
+                    else if(i==DEBUG_ACT_TP_ECHO) lbl = "TP KIOSK";
+                    else if(i==DEBUG_ACT_TP_EXIT) lbl = "TP DRILL";
                     float baseX = -measureTextWidthNdc(lbl, 1.35f) * 0.5f;
                     if(debugTools.selectedAction==i) drawHudText(">",baseX - 0.07f,y,1.4f,0.92f,0.9f,0.65f,0.95f);
                     drawHudText(lbl,baseX,y,1.35f,0.82f*s,0.88f*s,0.72f*s,0.92f);
@@ -303,37 +257,30 @@ void updateMultiplayer(){
         clientApplyFeatureState();
         if(netMgr.entitySnapshotReceived){
             netMgr.entitySnapshotReceived = false;
-            entityMgr.entities.clear();
+            // Entities are matched by id and glide to the new spot instead of being rebuilt.
+            entityMgr.beginSnapshot();
             for(int i=0;i<netMgr.entitySnapshotCount;i++){
-                if(!netMgr.entitySnapshot[i].active) continue;
-                Entity e;
-                e.type = (EntityType)netMgr.entitySnapshot[i].type;
-                e.pos = netMgr.entitySnapshot[i].pos;
-                e.yaw = netMgr.entitySnapshot[i].yaw;
-                e.state = (EntityState)netMgr.entitySnapshot[i].state;
-                e.active = true;
-                if(e.type==ENTITY_STALKER){ e.speed=1.5f; e.detectionRange=20.0f; e.attackRange=1.0f; }
-                else if(e.type==ENTITY_CRAWLER){ e.speed=5.0f; e.detectionRange=15.0f; e.attackRange=1.5f; e.pos.y=-0.8f; }
-                else if(e.type==ENTITY_SHADOW){ e.speed=0.5f; e.detectionRange=8.0f; e.attackRange=2.0f; }
-                entityMgr.entities.push_back(e);
+                const NetEntitySnapshotEntry& se = netMgr.entitySnapshot[i];
+                if(!se.active) continue;
+                entityMgr.applySnapshotEntity(se.id, se.type, se.pos, se.yaw, (unsigned char)se.state);
             }
+            entityMgr.endSnapshot();
         }
     }else{
         processHostInteractRequests();
-        updateCoopObjectiveHost();
         hostUpdateItems();
-        updateRoamEventsHost();
+        if(heistDangerActive()) updateRoamEventsHost();
         if(stateSyncTimer>=0.12f){
             stateSyncTimer = 0;
             NetEntitySnapshotEntry snap[MAX_SYNC_ENTITIES];
             int c = 0;
             for(auto& e:entityMgr.entities){
                 if(c>=MAX_SYNC_ENTITIES) break;
-                snap[c].id = c;
+                snap[c].id = e.uid;
                 snap[c].type = (int)e.type;
                 snap[c].pos = e.pos;
                 snap[c].yaw = e.yaw;
-                snap[c].state = (int)e.state;
+                snap[c].state = packEntityState((int)e.state, e.mood);
                 snap[c].active = e.active;
                 c++;
             }

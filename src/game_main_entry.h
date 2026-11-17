@@ -2,13 +2,15 @@
 #include "progression.h"
 #include "sanity_balance.h"
 #include "window_title.h"
+#include "dev_selftest.h"
 int main(){
     std::random_device rd;rng.seed(rd());
     if(!glfwInit())return -1;
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR,3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR,3);
     glfwWindowHint(GLFW_OPENGL_PROFILE,GLFW_OPENGL_CORE_PROFILE);
-    gWin=glfwCreateWindow(winW,winH,"Backrooms: Void Shift",NULL,NULL);
+    selftestInit();
+    gWin=glfwCreateWindow(winW,winH,"Backrooms: Seed Round",NULL,NULL);
     if(!gWin){glfwTerminate();return -1;}
     glfwMakeContextCurrent(gWin);
     int appliedSwapInterval = settings.vsync ? 1 : 0;
@@ -17,6 +19,7 @@ int main(){
     glfwSetFramebufferSizeCallback(gWin,windowResize);
     if(!gladLoadGL())return -1;
     glEnable(GL_DEPTH_TEST);glEnable(GL_CULL_FACE);
+    heistLoadTutorialSeen();
     genWorld();
     loadArchiveMetaProgress(archivePoints, archiveTier, perkQuietSteps, perkFastHands, perkEchoBuffer);
     wallTex=genTex(0);floorTex=genTex(1);ceilTex=genTex(2);lightTex=genTex(3);lampTex=genTex(4);propTex=genTex(5);
@@ -30,6 +33,7 @@ int main(){
     initFBO(fbo,fboTex,fboDepthTex,renderW,renderH);
     initTaaTargets();
     initText();
+    initHudIcons();
     entityMgr.init();
     initPlayerModels(); playerModelsInit = true;
     std::thread aT(audioThread);
@@ -78,6 +82,8 @@ int main(){
         sndState.sfxVol=settings.sfxVol;
         sndState.voiceVol=settings.voiceVol;
         sndState.deathMode = isPlayerDead;
+        sndState.healthLevel = playerHealth / 100.0f; sndState.crouch = cam.crouch ? 1.0f : 0.0f;
+        sndState.depthLevel = (float)gCurrentLevel / 6.0f;
 
         netMgr.updatePingMarkTtl(dTime);
         // Keep the session alive while this player sits in pause/settings/intro (a paused host used to time everyone out).
@@ -93,6 +99,7 @@ int main(){
             sndState.lowStamina *= 0.92f;
             sndState.monsterProximity *= 0.84f;
             sndState.monsterMenace *= 0.84f;
+            sndState.monsterAlert = 0.0f; sndState.monsterCall = 0; sndState.pacing *= 0.9f;
         }
 
         if(gameState==STATE_INTRO){
@@ -151,18 +158,14 @@ int main(){
                 bool eN=glfwGetKey(gWin,GLFW_KEY_ENTER)==GLFW_PRESS||
                         glfwGetKey(gWin,GLFW_KEY_SPACE)==GLFW_PRESS;
                 bool esN=glfwGetKey(gWin,GLFW_KEY_ESCAPE)==GLFW_PRESS;
-                if(eN&&!enterPressed){
-                    if(multiState==MULTI_IN_GAME) leaveRunToMenu();
-                    else if(isLevelZero(gCurrentLevel)){ gCurrentLevel = 1; gCompletedLevels++; genWorld(); buildGeom(); gameState=STATE_INTRO; }
-                    else{ gCompletedLevels++; leaveRunToMenu(); }
-                }
+                if(eN&&!enterPressed) leaveRunToMenu(); // extracted: the run is over
                 if(esN&&!escPressed) leaveRunToMenu();
                 enterPressed=eN;escPressed=esN;
             }else if(isPlayerDead){
                 bool eN=glfwGetKey(gWin,GLFW_KEY_ENTER)==GLFW_PRESS||
                         glfwGetKey(gWin,GLFW_KEY_SPACE)==GLFW_PRESS;
                 bool esN=glfwGetKey(gWin,GLFW_KEY_ESCAPE)==GLFW_PRESS;
-                if(eN&&!enterPressed){genWorld();buildGeom();gameState=STATE_INTRO;}
+                if(eN&&!enterPressed){ heist.cash = cashAfterWipe(heist.cash); reloadLevelAndResume(nullptr); }
                 if(esN&&!escPressed) leaveRunToMenu();
                 enterPressed=eN;escPressed=esN;
             }else{
@@ -170,6 +173,7 @@ int main(){
                     lightsOutTimer-=dTime;
                     if(lightsOutTimer<=0){
                         lightsOutTimer=0;
+                        lights.clear(); // regenerate: lamps that were switched off by the blackout come back
                         updateLightsAndPillars(playerChunkX,playerChunkZ);
                         updateMapContent(playerChunkX,playerChunkZ);
                         buildGeom();
@@ -179,7 +183,7 @@ int main(){
                 updateFloorHoles();
                 gameInput(gWin);
                 updatePoiRuntime();
-                if(multiState!=MULTI_IN_GAME){ updateRoamEventsHost(); hostUpdateItems(); }
+                if(multiState!=MULTI_IN_GAME){ if(heistDangerActive()) updateRoamEventsHost(); hostUpdateItems(); }
                 int holeCountNow = (int)floorHoles.size();
                 if(holeCountNow != lastHoleCount){
                     buildGeom();
@@ -196,35 +200,44 @@ int main(){
                     buildGeom();
                 }
                 storyMgr.update(dTime,survivalTime,playerSanity,rng);
-                if(tryTriggerRandomScare(scareState, dTime, storyMgr.getPhase(), playerSanity, (int)(rng()%100))){
+                if(heistDangerActive() && tryTriggerRandomScare(scareState, dTime, storyMgr.getPhase(), playerSanity, (int)(rng()%100))){
                     triggerLocalScare(0.26f, 0.14f, 3.0f);
                 }
                 nearNoteId=-1;
-                bool canSpawnEnt = (multiState!=MULTI_IN_GAME || netMgr.isHost);
+                // Nothing hunts the squad before the accident: the first shift is a guided tour.
+                bool canSpawnEnt = (multiState!=MULTI_IN_GAME || netMgr.isHost) && heistDangerActive();
                 collectEntityTargets();
                 entitySpawnTimer-=dTime;
                 int maxEnt = computeEntityCap(survivalTime);
                 maxEnt += levelEntityCapBonus(gCurrentLevel);
                 if(maxEnt > 8) maxEnt = 8;
-                if(canSpawnEnt && entitySpawnTimer<=0&&(int)entityMgr.entities.size()<maxEnt){
+                // The pacing director holds spawns back while the squad catches its breath.
+                if(canSpawnEnt && entitySpawnTimer<=0&&(int)entityMgr.entities.size()<maxEnt&&entityMgr.directorOut.allowSpawn){
                     EntityType type = chooseSpawnEntityType(survivalTime, (int)rng(), (int)rng());
-                    Vec3 huntAround = entityMgr.targetCount>0 ? entityMgr.targetPos[rng()%(unsigned)entityMgr.targetCount] : cam.pos;
-                    Vec3 spawnP = findSpawnPos(huntAround,25.0f);
-                    if(!hasEntityNearPos(entityMgr.entities, spawnP, 14.0f)){
-                        entityMgr.spawnEntity(type,spawnP,nullptr,0,0);
-                    }
+                    Vec3 huntAround = entityMgr.targetCount>0 ? entityMgr.targets[rng()%(unsigned)entityMgr.targetCount].pos : cam.pos;
+                    entityMgr.spawnOutOfSight(type, huntAround);
                     entitySpawnTimer = computeEntitySpawnDelay(survivalTime, (int)rng()) * levelSpawnDelayScale(gCurrentLevel);
                 }
                 entityMgr.update(dTime,cam.pos,cam.yaw,nullptr,0,0,CS);
                 float nearestMonster = 9999.0f;
                 float menace = 0.0f;
                 EntityType dominantMonster = ENTITY_NONE;
+                float monsterSide = 0.0f, monsterAlert = 0.0f, monsterScore = -1.0f;
+                int monstersInEarshot = 0;
                 for(const auto& e:entityMgr.entities){
                     if(!e.active) continue;
                     Vec3 dd = e.pos - cam.pos;
                     dd.y = 0;
                     float dist = dd.len();
-                    if(dist < nearestMonster){ nearestMonster = dist; dominantMonster = e.type; }
+                    if(dist < 30.0f) monstersInEarshot++;
+                    // The one the sound follows: close matters, but one that is hunting matters more.
+                    float alert = monsterAlertFromEntity(e);
+                    float score = (1.0f - dist / 30.0f) + alert * 0.35f;
+                    if(dist < 30.0f && score > monsterScore){
+                        monsterScore = score; nearestMonster = dist; dominantMonster = e.type; monsterAlert = alert;
+                        // Stereo side: the camera's "right" vector points to screen-left.
+                        monsterSide = dist > 0.05f ? (dd.z * mSin(cam.yaw) - dd.x * mCos(cam.yaw)) / dist : 0.0f;
+                    }
                     float localMenace = 0.35f;
                     if(e.type==ENTITY_STALKER) localMenace = 0.45f;
                     else if(e.type==ENTITY_CRAWLER) localMenace = 0.75f;
@@ -238,6 +251,10 @@ int main(){
                     if(monsterProx < 0.0f) monsterProx = 0.0f; else if(monsterProx > 1.0f) monsterProx = 1.0f;
                 }
                 sndState.monsterProximity = monsterProx;
+                sndState.monsterPan = monsterSide;
+                sndState.monsterAlert = monsterAlert; sndState.monsterCall = monsterCallFromAlert(monsterAlert);
+                sndState.monsterCrowd = (float)monstersInEarshot * 0.25f;
+                sndState.pacing = entityMgr.director.intensity;
                 sndState.monsterMenace = menace > 1.0f ? 1.0f : menace; sndState.monsterType = monsterTypeMixFromEntity(dominantMonster);
                 
                 reshuffleTimer-=dTime;
@@ -246,7 +263,7 @@ int main(){
                 float reshuffleDelay=25.0f-survivalTime*0.03f;
                 if(reshuffleDelay<5.0f)reshuffleDelay=5.0f;
                 // Walls only shift in solo: in co-op teammates would watch them pop and peers would desync.
-                bool canReshuffle = (multiState!=MULTI_IN_GAME);
+                bool canReshuffle = (multiState!=MULTI_IN_GAME) && heistDangerActive();
                 bool frontReshuffle=survivalTime>300&&rng()%100<20;
                 if(canReshuffle && reshuffleTimer<=0&&rng()%100<(int)reshuffleChance){
                     if(frontReshuffle||reshuffleBehind(cam.pos.x,cam.pos.z,cam.yaw)){
@@ -257,7 +274,9 @@ int main(){
                     reshuffleTimer=reshuffleDelay+(rng()%10);
                 }else if(reshuffleTimer<=0)reshuffleTimer=8.0f+(rng()%8);
                 
+                heistUpdate();
                 updatePlayerVitals();
+                if(!heistDangerActive()){ playerSanity = 100.0f; survivalTime = 0.0f; }
                 camShake*=0.9f;damageFlash*=0.92f;survivalTime+=dTime;
                 if(multiState==MULTI_IN_GAME && !netMgr.isHost) captureSessionSnapshot();
                 updateMultiplayer();
@@ -267,6 +286,8 @@ int main(){
         glViewport(0,0,renderW,renderH);
         glClearColor(0.02f,0.02f,0.02f,1);
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+        gPostFx.sceneDrawn=false;
+        spectatorBeginView(); // dead co-op players watch through the spectator camera
         if((gameState==STATE_GAME&&!isPlayerDead)||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_KEYBINDS_PAUSE||gameState==STATE_NOTE)
             renderScene();
         
@@ -295,7 +316,7 @@ int main(){
         static GLint vhsSharpnessLoc=-1,vhsTexelXLoc=-1,vhsTexelYLoc=-1;
         static GLint vhsTaaHistLoc=-1,vhsTaaBlendLoc=-1,vhsTaaJitterLoc=-1,vhsTaaValidLoc=-1;
         static GLint vhsFrameGenLoc=-1,vhsFrameGenBlendLoc=-1;
-        static GLint vhsRtxALoc=-1,vhsRtxGLoc=-1,vhsRtxRLoc=-1,vhsRtxBLoc=-1,vhsRtxDenoiseOnLoc=-1,vhsRtxDenoiseStrengthLoc=-1,vhsDepthTexLoc=-1,vhsDeathFxLoc=-1;
+        static GLint vhsDepthTexLoc=-1,vhsDeathFxLoc=-1;
         if(vhsTmLoc<0){
             glUniform1i(glGetUniformLocation(vhsShader,"tex"),0);
             vhsTmLoc=glGetUniformLocation(vhsShader,"tm"); vhsIntenLoc=glGetUniformLocation(vhsShader,"inten");
@@ -305,9 +326,6 @@ int main(){
             vhsTaaBlendLoc=glGetUniformLocation(vhsShader,"taaBlend"); vhsTaaJitterLoc=glGetUniformLocation(vhsShader,"taaJitter");
             vhsTaaValidLoc=glGetUniformLocation(vhsShader,"taaValid"); vhsFrameGenLoc=glGetUniformLocation(vhsShader,"frameGen");
             vhsFrameGenBlendLoc=glGetUniformLocation(vhsShader,"frameGenBlend"); vhsDepthTexLoc=glGetUniformLocation(vhsShader,"depthTex");
-            vhsRtxALoc=glGetUniformLocation(vhsShader,"rtxA"); vhsRtxGLoc=glGetUniformLocation(vhsShader,"rtxG");
-            vhsRtxRLoc=glGetUniformLocation(vhsShader,"rtxR"); vhsRtxBLoc=glGetUniformLocation(vhsShader,"rtxB");
-            vhsRtxDenoiseOnLoc=glGetUniformLocation(vhsShader,"rtxDenoiseOn"); vhsRtxDenoiseStrengthLoc=glGetUniformLocation(vhsShader,"rtxDenoiseStrength");
             vhsDeathFxLoc=glGetUniformLocation(vhsShader,"deathFx");
         }
         float preDeathFx = gSanityCollapseTimer / 2.3f; if(preDeathFx < 0.0f) preDeathFx = 0.0f; if(preDeathFx > 1.0f) preDeathFx = 1.0f;
@@ -337,8 +355,7 @@ int main(){
             glActiveTexture(GL_TEXTURE0 + 2);
             glBindTexture(GL_TEXTURE_2D,fboDepthTex);
             glUniform1i(vhsDepthTexLoc,2);
-            glUniform1i(vhsRtxALoc,clampSsao(settings.ssaoQuality)); glUniform1i(vhsRtxGLoc,clampGi(settings.giQuality)); glUniform1i(vhsRtxRLoc,settings.godRays?1:0); glUniform1i(vhsRtxBLoc,settings.bloom?1:0);
-            glUniform1i(vhsRtxDenoiseOnLoc,settings.rtxDenoise?1:0); glUniform1f(vhsRtxDenoiseStrengthLoc,settings.rtxDenoiseStrength);
+            postFxSetUniforms(vhsShader,true);
             glActiveTexture(GL_TEXTURE0);
             glUniform1f(vhsTmLoc,vhsTime);
             glUniform1f(vhsIntenLoc,vI);
@@ -386,7 +403,7 @@ int main(){
             glUniform1i(vhsFrameGenLoc,0);
             glUniform1f(vhsFrameGenBlendLoc,0.0f);
             glUniform1f(vhsDeathFxLoc,0.0f);
-            glUniform1i(vhsRtxALoc,0); glUniform1i(vhsRtxGLoc,0); glUniform1i(vhsRtxRLoc,0); glUniform1i(vhsRtxBLoc,0);
+            postFxSetUniforms(vhsShader,false);
             glBindVertexArray(quadVAO);
             glDrawArrays(GL_TRIANGLES,0,6);
         }else{
@@ -400,8 +417,7 @@ int main(){
             glActiveTexture(GL_TEXTURE0 + 2);
             glBindTexture(GL_TEXTURE_2D,fboDepthTex);
             glUniform1i(vhsDepthTexLoc,2);
-            glUniform1i(vhsRtxALoc,clampSsao(settings.ssaoQuality)); glUniform1i(vhsRtxGLoc,clampGi(settings.giQuality)); glUniform1i(vhsRtxRLoc,settings.godRays?1:0); glUniform1i(vhsRtxBLoc,settings.bloom?1:0);
-            glUniform1i(vhsRtxDenoiseOnLoc,settings.rtxDenoise?1:0); glUniform1f(vhsRtxDenoiseStrengthLoc,settings.rtxDenoiseStrength);
+            postFxSetUniforms(vhsShader,true);
             glActiveTexture(GL_TEXTURE0);
             glUniform1f(vhsTmLoc,vhsTime);
             glUniform1f(vhsIntenLoc,vI);
@@ -421,11 +437,13 @@ int main(){
         }
         glEnable(GL_DEPTH_TEST);
         drawUI();
+        spectatorEndView();
         glDisable(GL_BLEND);
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
         int frameGenBaseCap = frameGenBaseFpsCap(cachedRefreshRateHz, settings.frameGenMode, settings.vsync);
         gPerfFrameGenBaseCap = frameGenBaseCap;
+        selftestFrame();
         glfwSwapBuffers(gWin);glfwPollEvents();
         if(!settings.vsync) applyFramePacing(frameStartTime, frameGenBaseCap);
     }

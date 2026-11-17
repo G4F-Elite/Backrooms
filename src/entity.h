@@ -10,10 +10,14 @@
 #include "creature_anim.h"
 #include "world.h"
 #include "progression.h"
+#include "ai_senses.h"
+#include "ai_director.h"
 
 // Backlog: "hearing" support for entities (crawler reacts to loud footsteps/sprinting)
 // Values are set from gameplay/audio (see game_main_entry.h loop).
 inline float gPlayerNoise = 0.0f; // 0..1
+
+struct BrainContext;
 
 class EntityManager {
 public:
@@ -25,17 +29,42 @@ public:
     float spawnTimer, maxEntities, dangerLevel;
     Vec3 lastPlayerPos;
     bool hasLastPlayerPos;
-    // Co-op hunt targets (host fills these each frame). Empty = hunt the local player.
-    Vec3 targetPos[8];
-    float targetYaw[8];
+    // Hunt targets (the host fills these each frame). Empty = hunt the local player.
+    AiTarget targets[AI_MAX_TARGETS];
     int targetCount = 0;
     bool ignoreLocal = false; // local player is a ghost / protected while downed
+    AiNoise noises[AI_MAX_NOISES];
+    int noiseCount = 0;
+    AiDirector director;
+    DirectorOutput directorOut;
+    bool puppetMode = false;   // network client: no brains, replay snapshots
+    bool localGhost = false;   // local player is dead and spectating: no danger tint for them
+    bool lightsOut = false;
+    float attention01 = 0.0f;  // squad noise meter, 0..1
+    float pendingDamage = 0.0f;
+    int pendingDowns = 0;
+    int squadStanding = 1, squadSize = 1;
+    unsigned char nextUid = 1;
+    bool bonkPending = false;  // a crawler just knocked itself out (for sound / HUD)
+    Vec3 bonkPos;
+    // Haven: a lit, running machine the things in the halls keep away from (the heist rig).
+    // Nobody inside it can be seen or heard, and nothing walks into it. Radius 0 = no haven.
+    // Around it lies a quiet ring: monsters with nobody to chase turn back there and none spawn there.
+    Vec3 havenPos;
+    float havenRadius = 0.0f;
+    float quietRadius = 0.0f;
+
+    void addTarget(const AiTarget& t) {
+        if(targetCount >= AI_MAX_TARGETS) return;
+        targets[targetCount++] = t;
+    }
 
     void addTarget(const Vec3& pos, float yaw) {
-        if(targetCount >= 8) return;
-        targetPos[targetCount] = pos;
-        targetYaw[targetCount] = yaw;
-        targetCount++;
+        AiTarget t;
+        t.pos = pos;
+        t.yaw = yaw;
+        t.id = targetCount;
+        addTarget(t);
     }
 
     EntityManager() : spawnTimer(0), maxEntities(3), dangerLevel(0), lastPlayerPos(0,0,0), hasLastPlayerPos(false) {
@@ -74,314 +103,32 @@ public:
         }
     }
     
-    void spawnEntity(EntityType type, Vec3 pos, int maze[][30], int mzw, int mzh) {
-        (void)maze; (void)mzw; (void)mzh;
-        Entity e; e.type = type; e.pos = pos; e.pos.y = 0; e.active = true; e.state = ENT_ROAMING;
-        if(type==ENTITY_STALKER) { e.speed=1.7f; e.detectionRange=22.0f; e.attackRange=1.15f; }
-        else if(type==ENTITY_CRAWLER) { e.speed=3.4f; e.detectionRange=17.0f; e.attackRange=1.35f; e.pos.y=0.58f; }
-        else if(type==ENTITY_SHADOW) { e.speed=1.15f; e.detectionRange=12.0f; e.attackRange=1.8f; }
+    // Simulation lives in entity_update.h (brains: entity_behaviors.h).
+    void spawnEntity(EntityType type, Vec3 pos, int maze[][30], int mzw, int mzh);
+    bool spawnOutOfSight(EntityType type, const Vec3& around);
+    void update(float dt, Vec3 localPos, float localYaw, int maze[][30], int mzw, int mzh, float cs);
+    void emitNoise(const Vec3& pos, float radius, int sourceId);
+    bool anyTargetSees(const Vec3& pos, float maxDist) const;
+    bool pickHiddenEntrance(const Vec3& around, Vec3& out) const;
+    void sendBackstage(Entity& e);
 
-        if(isParkingLevel(gCurrentLevel)){
-            if(type==ENTITY_STALKER){ e.speed *= 0.92f; e.detectionRange += 4.0f; }
-            if(type==ENTITY_CRAWLER){ e.speed *= 1.18f; e.detectionRange += 2.5f; }
-            if(type==ENTITY_SHADOW){ e.attackRange += 0.4f; e.detectionRange += 1.2f; }
-        }else{
-            if(type==ENTITY_STALKER){ e.attackRange += 0.2f; }
-            if(type==ENTITY_CRAWLER){ e.speed *= 1.06f; }
-            if(type==ENTITY_SHADOW){ e.speed *= 0.92f; }
-        }
-        e.behaviorMode = BEHAVIOR_DEFAULT;
-        e.behaviorTimer = 0.8f + (float)(rand()%120) * 0.01f;
-        e.stateTimer = 0.0f;
-        entities.push_back(e);
-    }
-    
-    void update(float dt, Vec3 localPos, float localYaw, int maze[][30], int mzw, int mzh, float cs) {
-        (void)maze; (void)mzw; (void)mzh; (void)cs;
-        dangerLevel = 0;
-        animClock += dt;
-        if(animClock > 3600.0f) animClock -= 3600.0f;
-        float playerMove = 0.0f;
-        if(hasLastPlayerPos){
-            Vec3 pm = localPos - lastPlayerPos;
-            pm.y = 0.0f;
-            playerMove = pm.len();
-        }
-        hasLastPlayerPos = true;
-        lastPlayerPos = localPos;
-        for(auto& e : entities) {
-            if(!e.active) continue;
-            EntityState prevState = e.state;
-            // Each entity hunts its nearest target; danger feedback stays relative to the local player.
-            Vec3 pPos = localPos;
-            float pYaw = localYaw;
-            float bestSq = 1e30f;
-            if(targetCount == 0 && ignoreLocal) pPos = localPos + Vec3(4000.0f, 0.0f, 4000.0f); // nobody to hunt: roam
-            for(int t=0;t<targetCount;t++){
-                float tx = targetPos[t].x - e.pos.x, tz = targetPos[t].z - e.pos.z;
-                float dsq = tx*tx + tz*tz;
-                if(dsq < bestSq){ bestSq = dsq; pPos = targetPos[t]; pYaw = targetYaw[t]; }
-            }
-            Vec3 toLocal = localPos - e.pos; toLocal.y = 0;
-            float distLocal = toLocal.len();
-            Vec3 toP = pPos - e.pos; toP.y = 0;
-            float dist = sqrtf(toP.x*toP.x + toP.z*toP.z);
+    // Network clients: entities are puppets driven by host snapshots.
+    void updatePuppets(float dt, Vec3 localPos);
+    void beginSnapshot();
+    void applySnapshotEntity(int uid, int type, const Vec3& pos, float yaw, unsigned char packedState);
+    void endSnapshot();
 
-            // Crawler hearing: expands detection range based on player noise.
-            float effectiveDetect = e.detectionRange;
-            if(e.type == ENTITY_CRAWLER){
-                float noise = gPlayerNoise;
-                if(noise < 0.0f) noise = 0.0f;
-                if(noise > 1.0f) noise = 1.0f;
-                effectiveDetect = e.detectionRange + noise * 10.0f; // up to +10m
-            }
-            Vec3 look(mSin(pYaw), 0, mCos(pYaw)), toE = e.pos - pPos; toE.y = 0;
-            float toEL = sqrtf(toE.x*toE.x + toE.z*toE.z);
-            if(toEL > 0.01f) { toE.x /= toEL; toE.z /= toEL; }
-            bool looking = (look.x*toE.x + look.z*toE.z) > 0.85f && dist < effectiveDetect;
-            if(distLocal < effectiveDetect + 5.0f) {
-                float prox = 1.0f - distLocal/(effectiveDetect + 5.0f);
-                if(prox > dangerLevel) dangerLevel = prox;
-            }
+    void ageNoises(float dt);
+    float computeMenace(bool& anyEngaged) const;
+    void hintSomeMonster();
+    void animateEntity(Entity& e, float dt);
+    void addLocalDanger(const Entity& e, const Vec3& localPos);
+    void noteMoodChange(const Entity& e, int prevMood);
+    bool inHaven(const Vec3& pos) const;
+    bool inQuiet(const Vec3& pos) const;
+    int shelterTargets();
+    void leaveHaven(Entity& e, const BrainContext& ctx, float speedMul, float patience);
 
-            e.behaviorTimer -= dt;
-            if(e.behaviorTimer <= 0.0f){
-                e.behaviorTimer = 0.9f + (float)(rand()%190) / 100.0f;
-                if(e.type == ENTITY_STALKER){
-                    if(looking && dist < 11.0f) e.behaviorMode = BEHAVIOR_SNEAK;
-                    else if(!looking && dist > 7.0f && dist < 18.0f) e.behaviorMode = BEHAVIOR_FLANK;
-                    else if(dist < 7.0f) e.behaviorMode = BEHAVIOR_RUSH;
-                    else e.behaviorMode = BEHAVIOR_DEFAULT;
-                }else if(e.type == ENTITY_CRAWLER){
-                    if(dist < 5.8f || (dist < 9.0f && playerMove > 0.035f)) e.behaviorMode = BEHAVIOR_RUSH;
-                    else if(playerMove > 0.02f && dist < 13.0f) e.behaviorMode = BEHAVIOR_FLANK;
-                    else e.behaviorMode = BEHAVIOR_DEFAULT;
-                }else if(e.type == ENTITY_SHADOW){
-                    if(looking) e.behaviorMode = BEHAVIOR_SNEAK;
-                    else if(dist < 8.5f) e.behaviorMode = BEHAVIOR_RUSH;
-                    else e.behaviorMode = BEHAVIOR_FLANK;
-                }
-            }
-            
-            if(e.type == ENTITY_STALKER) updateStalker(e, dt, pPos, dist, looking, maze, mzw, mzh, cs);
-            else if(e.type == ENTITY_CRAWLER) updateCrawler(e, dt, pPos, dist, effectiveDetect, maze, mzw, mzh, cs);
-            else if(e.type == ENTITY_SHADOW) updateShadow(e, dt, pPos, dist, looking, pYaw);
-
-            if(isParkingLevel(gCurrentLevel) && e.type == ENTITY_CRAWLER && dist < 10.0f && (rand()%1000) < 18){
-                e.behaviorMode = BEHAVIOR_RUSH;
-            }
-            if(isLevelZero(gCurrentLevel) && e.type == ENTITY_SHADOW && looking && dist < 13.0f && (rand()%1000) < 14){
-                e.behaviorMode = BEHAVIOR_FLANK;
-            }
-            // Check for attacking state for shadow/crawler
-            if(e.type == ENTITY_SHADOW && dist < e.attackRange && !looking) e.state = ENT_ATTACKING;
-            if(e.type == ENTITY_CRAWLER && dist < e.attackRange) e.state = ENT_ATTACKING;
-            if(e.state != prevState) e.stateTimer = 0.0f;
-            
-            e.animPhase += dt * 3.0f; if(e.animPhase > 6.283f) e.animPhase -= 6.283f;
-            e.flickerTimer += dt;
-            if(e.type != ENTITY_SHADOW) e.visible = true;
-            else e.visible = (dist < 6.0f) ? ((int)(e.flickerTimer*15)%4) != 0 : true;
-        }
-        entities.erase(std::remove_if(entities.begin(), entities.end(), [](const Entity& e) { return !e.active; }), entities.end());
-    }
-    
-    void updateStalker(Entity& e, float dt, Vec3 pPos, float dist, bool looking, int maze[][30], int mzw, int mzh, float cs) {
-        (void)maze; (void)mzw; (void)mzh; (void)cs;
-        e.stateTimer += dt;
-        float speedMul = 1.0f;
-        if(e.behaviorMode == BEHAVIOR_SNEAK) speedMul = 0.64f;
-        else if(e.behaviorMode == BEHAVIOR_RUSH) speedMul = 1.72f;
-        else if(e.behaviorMode == BEHAVIOR_FLANK) speedMul = 1.12f;
-        if(looking && dist < e.detectionRange) {
-            e.state = ENT_STALKING;
-            e.lastSeenTimer += dt;
-            Vec3 dir = pPos - e.pos; dir.y = 0; float len = sqrtf(dir.x*dir.x + dir.z*dir.z);
-            if(len > 0.1f) {
-                dir.x /= len; dir.z /= len;
-                float sideSign = ((int)(e.animPhase * 2.2f) & 1) ? -1.0f : 1.0f;
-                float sx = dir.z * sideSign;
-                float sz = -dir.x * sideSign;
-                float keep = (dist < 5.5f) ? -0.55f : 0.15f;
-                float nx = e.pos.x + (sx * 0.75f + dir.x * keep) * e.speed * speedMul * dt;
-                float nz = e.pos.z + (sz * 0.75f + dir.z * keep) * e.speed * speedMul * dt;
-                if(!collideWorld(nx,nz,0.32f)) { e.pos.x = nx; e.pos.z = nz; }
-                e.yaw = atan2f(sx, sz);
-            }
-            if(e.lastSeenTimer > 3.2f) e.state = ENT_FLEEING;
-        }
-        else { e.lastSeenTimer = 0;
-            if(dist < e.detectionRange) { e.state = ENT_STALKING;
-                Vec3 dir = pPos - e.pos; dir.y = 0; float len = sqrtf(dir.x*dir.x + dir.z*dir.z);
-                if(len > 0.1f) { dir.x /= len; dir.z /= len;
-                    if(e.behaviorMode == BEHAVIOR_FLANK){
-                        float ox = dir.x;
-                        dir.x = dir.z;
-                        dir.z = -ox;
-                    }
-                    float nx = e.pos.x + dir.x*e.speed*speedMul*dt, nz = e.pos.z + dir.z*e.speed*speedMul*dt;
-                    if(!collideWorld(nx,nz,0.32f)) { e.pos.x = nx; e.pos.z = nz; }
-                    else {
-                        float sx = e.pos.x + dir.z*e.speed*0.65f*speedMul*dt;
-                        float sz = e.pos.z - dir.x*e.speed*0.65f*speedMul*dt;
-                        if(!collideWorld(sx,sz,0.32f)) { e.pos.x = sx; e.pos.z = sz; }
-                    }
-                    e.yaw = atan2f(dir.x, dir.z);
-                }
-            } else { e.state = ENT_ROAMING;
-                if(e.stateTimer > 2.3f) { e.yaw += ((rand()%100)/50.0f-1.0f)*2.2f; e.stateTimer = 0; }
-                float nx = e.pos.x + mSin(e.yaw)*e.speed*0.3f*speedMul*dt, nz = e.pos.z + mCos(e.yaw)*e.speed*0.3f*speedMul*dt;
-                if(!collideWorld(nx,nz,0.32f)) { e.pos.x = nx; e.pos.z = nz; }
-                else e.yaw += 1.2f;
-            }
-        }
-        if(!looking && dist > 10.0f && dist < 22.0f && (rand()%1000) < 10){
-            Vec3 dir = pPos - e.pos;
-            dir.y = 0.0f;
-            float len = dir.len();
-            if(len > 0.1f){
-                dir = dir * (1.0f / len);
-                float nx = pPos.x - dir.x * (3.0f + (float)(rand()%4));
-                float nz = pPos.z - dir.z * (3.0f + (float)(rand()%4));
-                if(!collideWorld(nx, nz, 0.32f)){
-                    e.pos.x = nx;
-                    e.pos.z = nz;
-                    e.behaviorMode = BEHAVIOR_RUSH;
-                }
-            }
-        }
-        if(e.state == ENT_FLEEING) { Vec3 dir = e.pos - pPos; dir.y = 0; float len = sqrtf(dir.x*dir.x+dir.z*dir.z);
-            if(len > 0.1f) {
-                dir.x/=len; dir.z/=len;
-                float nx = e.pos.x + dir.x*e.speed*2.2f*dt, nz = e.pos.z + dir.z*e.speed*2.2f*dt;
-                if(!collideWorld(nx,nz,0.32f)) { e.pos.x = nx; e.pos.z = nz; }
-            }
-            if(e.stateTimer > 5.0f || dist > 25.0f) e.active = false; }
-        if(dist < e.attackRange && e.state == ENT_STALKING) e.state = ENT_ATTACKING;
-    }
-    
-    void updateCrawler(Entity& e, float dt, Vec3 pPos, float dist, float effectiveDetect, int maze[][30], int mzw, int mzh, float cs) {
-        (void)maze; (void)mzw; (void)mzh; (void)cs;
-        e.stateTimer += dt; e.pos.y = 0.58f; // Keep body above floor
-        float speedMul = 1.0f;
-        if(e.behaviorMode == BEHAVIOR_RUSH) speedMul = 1.70f;
-        else if(e.behaviorMode == BEHAVIOR_FLANK) speedMul = 1.15f;
-        if(dist < 9.0f && e.stateTimer > 1.2f && e.behaviorMode != BEHAVIOR_RUSH){
-            e.state = ENT_IDLE;
-            if(e.stateTimer > 2.1f) {
-                e.behaviorMode = BEHAVIOR_RUSH;
-                e.stateTimer = 0.0f;
-            }
-        }
-        if(dist < effectiveDetect) { e.state = ENT_CHASING;
-            Vec3 dir = pPos - e.pos; dir.y = 0; float len = sqrtf(dir.x*dir.x + dir.z*dir.z);
-            if(len > 0.1f) { dir.x /= len; dir.z /= len;
-                float burstMul = 1.0f;
-                if(e.behaviorMode == BEHAVIOR_RUSH){
-                    if(e.stateTimer < 0.55f) burstMul = 2.25f;
-                    else if(e.stateTimer < 1.10f) burstMul = 1.55f;
-                }
-                float moveX = dir.x;
-                float moveZ = dir.z;
-                if(e.behaviorMode == BEHAVIOR_FLANK){
-                    float zig = sinf(e.animPhase * 2.4f) * 0.55f;
-                    moveX = dir.x + (-dir.z) * zig;
-                    moveZ = dir.z + dir.x * zig;
-                    float mLen = sqrtf(moveX*moveX + moveZ*moveZ);
-                    if(mLen > 0.1f){ moveX /= mLen; moveZ /= mLen; }
-                }
-                float nx = e.pos.x + moveX*e.speed*speedMul*burstMul*dt, nz = e.pos.z + moveZ*e.speed*speedMul*burstMul*dt;
-                if(!collideWorld(nx,nz,0.34f)) { e.pos.x = nx; e.pos.z = nz; }
-                else {
-                    float bx = e.pos.x - moveZ*e.speed*0.7f*speedMul*dt;
-                    float bz = e.pos.z + moveX*e.speed*0.7f*speedMul*dt;
-                    if(!collideWorld(bx,bz,0.34f)) { e.pos.x = bx; e.pos.z = bz; }
-                }
-                e.yaw = atan2f(moveX, moveZ); }
-            if(e.behaviorMode == BEHAVIOR_RUSH && e.stateTimer > 1.35f){
-                e.behaviorMode = BEHAVIOR_DEFAULT;
-                e.stateTimer = 0.0f;
-            }
-            if(dist < e.attackRange) e.state = ENT_ATTACKING;
-        } else { e.state = ENT_ROAMING;
-            if(e.stateTimer > 1.8f) { e.yaw += ((rand()%100)/50.0f-1.0f)*2.6f; e.stateTimer = 0; }
-            float nx = e.pos.x + mSin(e.yaw)*e.speed*0.2f*speedMul*dt, nz = e.pos.z + mCos(e.yaw)*e.speed*0.2f*speedMul*dt;
-            if(!collideWorld(nx,nz,0.34f)) { e.pos.x = nx; e.pos.z = nz; }
-            else e.yaw += 1.3f; }
-    }
-    
-    void updateShadow(Entity& e, float dt, Vec3 pPos, float dist, bool looking, float pYaw) {
-        if(looking && dist < 13.0f){
-            e.lastSeenTimer += dt;
-            if(e.lastSeenTimer > 0.8f){
-                for(int i=0;i<8;i++){
-                    float ang = ((float)(rand()%628) / 100.0f);
-                    float r = 6.5f + (float)(rand()%7);
-                    float nx = pPos.x + mSin(ang) * r;
-                    float nz = pPos.z + mCos(ang) * r;
-                    if(!collideWorld(nx,nz,0.32f)){
-                        e.pos.x = nx; e.pos.z = nz;
-                        e.visible = false;
-                        break;
-                    }
-                }
-                e.lastSeenTimer = 0.0f;
-            }
-        }else{
-            e.lastSeenTimer = 0.0f;
-        }
-        if(!looking && dist < e.detectionRange + 8.0f && (rand()%1000) < 9){
-            float jitter = ((float)(rand()%628) / 100.0f);
-            Vec3 backDir(-mSin(pYaw), 0.0f, -mCos(pYaw));
-            Vec3 sideDir(mCos(pYaw), 0.0f, -mSin(pYaw));
-            float backDist = 2.8f + (float)(rand()%4);
-            float sideDist = (mSin(jitter) > 0.0f ? 1.0f : -1.0f) * (0.9f + (float)(rand()%10) * 0.1f);
-            float nx = pPos.x + backDir.x * backDist + sideDir.x * sideDist;
-            float nz = pPos.z + backDir.z * backDist + sideDir.z * sideDist;
-            if(!collideWorld(nx,nz,0.32f)){
-                e.pos.x = nx;
-                e.pos.z = nz;
-                e.visible = false;
-            }
-        }
-        e.visible = !looking && (dist < e.detectionRange + 8.0f);
-        if(!looking && dist < e.detectionRange + 3.0f && dist > e.attackRange) {
-            Vec3 dir = pPos - e.pos; dir.y = 0; float len = sqrtf(dir.x*dir.x+dir.z*dir.z);
-            if(len > 0.1f) {
-                dir.x/=len; dir.z/=len;
-                float moveMul = (e.behaviorMode == BEHAVIOR_SNEAK) ? 0.72f : 1.75f;
-                if(e.behaviorMode == BEHAVIOR_RUSH){
-                    moveMul = 2.25f;
-                }
-                if(e.behaviorMode == BEHAVIOR_FLANK || dist < 6.5f){
-                    float ox = dir.x;
-                    dir.x = dir.z;
-                    dir.z = -ox;
-                    if((rand()%100) < 45){ dir.x = -dir.x; dir.z = -dir.z; }
-                    moveMul = (dist < 6.5f) ? 1.65f : 1.35f;
-                }
-                float nx = e.pos.x + dir.x*e.speed*moveMul*dt;
-                float nz = e.pos.z + dir.z*e.speed*moveMul*dt;
-                if(!collideWorld(nx,nz,0.32f)){ e.pos.x = nx; e.pos.z = nz; }
-                e.yaw = atan2f(dir.x,dir.z);
-            }
-        }
-        if(dist < 11.0f && !looking && (rand()%1000) < 12){
-            for(int i=0;i<8;i++){
-                float ang = ((float)(rand()%628) / 100.0f);
-                float r = 2.4f + (float)(rand()%4);
-                float nx = pPos.x + mSin(ang) * r;
-                float nz = pPos.z + mCos(ang) * r;
-                if(!collideWorld(nx,nz,0.32f)){
-                    e.pos.x = nx;
-                    e.pos.z = nz;
-                    break;
-                }
-            }
-        }
-        if(dist > 32.0f) e.active = false;
-    }
-    
     void render(GLuint shader, Mat4& proj, Mat4& view) {
         glUseProgram(shader);
         glUniformMatrix4fv(glGetUniformLocation(shader,"P"),1,GL_FALSE,proj.m);
@@ -395,8 +142,9 @@ public:
             if(ti < 1 || ti > 3 || entityVC[ti] <= 0) continue;
             // Models stand on the floor; the crawler's logical height is not a render offset.
             Vec3 base(e.pos.x, e.type == ENTITY_CRAWLER ? 0.0f : e.pos.y, e.pos.z);
-            // Offset idle motion per entity so two of a kind never move in sync.
-            CreaturePose pose = entityPose(e, animClock + (float)index * 2.3f);
+            // Offset idle motion per entity so two of a kind never move in sync. Each entity runs
+            // its own idle clock: it stops dead while a stalker is being watched.
+            CreaturePose pose = entityPose(e, e.animTime + (float)index * 2.3f);
             const std::vector<CreaturePart>& parts = entityParts[ti];
             Mat4 mats[CREATURE_MAX_PARTS];
             creaturePartMatrices(parts, pose, creatureWorldMatrix(base, e.yaw), mats);
@@ -427,7 +175,23 @@ public:
         return getAttackingType(pPos) != ENTITY_NONE;
     }
     
-    void reset() { entities.clear(); spawnTimer = 0; dangerLevel = 0; hasLastPlayerPos = false; }
+    void reset() {
+        entities.clear();
+        spawnTimer = 0;
+        dangerLevel = 0;
+        hasLastPlayerPos = false;
+        havenRadius = 0.0f;
+        quietRadius = 0.0f;
+        targetCount = 0;
+        noiseCount = 0;
+        director.reset();
+        directorOut = DirectorOutput();
+        pendingDamage = 0.0f;
+        pendingDowns = 0;
+        bonkPending = false;
+    }
 };
+
+#include "entity_update.h"
 
 #endif

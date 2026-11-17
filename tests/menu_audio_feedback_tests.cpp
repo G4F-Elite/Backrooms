@@ -43,7 +43,7 @@ void testMenuPitchVariesAcrossTriggers() {
 }
 
 void testFillAudioConsumesUiFlags() {
-    short buf[64] = {};
+    short buf[64 * AUDIO_CHANNELS] = {};
     sndState.uiMoveTrig = true;
     sndState.uiAdjustTrig = true;
     sndState.uiConfirmTrig = true;

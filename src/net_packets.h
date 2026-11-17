@@ -298,27 +298,7 @@ inline void NetworkManager::handlePacket(char* buf, int len, sockaddr_in& from) 
     else if (type == PKT_ROAM_EVENT) handleRoamEvent(buf, len);
     else if (type == PKT_PING_MARK) handlePingMark(buf, len);
     else if (type == PKT_VOID_SHIFT_STATE) handleVoidShiftState(buf, len);
-}
-
-inline void NetworkManager::handlePingMark(char* buf, int len) {
-    if(len < 2 + (int)sizeof(Vec3)) return;
-    int fromId = (unsigned char)buf[1];
-    Vec3 p;
-    memcpy(&p, buf + 2, sizeof(Vec3));
-    pingMarkFrom = fromId;
-    pingMarkPos = p;
-    pingMarkTtl = 6.0f;
-    pingMarkReceived = true;
-    if(isHost){
-        for (int i = 1; i < MAX_PLAYERS; i++) {
-            if (!players[i].active || i == fromId) continue;
-            sockaddr_in dest;
-            dest.sin_family = AF_INET;
-            dest.sin_addr.s_addr = players[i].addr;
-            dest.sin_port = players[i].port;
-            sendto(sock, buf, 32, 0, (sockaddr*)&dest, sizeof(dest));
-        }
-    }
+    else if (type == PKT_SQUAD_FX) handleSquadFx(buf, len);
 }
 
 inline void NetworkManager::handleJoin(char* buf, sockaddr_in& from) {
@@ -460,7 +440,7 @@ inline void NetworkManager::handleScare(char* buf, int len) {
     }
     
     if (sourcePlayerId >= 0 && sourcePlayerId < MAX_PLAYERS) {
-        triggerScare();
+        triggerScare(0.5f); // a teammate is being hit somewhere: quieter than your own
     }
 }
 

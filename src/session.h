@@ -22,6 +22,7 @@
 extern GLuint deviceTex;
 extern GLuint plushTex;
 extern GLuint playerTex;
+extern GLuint decorTex;
 
 GLuint noteVAO=0, noteVBO=0;
 int noteVC=0;
@@ -49,8 +50,11 @@ enum InteractRequestType {
     REQ_DEBUG_SPAWN_STALKER = 3,
     REQ_DEBUG_SPAWN_CRAWLER = 4,
     REQ_DEBUG_SPAWN_SHADOW = 5,
-    REQ_VOID_SHIFT_INTERACT = 6,
-    REQ_EXIT_LEVEL = 7
+    REQ_HEIST_ACTION = 6,   // target = HeistAction (deposit, sell, drop, start the drill...)
+    REQ_EXIT_LEVEL = 7,
+    REQ_HEIST_BREAK = 8,    // target = side of the player's cell (0..3)
+    REQ_HEIST_BUY = 9,      // target = ShopItem
+    REQ_HEIST_STUDY = 10    // target = EntityType
 };
 
 enum RoamEventType {
@@ -62,11 +66,9 @@ enum RoamEventType {
     ROAM_SUPPLY_CACHE = 5
 };
 
+// Where the squad regroups on a floor: the drill. (Kept as `coop.doorPos` for the teleport helpers.)
 struct CoopObjectives {
-    Vec3 switches[2];
-    bool switchOn[2];
     Vec3 doorPos;
-    bool doorOpen;
     bool initialized;
 } coop = {};
 
@@ -146,72 +148,14 @@ inline void setSquadCallout(const char* txt) {
     std::snprintf(squadCalloutText, sizeof(squadCalloutText), "%s", txt);
     squadCalloutTimer = 3.5f;
 }
-enum ResonatorMode {
-    RESONATOR_SCAN = 0,
-    RESONATOR_RECORD = 1,
-    RESONATOR_PLAYBACK = 2,
-    RESONATOR_PING = 3
-};
-int resonatorMode = RESONATOR_SCAN;
-float resonatorBattery = 100.0f;
 float attentionLevel = 0.0f;
 float attentionEventCooldown = 0.0f;
-
-bool echoRecording = false;
-bool echoPlayback = false;
-float echoRecordTimer = 0.0f;
-std::vector<Vec3> echoTrack;
-int echoPlaybackIndex = 0;
-Vec3 echoGhostPos(0, 0, 0);
-bool echoGhostActive = false;
-
-Vec3 level1Nodes[3];
-bool level1NodeDone[3] = {false, false, false};
-int level1NodeStage[3] = {0, 0, 0};
-int level1NodeGoal[3] = {2, 2, 2};
-Vec3 level1SyncSwitches[2];
-float level1SyncTimer = 0.0f;
-bool level1HoldActive = false;
-float level1HoldTimer = 90.0f;
-bool level1ContractComplete = false;
-
-bool level2BatteryInstalled = false;
-int level2BatteryStage = 0;
-int level2FuseCount = 0;
-bool level2AccessReady = false;
-bool level2FusePanelPowered = false;
-bool level2HoldActive = false;
-float level2HoldTimer = 15.0f;
-bool level2ContractComplete = false;
-Vec3 level2BatteryNode(0, 0, 0);
-Vec3 level2FuseNodes[3];
-bool level2FuseDone[3] = {false, false, false};
-Vec3 level2AccessNode(0, 0, 0);
-Vec3 level2LiftNode(0, 0, 0);
-Vec3 level2PowerNode(0, 0, 0);
 
 int archivePoints = 0;
 int archiveTier = 0;
 bool perkQuietSteps = false;
 bool perkFastHands = false;
 bool perkEchoBuffer = false;
-
-enum SideContractType {
-    SIDE_NONE = 0,
-    SIDE_COLLECT_BADGES = 1,
-    SIDE_SCAN_WALLS = 2,
-    SIDE_STABILIZE_RIFTS = 3,
-    SIDE_RESCUE_SURVIVOR = 4
-};
-
-int sideContractType = SIDE_NONE;
-int sideContractProgress = 0;
-int sideContractTarget = 0;
-bool sideContractCompleted = false;
-
-Vec3 npcLostSurvivorPos(0, 0, 0);
-bool npcLostSurvivorActive = false;
-bool npcLostSurvivorEscorted = false;
 
 TrapCorridorState trapCorridor = {};
 DebugToolsState debugTools = {};
@@ -222,7 +166,11 @@ char trapStatusText[96] = {};
 extern int nearbyWorldItemId;
 extern int nearbyWorldItemType;
 
+// Set while the local player stands somewhere safe (the rig's haven): no jump scares there.
+inline bool gScaresMuted = false;
+
 inline void triggerLocalScare(float flash, float shake, float sanityDamage){
+    if(gScaresMuted) return;
     if(damageFlash < flash) damageFlash = flash;
     if(camShake < shake) camShake = shake;
     playerSanity -= sanityDamage;
@@ -275,76 +223,7 @@ inline void restoreSessionSnapshot(){
 }
 
 inline void initCoopObjectives(const Vec3& basePos){
-    auto findNearestCell = [](int targetWX, int targetWZ, int maxRadius, auto predicate, int& outWX, int& outWZ) {
-        if (predicate(targetWX, targetWZ)) {
-            outWX = targetWX;
-            outWZ = targetWZ;
-            return true;
-        }
-        for (int r = 1; r <= maxRadius; r++) {
-            for (int dz = -r; dz <= r; dz++) {
-                for (int dx = -r; dx <= r; dx++) {
-                    if (dx != -r && dx != r && dz != -r && dz != r) continue;
-                    int wx = targetWX + dx;
-                    int wz = targetWZ + dz;
-                    if (!predicate(wx, wz)) continue;
-                    outWX = wx;
-                    outWZ = wz;
-                    return true;
-                }
-            }
-        }
-        return false;
-    };
-
-    auto openCell = [](int wx, int wz) { return getCellWorld(wx, wz) == 0; };
-    // The exit door spans one corridor cell: floor in front and behind, walls on both sides.
-    // (The old footprint check also demanded open side cells, which can never hold together
-    // with the wall test, so the door always fell back onto the spawn cell.)
-    auto validDoorCell = [](int wx, int wz) {
-        if (getCellWorld(wx, wz) != 0) return false;
-        bool frontOpen = getCellWorld(wx, wz + 1) == 0;
-        bool backOpen = getCellWorld(wx, wz - 1) == 0;
-        bool leftWall = getCellWorld(wx - 1, wz) == 1;
-        bool rightWall = getCellWorld(wx + 1, wz) == 1;
-        return frontOpen && backOpen && leftWall && rightWall;
-    };
-
-    int baseWX = (int)floorf(basePos.x / CS);
-    int baseWZ = (int)floorf(basePos.z / CS);
-
-    int doorWX = baseWX;
-    int doorWZ = baseWZ + 12;
-    if (!findNearestCell(doorWX, doorWZ, 16, validDoorCell, doorWX, doorWZ)) {
-        if (!findNearestCell(baseWX, baseWZ, 34, validDoorCell, doorWX, doorWZ)) {
-            if (!findNearestCell(baseWX, baseWZ, 12, openCell, doorWX, doorWZ)) {
-                doorWX = baseWX;
-                doorWZ = baseWZ + 4;
-            }
-            setCellWorld(doorWX, doorWZ, 0);
-            setCellWorld(doorWX, doorWZ - 1, 0);
-            setCellWorld(doorWX, doorWZ + 1, 0);
-            setCellWorld(doorWX - 1, doorWZ, 1);
-            setCellWorld(doorWX + 1, doorWZ, 1);
-        }
-    }
-
-    int sw0x = baseWX + 2;
-    int sw0z = baseWZ + 1;
-    int sw1x = baseWX - 2;
-    int sw1z = baseWZ + 1;
-    findNearestCell(sw0x, sw0z, 8, openCell, sw0x, sw0z);
-    findNearestCell(sw1x, sw1z, 8, openCell, sw1x, sw1z);
-
-    coop.switches[0] = Vec3((sw0x + 0.5f) * CS, 0, (sw0z + 0.5f) * CS);
-    coop.switches[1] = Vec3((sw1x + 0.5f) * CS, 0, (sw1z + 0.5f) * CS);
-    coop.switchOn[0] = false;
-    coop.switchOn[1] = false;
-    coop.doorPos = Vec3((doorWX + 0.5f) * CS, 0, (doorWZ + 0.5f) * CS);
-    // The exit portal reuses the standard doorway frame (mesh + collision).
-    forcedDoorways.clear();
-    forcedDoorways.push_back({doorWX, doorWZ});
-    coop.doorOpen = false;
+    coop.doorPos = basePos;
     coop.initialized = true;
 }
 
@@ -377,7 +256,8 @@ inline bool projectToScreen(const Vec3& worldPos, float& sx, float& sy){
     float cy = mCos(gRenderViewYaw), syaw = mSin(gRenderViewYaw);
     float cp = mCos(gRenderViewPitch), sp = mSin(gRenderViewPitch);
 
-    float cx = d.x * cy - d.z * syaw;
+    // Screen right is forward x up = (-cos yaw, 0, sin yaw); (cos, 0, -sin) is the strafe-left axis.
+    float cx = d.z * syaw - d.x * cy;
     float cz0 = d.x * syaw + d.z * cy;
     float cy2 = d.y * cp - cz0 * sp;
     float cz = d.y * sp + cz0 * cp;
@@ -441,6 +321,12 @@ inline bool gCoopDead = false;
 inline bool gRunComplete = false;
 inline bool gHostExitRequested = false;
 
+// Shift report counters restart whenever a run (re)starts from the first level.
+inline void resetShiftStats(){
+    for(int i=0;i<MAX_PLAYERS;i++) netMgr.squadStats[i] = {};
+    netMgr.fxQueueCount = 0;
+}
+
 inline void resetCoopRunState(){
     gCoopDead = false;
     gRunComplete = false;
@@ -460,46 +346,21 @@ inline float vmFlashLensUp = 0.09f;
 // 0..1: how much camera shake affects held items (0 = stable, 1 = full shake)
 inline float vmShake = 0.0f;
 
-inline void applyPlushToyUse(){
-    if(invPlush <= 0) return;
-    invPlush--;
-    // Slot 3 plush toy should recover sanity, but not instantly.
-    playerSanity += 25.0f;
-    if(playerSanity > 100.0f) playerSanity = 100.0f;
-    setEchoStatus("PLUSH TOY: YOUR MIND FEELS WHOLE AGAIN");
-}
 
-inline void initLevel1PuzzleStages();
-inline bool processLevel1NodeStage(int nodeIndex);
-inline void buildLevel1NodeActionPrompt(int nodeIndex, char* out, int outSize);
-inline void updateLevel1SyncSwitchProgress(float dt);
-inline bool isLevel1HoldMaintained();
-inline void initLevel2PuzzleStages();
-inline bool processLevel2Step(const Vec3& playerPos);
-inline bool buildLevel2ActionPrompt(const Vec3& playerPos, char* out, int outSize);
-inline bool isLevel2HoldMaintained();
-inline void initVoidShiftSetpieces();
-inline void snapVoidShiftObjectives(const Vec3& base);
-inline void reopenObjectiveCells();
 inline void triggerConferenceCallSetpiece(float duration);
 inline void triggerCorridorShiftSetpiece(float duration);
 inline void triggerBlackoutSetpiece(float duration);
+inline void initVoidShiftSetpieces();
 inline void updateVoidShiftSetpieces(float dt);
-inline void updateVoidShiftHoldPhases(float dt);
-inline void updateVoidShiftEnemyEffects(float dt);
+inline void reopenObjectiveCells();
+inline bool isFallCell(int wx, int wz);
 
+#include "heist_state.h"
 #include "void_shift_runtime.h"
-#include "void_shift_puzzles_ext.h"
-#include "void_shift_level2_ext.h"
 #include "void_shift_setpieces_ext.h"
-#include "void_shift_enemy_effects_ext.h"
 #include "objective_layout.h"
-
-inline int storyNotesRequired(){
-    if (isParkingLevel(gCurrentLevel)) return 3;
-    return 3;
-}
+#include "heist_sets.h"
 
 inline bool isStoryExitReady(){
-    return isVoidShiftExitReady();
+    return heistDrillReady();
 }

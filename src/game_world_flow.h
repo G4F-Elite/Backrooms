@@ -4,27 +4,30 @@
 #include "map_content.h"
 #include "device_models.h"
 #include "structure_models.h"
+#include "world_mesh.h"
 #include "decor_atlas.h"
+#include "heist_render.h"
+#include "rig_render.h"
 
 // World mutations (trap corridor, exit portal, floor holes, reshuffles) can leave decor inside
 // a wall, in the exit doorway or above a pit. Drop it before meshing.
 inline bool isDecorSpotLost(float x, float z){
     int wx=(int)floorf(x/CS), wz=(int)floorf(z/CS);
-    return getCellWorld(wx,wz)!=0 || isForcedDoorway(wx,wz) || isFallCell(wx,wz);
+    return getCellWorld(wx,wz)!=0 || isForcedDoorway(wx,wz) || isFallCell(wx,wz) || heistIsReservedCell(wx,wz);
 }
 
 // Objectives are placed after the props, so a prop may end up on top of one.
 inline bool isPropOnObjective(const MapProp& p){
     float hx=0.0f, hz=0.0f;
     mapPropHalfExtents(p,hx,hz);
-    const float clearance=0.45f;
+    const float clearance=0.90f; // room for the objective machine itself
     auto hit=[&](const Vec3& o){ return fabsf(o.x-p.pos.x)<hx+clearance && fabsf(o.z-p.pos.z)<hz+clearance; };
     // a player spawned inside a prop could not move at all
     if(fabsf(cam.pos.x-p.pos.x)<hx+0.2f && fabsf(cam.pos.z-p.pos.z)<hz+0.2f) return true;
-    if(!coop.initialized) return false;
-    for(int i=0;i<2;i++) if(hit(coop.switches[i]) || hit(level1SyncSwitches[i])) return true;
-    for(int i=0;i<3;i++) if(hit(level1Nodes[i]) || hit(level2FuseNodes[i])) return true;
-    return hit(level2BatteryNode) || hit(level2AccessNode) || hit(level2LiftNode) || hit(level2PowerNode);
+    HeistSolid solids[4];
+    int n = collectHeistSolids(solids);
+    for(int i=0;i<n;i++) if(hit(solids[i].pos)) return true;
+    return false;
 }
 
 inline void pruneInvalidDecor(){
@@ -44,114 +47,49 @@ inline void pruneInvalidDecor(){
 
 void buildGeom(){
     pruneInvalidDecor();
-    std::vector<float>wv,fv,cv,pv,lv,lvOff,dv;
+    heistApplyDarkZone();
     int pcx=playerChunkX,pcz=playerChunkZ;
-    for(int dcx=-VIEW_CHUNKS;dcx<=VIEW_CHUNKS;dcx++){
-        for(int dcz=-VIEW_CHUNKS;dcz<=VIEW_CHUNKS;dcz++){
-            auto it=chunks.find(chunkKey(pcx+dcx,pcz+dcz));
-            if(it==chunks.end())continue;
-            for(int lx=0;lx<CHUNK_SIZE;lx++){
-                for(int lz=0;lz<CHUNK_SIZE;lz++){
-                    int wx=(pcx+dcx)*CHUNK_SIZE+lx,wz=(pcz+dcz)*CHUNK_SIZE+lz;
-                    if(it->second.cells[lx][lz]!=0)continue;
-                    float px=wx*CS,pz=wz*CS;
-                    const float uvFloor = 1.0f;
-                    const float uvCeil = 1.0f;
-                    bool hasHole = isFloorHoleCell(wx,wz) || isAbyssCell(wx,wz);
-                    if(!hasHole){
-                        float fl[]={px,0,pz,0,0,0,1,0,px,0,pz+CS,0,uvFloor,0,1,0,px+CS,0,pz+CS,uvFloor,uvFloor,0,1,0,
-                                   px,0,pz,0,0,0,1,0,px+CS,0,pz+CS,uvFloor,uvFloor,0,1,0,px+CS,0,pz,uvFloor,0,0,1,0};
-                        for(int i=0;i<48;i++)fv.push_back(fl[i]);
-                    }else{
-                        const float shaftDepth = 30.0f;
-                        bool leftSolid = getCellWorld(wx-1,wz)==1 || (!isFloorHoleCell(wx-1,wz) && !isAbyssCell(wx-1,wz) && getCellWorld(wx-1,wz)==0);
-                        bool rightSolid = getCellWorld(wx+1,wz)==1 || (!isFloorHoleCell(wx+1,wz) && !isAbyssCell(wx+1,wz) && getCellWorld(wx+1,wz)==0);
-                        bool backSolid = getCellWorld(wx,wz-1)==1 || (!isFloorHoleCell(wx,wz-1) && !isAbyssCell(wx,wz-1) && getCellWorld(wx,wz-1)==0);
-                        bool frontSolid = getCellWorld(wx,wz+1)==1 || (!isFloorHoleCell(wx,wz+1) && !isAbyssCell(wx,wz+1) && getCellWorld(wx,wz+1)==0);
-                        if(leftSolid) mkShaftWall(wv,px,pz,0,CS,0,shaftDepth,CS);
-                        if(rightSolid) mkShaftWall(wv,px+CS,pz+CS,0,-CS,0,shaftDepth,CS);
-                        if(backSolid) mkShaftWall(wv,px+CS,pz,-CS,0,0,shaftDepth,CS);
-                        if(frontSolid) mkShaftWall(wv,px,pz+CS,CS,0,0,shaftDepth,CS);
-                    }
-                    float cl[]={px,WH,pz,0,0,0,-1,0,px,WH,pz+CS,0,uvCeil,0,-1,0,px+CS,WH,pz+CS,uvCeil,uvCeil,0,-1,0,
-                               px,WH,pz,0,0,0,-1,0,px+CS,WH,pz+CS,uvCeil,uvCeil,0,-1,0,px+CS,WH,pz,uvCeil,0,0,-1,0};
-                    for(int i=0;i<48;i++)cv.push_back(cl[i]);
-                    bool wallL = getCellWorld(wx-1,wz)==1;
-                    bool wallR = getCellWorld(wx+1,wz)==1;
-                    bool wallB = getCellWorld(wx,wz-1)==1;
-                    bool wallF = getCellWorld(wx,wz+1)==1;
-                    if(wallL)mkWall(wv,px,pz,0,CS,WH,CS,WH);
-                    if(wallR)mkWall(wv,px+CS,pz+CS,0,-CS,WH,CS,WH);
-                    if(wallB)mkWall(wv,px+CS,pz,-CS,0,WH,CS,WH);
-                    if(wallF)mkWall(wv,px,pz+CS,CS,0,WH,CS,WH);
-
-                    int doorAxis = doorwayAxisAt(wx,wz);
-                    if(doorAxis!=0) buildDoorwayModel(dv,wx,wz,doorAxis);
-                }
-            }
-        }
-    }
-    bool parkingLevel = isParkingLevel(gCurrentLevel);
-    for(auto&p:pillars){
-        mkPillar(pv,p.x,p.z,PILLAR_SIZE,WH);
-        buildPillarTrimModel(dv,p,parkingLevel);
-    }
-    for(const auto& pr:mapProps) buildMapPropModel(dv,pr);
-    for(const auto& poi:mapPois) buildMapPoiModel(dv,poi);
-    if(parkingLevel){
-        // Bay lines are laid per open cell of parking halls, so they stop at walls.
-        for(int dcx=-VIEW_CHUNKS;dcx<=VIEW_CHUNKS;dcx++){
-            for(int dcz=-VIEW_CHUNKS;dcz<=VIEW_CHUNKS;dcz++){
-                if(chunkStyleAt(pcx+dcx,pcz+dcz)!=CHUNK_STYLE_PARKING) continue;
-                if(chunks.find(chunkKey(pcx+dcx,pcz+dcz))==chunks.end()) continue;
-                for(int lx=0;lx<CHUNK_SIZE;lx++){
-                    for(int lz=0;lz<CHUNK_SIZE;lz+=3){
-                        int wx=(pcx+dcx)*CHUNK_SIZE+lx, wz=(pcz+dcz)*CHUNK_SIZE+lz;
-                        if(getCellWorld(wx,wz)!=0 || isFloorHoleCell(wx,wz) || isAbyssCell(wx,wz)) continue;
-                        DecorBuilder line(dv,((float)wx+0.5f)*CS,((float)wz+0.5f)*CS,0.0f,1.0f);
-                        line.decal(0.0f,0.012f,0.0f,CS,0.16f,DECOR_MAT_WHITE);
-                    }
-                }
-            }
-        }
-    }
-    if(coop.initialized){
-        for(int s=0;s<2;s++) buildSwitchModel(dv,coop.switches[s],coop.switchOn[s]);
-        bool storyExitReady = isStoryExitReady();
-        bool doorOpenVisual = (multiState==MULTI_IN_GAME) ? coop.doorOpen : storyExitReady;
-        buildExitDoorModel(dv,coop.doorPos,doorOpenVisual);
-    }
-    for(auto&l:lights){
-        if(l.on)mkLight(lv,l.pos,l.sizeX,l.sizeZ);
-        else mkLight(lvOff,l.pos,l.sizeX,l.sizeZ);
-    }
+    WorldMesh world;
+    buildWorldBaseMesh(world,pcx,pcz,[](int wx,int wz){ return isFloorHoleCell(wx,wz) || isAbyssCell(wx,wz); });
+    if(coop.initialized) buildHeistModels(world.decor);
+    buildWorldLampMesh(world);
+    // Faces that share a plane would flicker through each other: the later one keeps the spot.
+    gZfightWorld = resolveWorldMesh(world);
+    std::vector<float>&wv=world.walls,&fv=world.floors,&cv=world.ceilings,&pv=world.pillars;
+    std::vector<float>&dv=world.decor,&lv=world.lampsOn,&lvOff=world.lampsOff;
     {
         std::vector<float> m;
         buildFlashlightModel(m);
+        resolveModelMesh(m, "flashlight");
         flashlightVC = (int)m.size()/8;
         if(flashlightVC>0) setupVAO(flashlightVAO, flashlightVBO, m, true);
     }
     {
         std::vector<float> m;
         buildScannerModel(m);
+        resolveModelMesh(m, "scanner");
         scannerVC = (int)m.size()/8;
         if(scannerVC>0) setupVAO(scannerVAO, scannerVBO, m, true);
     }
     {
         std::vector<float> m;
         buildPlushToyModel(m);
+        resolveModelMesh(m, "plush toy");
         plushVC = (int)m.size()/8;
         if(plushVC>0) setupVAO(plushVAO, plushVBO, m, true);
     }
     {
         std::vector<float> m;
         buildBatteryModel(m);
+        resolveModelMesh(m, "battery");
         batteryVC = (int)m.size()/8;
         if(batteryVC>0) setupVAO(batteryVAO, batteryVBO, m, true);
     }
+    buildHeistItemMeshes();
     {
         std::vector<float> m;
         buildMedSprayModel(m);
+        resolveModelMesh(m, "med spray");
         medSprayVC = (int)m.size()/8;
         if(medSprayVC>0) setupVAO(medSprayVAO, medSprayVBO, m, true);
     }
@@ -221,7 +159,7 @@ void genWorld(){
         if(multiState==MULTI_IN_GAME) netMgr.worldSeed = worldSeed;
     }
     
-    chunks.clear();lights.clear();pillars.clear();resetMapContent();forcedDoorways.clear();
+    chunks.clear();lights.clear();pillars.clear();resetMapContent();forcedDoorways.clear();gCellOverrides.clear();
     g_lightStates.clear();
     updateVisibleChunks(0,0);
     updateLightsAndPillars(0,0);
@@ -248,26 +186,25 @@ void genWorld(){
     updateLightsAndPillars(playerChunkX,playerChunkZ);
     updateMapContent(playerChunkX,playerChunkZ);
     entityMgr.reset();storyMgr.init();
-    initTrapCorridor(sp);
+    storyMgr.introComplete = true;
+    trapCorridor = {};
+    if(!isLevelZero(gCurrentLevel)) initTrapCorridor(sp); // the first floor is the tutorial
 
     resetPlayerInterpolation();
     initCoopObjectives(coopBase);
-    // Objectives hang off the shared squad spawn (cam.pos differs per player in co-op).
-    resetVoidShiftState(coopBase, coop.doorPos);
-    placeAbyss(coopBase);
+    resetVoidShiftState();
     resetCoopRunState(); resetPoiRuntime();
-    {
-        Vec3 d = cam.pos - coop.doorPos;
-        d.y = 0.0f;
-        if(d.len() < 8.0f){
-            Vec3 alt = findSpawnPos(coop.doorPos, 14.0f);
-            cam.pos = Vec3(alt.x, PH, alt.z);
-        }
-    }
+    if(isLevelZero(gCurrentLevel)) resetShiftStats();
     worldItems.clear();
     nextWorldItemId = 1;
-    invBattery = 0;
-    invPlush = 0;
+    if(isLevelZero(gCurrentLevel)){ invBattery = 0; invPlush = 0; }
+    // Garage + portal on the first floor, drill / kiosk / loot everywhere (moves the player too).
+    heistBeginLevel(coopBase);
+    coop.doorPos = heist.drillPos;
+    placeAbyss(coopBase);
+    updateVisibleChunks(cam.pos.x,cam.pos.z);
+    updateLightsAndPillars(playerChunkX,playerChunkZ);
+    updateMapContent(playerChunkX,playerChunkZ);
     clearEchoSignal();
     echoSpawnTimer = 7.0f + (float)(rng()%6);
     echoStatusTimer = 0.0f;

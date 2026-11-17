@@ -1,0 +1,441 @@
+#pragma once
+#include "prop_themes.h"
+
+// ============================================================================
+// PROP CATALOG
+// Every placeable prop: where it belongs (themes), how it is placed and how big
+// its footprint is. Level generators ask the catalog for "something that fits
+// theme X" instead of hard-coding prop lists, so one model can serve several
+// themes (a trash bin fits an office, a hotel and a parking deck alike).
+//
+// Themes live in prop_themes.h.
+//
+// Adding a prop:
+//   1. append an id to MapPropType (before MAP_PROP_TYPE_COUNT),
+//   2. add its row to PROP_CATALOG (same order as the enum),
+//   3. build its mesh in one of the props_*.h files and hook it up in
+//      props_library.h.
+// tests/prop_library_tests.cpp checks that mesh, footprint and row agree.
+// ============================================================================
+
+enum MapPropType {
+    // --- base set, used by the level 0 / parking generators (prop_models.h) ---
+    MAP_PROP_CRATE_STACK = 0,
+    MAP_PROP_CONE_CLUSTER = 1,
+    MAP_PROP_BARRIER = 2,
+    MAP_PROP_CABLE_REEL = 3,
+    MAP_PROP_PUDDLE = 4,
+    MAP_PROP_DEBRIS = 5,
+    MAP_PROP_DESK = 6,
+    MAP_PROP_CHAIR = 7,
+    MAP_PROP_CABINET = 8,
+    MAP_PROP_PARTITION = 9,
+    MAP_PROP_BOX_PALLET = 10,
+    MAP_PROP_DRUM_STACK = 11,
+    MAP_PROP_LOCKER_BANK = 12,
+
+    // --- library: shared between themes (props_shared.h) ---
+    MAP_PROP_LIBRARY_FIRST = 13,
+    MAP_PROP_TRASH_BIN = 13,
+    MAP_PROP_BENCH,
+    MAP_PROP_VENDING_MACHINE,
+    MAP_PROP_WATER_COOLER,
+    MAP_PROP_FIRE_CABINET,
+    MAP_PROP_WET_FLOOR_SIGN,
+    MAP_PROP_PIPE_RUN,
+    MAP_PROP_VENT_DUCT,
+    MAP_PROP_ELECTRICAL_CABINET,
+    MAP_PROP_STEP_LADDER,
+    MAP_PROP_HAND_TRUCK,
+    MAP_PROP_SHELF_UNIT,
+    MAP_PROP_HANGING_SIGN,
+    MAP_PROP_FLOOR_DRAIN,
+    MAP_PROP_CEILING_FAN,
+    MAP_PROP_WALL_SIGN,
+    MAP_PROP_CABLE_TRAY,
+    MAP_PROP_FLOOR_MAT,
+    MAP_PROP_PAPER_LITTER,
+
+    // --- office (props_office.h) ---
+    MAP_PROP_COPIER,
+    MAP_PROP_MEETING_TABLE,
+    MAP_PROP_SOFA,
+    MAP_PROP_WHITEBOARD,
+    MAP_PROP_PAPER_STACKS,
+
+    // --- parking (props_parking.h) ---
+    MAP_PROP_JERSEY_BARRIER,
+    MAP_PROP_BOLLARD_ROW,
+    MAP_PROP_TIRE_STACK,
+    MAP_PROP_PAY_STATION,
+    MAP_PROP_WHEEL_STOP,
+    MAP_PROP_BARRIER_GATE,
+
+    // --- maintenance tunnels / plant rooms (props_maintenance.h) ---
+    MAP_PROP_BOILER_TANK,
+    MAP_PROP_VALVE_MANIFOLD,
+    MAP_PROP_GENERATOR,
+    MAP_PROP_WORKBENCH,
+    MAP_PROP_TOOL_CHEST,
+    MAP_PROP_FLOOR_HATCH,
+    MAP_PROP_CONTROL_CONSOLE,
+    MAP_PROP_PUMP_UNIT,
+
+    // --- warehouse (props_warehouse.h) ---
+    MAP_PROP_PALLET_RACK,
+    MAP_PROP_WRAPPED_PALLET,
+    MAP_PROP_LONG_CRATE,
+    MAP_PROP_PALLET_JACK,
+    MAP_PROP_PALLET_PILE,
+
+    // --- hotel (props_hotel.h) ---
+    MAP_PROP_BED,
+    MAP_PROP_NIGHTSTAND,
+    MAP_PROP_ARMCHAIR,
+    MAP_PROP_LUGGAGE_CART,
+    MAP_PROP_RECEPTION_DESK,
+    MAP_PROP_WARDROBE,
+
+    // --- pool rooms (props_pool.h) ---
+    MAP_PROP_LOUNGE_CHAIR,
+    MAP_PROP_STARTING_BLOCK,
+    MAP_PROP_LIFEGUARD_CHAIR,
+    MAP_PROP_TOWEL_CART,
+    MAP_PROP_SHOWER_POST,
+    MAP_PROP_FLOAT_RACK,
+
+    // --- hospital ward (props_hospital.h) ---
+    MAP_PROP_GURNEY,
+    MAP_PROP_IV_STAND,
+    MAP_PROP_MED_CABINET,
+    MAP_PROP_PRIVACY_SCREEN,
+    MAP_PROP_WHEELCHAIR,
+    MAP_PROP_WAITING_SEATS,
+
+    // --- building fixtures found in most themes (props_fixtures.h) ---
+    MAP_PROP_WALL_CLOCK,
+    MAP_PROP_PA_SPEAKER,
+    MAP_PROP_WALL_TV,
+    MAP_PROP_DANGLING_LIGHT,
+    MAP_PROP_SPRINKLER_PIPE,
+    MAP_PROP_NOTICE_BOARD,
+    MAP_PROP_PAYPHONE,
+    MAP_PROP_RADIATOR,
+    MAP_PROP_DRINKING_FOUNTAIN,
+
+    // --- loose clutter found in most themes (props_clutter.h) ---
+    MAP_PROP_DEAD_PLANT,
+    MAP_PROP_BOOKCASE,
+    MAP_PROP_JANITOR_CART,
+    MAP_PROP_STANCHIONS,
+    MAP_PROP_STACKED_CHAIRS,
+    MAP_PROP_FALLEN_TILES,
+    MAP_PROP_GAS_CYLINDERS,
+    MAP_PROP_NEWSSTAND,
+
+    // --- school (props_school.h) ---
+    MAP_PROP_SCHOOL_DESK,
+    MAP_PROP_BLACKBOARD,
+    MAP_PROP_COAT_HOOKS,
+    MAP_PROP_VAULTING_HORSE,
+    MAP_PROP_TROPHY_CASE,
+    MAP_PROP_AV_CART,
+    MAP_PROP_LECTERN,
+
+    // --- mall (props_mall.h) ---
+    MAP_PROP_CLOTHES_RACK,
+    MAP_PROP_MANNEQUIN,
+    MAP_PROP_SHOPPING_CART,
+    MAP_PROP_DISPLAY_COUNTER,
+    MAP_PROP_INFO_KIOSK,
+    MAP_PROP_GONDOLA_SHELF,
+    MAP_PROP_FITTING_BOOTH,
+
+    // --- playrooms / party rooms (props_playroom.h) ---
+    MAP_PROP_PARTY_TABLE,
+    MAP_PROP_BALLOON_BUNCH,
+    MAP_PROP_BALL_PIT,
+    MAP_PROP_ARCADE_CABINET,
+    MAP_PROP_PLAY_SLIDE,
+    MAP_PROP_SOFT_BLOCKS,
+    MAP_PROP_GIFT_PILE,
+    MAP_PROP_BUNTING,
+
+    // --- metro station (props_station.h) ---
+    MAP_PROP_TURNSTILE,
+    MAP_PROP_TICKET_MACHINE,
+    MAP_PROP_ROUTE_MAP,
+    MAP_PROP_TACTILE_STRIP,
+    MAP_PROP_TICKET_BOOTH,
+    MAP_PROP_SUITCASES,
+
+    // --- laboratory / server room (props_lab.h) ---
+    MAP_PROP_SERVER_RACK,
+    MAP_PROP_LAB_BENCH,
+    MAP_PROP_FUME_HOOD,
+    MAP_PROP_SPECIMEN_TANK,
+    MAP_PROP_TAPE_DRIVE,
+    MAP_PROP_EQUIPMENT_CART,
+    MAP_PROP_EYEWASH_STATION,
+    MAP_PROP_CABLE_COVER,
+
+    // --- kitchen / canteen (props_kitchen.h) ---
+    MAP_PROP_STOVE_RANGE,
+    MAP_PROP_FRIDGE,
+    MAP_PROP_PREP_COUNTER,
+    MAP_PROP_DINER_BOOTH,
+    MAP_PROP_CAFETERIA_TABLE,
+    MAP_PROP_TRAY_RACK,
+    MAP_PROP_SERVING_LINE,
+    MAP_PROP_RANGE_HOOD,
+    MAP_PROP_SACK_PILE,
+
+    MAP_PROP_TYPE_COUNT
+};
+
+// How a prop meets the room. FLOOR and WALL props block movement; the rest are
+// walked over or under.
+enum PropPlacement {
+    PROP_PLACE_FLOOR = 0,      // stands free on the floor
+    PROP_PLACE_WALL = 1,       // stands on the floor with its back against a wall
+    PROP_PLACE_WALL_HIGH = 2,  // hangs on a wall above head height
+    PROP_PLACE_CEILING = 3,    // hangs from the ceiling above head height
+    PROP_PLACE_FLAT = 4        // lies flat on the floor
+};
+
+enum PropFlag : unsigned {
+    PROP_FLAG_PUSHABLE = 1u << 0,  // the player can shove it
+    PROP_FLAG_ALIGNED = 1u << 1    // loose placement keeps it parallel to the walls
+};
+
+// Low props end below this height and overhead props start above it, so the two
+// layers can share a floor spot without touching.
+const float PROP_OVERHEAD_Y = 2.7f;
+const float PROP_FLAT_MAX_Y = 0.12f;
+
+struct PropInfo {
+    int type;
+    const char* name;
+    unsigned themes;
+    int placement;
+    unsigned flags;
+    float hx, hz;   // unscaled half extents of the mesh footprint (local X / Z)
+    int weight;     // relative pick chance inside a theme
+};
+
+const PropInfo PROP_CATALOG[MAP_PROP_TYPE_COUNT] = {
+    {MAP_PROP_CRATE_STACK, "crate_stack", THEME_INDUSTRIAL, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.50f, 0.50f, 8},
+    {MAP_PROP_CONE_CLUSTER, "cone_cluster", THEME_INDUSTRIAL | THEME_POOL | THEME_STATION | THEME_PLAYROOM, PROP_PLACE_FLOOR, 0, 0.50f, 0.50f, 6},
+    {MAP_PROP_BARRIER, "barrier", THEME_INDUSTRIAL | THEME_STATION, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 0.80f, 0.24f, 6},
+    {MAP_PROP_CABLE_REEL, "cable_reel", THEME_INDUSTRIAL, PROP_PLACE_FLOOR, 0, 0.50f, 0.50f, 5},
+    {MAP_PROP_PUDDLE, "puddle", THEME_INDUSTRIAL | THEME_POOL | THEME_HOSPITAL | THEME_STATION | THEME_KITCHEN | THEME_PLAYROOM, PROP_PLACE_FLAT, 0, 0.0f, 0.0f, 4},
+    {MAP_PROP_DEBRIS, "debris", THEME_ALL, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.60f, 0.50f, 3},
+    {MAP_PROP_DESK, "desk", THEME_PUBLIC | THEME_SCHOOL | THEME_LAB, PROP_PLACE_WALL, 0, 0.70f, 0.35f, 8},
+    {MAP_PROP_CHAIR, "chair", THEME_PUBLIC | THEME_SCHOOL | THEME_LAB | THEME_PLAYROOM, PROP_PLACE_FLOOR, 0, 0.25f, 0.25f, 6},
+    {MAP_PROP_CABINET, "cabinet", THEME_OFFICE | THEME_HOSPITAL | THEME_WAREHOUSE | THEME_SCHOOL | THEME_LAB, PROP_PLACE_WALL, 0, 0.25f, 0.30f, 6},
+    {MAP_PROP_PARTITION, "partition", THEME_OFFICE | THEME_HOSPITAL, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 0.75f, 0.14f, 5},
+    {MAP_PROP_BOX_PALLET, "box_pallet", THEME_INDUSTRIAL | THEME_MALL | THEME_KITCHEN, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.60f, 0.50f, 8},
+    {MAP_PROP_DRUM_STACK, "drum_stack", THEME_INDUSTRIAL | THEME_POOL, PROP_PLACE_FLOOR, 0, 0.60f, 0.56f, 6},
+    {MAP_PROP_LOCKER_BANK, "locker_bank", THEME_PARKING | THEME_MAINT | THEME_POOL | THEME_HOSPITAL | THEME_OFFICE | THEME_SCHOOL | THEME_STATION | THEME_STAFF | THEME_PLAYROOM, PROP_PLACE_WALL, 0, 0.57f, 0.23f, 6},
+
+    {MAP_PROP_TRASH_BIN, "trash_bin", THEME_PUBLIC | THEME_PARKING | THEME_POOL | THEME_CROWD | THEME_PLAYROOM | THEME_KITCHEN, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.21f, 0.21f, 5},
+    {MAP_PROP_BENCH, "bench", THEME_PARKING | THEME_POOL | THEME_HOSPITAL | THEME_HOTEL | THEME_CROWD | THEME_PLAYROOM, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 0.75f, 0.19f, 5},
+    {MAP_PROP_VENDING_MACHINE, "vending_machine", THEME_PUBLIC | THEME_PARKING | THEME_POOL | THEME_CROWD | THEME_PLAYROOM, PROP_PLACE_WALL, 0, 0.45f, 0.39f, 4},
+    {MAP_PROP_WATER_COOLER, "water_cooler", THEME_PUBLIC | THEME_SCHOOL | THEME_LAB, PROP_PLACE_WALL, 0, 0.17f, 0.19f, 4},
+    {MAP_PROP_FIRE_CABINET, "fire_cabinet", THEME_ALL, PROP_PLACE_WALL, 0, 0.30f, 0.10f, 3},
+    {MAP_PROP_WET_FLOOR_SIGN, "wet_floor_sign", THEME_PUBLIC | THEME_POOL | THEME_PARKING | THEME_CROWD | THEME_KITCHEN | THEME_PLAYROOM, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.15f, 0.17f, 4},
+    {MAP_PROP_PIPE_RUN, "pipe_run", THEME_INDUSTRIAL | THEME_POOL | THEME_HOSPITAL | THEME_STATION | THEME_STAFF, PROP_PLACE_WALL_HIGH, 0, 1.20f, 0.20f, 6},
+    {MAP_PROP_VENT_DUCT, "vent_duct", THEME_INDUSTRIAL | THEME_PUBLIC | THEME_CROWD | THEME_STAFF | THEME_PLAYROOM, PROP_PLACE_CEILING, PROP_FLAG_ALIGNED, 1.10f, 0.26f, 5},
+    {MAP_PROP_ELECTRICAL_CABINET, "electrical_cabinet", THEME_INDUSTRIAL | THEME_POOL | THEME_STATION | THEME_LAB, PROP_PLACE_WALL, 0, 0.40f, 0.19f, 5},
+    {MAP_PROP_STEP_LADDER, "step_ladder", THEME_INDUSTRIAL | THEME_POOL | THEME_MALL | THEME_STATION | THEME_LAB, PROP_PLACE_FLOOR, 0, 0.25f, 0.44f, 4},
+    {MAP_PROP_HAND_TRUCK, "hand_truck", THEME_INDUSTRIAL | THEME_HOTEL | THEME_MALL | THEME_STATION | THEME_KITCHEN, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.23f, 0.23f, 4},
+    {MAP_PROP_SHELF_UNIT, "shelf_unit", THEME_WAREHOUSE | THEME_MAINT | THEME_OFFICE | THEME_HOSPITAL | THEME_SCHOOL | THEME_MALL | THEME_STAFF, PROP_PLACE_WALL, 0, 0.60f, 0.22f, 6},
+    {MAP_PROP_HANGING_SIGN, "hanging_sign", THEME_PARKING | THEME_WAREHOUSE | THEME_HOTEL | THEME_POOL | THEME_HOSPITAL | THEME_CROWD, PROP_PLACE_CEILING, PROP_FLAG_ALIGNED, 0.60f, 0.04f, 4},
+    {MAP_PROP_FLOOR_DRAIN, "floor_drain", THEME_POOL | THEME_PARKING | THEME_MAINT | THEME_HOSPITAL | THEME_STATION | THEME_STAFF, PROP_PLACE_FLAT, 0, 0.28f, 0.28f, 4},
+    {MAP_PROP_CEILING_FAN, "ceiling_fan", THEME_PUBLIC | THEME_POOL | THEME_SCHOOL | THEME_PLAYROOM | THEME_KITCHEN, PROP_PLACE_CEILING, 0, 0.63f, 0.63f, 4},
+    {MAP_PROP_WALL_SIGN, "wall_sign", THEME_PUBLIC | THEME_PARKING | THEME_POOL | THEME_WAREHOUSE | THEME_CROWD | THEME_LAB | THEME_PLAYROOM, PROP_PLACE_WALL_HIGH, 0, 0.40f, 0.05f, 4},
+    {MAP_PROP_CABLE_TRAY, "cable_tray", THEME_INDUSTRIAL | THEME_OFFICE | THEME_HOSPITAL | THEME_STATION | THEME_LAB, PROP_PLACE_CEILING, PROP_FLAG_ALIGNED, 1.10f, 0.22f, 5},
+    {MAP_PROP_FLOOR_MAT, "floor_mat", THEME_PUBLIC | THEME_POOL | THEME_CROWD | THEME_PLAYROOM | THEME_KITCHEN, PROP_PLACE_FLAT, PROP_FLAG_ALIGNED, 0.70f, 0.45f, 3},
+    {MAP_PROP_PAPER_LITTER, "paper_litter", THEME_PUBLIC | THEME_WAREHOUSE | THEME_SCHOOL | THEME_STATION | THEME_LAB, PROP_PLACE_FLAT, 0, 0.48f, 0.46f, 4},
+
+    {MAP_PROP_COPIER, "copier", THEME_OFFICE | THEME_HOTEL, PROP_PLACE_WALL, 0, 0.45f, 0.31f, 6},
+    {MAP_PROP_MEETING_TABLE, "meeting_table", THEME_OFFICE | THEME_HOTEL, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 1.00f, 0.50f, 6},
+    {MAP_PROP_SOFA, "sofa", THEME_PUBLIC | THEME_MALL | THEME_PLAYROOM, PROP_PLACE_WALL, 0, 0.90f, 0.40f, 6},
+    {MAP_PROP_WHITEBOARD, "whiteboard", THEME_OFFICE | THEME_HOSPITAL | THEME_SCHOOL | THEME_LAB, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 0.73f, 0.25f, 5},
+    {MAP_PROP_PAPER_STACKS, "paper_stacks", THEME_OFFICE | THEME_WAREHOUSE, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.43f, 0.36f, 6},
+
+    {MAP_PROP_JERSEY_BARRIER, "jersey_barrier", THEME_PARKING | THEME_WAREHOUSE, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 1.00f, 0.30f, 8},
+    {MAP_PROP_BOLLARD_ROW, "bollard_row", THEME_PARKING | THEME_WAREHOUSE, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 0.86f, 0.11f, 7},
+    {MAP_PROP_TIRE_STACK, "tire_stack", THEME_INDUSTRIAL, PROP_PLACE_FLOOR, 0, 0.63f, 0.46f, 7},
+    {MAP_PROP_PAY_STATION, "pay_station", THEME_PARKING, PROP_PLACE_WALL, 0, 0.27f, 0.19f, 5},
+    {MAP_PROP_WHEEL_STOP, "wheel_stop", THEME_PARKING, PROP_PLACE_FLAT, PROP_FLAG_ALIGNED, 0.90f, 0.09f, 8},
+    {MAP_PROP_BARRIER_GATE, "barrier_gate", THEME_PARKING | THEME_WAREHOUSE, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 1.24f, 0.20f, 4},
+
+    {MAP_PROP_BOILER_TANK, "boiler_tank", THEME_MAINT | THEME_POOL, PROP_PLACE_FLOOR, 0, 0.51f, 0.52f, 7},
+    {MAP_PROP_VALVE_MANIFOLD, "valve_manifold", THEME_MAINT | THEME_POOL, PROP_PLACE_WALL, 0, 0.70f, 0.16f, 8},
+    {MAP_PROP_GENERATOR, "generator", THEME_INDUSTRIAL, PROP_PLACE_FLOOR, 0, 0.55f, 0.29f, 6},
+    {MAP_PROP_WORKBENCH, "workbench", THEME_INDUSTRIAL, PROP_PLACE_WALL, 0, 0.80f, 0.32f, 7},
+    {MAP_PROP_TOOL_CHEST, "tool_chest", THEME_INDUSTRIAL, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.38f, 0.25f, 5},
+    {MAP_PROP_FLOOR_HATCH, "floor_hatch", THEME_INDUSTRIAL, PROP_PLACE_FLAT, PROP_FLAG_ALIGNED, 0.48f, 0.48f, 4},
+    {MAP_PROP_CONTROL_CONSOLE, "control_console", THEME_MAINT | THEME_LAB | THEME_STATION, PROP_PLACE_WALL, 0, 0.70f, 0.35f, 6},
+    {MAP_PROP_PUMP_UNIT, "pump_unit", THEME_MAINT | THEME_POOL, PROP_PLACE_FLOOR, 0, 0.50f, 0.25f, 6},
+
+    {MAP_PROP_PALLET_RACK, "pallet_rack", THEME_WAREHOUSE | THEME_MAINT, PROP_PLACE_WALL, 0, 1.20f, 0.45f, 9},
+    {MAP_PROP_WRAPPED_PALLET, "wrapped_pallet", THEME_WAREHOUSE | THEME_PARKING, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.50f, 0.40f, 8},
+    {MAP_PROP_LONG_CRATE, "long_crate", THEME_WAREHOUSE | THEME_MAINT, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.80f, 0.30f, 7},
+    {MAP_PROP_PALLET_JACK, "pallet_jack", THEME_WAREHOUSE | THEME_PARKING, PROP_PLACE_FLOOR, 0, 0.27f, 0.76f, 5},
+    {MAP_PROP_PALLET_PILE, "pallet_pile", THEME_INDUSTRIAL, PROP_PLACE_FLOOR, 0, 0.54f, 0.45f, 6},
+
+    {MAP_PROP_BED, "bed", THEME_HOTEL, PROP_PLACE_WALL, 0, 0.52f, 1.05f, 9},
+    {MAP_PROP_NIGHTSTAND, "nightstand", THEME_HOTEL | THEME_HOSPITAL, PROP_PLACE_WALL, 0, 0.23f, 0.21f, 5},
+    {MAP_PROP_ARMCHAIR, "armchair", THEME_HOTEL | THEME_OFFICE | THEME_MALL, PROP_PLACE_FLOOR, 0, 0.40f, 0.40f, 6},
+    {MAP_PROP_LUGGAGE_CART, "luggage_cart", THEME_HOTEL | THEME_STATION, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.55f, 0.30f, 5},
+    {MAP_PROP_RECEPTION_DESK, "reception_desk", THEME_PUBLIC | THEME_MALL, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 1.10f, 0.35f, 4},
+    {MAP_PROP_WARDROBE, "wardrobe", THEME_HOTEL, PROP_PLACE_WALL, 0, 0.62f, 0.31f, 7},
+
+    {MAP_PROP_LOUNGE_CHAIR, "lounge_chair", THEME_POOL | THEME_HOTEL, PROP_PLACE_FLOOR, 0, 0.30f, 0.93f, 9},
+    {MAP_PROP_STARTING_BLOCK, "starting_block", THEME_POOL, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 0.30f, 0.35f, 5},
+    {MAP_PROP_LIFEGUARD_CHAIR, "lifeguard_chair", THEME_POOL, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 0.41f, 0.46f, 5},
+    {MAP_PROP_TOWEL_CART, "towel_cart", THEME_POOL | THEME_HOTEL | THEME_HOSPITAL, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.48f, 0.28f, 6},
+    {MAP_PROP_SHOWER_POST, "shower_post", THEME_POOL, PROP_PLACE_WALL, 0, 0.45f, 0.25f, 7},
+    {MAP_PROP_FLOAT_RACK, "float_rack", THEME_POOL, PROP_PLACE_WALL, 0, 0.60f, 0.15f, 6},
+
+    {MAP_PROP_GURNEY, "gurney", THEME_HOSPITAL, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.34f, 0.95f, 9},
+    {MAP_PROP_IV_STAND, "iv_stand", THEME_HOSPITAL, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.25f, 0.25f, 6},
+    {MAP_PROP_MED_CABINET, "med_cabinet", THEME_HOSPITAL | THEME_POOL | THEME_LAB, PROP_PLACE_WALL, 0, 0.45f, 0.21f, 7},
+    {MAP_PROP_PRIVACY_SCREEN, "privacy_screen", THEME_HOSPITAL | THEME_HOTEL | THEME_POOL, PROP_PLACE_FLOOR, 0, 0.90f, 0.26f, 6},
+    {MAP_PROP_WHEELCHAIR, "wheelchair", THEME_HOSPITAL | THEME_HOTEL, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.30f, 0.41f, 6},
+    {MAP_PROP_WAITING_SEATS, "waiting_seats", THEME_HOSPITAL | THEME_OFFICE | THEME_PARKING | THEME_STATION | THEME_MALL, PROP_PLACE_WALL, 0, 0.75f, 0.25f, 7},
+
+    {MAP_PROP_WALL_CLOCK, "wall_clock", THEME_PUBLIC | THEME_CROWD | THEME_KITCHEN | THEME_PLAYROOM, PROP_PLACE_WALL_HIGH, 0, 0.24f, 0.04f, 4},
+    {MAP_PROP_PA_SPEAKER, "pa_speaker", THEME_CROWD | THEME_PARKING | THEME_POOL | THEME_WAREHOUSE | THEME_PLAYROOM, PROP_PLACE_WALL_HIGH, 0, 0.22f, 0.14f, 4},
+    {MAP_PROP_WALL_TV, "wall_tv", THEME_HOTEL | THEME_HOSPITAL | THEME_STATION | THEME_MALL | THEME_PLAYROOM | THEME_KITCHEN, PROP_PLACE_WALL_HIGH, 0, 0.32f, 0.28f, 3},
+    {MAP_PROP_DANGLING_LIGHT, "dangling_light", THEME_INDUSTRIAL | THEME_OFFICE | THEME_HOSPITAL | THEME_CROWD | THEME_STAFF | THEME_PLAYROOM, PROP_PLACE_CEILING, 0, 0.62f, 0.15f, 3},
+    {MAP_PROP_SPRINKLER_PIPE, "sprinkler_pipe", THEME_INDUSTRIAL | THEME_OFFICE | THEME_HOTEL | THEME_CROWD | THEME_STAFF, PROP_PLACE_CEILING, PROP_FLAG_ALIGNED, 1.20f, 0.06f, 4},
+    {MAP_PROP_NOTICE_BOARD, "notice_board", THEME_OFFICE | THEME_HOSPITAL | THEME_CROWD | THEME_LAB, PROP_PLACE_WALL, 0, 0.65f, 0.03f, 4},
+    {MAP_PROP_PAYPHONE, "payphone", THEME_HOTEL | THEME_HOSPITAL | THEME_PARKING | THEME_STATION | THEME_MALL, PROP_PLACE_WALL, 0, 0.30f, 0.18f, 4},
+    {MAP_PROP_RADIATOR, "radiator", THEME_PUBLIC | THEME_SCHOOL | THEME_PLAYROOM | THEME_STATION, PROP_PLACE_WALL, 0, 0.56f, 0.09f, 4},
+    {MAP_PROP_DRINKING_FOUNTAIN, "drinking_fountain", THEME_SCHOOL | THEME_STATION | THEME_MALL | THEME_POOL | THEME_HOSPITAL | THEME_PARKING | THEME_PLAYROOM, PROP_PLACE_WALL, 0, 0.24f, 0.19f, 4},
+
+    {MAP_PROP_DEAD_PLANT, "dead_plant", THEME_PUBLIC | THEME_CROWD, PROP_PLACE_FLOOR, 0, 0.31f, 0.31f, 5},
+    {MAP_PROP_BOOKCASE, "bookcase", THEME_OFFICE | THEME_HOTEL | THEME_SCHOOL | THEME_PLAYROOM | THEME_LAB, PROP_PLACE_WALL, 0, 0.50f, 0.16f, 6},
+    {MAP_PROP_JANITOR_CART, "janitor_cart", THEME_PUBLIC | THEME_CROWD | THEME_KITCHEN | THEME_POOL | THEME_PARKING | THEME_PLAYROOM, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.22f, 0.34f, 4},
+    {MAP_PROP_STANCHIONS, "stanchions", THEME_HOTEL | THEME_HOSPITAL | THEME_STATION | THEME_MALL | THEME_PLAYROOM, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 0.85f, 0.16f, 4},
+    {MAP_PROP_STACKED_CHAIRS, "stacked_chairs", THEME_OFFICE | THEME_HOTEL | THEME_SCHOOL | THEME_PLAYROOM | THEME_KITCHEN | THEME_WAREHOUSE, PROP_PLACE_FLOOR, 0, 0.22f, 0.27f, 4},
+    {MAP_PROP_FALLEN_TILES, "fallen_tiles", THEME_PUBLIC | THEME_CROWD | THEME_STAFF | THEME_PLAYROOM, PROP_PLACE_FLAT, 0, 0.70f, 0.59f, 4},
+    {MAP_PROP_GAS_CYLINDERS, "gas_cylinders", THEME_MAINT | THEME_WAREHOUSE | THEME_HOSPITAL | THEME_STAFF, PROP_PLACE_WALL, 0, 0.42f, 0.15f, 5},
+    {MAP_PROP_NEWSSTAND, "newsstand", THEME_OFFICE | THEME_HOTEL | THEME_STATION | THEME_MALL, PROP_PLACE_WALL, 0, 0.32f, 0.18f, 4},
+
+    {MAP_PROP_SCHOOL_DESK, "school_desk", THEME_SCHOOL, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 0.30f, 0.45f, 10},
+    {MAP_PROP_BLACKBOARD, "blackboard", THEME_SCHOOL | THEME_LAB, PROP_PLACE_WALL, 0, 1.00f, 0.05f, 7},
+    {MAP_PROP_COAT_HOOKS, "coat_hooks", THEME_SCHOOL | THEME_PLAYROOM, PROP_PLACE_WALL, 0, 0.70f, 0.18f, 6},
+    {MAP_PROP_VAULTING_HORSE, "vaulting_horse", THEME_SCHOOL, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 0.65f, 0.35f, 5},
+    {MAP_PROP_TROPHY_CASE, "trophy_case", THEME_SCHOOL | THEME_HOTEL, PROP_PLACE_WALL, 0, 0.60f, 0.18f, 5},
+    {MAP_PROP_AV_CART, "av_cart", THEME_SCHOOL | THEME_OFFICE | THEME_LAB, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.35f, 0.25f, 5},
+    {MAP_PROP_LECTERN, "lectern", THEME_SCHOOL | THEME_HOTEL | THEME_OFFICE, PROP_PLACE_FLOOR, 0, 0.30f, 0.25f, 4},
+
+    {MAP_PROP_CLOTHES_RACK, "clothes_rack", THEME_MALL | THEME_HOTEL, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.68f, 0.25f, 8},
+    {MAP_PROP_MANNEQUIN, "mannequin", THEME_MALL, PROP_PLACE_FLOOR, 0, 0.32f, 0.22f, 7},
+    {MAP_PROP_SHOPPING_CART, "shopping_cart", THEME_MALL | THEME_PARKING | THEME_WAREHOUSE, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.23f, 0.43f, 6},
+    {MAP_PROP_DISPLAY_COUNTER, "display_counter", THEME_MALL | THEME_KITCHEN | THEME_PLAYROOM, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 0.83f, 0.33f, 6},
+    {MAP_PROP_INFO_KIOSK, "info_kiosk", THEME_MALL | THEME_STATION, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 0.40f, 0.18f, 5},
+    {MAP_PROP_GONDOLA_SHELF, "gondola_shelf", THEME_MALL | THEME_WAREHOUSE, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 0.90f, 0.40f, 8},
+    {MAP_PROP_FITTING_BOOTH, "fitting_booth", THEME_MALL | THEME_POOL, PROP_PLACE_WALL, 0, 0.55f, 0.50f, 5},
+
+    {MAP_PROP_PARTY_TABLE, "party_table", THEME_PLAYROOM, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 0.91f, 0.39f, 8},
+    {MAP_PROP_BALLOON_BUNCH, "balloon_bunch", THEME_PLAYROOM | THEME_MALL, PROP_PLACE_FLOOR, 0, 0.29f, 0.27f, 7},
+    {MAP_PROP_BALL_PIT, "ball_pit", THEME_PLAYROOM, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 0.80f, 0.80f, 6},
+    {MAP_PROP_ARCADE_CABINET, "arcade_cabinet", THEME_PLAYROOM | THEME_MALL | THEME_HOTEL, PROP_PLACE_WALL, 0, 0.32f, 0.35f, 7},
+    {MAP_PROP_PLAY_SLIDE, "play_slide", THEME_PLAYROOM | THEME_SCHOOL | THEME_POOL, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 0.34f, 0.98f, 5},
+    {MAP_PROP_SOFT_BLOCKS, "soft_blocks", THEME_PLAYROOM | THEME_SCHOOL, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.52f, 0.43f, 6},
+    {MAP_PROP_GIFT_PILE, "gift_pile", THEME_PLAYROOM | THEME_MALL, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.49f, 0.46f, 6},
+    {MAP_PROP_BUNTING, "bunting", THEME_PLAYROOM | THEME_MALL | THEME_SCHOOL, PROP_PLACE_CEILING, PROP_FLAG_ALIGNED, 1.05f, 0.00f, 6},
+
+    {MAP_PROP_TURNSTILE, "turnstile", THEME_STATION | THEME_MALL, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 0.56f, 0.50f, 8},
+    {MAP_PROP_TICKET_MACHINE, "ticket_machine", THEME_STATION | THEME_PARKING, PROP_PLACE_WALL, 0, 0.42f, 0.25f, 7},
+    {MAP_PROP_ROUTE_MAP, "route_map", THEME_STATION, PROP_PLACE_WALL, 0, 0.80f, 0.04f, 6},
+    {MAP_PROP_TACTILE_STRIP, "tactile_strip", THEME_STATION, PROP_PLACE_FLAT, PROP_FLAG_ALIGNED, 1.00f, 0.26f, 6},
+    {MAP_PROP_TICKET_BOOTH, "ticket_booth", THEME_STATION | THEME_PARKING, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 0.75f, 0.70f, 4},
+    {MAP_PROP_SUITCASES, "suitcases", THEME_STATION | THEME_HOTEL, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.52f, 0.31f, 6},
+
+    {MAP_PROP_SERVER_RACK, "server_rack", THEME_LAB | THEME_OFFICE, PROP_PLACE_WALL, 0, 0.32f, 0.43f, 8},
+    {MAP_PROP_LAB_BENCH, "lab_bench", THEME_LAB | THEME_SCHOOL, PROP_PLACE_WALL, 0, 0.92f, 0.35f, 8},
+    {MAP_PROP_FUME_HOOD, "fume_hood", THEME_LAB, PROP_PLACE_WALL, 0, 0.65f, 0.40f, 6},
+    {MAP_PROP_SPECIMEN_TANK, "specimen_tank", THEME_LAB, PROP_PLACE_FLOOR, 0, 0.50f, 0.50f, 5},
+    {MAP_PROP_TAPE_DRIVE, "tape_drive", THEME_LAB | THEME_OFFICE, PROP_PLACE_WALL, 0, 0.38f, 0.35f, 6},
+    {MAP_PROP_EQUIPMENT_CART, "equipment_cart", THEME_LAB | THEME_HOSPITAL, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.41f, 0.24f, 6},
+    {MAP_PROP_EYEWASH_STATION, "eyewash_station", THEME_LAB | THEME_MAINT, PROP_PLACE_WALL, 0, 0.30f, 0.25f, 4},
+    {MAP_PROP_CABLE_COVER, "cable_cover", THEME_LAB | THEME_OFFICE | THEME_MAINT | THEME_STATION | THEME_WAREHOUSE, PROP_PLACE_FLAT, PROP_FLAG_ALIGNED, 0.96f, 0.17f, 4},
+
+    {MAP_PROP_STOVE_RANGE, "stove_range", THEME_KITCHEN, PROP_PLACE_WALL, 0, 0.50f, 0.35f, 8},
+    {MAP_PROP_FRIDGE, "fridge", THEME_KITCHEN | THEME_LAB, PROP_PLACE_WALL, 0, 0.60f, 0.38f, 7},
+    {MAP_PROP_PREP_COUNTER, "prep_counter", THEME_KITCHEN, PROP_PLACE_WALL, 0, 0.80f, 0.35f, 8},
+    {MAP_PROP_DINER_BOOTH, "diner_booth", THEME_KITCHEN | THEME_MALL | THEME_HOTEL, PROP_PLACE_WALL, 0, 0.81f, 0.55f, 6},
+    {MAP_PROP_CAFETERIA_TABLE, "cafeteria_table", THEME_KITCHEN | THEME_SCHOOL | THEME_HOSPITAL | THEME_MALL | THEME_PLAYROOM, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 0.90f, 0.70f, 7},
+    {MAP_PROP_TRAY_RACK, "tray_rack", THEME_KITCHEN | THEME_SCHOOL | THEME_HOSPITAL, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.27f, 0.34f, 5},
+    {MAP_PROP_SERVING_LINE, "serving_line", THEME_KITCHEN | THEME_SCHOOL, PROP_PLACE_FLOOR, PROP_FLAG_ALIGNED, 1.00f, 0.40f, 6},
+    {MAP_PROP_RANGE_HOOD, "range_hood", THEME_KITCHEN | THEME_LAB, PROP_PLACE_CEILING, PROP_FLAG_ALIGNED, 0.90f, 0.50f, 5},
+    {MAP_PROP_SACK_PILE, "sack_pile", THEME_KITCHEN | THEME_WAREHOUSE, PROP_PLACE_FLOOR, PROP_FLAG_PUSHABLE, 0.40f, 0.48f, 6}
+};
+
+inline const PropInfo* propInfo(int type) {
+    if (type < 0 || type >= MAP_PROP_TYPE_COUNT) return nullptr;
+    return &PROP_CATALOG[type];
+}
+
+inline bool isLibraryPropType(int type) {
+    return type >= MAP_PROP_LIBRARY_FIRST && type < MAP_PROP_TYPE_COUNT;
+}
+
+inline int propPlacement(int type) {
+    const PropInfo* info = propInfo(type);
+    return info ? info->placement : PROP_PLACE_FLOOR;
+}
+
+inline bool propHasFlag(int type, unsigned flag) {
+    const PropInfo* info = propInfo(type);
+    return info && (info->flags & flag) != 0;
+}
+
+// Blocks movement (FLOOR / WALL). Overhead and flat props never do.
+inline bool isPropSolidType(int type) {
+    int place = propPlacement(type);
+    return place == PROP_PLACE_FLOOR || place == PROP_PLACE_WALL;
+}
+
+inline bool isPropOverheadType(int type) {
+    int place = propPlacement(type);
+    return place == PROP_PLACE_WALL_HIGH || place == PROP_PLACE_CEILING;
+}
+
+inline bool isPropAgainstWallType(int type) {
+    int place = propPlacement(type);
+    return place == PROP_PLACE_WALL || place == PROP_PLACE_WALL_HIGH;
+}
+
+inline int propThemeWeight(unsigned themes, unsigned placementMask) {
+    int total = 0;
+    for (int i = 0; i < MAP_PROP_TYPE_COUNT; i++) {
+        const PropInfo& p = PROP_CATALOG[i];
+        if ((p.themes & themes) == 0) continue;
+        if (((1u << p.placement) & placementMask) == 0) continue;
+        total += p.weight;
+    }
+    return total;
+}
+
+// Weighted pick among the props that belong to any of `themes` and whose placement
+// is in `placementMask` (bit = 1 << PropPlacement). Returns -1 when nothing fits.
+inline int pickThemedPropType(unsigned themes, unsigned roll, unsigned placementMask = 0xFFu) {
+    int total = propThemeWeight(themes, placementMask);
+    if (total <= 0) return -1;
+    int at = (int)(roll % (unsigned)total);
+    for (int i = 0; i < MAP_PROP_TYPE_COUNT; i++) {
+        const PropInfo& p = PROP_CATALOG[i];
+        if ((p.themes & themes) == 0) continue;
+        if (((1u << p.placement) & placementMask) == 0) continue;
+        at -= p.weight;
+        if (at < 0) return p.type;
+    }
+    return -1;
+}

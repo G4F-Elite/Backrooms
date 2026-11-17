@@ -4,89 +4,24 @@
 #include "map_content.h"
 #include "item_types.h"
 
-inline bool tryHandleVoidShiftInteract(const Vec3& playerPos);
 void genWorld();
+inline bool heistHostPick(int pid, int itemId);
+inline void heistHostHandleRequest(int pid, int type, int target);
 
 inline void captureVoidShiftState(NetVoidShiftState& out){
     out.attentionLevel = attentionLevel;
-    out.resonatorBattery = resonatorBattery;
-    out.level1HoldTimer = level1HoldTimer;
-    out.level2HoldTimer = level2HoldTimer;
-    out.sideContractType = sideContractType;
-    out.sideContractProgress = sideContractProgress;
-    out.sideContractTarget = sideContractTarget;
-    out.level2BatteryStage = level2BatteryStage;
-    out.level2FuseCount = level2FuseCount;
-    out.sideContractCompleted = sideContractCompleted;
-    for(int i=0;i<3;i++) out.level1NodeDone[i] = level1NodeDone[i];
-    out.level1HoldActive = level1HoldActive;
-    out.level1ContractComplete = level1ContractComplete;
-    out.level2BatteryInstalled = level2BatteryInstalled;
-    for(int i=0;i<3;i++) out.level2FuseDone[i] = level2FuseDone[i];
-    out.level2AccessReady = level2AccessReady;
-    out.level2FusePanelPowered = level2FusePanelPowered;
-    out.level2HoldActive = level2HoldActive;
-    out.level2ContractComplete = level2ContractComplete;
-    out.npcLostSurvivorActive = npcLostSurvivorActive;
-    out.npcLostSurvivorEscorted = npcLostSurvivorEscorted;
-    out.npcLostSurvivorPos = npcLostSurvivorPos;
-
     out.level = gCurrentLevel;
     out.seed = worldSeed;
     out.spawn = netMgr.spawnPos;
     out.runComplete = gRunComplete;
-    out.doorOpen = coop.doorOpen;
-    out.doorPos = coop.doorPos;
-    for(int i=0;i<2;i++) out.doorSwitches[i] = coop.switches[i];
-    for(int i=0;i<3;i++) out.level1Nodes[i] = level1Nodes[i];
-    for(int i=0;i<2;i++) out.level1SyncSwitches[i] = level1SyncSwitches[i];
-    for(int i=0;i<3;i++) out.level1NodeStage[i] = level1NodeStage[i];
-    out.level2Nodes[0] = level2BatteryNode;
-    for(int i=0;i<3;i++) out.level2Nodes[1 + i] = level2FuseNodes[i];
-    out.level2Nodes[4] = level2AccessNode;
-    out.level2Nodes[5] = level2LiftNode;
-    out.level2Nodes[6] = level2PowerNode;
     out.statusSeq = gStatusSeq;
     snprintf(out.status, sizeof(out.status), "%s", trapStatusText);
+    captureHeistNet(out.heist);
 }
 
 inline void applyVoidShiftState(const NetVoidShiftState& state){
     attentionLevel = state.attentionLevel;
-    resonatorBattery = state.resonatorBattery;
-    level1HoldTimer = state.level1HoldTimer;
-    level2HoldTimer = state.level2HoldTimer;
-    sideContractType = state.sideContractType;
-    sideContractProgress = state.sideContractProgress;
-    sideContractTarget = state.sideContractTarget;
-    level2BatteryStage = state.level2BatteryStage;
-    level2FuseCount = state.level2FuseCount;
-    sideContractCompleted = state.sideContractCompleted;
-    for(int i=0;i<3;i++) level1NodeDone[i] = state.level1NodeDone[i];
-    level1HoldActive = state.level1HoldActive;
-    level1ContractComplete = state.level1ContractComplete;
-    level2BatteryInstalled = state.level2BatteryInstalled;
-    for(int i=0;i<3;i++) level2FuseDone[i] = state.level2FuseDone[i];
-    level2AccessReady = state.level2AccessReady;
-    level2FusePanelPowered = state.level2FusePanelPowered;
-    level2HoldActive = state.level2HoldActive;
-    level2ContractComplete = state.level2ContractComplete;
-    npcLostSurvivorActive = state.npcLostSurvivorActive;
-    npcLostSurvivorEscorted = state.npcLostSurvivorEscorted;
-    npcLostSurvivorPos = state.npcLostSurvivorPos;
-
-    bool doorMoved = !nearPoint2D(coop.doorPos, state.doorPos, 0.1f) || coop.doorOpen != state.doorOpen;
-    coop.doorOpen = state.doorOpen;
-    coop.doorPos = state.doorPos;
-    for(int i=0;i<2;i++) coop.switches[i] = state.doorSwitches[i];
-    for(int i=0;i<3;i++) level1Nodes[i] = state.level1Nodes[i];
-    for(int i=0;i<2;i++) level1SyncSwitches[i] = state.level1SyncSwitches[i];
-    for(int i=0;i<3;i++) level1NodeStage[i] = state.level1NodeStage[i];
-    level2BatteryNode = state.level2Nodes[0];
-    for(int i=0;i<3;i++) level2FuseNodes[i] = state.level2Nodes[1 + i];
-    level2AccessNode = state.level2Nodes[4];
-    level2LiftNode = state.level2Nodes[5];
-    level2PowerNode = state.level2Nodes[6];
-    if(doorMoved) buildGeom();
+    applyHeistNet(state.heist);
 
     static int lastHostStatusSeq = -1;
     if(state.statusSeq != lastHostStatusSeq){
@@ -113,44 +48,10 @@ inline void clientFollowHostLevel(const NetVoidShiftState& state){
     buildGeom();
 }
 
-inline void updateCoopObjectiveHost(){
-    if(!coop.initialized) return;
-    for(int s=0;s<2;s++) {
-        bool on = nearPoint2D(cam.pos, coop.switches[s], 2.4f);
-        for(int p=0;p<MAX_PLAYERS;p++){
-            if(p==netMgr.myId || !netMgr.players[p].active || !netMgr.players[p].hasValidPos) continue;
-            if(nearPoint2D(netMgr.players[p].pos, coop.switches[s], 2.4f)) { on = true; break; }
-        }
-        coop.switchOn[s] = on;
-    }
-    // Latches: with two players nobody could reach the door while both stood on switches.
-    if(coop.switchOn[0] && coop.switchOn[1] && !coop.doorOpen){ coop.doorOpen = true; buildGeom(); setTrapStatus("EXIT DOOR UNLOCKED"); }
-}
-
+// The old exit door is gone: floors are left through the drill.
 inline bool collideCoopDoor(float x, float z, float r){
-    if(multiState==MULTI_IN_GAME){
-        const int notesRequired = storyNotesRequired();
-        if(!shouldBlockStoryDoor(
-            coop.initialized,
-            coop.doorOpen,
-            multiState,
-            MULTI_IN_GAME,
-            storyMgr.totalCollected,
-            notesRequired
-        )) return false;
-    }else{
-        if(!coop.initialized || isStoryExitReady()) return false;
-    }
-    // Match visual geometry in game_world_flow.h: frame thickness is 0.36 (half 0.18),
-    // so use the same Z half-extent + player radius.
-    return fabsf(x - coop.doorPos.x) < (CS * 0.6f + r) && fabsf(z - coop.doorPos.z) < (0.18f + r);
-}
-
-inline void syncCoopFromNetwork(){
-    if(!netMgr.objectiveStateReceived) return;
-    netMgr.objectiveStateReceived = false;
-    coop.switchOn[0] = netMgr.objectiveSwitches[0];
-    coop.switchOn[1] = netMgr.objectiveSwitches[1];
+    (void)x; (void)z; (void)r;
+    return false;
 }
 
 inline void hostSpawnItem(int type, const Vec3& around){
@@ -162,11 +63,16 @@ inline void hostSpawnItem(int type, const Vec3& around){
     worldItems.push_back(it);
 }
 
+// A few batteries keep turning up near the squad; everything else has to be found or bought.
 inline void hostUpdateItems(){
+    worldItems.erase(std::remove_if(worldItems.begin(), worldItems.end(), [](const WorldItem& it){ return !it.active; }), worldItems.end());
     itemSpawnTimer -= dTime;
     if(itemSpawnTimer > 0) return;
-    itemSpawnTimer = 10.0f + (rng()%10);
-    if((int)worldItems.size() > 10) return;
+    itemSpawnTimer = 26.0f + (rng()%14);
+    if(!heistDangerActive()) return;
+    int batteries = 0;
+    for(const auto& it:worldItems) if(it.type==ITEM_BATTERY) batteries++;
+    if(batteries >= 2 || (int)worldItems.size() >= MAX_SYNC_ITEMS - 4) return;
     hostSpawnItem(ITEM_BATTERY, cam.pos);
 }
 
@@ -176,25 +82,18 @@ inline void applyItemUse(int type){
         flashlightBattery += 35.0f;
         if(flashlightBattery>100.0f) flashlightBattery = 100.0f;
         setEchoStatus("BATTERY: FLASHLIGHT CHARGED");
+        audioPostCue(CUE_BATTERY);
         return;
     }
-    if(type==ITEM_PLUSH_TOY){
-        // Mod: allow plush toy use even when not in inventory (slot 3 always available).
-        if(invPlush <= 0){
-            playerSanity += 24.0f;
-            if(playerSanity > 100.0f) playerSanity = 100.0f;
-            setEchoStatus("PLUSH TOY: YOUR MIND FEELS WHOLE AGAIN");
-            return;
-        }
-        applyPlushToyUse();
-        return;
-    }
+    // The plush toy has no "use": it restores morale only while held (slot 3).
+    if(type==ITEM_PLUSH_TOY) return;
 
     if(type==ITEM_MED_SPRAY){
         if(isPlayerDead) return;
         playerHealth += 40.0f;
         if(playerHealth > 100.0f) playerHealth = 100.0f;
-        setEchoStatus("MED SPRAY: WOUNDS STITCH UP");
+        setEchoStatus("MED SPRAY: GOOD ENOUGH. BACK TO WORK");
+        audioPostCue(CUE_SPRAY);
         return;
     }
 }
@@ -214,20 +113,7 @@ inline void processHostInteractRequests(){
         int type = netMgr.interactRequests[i].requestType;
         int target = netMgr.interactRequests[i].targetId;
         if(type==REQ_PICK_ITEM){
-            for(auto& it:worldItems){
-                if(!it.active || it.id!=target) continue;
-                it.active = false;
-                if(pid>=0 && pid<MAX_PLAYERS){
-                    if(it.type==ITEM_BATTERY) netMgr.inventoryBattery[pid]++;
-                    else if(it.type==ITEM_PLUSH_TOY) netMgr.inventoryPlush[pid]++;
-                }
-                break;
-            }
-        }else if(type==REQ_EXIT_LEVEL){
-            bool nearDoor = pid>=0 && pid<MAX_PLAYERS && netMgr.players[pid].hasValidPos && nearPoint2D(netMgr.players[pid].pos, coop.doorPos, 4.0f);
-            if(nearDoor) gHostExitRequested = true;
-        }else if(type==REQ_TOGGLE_SWITCH){
-            if(target>=0 && target<2) coop.switchOn[target] = !coop.switchOn[target];
+            if(pid>=0 && pid<MAX_PLAYERS) heistHostPick(pid, target);
         }else if(type==REQ_DEBUG_SPAWN_STALKER || type==REQ_DEBUG_SPAWN_CRAWLER || type==REQ_DEBUG_SPAWN_SHADOW){
             Vec3 base = cam.pos;
             if(pid>=0 && pid<MAX_PLAYERS && netMgr.players[pid].active && netMgr.players[pid].hasValidPos){
@@ -238,17 +124,8 @@ inline void processHostInteractRequests(){
             else if(type==REQ_DEBUG_SPAWN_SHADOW) spawnType = ENTITY_SHADOW;
             Vec3 sp = findSpawnPos(base, 6.0f);
             entityMgr.spawnEntity(spawnType, sp, nullptr, 0, 0);
-        }else if(type==REQ_VOID_SHIFT_INTERACT){
-            if(pid < 0 || pid >= MAX_PLAYERS) continue;
-            if(interactCooldown[pid] > 0.0f) continue;
-            interactCooldown[pid] = 0.25f;
-            Vec3 base = cam.pos;
-            if(pid>=0 && pid<MAX_PLAYERS && netMgr.players[pid].active && netMgr.players[pid].hasValidPos){
-                base = netMgr.players[pid].pos;
-            }
-            char prompt[96];
-            buildVoidShiftInteractPrompt(base, prompt, 96);
-            if(prompt[0] != '\0') tryHandleVoidShiftInteract(base);
+        }else{
+            heistHostHandleRequest(pid, type, target);
         }
     }
     netMgr.interactRequestCount = 0;
@@ -266,7 +143,6 @@ inline void hostSyncFeatureState(){
         count++;
     }
     netMgr.sendItemSnapshot(entries, count);
-    netMgr.sendObjectiveState(coop.switchOn[0], coop.switchOn[1], coop.doorOpen);
     netMgr.inventoryBattery[netMgr.myId] = invBattery;
     netMgr.inventoryPlush[netMgr.myId] = invPlush;
     netMgr.sendInventorySync();
@@ -298,7 +174,6 @@ inline void clientApplyFeatureState(){
         clientFollowHostLevel(netMgr.voidShiftState);
         applyVoidShiftState(netMgr.voidShiftState);
     }
-    syncCoopFromNetwork();
 }
 
 inline void applyRoamEvent(int type, int a, int b, float duration){
@@ -327,7 +202,7 @@ inline void applyRoamEvent(int type, int a, int b, float duration){
             int itemType = ((rng()%100) < 70) ? ITEM_BATTERY : ITEM_PLUSH_TOY;
             hostSpawnItem(itemType, cam.pos);
         }
-        setEchoStatus("SUPPLY CACHE SHIFTED NEARBY");
+        setEchoStatus("SOMEBODY LEFT SUPPLIES NEARBY. FINDERS KEEPERS");
     }
 }
 
@@ -344,6 +219,8 @@ inline void updateRoamEventsHost(){
     else if(typeRoll < 82) type = ROAM_FLOOR_HOLES;
     else type = ROAM_SUPPLY_CACHE;
     float duration = (type==ROAM_GEOM_SHIFT) ? 0.1f : 11.0f + (float)(rng()%7);
+    // Around the running drill the building leaves the crew alone; only the care package still comes.
+    if(type!=ROAM_SUPPLY_CACHE && rigPosInQuiet(cam.pos)) return;
     applyRoamEvent(type, playerChunkX, playerChunkZ, duration);
     if(multiState==MULTI_IN_GAME && netMgr.isHost){
         netMgr.sendRoamEvent(type, playerChunkX & 0xFF, playerChunkZ & 0xFF, duration);

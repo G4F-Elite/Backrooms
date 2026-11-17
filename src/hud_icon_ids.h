@@ -1,0 +1,50 @@
+#pragma once
+// HUD pictograms. The game explains itself with these instead of words.
+
+enum HudIcon {
+    HUD_ICON_LOOT = 0,
+    HUD_ICON_COIN,
+    HUD_ICON_DRILL,
+    HUD_ICON_PORTAL,
+    HUD_ICON_HAND,
+    HUD_ICON_PICKAXE,
+    HUD_ICON_FLASHLIGHT,
+    HUD_ICON_SCANNER,
+    HUD_ICON_BATTERY,
+    HUD_ICON_MED,
+    HUD_ICON_PLUSH,
+    HUD_ICON_EXTRACT,
+    HUD_ICON_SKULL,
+    HUD_ICON_EYE,
+    HUD_ICON_NOISE,
+    HUD_ICON_MUTE,
+    HUD_ICON_PERSON,
+    HUD_ICON_GROUP,
+    HUD_ICON_ARROW_DOWN,
+    HUD_ICON_WEIGHT,
+    HUD_ICON_SHOP,
+    HUD_ICON_WARNING,
+    HUD_ICON_SEARCH,
+    HUD_ICON_HEART,
+    HUD_ICON_SANITY,
+    HUD_ICON_STAMINA,
+    HUD_ICON_PALLET,
+    HUD_ICON_CHECK,
+    HUD_ICON_CROSS,
+    HUD_ICON_REVIVE,
+    HUD_ICON_PING,
+    HUD_ICON_CORE,
+    HUD_ICON_DOWNED,
+    HUD_ICON_GHOST,
+    HUD_ICON_CLOCK,
+    HUD_ICON_STASH,
+    HUD_ICON_ARROW_RIGHT,
+    HUD_ICON_CRACK,
+    HUD_ICON_WRENCH,
+    HUD_ICON_HOME,
+    HUD_ICON_COUNT
+};
+
+inline constexpr int HUD_ICON_PX = 32;
+inline constexpr int HUD_ICON_COLS = 8;
+inline constexpr int HUD_ICON_ROWS = 5;

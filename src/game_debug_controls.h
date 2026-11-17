@@ -3,9 +3,12 @@ struct GLFWwindow;
 #include "math.h"
 #include "item_types.h"
 #include "consumable_slot.h"
-#include "debug_actions.h"
+#include "spectator_cam.h"
 #include "game_mouse_input.h"
 #include "player_vitals.h"
+#include "squad_play.h"
+#include "heist_play.h"
+#include "debug_actions.h"
 void gameInput(GLFWwindow*w){
     static bool debugTogglePressed = false;
     static bool debugEnterPressed = false;
@@ -14,7 +17,6 @@ void gameInput(GLFWwindow*w){
     static double debugNextNavTime = 0.0;
     static bool perfTogglePressed = false;
     static bool hudTogglePressed = false;
-    static bool recordPressed = false, playbackPressed = false;
     bool debugToggleNow = glfwGetKey(w,GLFW_KEY_F10)==GLFW_PRESS;
     if(settings.debugMode && debugToggleNow && !debugTogglePressed){
         debugTools.open = !debugTools.open;
@@ -120,59 +122,18 @@ void gameInput(GLFWwindow*w){
     flashlightPressed=fNow;
     
     bool eNow=glfwGetKey(w,settings.binds.interact)==GLFW_PRESS && !gCoopDead; // ghosts cannot interact
-    if(playerDowned && eNow && !interactPressed && invPlush > 0){ invPlush--; playerDowned=false; playerDownedTimer=0.0f; playerHealth=45.0f; playerSanity+=20.0f; if(playerSanity>100.0f) playerSanity=100.0f; setEchoStatus("SELF-REVIVE SUCCESS"); }
-    nearbyWorldItemId = -1;
-    nearbyWorldItemType = -1;
-    for(auto& it:worldItems){
-        if(!it.active) continue;
-        if(nearPoint2D(cam.pos, it.pos, 2.2f)){
-            nearbyWorldItemId = it.id;
-            nearbyWorldItemType = it.type;
-            break;
-        }
-    }
-    bool nearExitDoor = nearPoint2D(cam.pos, coop.doorPos, 2.4f), exitReady = (multiState==MULTI_IN_GAME) ? (coop.doorOpen && isStoryExitReady()) : isStoryExitReady();
-    if(eNow&&!interactPressed&&nearbyWorldItemId>=0){
-        if(multiState==MULTI_IN_GAME){
-            if(netMgr.isHost){
-                for(auto& it:worldItems){
-                    if(!it.active||it.id!=nearbyWorldItemId) continue;
-                    it.active=false;
-                    if(it.type==ITEM_BATTERY) invBattery++;
-                    else if(it.type==ITEM_PLUSH_TOY) invPlush++;
-                    else if(it.type==ITEM_MED_SPRAY) applyItemUse(ITEM_MED_SPRAY);
-                    notifyVoidShiftItemPickup(it.type);
-                    break;
-                }
-            }else{
-                netMgr.sendInteractRequest(REQ_PICK_ITEM, nearbyWorldItemId);
-            }
-        }else{
-            for(auto& it:worldItems){
-                if(!it.active||it.id!=nearbyWorldItemId) continue;
-                it.active=false;
-                if(it.type==ITEM_BATTERY) invBattery++;
-                else if(it.type==ITEM_PLUSH_TOY) invPlush++;
-                else if(it.type==ITEM_MED_SPRAY) applyItemUse(ITEM_MED_SPRAY);
-                addAttention(1.2f);
-                notifyVoidShiftItemPickup(it.type);
-                break;
-            }
-        }
-    }else if(eNow&&!interactPressed){
-        bool contractHandled = (multiState!=MULTI_IN_GAME) ? tryHandleVoidShiftInteract(cam.pos) : false;
-        if(multiState==MULTI_IN_GAME){
-            if(netMgr.isHost) contractHandled = tryHandleVoidShiftInteract(cam.pos);
-            else { char prompt[96]; buildVoidShiftInteractPrompt(cam.pos, prompt, 96); if(prompt[0] != '\0') { netMgr.sendInteractRequest(REQ_VOID_SHIFT_INTERACT, 0); contractHandled = true; } }
-        }
-        if(!contractHandled && nearExitDoor && exitReady) requestLevelExit();
-    }
+    if(playerDowned && eNow && !interactPressed && invPlush > 0){ invPlush--; playerDowned=false; playerDownedTimer=0.0f; playerHealth=45.0f; playerSanity+=20.0f; if(playerSanity>100.0f) playerSanity=100.0f; setEchoStatus("THE PLUSH TOOK THE HIT. BACK ON THE CLOCK"); }
+    heistHandleInteract(eNow && !playerDowned, eNow && !interactPressed && !playerDowned);
     interactPressed=eNow;
     
     static bool key1Pressed=false,key2Pressed=false,key3Pressed=false,key4Pressed=false;
     bool k1=glfwGetKey(w,settings.binds.item1)==GLFW_PRESS, k2=glfwGetKey(w,settings.binds.item2)==GLFW_PRESS, k3=glfwGetKey(w,settings.binds.item3)==GLFW_PRESS, k4=glfwGetKey(w,settings.binds.item4)==GLFW_PRESS;
-    bool callHere = glfwGetKey(w, GLFW_KEY_T)==GLFW_PRESS, callDanger = glfwGetKey(w, GLFW_KEY_Y)==GLFW_PRESS, callBattery = glfwGetKey(w, GLFW_KEY_U)==GLFW_PRESS, callCode = glfwGetKey(w, GLFW_KEY_I)==GLFW_PRESS, callDoor = glfwGetKey(w, GLFW_KEY_O)==GLFW_PRESS;
-    bool recordNow = glfwGetKey(w, GLFW_KEY_R) == GLFW_PRESS, playbackNow = glfwGetKey(w, GLFW_KEY_P) == GLFW_PRESS;
+    static bool dropPressed=false;
+    bool dropNow = glfwGetKey(w, GLFW_KEY_R) == GLFW_PRESS && !gCoopDead && !playerDowned;
+    if(dropNow && !dropPressed && carryCount(heistMyCarry()) > 0){ heistRequestAction(HEIST_ACT_DROP); triggerToySound(TOY_SHOVE, 0.3f, 1.2f); }
+    dropPressed = dropNow;
+    // At the kiosk the item keys buy things instead of switching tools.
+    if(heistHandleShopKeys(k1&&!key1Pressed, k2&&!key2Pressed, k3&&!key3Pressed, k4&&!key4Pressed)){ key1Pressed=k1; key2Pressed=k2; key3Pressed=k3; key4Pressed=k4; }
     static bool pingPressed=false;
     bool pingNow = glfwGetKey(w, GLFW_KEY_G) == GLFW_PRESS;
     if(k1&&!key1Pressed){
@@ -189,7 +150,6 @@ void gameInput(GLFWwindow*w){
     if(k2&&!key2Pressed){
         if(activeDeviceSlot != 2){
             activeDeviceSlot = 2;
-            resonatorMode = RESONATOR_SCAN;
             if(flashlightOn){
                 flashlightOn = false;
                 flashlightShutdownBlinkActive = false;
@@ -210,9 +170,8 @@ void gameInput(GLFWwindow*w){
         handleConsumableSlot3Press();
     }
     if(k4&&!key4Pressed){
-        // Slot 4: quick-use consumable (prefer plush, else battery) without equipping.
-        if(invPlush > 0) applyItemUse(ITEM_PLUSH_TOY);
-        else if(invBattery > 0) applyItemUse(ITEM_BATTERY);
+        // Slot 4: quick-use battery without equipping.
+        if(invBattery > 0) applyItemUse(ITEM_BATTERY);
     }
 
     if(multiState==MULTI_IN_GAME && pingNow && !pingPressed){
@@ -222,24 +181,13 @@ void gameInput(GLFWwindow*w){
         netMgr.pingMarkTtl = 6.0f;
         netMgr.pingMarkReceived = true;
         addAttention(1.0f);
-        notifyVoidShiftPingUsed();
+        emitSquadNoise(netMgr.myId, NOISE_PING);
     }
-    if((callHere||callDanger||callBattery||callCode||callDoor) && !pingPressed){ if(callHere) setSquadCallout("CALLOUT: MOVE HERE"); else if(callDanger) setSquadCallout("CALLOUT: DANGER"); else if(callBattery) setSquadCallout("CALLOUT: NEED BATTERY"); else if(callCode) setSquadCallout("CALLOUT: CODE FOUND"); else if(callDoor) setSquadCallout("CALLOUT: HOLDING DOOR"); }
-
-    if(recordNow && !recordPressed){
-        resonatorMode = RESONATOR_RECORD;
-        if(!echoRecording) startEchoRecordingTrack();
-        else stopEchoRecordingTrack();
-    }
-    if(playbackNow && !playbackPressed){
-        resonatorMode = RESONATOR_PLAYBACK;
-        startEchoPlaybackTrack();
-    }
+    updateSquadPlay(w);
+    updateSpectator(w);
 
     key1Pressed=k1; key2Pressed=k2; key3Pressed=k3; key4Pressed=k4;
     pingPressed = pingNow;
-    recordPressed = recordNow;
-    playbackPressed = playbackNow;
     
     if(playerFalling){
         fallTimer += dTime;
@@ -265,15 +213,16 @@ void gameInput(GLFWwindow*w){
         staminaCooldown = 0.0f;
     }
     if(playerDowned) spd *= 0.42f;
+    spd *= heistMoveScale(); // hauling loot is heavy
     if(sprinting){
         spd*=1.6f;
         if(!debugTools.infiniteStamina){
-            playerStamina-=20.0f*dTime;
-            if(playerStamina<0){playerStamina=0;staminaCooldown=1.5f;}
+            playerStamina-=(14.0f+2.0f*(float)carryWeight(heistMyCarry()))*dTime;
+            if(playerStamina<0){playerStamina=0;staminaCooldown=1.0f;}
         }
     }else{
         if(!debugTools.infiniteStamina){
-            playerStamina+=15.0f*dTime;
+            playerStamina+=20.0f*dTime;
             if(playerStamina>125)playerStamina=125;
         }
     }
@@ -294,10 +243,11 @@ void gameInput(GLFWwindow*w){
 
     Vec3 fwd(mSin(cam.yaw),0,mCos(cam.yaw)),right(mCos(cam.yaw),0,-mSin(cam.yaw));
     Vec3 np=cam.pos;bool mv=false;
-    if(glfwGetKey(w,settings.binds.forward)==GLFW_PRESS){np=np+fwd*spd;mv=true;}
-    if(glfwGetKey(w,settings.binds.back)==GLFW_PRESS){np=np-fwd*spd;mv=true;}
-    if(glfwGetKey(w,settings.binds.left)==GLFW_PRESS){np=np+right*spd;mv=true;}
-    if(glfwGetKey(w,settings.binds.right)==GLFW_PRESS){np=np-right*spd;mv=true;}
+    bool onFoot=!spectatorRiding(); // a riding ghost goes where its ride goes; the keys drive the camera
+    if(onFoot&&glfwGetKey(w,settings.binds.forward)==GLFW_PRESS){np=np+fwd*spd;mv=true;}
+    if(onFoot&&glfwGetKey(w,settings.binds.back)==GLFW_PRESS){np=np-fwd*spd;mv=true;}
+    if(onFoot&&glfwGetKey(w,settings.binds.left)==GLFW_PRESS){np=np+right*spd;mv=true;}
+    if(onFoot&&glfwGetKey(w,settings.binds.right)==GLFW_PRESS){np=np-right*spd;mv=true;}
     if(debugTools.flyMode){
         if(glfwGetKey(w,GLFW_KEY_SPACE)==GLFW_PRESS){np.y += spd; mv=true;}
         if(glfwGetKey(w,settings.binds.crouch)==GLFW_PRESS){np.y -= spd; mv=true;}
@@ -306,7 +256,7 @@ void gameInput(GLFWwindow*w){
     if(debugTools.flyMode){
         cam.pos=np;
     }else{
-        bool xBlockedWorld = collideWorld(np.x,cam.pos.z,PR) || collideCoopDoor(np.x,cam.pos.z,PR) ||
+        bool xBlockedWorld = collideWorld(np.x,cam.pos.z,PR) || collideCoopDoor(np.x,cam.pos.z,PR) || collideHeistSolids(np.x,cam.pos.z,PR) ||
                              (falseDoorTimer>0&&nearPoint2D(Vec3(np.x,0,cam.pos.z),falseDoorPos,1.0f));
         bool xBlockedProps = collideMapProps(np.x,cam.pos.z,PR);
         if(!xBlockedWorld && !xBlockedProps){
@@ -315,7 +265,7 @@ void gameInput(GLFWwindow*w){
             if(tryPushMapProps(np.x,cam.pos.z,PR,np.x-cam.pos.x,0.0f)) cam.pos.x=np.x;
         }
 
-        bool zBlockedWorld = collideWorld(cam.pos.x,np.z,PR) || collideCoopDoor(cam.pos.x,np.z,PR) ||
+        bool zBlockedWorld = collideWorld(cam.pos.x,np.z,PR) || collideCoopDoor(cam.pos.x,np.z,PR) || collideHeistSolids(cam.pos.x,np.z,PR) ||
                              (falseDoorTimer>0&&nearPoint2D(Vec3(cam.pos.x,0,np.z),falseDoorPos,1.0f));
         bool zBlockedProps = collideMapProps(cam.pos.x,np.z,PR);
         if(!zBlockedWorld && !zBlockedProps){
@@ -331,7 +281,6 @@ void gameInput(GLFWwindow*w){
         float cb=mSin(bobT);cam.pos.y=cam.curH+cb*0.04f;
         if(lastB>-0.7f&&cb<=-0.7f&&!sndState.stepTrig){
             sndState.stepTrig=true;
-            sndState.footPhase=0;
             float pitchRnd = 0.88f + (float)(rand()%30) / 100.0f;
             if(spd > 5.0f) pitchRnd += 0.10f;
             sndState.stepPitch = pitchRnd;
@@ -353,7 +302,7 @@ void gameInput(GLFWwindow*w){
     
     float rawSignal = 0.0f;
     Vec3 resonanceTarget(0, 0, 0);
-    bool scannerHasTarget = (activeDeviceSlot == 2 && getVoidShiftResonanceTarget(resonanceTarget));
+    bool scannerHasTarget = (activeDeviceSlot == 2 && heistScannerTarget(resonanceTarget));
     if(scannerHasTarget){
         Vec3 toEcho = resonanceTarget - cam.pos;
         float dist = toEcho.len();
@@ -405,7 +354,7 @@ void gameInput(GLFWwindow*w){
     if(!scannerOverheated && scannerHeat >= 0.98f){
         scannerOverheated = true;
         scannerOverheatTimer = 2.8f;
-        setTrapStatus("SCANNER OVERHEAT");
+        setTrapStatus("SCANNER OVERHEATED. THE WARRANTY DID NOT COVER THIS");
     }
     if(scannerOverheated){
         scannerOverheatTimer -= dTime;

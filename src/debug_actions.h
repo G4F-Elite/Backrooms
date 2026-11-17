@@ -68,25 +68,13 @@ inline void executeDebugAction(int action){
         return;
     }
     if(action==DEBUG_ACT_TP_NOTE){
-        Vec3 target = coop.doorPos;
-        if(isLevelZero(gCurrentLevel)){
-            target = coop.doorPos;
-            for(int i=0;i<3;i++){
-                if(level1NodeDone[i]) continue;
-                target = level1Nodes[i];
-                break;
-            }
-        }else if(!level2BatteryInstalled) target = level2BatteryNode;
-        else if(level2FuseCount < 3){
-            for(int i=0;i<3;i++) if(!level2FuseDone[i]){ target = level2FuseNodes[i]; break; }
-        }else if(!level2AccessReady) target = level2AccessNode;
-        else if(!level2HoldActive && !level2ContractComplete) target = level2LiftNode;
+        Vec3 target = rigWorld(rigSeat(0));
+        heistScannerTarget(target);
         debugTeleportTo(target, "DEBUG: TELEPORTED TO OBJECTIVE");
         return;
     }
     if(action==DEBUG_ACT_TP_ECHO){
-        Vec3 target = coop.doorPos;
-        if(npcLostSurvivorActive && !npcLostSurvivorEscorted) target = npcLostSurvivorPos;
+        Vec3 target = heist.hasKiosk ? heist.kioskPos : rigWorld(rigSeat(0));
         debugTeleportTo(target, "DEBUG: TELEPORTED TO TARGET");
         return;
     }
@@ -97,48 +85,19 @@ inline void executeDebugAction(int action){
         return;
     }
     if(action==DEBUG_ACT_SKIP_LEVEL){
-        if(multiState==MULTI_IN_GAME && !netMgr.isHost){
+        if(!heistIsAuthority()){
             setTrapStatus("DEBUG: SKIP LEVEL HOST ONLY");
             return;
         }
-        if(multiState==MULTI_IN_GAME){
-            if(isLevelZero(gCurrentLevel)){
-                for(int i=0;i<3;i++) level1NodeDone[i] = true;
-                level1HoldActive = false;
-                level1HoldTimer = 0.0f;
-                level1ContractComplete = true;
-                coop.doorOpen = true;
-                setTrapStatus("DEBUG: L1 CONTRACT FORCED COMPLETE");
-            }else{
-                level2BatteryInstalled = true;
-                level2BatteryStage = 2;
-                level2FusePanelPowered = true;
-                level2FuseCount = 3;
-                for(int i=0;i<3;i++) level2FuseDone[i] = true;
-                level2AccessReady = true;
-                level2HoldActive = false;
-                level2HoldTimer = 0.0f;
-                level2ContractComplete = true;
-                coop.doorOpen = true;
-                setTrapStatus("DEBUG: L2 CONTRACT FORCED COMPLETE");
-            }
-            return;
+        // Tutorial -> straight to the accident; otherwise the drill is fed and started.
+        if(heistStageIsSafe(heist.stage)) heistTriggerAccident(heistMe());
+        else if(heist.stage==HEIST_RUN){
+            heist.quotaHave = heist.quotaNeed;
+            heist.cash += 500;
+            heist.stage = HEIST_DRILLING;
+            heist.stageTimer = 0.0f;
         }
-        if(isLevelZero(gCurrentLevel)){
-            gCurrentLevel = 1;
-            gCompletedLevels++;
-            genWorld();
-            buildGeom();
-            gameState = STATE_INTRO;
-            setEchoStatus("DEBUG: SKIPPED TO LEVEL 2");
-        }else{
-            gCompletedLevels++;
-            gCurrentLevel = 0;
-            gameState = STATE_MENU;
-            menuSel = 0;
-            glfwSetInputMode(gWin,GLFW_CURSOR,GLFW_CURSOR_NORMAL);
-            setEchoStatus("DEBUG: RUN COMPLETE SKIPPED");
-        }
+        setTrapStatus("DEBUG: STAGE SKIPPED");
         return;
     }
     if(action==DEBUG_ACT_TRIGGER_EYE){

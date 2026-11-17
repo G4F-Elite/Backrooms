@@ -149,14 +149,15 @@ EntityManager entityMgr;
 // Audio thread function
 void audioThread() {
     hEvent = CreateEvent(0, FALSE, FALSE, 0);
-    WAVEFORMATEX wfx = {WAVE_FORMAT_PCM, 1, SAMP_RATE, SAMP_RATE*2, 2, 16, 0};
+    const int frameBytes = AUDIO_CHANNELS * (int)sizeof(short);
+    WAVEFORMATEX wfx = {WAVE_FORMAT_PCM, (WORD)AUDIO_CHANNELS, SAMP_RATE, (DWORD)(SAMP_RATE*frameBytes), (WORD)frameBytes, 16, 0};
     waveOutOpen(&hWaveOut, WAVE_MAPPER, &wfx, (DWORD_PTR)hEvent, 0, CALLBACK_EVENT);
     
     for (int i = 0; i < BUF_COUNT; i++) {
-        waveBufs[i] = new short[BUF_LEN];
+        waveBufs[i] = new short[BUF_LEN * AUDIO_CHANNELS];
         memset(&waveHdrs[i], 0, sizeof(WAVEHDR));
         waveHdrs[i].lpData = (LPSTR)waveBufs[i];
-        waveHdrs[i].dwBufferLength = BUF_LEN * 2;
+        waveHdrs[i].dwBufferLength = BUF_LEN * frameBytes;
         fillAudio(waveBufs[i], BUF_LEN);
         waveOutPrepareHeader(hWaveOut, &waveHdrs[i], sizeof(WAVEHDR));
         waveOutWrite(hWaveOut, &waveHdrs[i], sizeof(WAVEHDR));

@@ -215,6 +215,11 @@ inline int gatherRemoteFlashlights(int myId, float outPos[12], float outDir[12])
     return count;
 }
 
+// Spectator bodycam: the teammate whose eyes the camera sits in is not drawn.
+inline int gHiddenPlayerModel = -1;
+inline constexpr float GHOST_MODEL_SCALE = 0.42f;
+inline constexpr float GHOST_MODEL_DROP = 0.62f; // keep equal to SPECTATOR_GHOST_DROP (spectator_math.h)
+
 inline void renderPlayers(GLuint shader, Mat4& proj, Mat4& view, int myId) {
     glUseProgram(shader);
     glUniformMatrix4fv(glGetUniformLocation(shader, "P"), 1, GL_FALSE, proj.m);
@@ -232,9 +237,14 @@ inline void renderPlayers(GLuint shader, Mat4& proj, Mat4& view, int myId) {
 
     for (int i = 0; i < MAX_PLAYERS; i++) {
         if (i == myId || !netMgr.players[i].active || !netMgr.players[i].hasValidPos) continue;
-        if (!playerInterpReady[i]) continue;
+        if (!playerInterpReady[i] || i == gHiddenPlayerModel) continue;
 
-        if(tintLoc >= 0) glUniform3f(tintLoc, PLAYER_COLORS[i][0], PLAYER_COLORS[i][1], PLAYER_COLORS[i][2]);
+        // The dead are small bobbing ghosts: they ride a shoulder (or a monster) or float about.
+        bool ghost = (netMgr.players[i].flags & PLAYER_FLAG_DEAD) != 0;
+        if(tintLoc >= 0){
+            if(ghost) glUniform3f(tintLoc, 0.50f, 0.86f, 0.98f);
+            else glUniform3f(tintLoc, PLAYER_COLORS[i][0], PLAYER_COLORS[i][1], PLAYER_COLORS[i][2]);
+        }
         Vec3 pos = playerRenderPos[i];
         Vec3 delta = pos - playerLastPos[i];
         delta.y = 0;
@@ -251,11 +261,24 @@ inline void renderPlayers(GLuint shader, Mat4& proj, Mat4& view, int myId) {
         float crouch = 0.0f;
         if (pos.y > 0.6f && pos.y < 1.7f) crouch = clamp01((1.7f - pos.y) / 0.8f);
         Vec3 base(pos.x, pos.y - 1.7f + crouch * 0.8f, pos.z);
+        float bodyYaw = playerRenderYaw[i];
+        if (ghost) {
+            // Feet hang below the ghost's position (see SPECTATOR_GHOST_DROP): on the shoulder it rides.
+            crouch = 0.0f;
+            base.y = pos.y - GHOST_MODEL_DROP + sinf((float)now * 2.3f + (float)i) * 0.04f;
+            bodyYaw += sinf((float)now * 1.1f + (float)i * 2.0f) * 0.35f;
+        }
 
         CreaturePose pose = playerPose(playerAnimPhase[i], playerMoveBlend[i], crouch, playerRenderPitch[i],
                                        netMgr.players[i].flashlightOn, (float)now + (float)i * 1.7f);
         Mat4 mats[CREATURE_MAX_PARTS];
-        creaturePartMatrices(playerParts, pose, creatureWorldMatrix(base, playerRenderYaw[i]), mats);
+        Mat4 world = creatureWorldMatrix(base, bodyYaw);
+        if (ghost) {
+            for (int k = 0; k < 12; k++) {
+                if ((k & 3) != 3) world.m[k] *= GHOST_MODEL_SCALE;
+            }
+        }
+        creaturePartMatrices(playerParts, pose, world, mats);
         glBindVertexArray(playerVAOs[i]);
         for (size_t k = 0; k < playerParts.size() && k < (size_t)CREATURE_MAX_PARTS; k++) {
             glUniformMatrix4fv(modelLoc, 1, GL_FALSE, mats[k].m);

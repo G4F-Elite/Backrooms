@@ -14,7 +14,12 @@ inline void menuInput(GLFWwindow* w) {
             triggerMenuConfirmSound();
             if (menuSel == 0) { 
                 // Start game - go to intro first
+                extern void genWorld();
+                extern void buildGeom();
                 gCurrentLevel = 0;
+                gHeistSkipTutorial = gHeistTutorialSeen; // veterans start at the drill
+                genWorld();
+                buildGeom();
                 gameState = STATE_INTRO;
             }
             else if (menuSel == 1) { 
@@ -29,9 +34,14 @@ inline void menuInput(GLFWwindow* w) {
                 menuSel = 0; 
             }
             else if (menuSel == 3) { 
-                // Guide screen
-                guideReturnToPause = false;
-                gameState = STATE_GUIDE;
+                // Tutorial: the first shift again, garage and all
+                extern void genWorld();
+                extern void buildGeom();
+                gCurrentLevel = 0;
+                gHeistSkipTutorial = false;
+                genWorld();
+                buildGeom();
+                gameState = STATE_INTRO;
             }
             else { 
                 // Quit
@@ -226,6 +236,8 @@ inline void menuInput(GLFWwindow* w) {
                 // Start multiplayer game with all connected players
                 // First set multiState so genWorld knows we're in multiplayer
                 multiState = MULTI_IN_GAME;
+                gCurrentLevel = 0;
+                gHeistSkipTutorial = gHeistTutorialSeen;
                 // Generate world and get spawn position
                 extern void genWorld();
                 extern void buildGeom();

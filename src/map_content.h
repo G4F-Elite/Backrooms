@@ -7,22 +7,7 @@
 
 #include "world.h"
 #include "progression.h"
-
-enum MapPropType {
-    MAP_PROP_CRATE_STACK = 0,
-    MAP_PROP_CONE_CLUSTER = 1,
-    MAP_PROP_BARRIER = 2,
-    MAP_PROP_CABLE_REEL = 3,
-    MAP_PROP_PUDDLE = 4,
-    MAP_PROP_DEBRIS = 5,
-    MAP_PROP_DESK = 6,
-    MAP_PROP_CHAIR = 7,
-    MAP_PROP_CABINET = 8,
-    MAP_PROP_PARTITION = 9,
-    MAP_PROP_BOX_PALLET = 10,
-    MAP_PROP_DRUM_STACK = 11,
-    MAP_PROP_LOCKER_BANK = 12
-};
+#include "prop_catalog.h"
 
 // pos = centre of the footprint on the floor, yaw = facing (local +Z is the front).
 struct MapProp {
@@ -62,13 +47,15 @@ inline void resetMapContent() {
 inline bool isMapPropPushableType(int type) {
     return type == MAP_PROP_CRATE_STACK ||
            type == MAP_PROP_DEBRIS ||
-           type == MAP_PROP_BOX_PALLET;
+           type == MAP_PROP_BOX_PALLET ||
+           (isLibraryPropType(type) && propHasFlag(type, PROP_FLAG_PUSHABLE));
 }
 
 inline bool isMapPropWallType(int type) {
     return type == MAP_PROP_DESK ||
            type == MAP_PROP_CABINET ||
-           type == MAP_PROP_LOCKER_BANK;
+           type == MAP_PROP_LOCKER_BANK ||
+           (isLibraryPropType(type) && isPropAgainstWallType(type));
 }
 
 // Unscaled, unrotated half extents of the model footprint (see prop_models.h).
@@ -86,6 +73,7 @@ inline void mapPropBaseExtents(int type, float& hx, float& hz) {
     if (type == MAP_PROP_BOX_PALLET) { hx = 0.60f; hz = 0.50f; return; }
     if (type == MAP_PROP_DRUM_STACK) { hx = 0.60f; hz = 0.56f; return; }
     if (type == MAP_PROP_LOCKER_BANK) { hx = 0.57f; hz = 0.23f; return; }
+    if (isLibraryPropType(type)) { hx = PROP_CATALOG[type].hx; hz = PROP_CATALOG[type].hz; return; }
     hx = 0.5f; hz = 0.5f;
 }
 
@@ -179,7 +167,7 @@ inline bool collideMapPropsEx(float x, float z, float pr, int ignoreIndex) {
         const MapProp& p = mapProps[idx];
         float hx = 0.0f, hz = 0.0f;
         mapPropHalfExtents(p, hx, hz);
-        if (hx <= 0.001f || hz <= 0.001f) continue;
+        if (hx <= 0.001f || hz <= 0.001f || !isPropSolidType(p.type)) continue;
         if (fabsf(x - p.pos.x) < (hx + pr) && fabsf(z - p.pos.z) < (hz + pr)) return true;
     }
     return collideMapPois(x, z, pr);
@@ -279,6 +267,8 @@ inline bool isMapPropSpotBlocked(const MapProp& pr) {
     for (const auto& other : mapProps) {
         float ox = 0.0f, oz = 0.0f;
         mapPropHalfExtents(other, ox, oz);
+        // overhead props (pipes, ducts) share a spot with whatever stands below them
+        if (isPropOverheadType(other.type) != isPropOverheadType(pr.type)) continue;
         if (other.type == MAP_PROP_PUDDLE || pr.type == MAP_PROP_PUDDLE) {
             if (other.type != pr.type) continue;
             ox = oz = hx = hz = 1.0f;
@@ -348,7 +338,7 @@ inline bool placePropLoose(int wx, int wz, int type, float scale, std::mt19937& 
         float reach = CS * (0.30f - 0.08f * (float)attempt);
         Vec3 pos(c.x + (rand01(r) * 2.0f - 1.0f) * reach, 0.0f, c.z + (rand01(r) * 2.0f - 1.0f) * reach);
         float yaw = rand01(r) * 6.2831853f;
-        if (type == MAP_PROP_PARTITION || type == MAP_PROP_BARRIER) yaw = (r() & 1u) ? 0.0f : 1.5707963f;
+        if (type == MAP_PROP_PARTITION || type == MAP_PROP_BARRIER || propHasFlag(type, PROP_FLAG_ALIGNED)) yaw = (r() & 1u) ? 0.0f : 1.5707963f;
         if (addMapProp(pos, type, scale, yaw)) return true;
     }
     return false;
@@ -475,12 +465,15 @@ inline void spawnChunkPoi(const Chunk& c, std::mt19937& r) {
     }
 }
 
+inline void spawnThemedChunkProps(const Chunk& c, std::mt19937& r);
+
 inline void rebuildChunkMapContent(const Chunk& c) {
     std::mt19937 r(hashCell(c.cx, c.cz, 0xA18F331u));
     spawnChunkPoi(c, r);
     spawnOfficeFurniture(c, r);
     spawnChunkCluster(c, r);
     spawnChunkProps(c, r);
+    spawnThemedChunkProps(c, r);
 }
 
 inline bool isMapPropOnWall(const MapProp& p) {
@@ -553,3 +546,5 @@ inline int nearestMapPoiIndex(const Vec3& pos, float maxDist) {
     }
     return idx;
 }
+
+#include "map_theme_spawn.h"

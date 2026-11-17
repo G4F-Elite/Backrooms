@@ -16,7 +16,9 @@ inline void resetPoiRuntime() {
 inline void applyPoiLoot(const MapPoi& poi) {
     int spawnCount = 1 + (int)(rng() % 2);
     if (poi.type == MAP_POI_STORAGE) spawnCount++;
-    for (int i = 0; i < spawnCount; i++) {
+    // Furnished rooms are where the good stuff is: loot first, then a supply or two.
+    hostSpawnItem(itemTypeFromLoot(rollLootType((unsigned)rng(), gCurrentLevel + 1)), poi.pos);
+    for (int i = 1; i < spawnCount; i++) {
         int itemType = choosePoiLootType(poi.type, (int)rng());
         hostSpawnItem(itemType, poi.pos);
     }
@@ -24,7 +26,7 @@ inline void applyPoiLoot(const MapPoi& poi) {
         playerStamina += 15.0f;
         if (playerStamina > 125.0f) playerStamina = 125.0f;
     }
-    setEchoStatus("POI DISCOVERED: SUPPLIES FOUND");
+    setEchoStatus("NICE ROOM. EVERYTHING IN IT IS NOW INVENTORY");
 }
 
 inline void applyPoiRisk(const MapPoi& poi) {
@@ -34,7 +36,7 @@ inline void applyPoiRisk(const MapPoi& poi) {
     if (multiState == MULTI_IN_GAME && netMgr.isHost) {
         netMgr.sendRoamEvent(roamType, playerChunkX & 0xFF, playerChunkZ & 0xFF, duration);
     }
-    setTrapStatus("POI INSTABILITY DETECTED");
+    setTrapStatus("THE ROOM NOTICED YOU TOUCHED ITS STUFF");
 }
 
 inline void updatePoiRuntime() {
@@ -43,7 +45,7 @@ inline void updatePoiRuntime() {
         if (gPoiTriggerCooldown < 0.0f) gPoiTriggerCooldown = 0.0f;
     }
     bool hostOwnsEvents = (multiState != MULTI_IN_GAME) || netMgr.isHost;
-    if (!hostOwnsEvents || gPoiTriggerCooldown > 0.0f) return;
+    if (!hostOwnsEvents || gPoiTriggerCooldown > 0.0f || !heistDangerActive()) return;
 
     int poiIdx = nearestMapPoiIndex(cam.pos, CS * 1.60f);
     if (poiIdx < 0 || poiIdx >= (int)mapPois.size()) return;
@@ -54,6 +56,7 @@ inline void updatePoiRuntime() {
     gPoiTriggerCooldown = 6.0f;
 
     int outcome = choosePoiOutcomeType(poi.type, (int)rng());
+    if (rigPosInQuiet(poi.pos)) outcome = POI_OUTCOME_LOOT; // rooms next to the running drill only pay
     if (outcome == POI_OUTCOME_LOOT) {
         applyPoiLoot(poi);
         return;

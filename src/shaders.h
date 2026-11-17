@@ -234,6 +234,10 @@ uniform int rtxA,rtxG,rtxR,rtxB;
 uniform int rtxDenoiseOn;
 uniform float rtxDenoiseStrength;
 uniform sampler2D depthTex;
+uniform vec3 projInfo;
+#define projT projInfo.xy
+uniform int rayN;
+uniform vec3 rayL[4];
 uniform float deathFx;
 float rnd(vec2 s){ return fract(sin(dot(s,vec2(12.9898,78.233)))*43758.5453); }
 float noise(vec2 p) {
@@ -335,90 +339,126 @@ float linZ(vec2 tc){
  float d = texture(depthTex, tc).r;
  return 20.0 / (100.1 - (d * 2.0 - 1.0) * 99.9);
 }
-float rtxSSAO(vec2 tc, int ns){
- float z0 = linZ(tc);
- if(z0 > 30.0) return 1.0;
- float rad = 0.010 + 0.028 / max(z0, 0.8);
- float ao = 0.0;
- float rot = rnd(floor(gl_FragCoord.xy * 0.25) * 0.17) * 6.283 + tm * 0.02;
- for(int i = 0; i < ns; i++){
-  float a = float(i) * 6.283 / float(ns) + rot;
-  float r = rad * (0.3 + 0.7 * float(i+1) / float(ns));
-  vec2 sc = tc + vec2(cos(a), sin(a)) * r;
-  float diff = z0 - linZ(sc);
-  if(diff > 0.003 && diff < 0.26) ao += smoothstep(0.26, 0.003, diff);
- }
- return clamp(1.0 - ao / float(ns) * 1.68, 0.45, 1.0);
+float fxLum(vec3 c){ return dot(c, vec3(0.3, 0.59, 0.11)); }
+// View-space position (x right, y up, z forward) rebuilt from the depth buffer.
+vec3 fxPos(vec2 tc){
+ float z = linZ(tc);
+ return vec3((tc * 2.0 - 1.0) * projT * z, z);
 }
-vec3 rtxGI(vec2 tc, int ns){
- float z0 = linZ(tc);
- float rad = 0.05 + 0.07 / max(z0, 0.8);
- vec3 gi = vec3(0.0); float tw = 0.001;
- float rot = rnd(floor(gl_FragCoord.xy * 0.25) * 0.11 + vec2(0.3)) * 6.283 + tm * 0.02;
- for(int i = 0; i < ns; i++){
-  float a = float(i) * 6.283 / float(ns) + rot;
-  float r = rad * (0.3 + 0.7 * float(i+1) / float(ns));
-  vec2 sc = tc + vec2(cos(a), sin(a)) * r;
-  vec3 sC = texture(tex, sc).rgb;
-  float depthDiff = abs(z0 - linZ(sc));
-  float w = smoothstep(1.2, 0.0, depthDiff);
-  float br = dot(sC, vec3(0.3, 0.59, 0.11));
-  w *= br;
-  gi += sC * w; tw += w;
- }
- return (gi / tw) * 1.78;
+// Surface normal from depth, taking the neighbour on the same surface on each axis.
+vec3 fxNormal(vec2 tc, vec3 p){
+ vec3 r = fxPos(tc + vec2(texelX, 0.0)) - p;
+ vec3 l = p - fxPos(tc - vec2(texelX, 0.0));
+ vec3 u = fxPos(tc + vec2(0.0, texelY)) - p;
+ vec3 d = p - fxPos(tc - vec2(0.0, texelY));
+ vec3 dx = abs(r.z) < abs(l.z) ? r : l;
+ vec3 dy = abs(u.z) < abs(d.z) ? u : d;
+ return normalize(cross(dy, dx));
 }
-vec3 rtxRays(vec2 tc, int ns){
- vec3 rays = vec3(0.0);
- float rot = rnd(floor(gl_FragCoord.xy * 0.5) * 0.13) * 6.283 + tm * 0.01;
+// Screen radius (uv) of a world-space radius at view depth z.
+float fxScreenRadius(float worldR, float z, float maxR){
+ return clamp(worldR * 0.5 / (z * projT.y), 0.003, maxR);
+}
+vec2 fxSpiral(int i, int ns, float rot, float rad){
+ float a = float(i) * 2.399963 + rot;
+ float r = sqrt((float(i) + 0.5) / float(ns)) * rad;
+ return vec2(cos(a) * projT.y / projT.x, sin(a)) * r;
+}
+// Ambient occlusion: only geometry above the surface plane darkens it, so flat
+// walls and floors stay clean and only corners, props and contact areas get shade.
+float fxAO(vec2 tc, vec3 p, vec3 n, int ns, float rot){
+ const float R = 0.65;
+ float rad = fxScreenRadius(R, p.z, 0.10);
+ float occ = 0.0;
  for(int i = 0; i < ns; i++){
-  float a = float(i) * 6.283 / float(ns) + rot;
-  float r = 0.02 + 0.12 * float(i) / float(ns);
-  vec2 sc = clamp(tc + vec2(cos(a), sin(a)) * r, 0.001, 0.999);
-  vec3 s = texture(tex, sc).rgb;
-  float lum = dot(s, vec3(0.3, 0.59, 0.11));
-  if(lum > 0.08){
-   float nearW = smoothstep(20.0, 1.0, linZ(sc));
-   float decay = 1.0 - float(i) / float(ns);
-   rays += s * (lum - 0.08) * decay * decay * nearW;
+  vec3 v = fxPos(tc + fxSpiral(i, ns, rot, rad)) - p;
+  float d2 = dot(v, v);
+  float cosT = dot(n, v) * inversesqrt(d2 + 0.00001);
+  float range = clamp(1.0 - d2 / (R * R), 0.0, 1.0);
+  occ += clamp((cosT - 0.18) * 1.6, 0.0, 1.0) * range;
+ }
+ float ao = 1.0 - occ / float(ns) * 2.6;
+ float fade = smoothstep(45.0, 25.0, p.z);
+ return mix(1.0, clamp(ao, 0.30, 1.0), fade);
+}
+// One light bounce from nearby visible surfaces that sit in front of this surface.
+vec3 fxGI(vec2 tc, vec3 p, vec3 n, int ns, float rot){
+ const float R = 1.8;
+ float rad = fxScreenRadius(R, p.z, 0.22);
+ vec3 gi = vec3(0.0);
+ for(int i = 0; i < ns; i++){
+  vec2 sc = tc + fxSpiral(i, ns, rot + 1.7, rad);
+  vec3 v = fxPos(sc) - p;
+  float d2 = dot(v, v);
+  float cosT = max(dot(n, v) * inversesqrt(d2 + 0.00001) - 0.10, 0.0);
+  float range = clamp(1.0 - d2 / (R * R), 0.0, 1.0);
+  gi += texture(tex, clamp(sc, 0.001, 0.999)).rgb * cosT * range;
+ }
+ return gi / float(ns);
+}
+// Light shafts: bright lamp pixels smeared away from each visible lamp. Anything
+// dark between the pixel and the lamp cuts the shaft.
+vec3 fxRays(vec2 tc, float jit){
+ const int NS = 14;
+ vec3 acc = vec3(0.0);
+ for(int l = 0; l < rayN; l++){
+  vec2 d = rayL[l].xy - tc;
+  float dist = length(d * vec2(projT.x / projT.y, 1.0));
+  if(dist > 0.60) continue;
+  float fall = 1.0 - dist / 0.60;
+  vec3 s = vec3(0.0);
+  for(int i = 0; i < NS; i++){
+   vec2 sc = tc + d * ((float(i) + jit) / float(NS));
+   vec3 col = texture(tex, sc).rgb;
+   s += col * smoothstep(0.72, 0.96, fxLum(col));
   }
+  acc += s / float(NS) * fall * fall * rayL[l].z;
  }
- return (rays / float(ns)) * 1.75;
+ return acc;
 }
-vec3 rtxBloom(vec2 tc, int rad){
- vec3 bl = vec3(0.0); float tw = 0.0;
- float sx = texelX * 2.5, sy = texelY * 2.5;
- for(int x = -rad; x <= rad; x++) for(int y = -rad; y <= rad; y++){
-  vec3 s = texture(tex, tc + vec2(float(x)*sx, float(y)*sy)).rgb;
-  float lum = dot(s, vec3(0.3, 0.59, 0.11));
-  float w = smoothstep(0.08, 0.35, lum) * exp(-length(vec2(x, y)) * 0.3);
-  bl += s * w; tw += 1.0;
+// Bloom: only really bright pixels (lamps, screens) glow, with a normalised gaussian.
+vec3 fxBloom(vec2 tc){
+ vec2 stp = vec2(projT.y / projT.x, 1.0) * 0.0030;
+ vec3 bl = vec3(0.0);
+ float tw = 0.0;
+ for(int x = -4; x <= 4; x++) for(int y = -4; y <= 4; y++){
+  vec2 o = vec2(float(x), float(y));
+  float w = exp(-dot(o, o) * 0.16);
+  vec3 s = texture(tex, tc + o * stp).rgb;
+  bl += s * smoothstep(0.70, 0.97, fxLum(s)) * w;
+  tw += w;
  }
- return (bl / max(tw, 1.0)) * 1.58;
+ return bl / tw;
 }
-vec3 rtxDenoise(vec2 tc, vec3 orig, vec3 mod_c){
- float z0 = linZ(tc);
- vec3 sum = mod_c; float wSum = 1.0;
- vec3 ratio = mod_c / max(orig, vec3(0.01));
- ratio = clamp(ratio, vec3(0.0), vec3(2.0));
- for(int dx = -2; dx <= 2; dx++) for(int dy = -2; dy <= 2; dy++){
-  if(dx == 0 && dy == 0) continue;
-  vec2 sc = tc + vec2(float(dx) * texelX * 1.35, float(dy) * texelY * 1.35);
-  float zn = linZ(sc);
-  vec3 nOrig = texture(tex, sc).rgb;
-  float dw = exp(-abs(z0 - zn) * 18.0);
-  float cw = exp(-length(orig - nOrig) * 8.5);
-  float w = dw * cw;
-  if(w < 0.01) continue;
-  sum += nOrig * ratio * w;
-  wSum += w;
+// The denoiser averages a noisy term over its 2x2 pixel quad (each pixel uses a
+// different sample rotation), which removes the grain without blurring the image.
+float fxQuad(float v, vec2 q){ v -= dFdx(v) * q.x; return v - dFdy(v) * q.y; }
+vec3 fxQuad(vec3 v, vec2 q){ v -= dFdx(v) * q.x; return v - dFdy(v) * q.y; }
+vec3 applyFx(vec2 tc, vec3 c){
+ if(rtxA <= 0 && rtxG <= 0 && rtxR <= 0 && rtxB <= 0) return c;
+ float ign = fract(52.9829189 * fract(dot(floor(gl_FragCoord.xy), vec2(0.06711056, 0.00583715))));
+ float ao = 1.0;
+ vec3 gi = vec3(0.0);
+ vec3 rays = vec3(0.0);
+ if((rtxA > 0 || rtxG > 0) && texture(depthTex, tc).r < 0.99995){
+  vec3 p = fxPos(tc);
+  vec3 n = fxNormal(tc, p);
+  float rot = ign * 6.2831853;
+  if(rtxA > 0) ao = fxAO(tc, p, n, rtxA <= 1 ? 8 : (rtxA <= 2 ? 12 : (rtxA <= 3 ? 16 : 24)), rot);
+  if(rtxG > 0) gi = fxGI(tc, p, n, rtxG <= 1 ? 8 : (rtxG <= 2 ? 12 : 18), rot);
  }
- vec3 outC = sum / wSum;
- if(taaValid > 0.5){
-  vec3 hist = texture(histTex, tc).rgb;
-  outC = mix(outC, hist, 0.16 * clamp(rtxDenoiseStrength, 0.0, 1.0));
+ if(rtxR > 0) rays = fxRays(tc, ign);
+ if(rtxDenoiseOn > 0){
+  vec2 q = (mod(floor(gl_FragCoord.xy), 2.0) - 0.5) * clamp(rtxDenoiseStrength, 0.0, 1.0);
+  ao = fxQuad(ao, q);
+  gi = fxQuad(gi, q);
+  rays = fxQuad(rays, q);
  }
- return outC;
+ vec3 lit = c * mix(1.0, ao, 1.0 - smoothstep(0.75, 1.0, fxLum(c)));
+ lit += gi * (c + 0.06) * 1.5;
+ lit += rays * 0.55;
+ if(rtxB > 0) lit += fxBloom(tc) * 0.40;
+ return lit;
 }
 vec3 deathPost(vec2 tc, vec3 base){
  float d = clamp(deathFx, 0.0, 1.0); if(d <= 0.001) return base;
@@ -430,15 +470,7 @@ vec3 deathPost(vec2 tc, vec3 base){
 }
 void main(){
  if(inten < 0.02) {
-  vec3 c0 = resolveSample(uv); vec3 orig0 = c0;
-  if(rtxA>0){ int n=rtxA<=1?20:(rtxA<=2?34:(rtxA<=3?52:84)); c0*=rtxSSAO(uv,n); }
-  if(rtxG>0){ int n=rtxG<=1?20:(rtxG<=2?34:56); c0+=rtxGI(uv,n)*0.42; }
-  if(rtxR>0){ int n=rtxA>=4?96:64; c0+=rtxRays(uv,n)*0.82; }
-  if(rtxB>0){ c0+=rtxBloom(uv,5)*0.58; }
-  if((rtxA>0||rtxG>0||rtxR>0||rtxB>0) && rtxDenoiseOn>0){
-   vec3 dn = rtxDenoise(uv,orig0,c0);
-   c0 = mix(c0, dn, clamp(rtxDenoiseStrength, 0.0, 1.0));
-  }
+  vec3 c0 = applyFx(uv, resolveSample(uv));
   c0 = deathPost(uv, c0);
   F = vec4(c0, 1.0);
  return;
@@ -500,15 +532,7 @@ vec3 c = vec3(r,g,b);
  c.g += 0.005 * smoothstep(0.4, 0.8, lumC) * inten;
 
  c = mix(vec3(lumC), c, 1.05);
- vec3 preRtx = c;
- if(rtxA>0){ int n=rtxA<=1?20:(rtxA<=2?34:(rtxA<=3?52:84)); c*=rtxSSAO(uv,n); }
- if(rtxG>0){ int n=rtxG<=1?20:(rtxG<=2?34:56); c+=rtxGI(uv,n)*0.42; }
- if(rtxR>0){ int n=rtxA>=4?96:64; c+=rtxRays(uv,n)*0.82; }
- if(rtxB>0){ c+=rtxBloom(uv,5)*0.58; }
-  if((rtxA>0||rtxG>0||rtxR>0||rtxB>0) && rtxDenoiseOn>0){
-   vec3 dn = rtxDenoise(uv,preRtx,c);
-   c = mix(c, dn, clamp(rtxDenoiseStrength, 0.0, 1.0));
-  }
+ c = applyFx(uv, c);
   c = deathPost(uv, c);
   F = vec4(c, 1);
 })";
