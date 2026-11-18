@@ -1,238 +1,143 @@
 #pragma once
+// Settings screen input: tabs, rows, slider dragging, typed percentages, key capture.
+// Rows and their behaviour come from settings_model.h; the layout is menu_settings.h.
 
-// Check if current settings item is a slider that supports numeric input
-inline bool isSliderItem(int tab, int sel) {
-    if(sel <= 0) return false;
-    if(tab == SETTINGS_TAB_AUDIO) {
-        int ai = sel - 1;
-        return ai >= 0 && ai < 5; // all 5 volume sliders
+inline void leaveSettings(bool fromPause) {
+    triggerMenuConfirmSound();
+    sliderInputActive = false;
+    keybindCaptureIndex = -1;
+    if (fromPause) {
+        bool multiplayer = multiState == MULTI_IN_GAME;
+        gameState = STATE_PAUSE;
+        menuSel = pauseRowOf(multiplayer, PAUSE_SETTINGS);
+    } else {
+        gameState = STATE_MENU;
+        menuSel = MAIN_MENU_SETTINGS;
     }
-    if(tab == SETTINGS_TAB_VIDEO) {
-        int vi = sel - 1;
-        return vi == 0 || vi == 1 || vi == 4; // VHS, mouse sens, FSR sharp
-    }
-    if(tab == SETTINGS_TAB_EFFECTS) {
-        int vi = sel - 1;
-        return vi == 5; // denoiser strength
-    }
-    return false;
 }
 
-// Apply typed numeric value to the correct slider
-inline void applySliderInputValue() {
-    sliderInputBuf[sliderInputLen] = 0;
-    int val = 0;
-    for(int i = 0; i < sliderInputLen; i++) {
-        val = val * 10 + (sliderInputBuf[i] - '0');
+inline void switchSettingsTab(int tab) {
+    tab = (tab % SETTINGS_TAB_COUNT + SETTINGS_TAB_COUNT) % SETTINGS_TAB_COUNT;
+    if (tab == settingsTab) return;
+    settingsTab = tab;
+    menuSel = 0;
+    triggerMenuNavigateSound();
+}
+
+// Waiting for the key that replaces a bind. ESC cancels, except on the pause bind itself,
+// where ESC is the usual answer. A click anywhere cancels too.
+inline void settingsCaptureInput(GLFWwindow* w, bool& waitRelease) {
+    if (waitRelease) {
+        if (!isAnyKeyboardKeyDown(w)) waitRelease = false;
+        return;
     }
-    if(val < 0) val = 0;
-    if(val > 100) val = 100;
-    float nv = (float)val / 100.0f;
-    if(sliderInputTab == SETTINGS_TAB_AUDIO) {
-        float* vols[] = {&settings.masterVol, &settings.musicVol, &settings.ambienceVol, &settings.sfxVol, &settings.voiceVol};
-        int ai = sliderInputItem - 1;
-        if(ai >= 0 && ai < 5) *vols[ai] = nv;
-    } else if(sliderInputTab == SETTINGS_TAB_VIDEO) {
-        int vi = sliderInputItem - 1;
-        if(vi == 0) settings.vhsIntensity = nv;
-        else if(vi == 1) settings.mouseSens = nv * 0.006f;
-        else if(vi == 4) settings.fsrSharpness = nv;
-    } else if(sliderInputTab == SETTINGS_TAB_EFFECTS) {
-        int vi = sliderInputItem - 1;
-        if(vi == 5) settings.rtxDenoiseStrength = nv;
+    int* pauseBind = &settings.binds.pause;
+    bool escAssignable = gameplayBindByIndex(settings.binds, keybindCaptureIndex) == pauseBind;
+    if (ui.mousePressed || (ui.esc && !escAssignable)) {
+        keybindCaptureIndex = -1;
+        triggerMenuNavigateSound();
+        return;
     }
-    sliderInputActive = false;
-    sliderInputLen = 0;
+    int pressed = firstPressedKeyboardKey(w);
+    if (pressed < 0) return;
+    assignBind(settings.binds, keybindCaptureIndex, pressed);
+    keybindCaptureIndex = -1;
+    triggerMenuConfirmSound();
+}
+
+// Typing a percentage into the selected slider.
+inline void settingsTypeInput(const SettingRow& row) {
+    for (int i = 0; i < ui.charCount; i++) {
+        char c = ui.chars[i];
+        int len = (int)strlen(sliderInputBuf);
+        if (c == UI_CHAR_BACKSPACE && len > 0) sliderInputBuf[len - 1] = '\0';
+        else if (c >= '0' && c <= '9' && len < 3) {
+            sliderInputBuf[len] = c;
+            sliderInputBuf[len + 1] = '\0';
+        }
+    }
+    ui.charCount = 0;
+    if (ui.enter) {
+        if (sliderInputBuf[0]) {
+            int percent = atoi(sliderInputBuf);
+            setSettingSlider01(settings, row.id, (float)(percent > 100 ? 100 : percent) / 100.0f);
+        }
+        sliderInputActive = false;
+        triggerMenuConfirmSound();
+    } else if (ui.esc || ui.mousePressed) {
+        sliderInputActive = false;
+    }
+}
+
+// Mouse on the controls inside a row: slider track, "<" and ">". They act on press, and a
+// press they used must not turn into a click on the row when the button comes up.
+inline void settingsMouseControls() {
+    if (ui.mousePressed) {
+        const UiZone* slider = uiHotZone(UI_ZONE_SLIDER);
+        const UiZone* prev = uiHotZone(UI_ZONE_PREV);
+        const UiZone* next = uiHotZone(UI_ZONE_NEXT);
+        if (slider) {
+            menuSel = slider->id;
+            ui.dragItem = slider->id;
+            ui.dragL = slider->l + 6.0f;
+            ui.dragR = slider->r - 6.0f;
+            ui.pressItem = -1;
+        } else if (prev || next) {
+            menuSel = prev ? prev->id : next->id;
+            if (adjustSetting(settings, settingsRowAt(settingsTab, menuSel), prev ? -1 : 1)) triggerMenuAdjustSound();
+            ui.pressItem = -1;
+        }
+    }
+    if (ui.dragItem < 0 || !ui.mouseDown) return;
+    SettingRow row = settingsRowAt(settingsTab, ui.dragItem);
+    if (row.kind != SETTING_SLIDER || ui.dragR <= ui.dragL) return;
+    float before = settingSlider01(settings, row.id);
+    float v = uiClamp01((ui.mx - ui.dragL) / (ui.dragR - ui.dragL));
+    setSettingSlider01(settings, row.id, floorf(v * 100.0f + 0.5f) / 100.0f);
+    float after = settingSlider01(settings, row.id);
+    if ((int)(before * 20.0f) != (int)(after * 20.0f)) triggerMenuAdjustSound();
+}
+
+inline void settingsActivateRow(const SettingRow& row, bool byKeyboard, bool& waitRelease) {
+    if (row.kind == SETTING_SLIDER) {
+        if (!byKeyboard || !settingEnabled(settings, row.id)) return;
+        sliderInputActive = true;
+        sliderInputBuf[0] = '\0';
+        triggerMenuConfirmSound();
+    } else if (row.kind == SETTING_BIND) {
+        keybindCaptureIndex = row.id;
+        waitRelease = true;
+        triggerMenuConfirmSound();
+    } else if (row.kind == SETTING_RESET_BINDS) {
+        settings.binds = GameplayBinds();
+        triggerMenuConfirmSound();
+    } else if (cycleSetting(settings, row)) {
+        triggerMenuAdjustSound();
+    }
 }
 
 inline void settingsInput(GLFWwindow* w, bool fromPause) {
-    bool esc = glfwGetKey(w, GLFW_KEY_ESCAPE) == GLFW_PRESS;
-    bool up = glfwGetKey(w, GLFW_KEY_UP) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_W) == GLFW_PRESS;
-    bool down = glfwGetKey(w, GLFW_KEY_DOWN) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_S) == GLFW_PRESS;
-    bool left = glfwGetKey(w, GLFW_KEY_LEFT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_A) == GLFW_PRESS;
-    bool right = glfwGetKey(w, GLFW_KEY_RIGHT) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_D) == GLFW_PRESS;
-    bool tab = glfwGetKey(w, GLFW_KEY_TAB) == GLFW_PRESS;
-    bool enter = glfwGetKey(w, GLFW_KEY_ENTER) == GLFW_PRESS || glfwGetKey(w, GLFW_KEY_KP_ENTER) == GLFW_PRESS;
-    const double now = glfwGetTime();
-    static int adjustHoldDir = 0;
-    static double nextAdjustTime = 0.0;
-    static bool tabPressed = false;
-    const double adjustFirstDelay = 0.28;
-    const double adjustRepeatInterval = 0.055;
-
-    // Handle numeric input mode for sliders
-    if(sliderInputActive) {
-        // Check digit keys 0-9
-        for(int k = GLFW_KEY_0; k <= GLFW_KEY_9; k++) {
-            static bool numPressed[10] = {};
-            int digit = k - GLFW_KEY_0;
-            bool pressed = glfwGetKey(w, k) == GLFW_PRESS;
-            if(pressed && !numPressed[digit] && sliderInputLen < 3) {
-                sliderInputBuf[sliderInputLen++] = '0' + digit;
-            }
-            numPressed[digit] = pressed;
-        }
-        // Numpad digits
-        for(int k = GLFW_KEY_KP_0; k <= GLFW_KEY_KP_9; k++) {
-            static bool kpPressed[10] = {};
-            int digit = k - GLFW_KEY_KP_0;
-            bool pressed = glfwGetKey(w, k) == GLFW_PRESS;
-            if(pressed && !kpPressed[digit] && sliderInputLen < 3) {
-                sliderInputBuf[sliderInputLen++] = '0' + digit;
-            }
-            kpPressed[digit] = pressed;
-        }
-        // Backspace
-        bool bksp = glfwGetKey(w, GLFW_KEY_BACKSPACE) == GLFW_PRESS;
-        static bool bkspPressed = false;
-        if(bksp && !bkspPressed && sliderInputLen > 0) sliderInputLen--;
-        bkspPressed = bksp;
-        // Enter confirms
-        if(enter && !enterPressed) {
-            if(sliderInputLen > 0) applySliderInputValue();
-            else sliderInputActive = false;
-            triggerMenuConfirmSound();
-        }
-        // Esc cancels
-        if(esc && !escPressed) {
-            sliderInputActive = false;
-            sliderInputLen = 0;
-        }
-        escPressed = esc; enterPressed = enter;
-        upPressed = up; downPressed = down;
-        leftPressed = left; rightPressed = right;
-        tabPressed = tab;
+    static bool waitRelease = false;
+    uiPollInput(w, sliderInputActive);
+    if (keybindCaptureIndex >= 0) {
+        settingsCaptureInput(w, waitRelease);
+        return;
+    }
+    if (sliderInputActive) {
+        settingsTypeInput(settingsRowAt(settingsTab, menuSel));
         return;
     }
 
-    auto switchTab = [&](int dir) {
-        settingsTab = (settingsTab + (dir > 0 ? 1 : 3)) % 4;
-        menuSel = clampSettingsSelection(settingsTab, menuSel);
-    };
+    const UiZone* tabZone = ui.mousePressed ? uiHotZone(UI_ZONE_TAB) : nullptr;
+    if (tabZone) switchSettingsTab(tabZone->id);
+    else if (ui.tab) switchSettingsTab(settingsTab + (ui.shift ? -1 : 1));
 
-    auto audioAdjust = [&](int idx, int dir) {
-        float* vals[] = {
-            &settings.masterVol,
-            &settings.musicVol,
-            &settings.ambienceVol,
-            &settings.sfxVol,
-            &settings.voiceVol
-        };
-        float maxV[] = {1.0f, 1.0f, 1.0f, 1.0f, 1.0f};
-        float minV[] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
-        float step[] = {0.05f, 0.05f, 0.05f, 0.05f, 0.05f};
-        int ai = idx - 1;
-        if (ai < 0 || ai >= 5) return false;
-        *vals[ai] += step[ai] * (float)dir;
-        if (*vals[ai] < minV[ai]) *vals[ai] = minV[ai];
-        if (*vals[ai] > maxV[ai]) *vals[ai] = maxV[ai];
-        return true;
-    };
+    settingsMouseControls();
+    bool activate = uiMenuNav(settingsRowCount(settingsTab));
+    menuSel = clampSettingsSelection(settingsTab, menuSel);
+    SettingRow row = settingsRowAt(settingsTab, menuSel);
 
-    auto videoAdjust = [&](int idx, int dir) {
-        int vi = idx - 1;
-        if(vi==0){ settings.vhsIntensity+=0.05f*(float)dir; if(settings.vhsIntensity<0)settings.vhsIntensity=0; if(settings.vhsIntensity>1)settings.vhsIntensity=1; return true; }
-        if(vi==1){ settings.mouseSens+=0.0003f*(float)dir; if(settings.mouseSens<0.0005f)settings.mouseSens=0.0005f; if(settings.mouseSens>0.006f)settings.mouseSens=0.006f; return true; }
-        if(vi==2){ settings.upscalerMode=clampUpscalerMode(settings.upscalerMode+dir); return true; }
-        if(vi==3){ settings.renderScalePreset=stepRenderScalePreset(settings.renderScalePreset,dir); return true; }
-        if(vi==4){ settings.fsrSharpness=clampFsrSharpness(settings.fsrSharpness+0.05f*(float)dir); return true; }
-        if(vi==5){ settings.aaMode=stepAaMode(settings.aaMode,dir); return true; }
-        if(vi==6){ settings.fastMath=!settings.fastMath; return true; }
-        if(vi==7){ settings.frameGenMode=stepFrameGenMode(settings.frameGenMode,dir); return true; }
-        if(vi==8){ settings.vsync=!settings.vsync; return true; }
-        if(vi==9){ settings.debugMode=!settings.debugMode; return true; }
-        return false;
-    };
-    auto effectsAdjust = [&](int idx, int dir) {
-        int vi = idx - 1;
-        if(vi==0){ settings.ssaoQuality=stepSsao(settings.ssaoQuality,dir); return true; }
-        if(vi==1){ settings.giQuality=stepGi(settings.giQuality,dir); return true; }
-        if(vi==2){ settings.godRays=!settings.godRays; return true; }
-        if(vi==3){ settings.bloom=!settings.bloom; return true; }
-        if(vi==4){ settings.rtxDenoise=!settings.rtxDenoise; return true; }
-        if(vi==5){ settings.rtxDenoiseStrength += 0.05f*(float)dir; if(settings.rtxDenoiseStrength<0.0f)settings.rtxDenoiseStrength=0.0f; if(settings.rtxDenoiseStrength>1.0f)settings.rtxDenoiseStrength=1.0f; return true; }
-        return false;
-    };
-
-    auto applyAdjust = [&](int dir) {
-        if (dir == 0) return;
-        bool changed = false;
-        if (menuSel == 0) { switchTab(dir); changed = true; }
-        else if (settingsTab == SETTINGS_TAB_AUDIO) changed = audioAdjust(menuSel, dir);
-        else if (settingsTab == SETTINGS_TAB_EFFECTS) changed = effectsAdjust(menuSel, dir);
-        else changed = videoAdjust(menuSel, dir);
-        if (changed) triggerMenuAdjustSound();
-    };
-    
-    if (up && !upPressed) {
-        menuSel = clampSettingsSelection(settingsTab, menuSel - 1);
-        triggerMenuNavigateSound();
-    }
-    if (down && !downPressed) {
-        menuSel = clampSettingsSelection(settingsTab, menuSel + 1);
-        triggerMenuNavigateSound();
-    }
-    if (tab && !tabPressed) {
-        switchTab(1);
-        triggerMenuNavigateSound();
-    }
-    
-    int adjustDir = right ? 1 : (left ? -1 : 0);
-    int bindsIndex = settingsBindsIndexForTab(settingsTab);
-    int backIndex = settingsBackIndexForTab(settingsTab);
-    bool canAdjust = menuSel == 0 || (menuSel != bindsIndex && menuSel != backIndex);
-    if (canAdjust) {
-        if (adjustDir == 0) {
-            adjustHoldDir = 0;
-            nextAdjustTime = 0.0;
-        } else if (adjustHoldDir != adjustDir) {
-            adjustHoldDir = adjustDir;
-            applyAdjust(adjustDir);
-            nextAdjustTime = now + adjustFirstDelay;
-        } else if (now >= nextAdjustTime) {
-            applyAdjust(adjustDir);
-            nextAdjustTime = now + adjustRepeatInterval;
-        }
-    } else if (menuSel == bindsIndex) {
-        if (enter && !enterPressed) {
-            triggerMenuConfirmSound();
-            gameState = fromPause ? STATE_KEYBINDS_PAUSE : STATE_KEYBINDS;
-            menuSel = 0;
-            keybindCaptureIndex = -1;
-        }
-    }
-
-    if (enter && !enterPressed) {
-        if (menuSel == backIndex) {
-            triggerMenuConfirmSound();
-            gameState = fromPause ? STATE_PAUSE : STATE_MENU;
-            menuSel = fromPause ? 1 : 2;
-        } else if (menuSel != bindsIndex) {
-            // Check if this is a slider - open numeric input
-            if (isSliderItem(settingsTab, menuSel)) {
-                sliderInputActive = true;
-                sliderInputTab = settingsTab;
-                sliderInputItem = menuSel;
-                sliderInputLen = 0;
-                triggerMenuConfirmSound();
-            } else if (menuSel == 0 || settingsTab == SETTINGS_TAB_VIDEO) {
-                applyAdjust(1);
-            }
-        }
-    }
-    
-    if (esc && !escPressed) { 
-        triggerMenuConfirmSound();
-        gameState = fromPause ? STATE_PAUSE : STATE_MENU; 
-        menuSel = fromPause ? 1 : 2;
-    }
-    
-    escPressed = esc; 
-    upPressed = up; 
-    downPressed = down; 
-    leftPressed = left; 
-    rightPressed = right; 
-    tabPressed = tab;
-    enterPressed = enter;
+    if (ui.adjust != 0 && adjustSetting(settings, row, ui.adjust)) triggerMenuAdjustSound();
+    if (activate) settingsActivateRow(row, ui.enter, waitRelease);
+    if (uiBackRequested()) leaveSettings(fromPause);
 }
-

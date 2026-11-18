@@ -1,204 +1,123 @@
 #pragma once
-#include "hud_icons.h"
+// In-run HUD basics: vital bars, the shift clock and the full-screen hurt / hallucination
+// vignettes. Built on the UI kit, so it scales with the window like the menus do.
+
+#include "ui_widgets.h"
 
 extern float vhsTime;
 
-// === Visual HUD Bar Constants ===
-static const float BAR_LEFT = -0.925f;
-static const float BAR_RIGHT = -0.50f;
-static const float BAR_W = BAR_RIGHT - BAR_LEFT;
-static const float BAR_H = 0.032f;
-static const float BAR_HALF_H = 0.016f;
-static const float BAR_LABEL_X = -0.94f;
-static const float BAR_PCT_X = -0.52f;
-static const float BAR_TEXT_SC = 1.0f;
+// NDC -> canvas, for HUD code that still thinks in -1..1.
+inline float uiFromNdcX(float nx) { return nx * uiHalfW(); }
+inline float uiFromNdcY(float ny) { return ny * uiHalfH(); }
 
-// Draw a rectangular border frame using 4 thin rectangles
-// Thickness is in NDC units; auto-compensates for aspect ratio so lines look equal
-inline void drawBorderRect(float left, float bottom, float right, float top,
-    float r, float g, float b, float a, float thickness) {
-    extern int currentWinW, currentWinH;
-    float aspect = (float)currentWinW / (float)currentWinH;
-    float vt = thickness / aspect;  // vertical-edge thickness (pixel-matched)
-    float inset = thickness * 0.5f; // draw slightly inside to avoid sub-pixel gaps
-    // Top edge
-    drawOverlayRectNdc(left + vt, top - thickness, right - vt, top, r, g, b, a);
-    // Bottom edge
-    drawOverlayRectNdc(left + vt, bottom, right - vt, bottom + thickness, r, g, b, a);
-    // Left edge (full height to cover corners)
-    drawOverlayRectNdc(left, bottom, left + vt, top, r, g, b, a);
-    // Right edge
-    drawOverlayRectNdc(right - vt, bottom, right, top, r, g, b, a);
+// Backing of a HUD group, an NDC rectangle: a dark plate, no outline.
+inline void drawHudPlate(float left, float bottom, float right, float top, float bodyAlpha = 0.62f) {
+    float l = uiFromNdcX(left), r = uiFromNdcX(right), b = uiFromNdcY(bottom), t = uiFromNdcY(top);
+    uiRect(l, b, r, t, UI_BLACK, bodyAlpha);
 }
 
-// Draw corner accent marks (2 short lines per corner, extending inward)
-inline void drawCornerAccents(float left, float bottom, float right, float top,
-    float r, float g, float b, float a, float len, float thickness) {
-    extern int currentWinW, currentWinH;
-    float vt = thickness / ((float)currentWinW / (float)currentWinH);
-    // Top-left corner: horizontal right, vertical down
-    drawOverlayRectNdc(left, top - thickness, left + len, top, r, g, b, a);
-    drawOverlayRectNdc(left, top - len, left + vt, top, r, g, b, a);
-    // Top-right corner: horizontal left, vertical down
-    drawOverlayRectNdc(right - len, top - thickness, right, top, r, g, b, a);
-    drawOverlayRectNdc(right - vt, top - len, right, top, r, g, b, a);
-    // Bottom-left corner: horizontal right, vertical up
-    drawOverlayRectNdc(left, bottom, left + len, bottom + thickness, r, g, b, a);
-    drawOverlayRectNdc(left, bottom, left + vt, bottom + len, r, g, b, a);
-    // Bottom-right corner: horizontal left, vertical up
-    drawOverlayRectNdc(right - len, bottom, right, bottom + thickness, r, g, b, a);
-    drawOverlayRectNdc(right - vt, bottom, right, bottom + len, r, g, b, a);
+// Small square slot (carried loot): dark cell with a hairline frame.
+inline void drawHudSlot(float cxNdc, float cyNdc, float hNdc, bool filled) {
+    float cx = uiFromNdcX(cxNdc), cy = uiFromNdcY(cyNdc), half = uiFromNdcY(hNdc) * 0.5f;
+    uiRect(cx - half, cy - half, cx + half, cy + half, UI_BLACK, 0.30f);
+    uiFrame(cx - half, cy - half, cx + half, cy + half, filled ? UI_DIM : UI_LINE, filled ? 0.80f : 0.45f);
 }
 
-// Panel backdrop behind left-side bars (stamina, HP, sanity)
-inline void drawLeftBarPanel() {
-    float pl = -0.97f, pr = -0.48f;
-    float sl = -0.94f, sr = -0.51f;
-    drawOverlayRectNdc(pl, -0.97f, pr, -0.78f, 0.01f, 0.01f, 0.02f, 0.50f);
-    // Panel border frame
-    drawBorderRect(pl, -0.97f, pr, -0.78f, 0.30f, 0.27f, 0.24f, 0.85f, 0.004f);
-    // Corner accents for horror feel
-    drawCornerAccents(pl, -0.97f, pr, -0.78f, 0.50f, 0.45f, 0.36f, 0.92f, 0.015f, 0.004f);
-    // Separator lines between bars
-    drawOverlayRectNdc(sl, -0.853f, sr, -0.850f, 0.25f, 0.22f, 0.18f, 0.55f);
-    drawOverlayRectNdc(sl, -0.908f, sr, -0.905f, 0.25f, 0.22f, 0.18f, 0.55f);
-}
+struct HudBarAnim {
+    float shown = 0.0f; // fades the bar in while it has something to say
+    float trail = 1.0f; // where the fill was a moment ago: losses leave a pale tail
+};
 
-// Panel backdrop behind right-side flashlight bar
-inline void drawRightBarPanel() {
-    float pl = 0.48f, pr = 0.97f;
-    drawOverlayRectNdc(pl, -0.97f, pr, -0.89f, 0.01f, 0.01f, 0.02f, 0.50f);
-    // Panel border frame
-    drawBorderRect(pl, -0.97f, pr, -0.89f, 0.30f, 0.27f, 0.24f, 0.85f, 0.004f);
-    // Corner accents for horror feel
-    drawCornerAccents(pl, -0.97f, pr, -0.89f, 0.50f, 0.45f, 0.36f, 0.92f, 0.015f, 0.004f);
-}
+inline constexpr float HUD_BAR_W = 180.0f;
+inline constexpr float HUD_BAR_PITCH = 20.0f;
 
-// Generic visual bar: background track + colored fill + label + percentage + border + ticks
-inline void drawVisualBar(float yCenter, int icon, float frac,
-    float fr, float fg, float fb, float lr, float lg, float lb) {
-    float left = BAR_LEFT, right = BAR_RIGHT, w = BAR_W;
-    float labelX = BAR_LABEL_X, pctX = BAR_PCT_X;
-    float yBot = yCenter - BAR_HALF_H;
-    float yTop = yCenter + BAR_HALF_H;
-    // Dark track background
-    drawOverlayRectNdc(left, yBot, right, yTop, 0.02f, 0.02f, 0.03f, 0.6f);
-    // Tick marks at 25%, 50%, 75%
-    float tick25 = left + w * 0.25f;
-    float tick50 = left + w * 0.50f;
-    float tick75 = left + w * 0.75f;
-    drawOverlayRectNdc(tick25, yBot, tick25 + 0.001f, yTop, 0.30f, 0.28f, 0.24f, 0.35f);
-    drawOverlayRectNdc(tick50, yBot, tick50 + 0.001f, yTop, 0.30f, 0.28f, 0.24f, 0.35f);
-    drawOverlayRectNdc(tick75, yBot, tick75 + 0.001f, yTop, 0.30f, 0.28f, 0.24f, 0.35f);
-    // Colored fill (clamped)
-    if (frac > 0.001f) {
-        float fillR = left + w * (frac > 1.0f ? 1.0f : frac);
-        drawOverlayRectNdc(left + 0.002f, yBot + 0.002f, fillR - 0.002f, yTop - 0.002f, fr, fg, fb, 0.85f);
-    }
-    // Border frame around bar track
-    drawBorderRect(left, yBot, right, yTop, 0.40f, 0.36f, 0.30f, 0.85f, 0.004f);
-    // Pictogram instead of a label; the fill itself is the number
-    (void)labelX; (void)pctX;
-    drawIcon(icon, left - 0.012f, yCenter, 0.046f, lr, lg, lb, 0.9f);
+// One vital bar. `slot` counts up from the bottom edge; `rightSide` mirrors it to the right
+// corner. Hidden bars fade out instead of popping.
+inline void drawVitalBar(HudBarAnim& anim, int slot, bool rightSide, int icon, float frac, bool visible, UiCol fill) {
+    frac = uiClamp01(frac);
+    anim.shown = uiApproach(anim.shown, visible ? 1.0f : 0.0f, 9.0f);
+    anim.trail = frac >= anim.trail ? frac : uiApproach(anim.trail, frac, 2.2f);
+    if (anim.shown < 0.02f) return;
+
+    float hw = uiHalfW(), y = -uiHalfH() + 30.0f + HUD_BAR_PITCH * (float)slot;
+    float l = rightSide ? hw - 36.0f - HUD_BAR_W : -hw + 62.0f, r = l + HUD_BAR_W;
+    float prevAlpha = ui.alpha;
+    ui.alpha = prevAlpha * anim.shown;
+
+    // a thin line: dark track, pale tail of what was just lost, coloured fill
+    uiRect(l, y - 2.0f, r, y + 2.0f, UI_BLACK, 0.55f);
+    if (anim.trail > frac + 0.004f) uiRect(l + HUD_BAR_W * frac, y - 2.0f, l + HUD_BAR_W * anim.trail, y + 2.0f, UI_TEXT, 0.55f);
+    if (frac > 0.002f) uiRect(l, y - 2.0f, l + HUD_BAR_W * frac, y + 2.0f, fill, 0.95f);
+    uiIcon(icon, l - 17.0f, y, 17.0f, frac < 0.25f ? uiMix(UI_TEXT, fill, 0.6f) : UI_DIM, 0.9f);
+    ui.alpha = prevAlpha;
 }
 
 inline void drawHealthBar(float hp) {
-    glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    float frac = hp / 100.0f;
-    float fr, fg, fb;
+    static HudBarAnim anim;
+    UiCol fill = {0.72f, 0.16f, 0.11f};
     if (hp < 30.0f) {
-        float pulse = 0.5f + 0.5f * sinf(vhsTime * 5.0f);
-        fr = 0.95f; fg = 0.2f * pulse; fb = 0.1f * pulse;
-    } else {
-        fr = 0.7f; fg = 0.15f; fb = 0.1f;
+        float pulse = uiPulse(5.0f);
+        fill = {0.95f, 0.20f * pulse, 0.10f * pulse};
     }
-    drawVisualBar(-0.88f, HUD_ICON_HEART, frac, fr, fg, fb, 0.65f, 0.6f, 0.5f);
-    glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
+    drawVitalBar(anim, 1, false, HUD_ICON_HEART, hp / 100.0f, hp < 100.0f, fill);
 }
 
-inline void drawSanityBar(float sn) {
-    glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    float frac = sn / 100.0f;
-    float fr, fg, fb;
-    if (sn < 30.0f) {
+inline void drawSanityBar(float sanity) {
+    static HudBarAnim anim;
+    UiCol fill = {0.40f, 0.24f, 0.62f};
+    if (sanity < 30.0f) {
         float flicker = 0.5f + 0.5f * sinf(vhsTime * 8.0f + sinf(vhsTime * 13.0f) * 2.0f);
-        fr = 0.45f * flicker; fg = 0.15f * flicker; fb = 0.65f * flicker;
-    } else {
-        fr = 0.35f; fg = 0.2f; fb = 0.55f;
+        fill = {0.50f * flicker + 0.08f, 0.17f * flicker + 0.04f, 0.72f * flicker + 0.10f};
     }
-    drawVisualBar(-0.93f, HUD_ICON_SANITY, frac, fr, fg, fb, 0.65f, 0.6f, 0.5f);
-    glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
+    drawVitalBar(anim, 0, false, HUD_ICON_SANITY, sanity / 100.0f, sanity < 100.0f, fill);
 }
 
-inline void drawDamageOverlay(float fl, float hp) {
-    if (fl < 0.01f && hp > 50.0f) return;
-    glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    float lo = (100.0f - hp) / 100.0f * 0.3f;
-    float a = fl + lo;
-    if (a > 0.8f) a = 0.8f;
-    // Red vignette edges
-    drawOverlayRectNdc(-1.0f, 0.85f, 1.0f, 1.0f, 0.6f, 0.0f, 0.0f, a * 0.5f);
-    drawOverlayRectNdc(-1.0f, -1.0f, 1.0f, -0.85f, 0.6f, 0.0f, 0.0f, a * 0.5f);
-    drawOverlayRectNdc(-1.0f, -1.0f, -0.85f, 1.0f, 0.6f, 0.0f, 0.0f, a * 0.4f);
-    drawOverlayRectNdc(0.85f, -1.0f, 1.0f, 1.0f, 0.6f, 0.0f, 0.0f, a * 0.4f);
-    glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
-}
-
-inline void drawStaminaBar(float st) {
-    if (st >= 124.0f) return;
-    glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    float frac = st / 125.0f;
-    float fr, fg, fb;
-    if (st < 25.0f) {
-        float pulse = 0.5f + 0.5f * sinf(vhsTime * 6.0f);
-        fr = 0.5f * pulse + 0.1f; fg = 0.6f * pulse + 0.2f; fb = 0.15f * pulse;
-    } else {
-        fr = 0.2f; fg = 0.5f; fb = 0.2f;
+inline void drawStaminaBar(float stamina) {
+    static HudBarAnim anim;
+    UiCol fill = {0.24f, 0.56f, 0.24f};
+    if (stamina < 25.0f) {
+        float pulse = uiPulse(6.0f);
+        fill = {0.50f * pulse + 0.10f, 0.60f * pulse + 0.20f, 0.15f * pulse};
     }
-    drawVisualBar(-0.82f, HUD_ICON_STAMINA, frac, fr, fg, fb, 0.65f, 0.6f, 0.5f);
-    glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
+    drawVitalBar(anim, 2, false, HUD_ICON_STAMINA, stamina / 125.0f, stamina < 124.0f, fill);
 }
 
 inline void drawFlashlightBattery(float battery, bool isOn) {
-    glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    drawRightBarPanel();
-    float frac = battery / 100.0f;
-    float fr, fg, fb;
-    if (isOn) { fr = 0.8f; fg = 0.75f; fb = 0.2f; }
-    else { fr = 0.3f; fg = 0.3f; fb = 0.3f; }
-    float fLeft = 0.525f, fRight = 0.95f;
-    float fW = fRight - fLeft;
-    float yBot = -0.93f - BAR_HALF_H;
-    float yTop = -0.93f + BAR_HALF_H;
-    // Track
-    drawOverlayRectNdc(fLeft, yBot, fRight, yTop, 0.02f, 0.02f, 0.03f, 0.6f);
-    // Tick marks at 25%, 50%, 75%
-    float ftick25 = fLeft + fW * 0.25f;
-    float ftick50 = fLeft + fW * 0.50f;
-    float ftick75 = fLeft + fW * 0.75f;
-    drawOverlayRectNdc(ftick25, yBot, ftick25 + 0.001f, yTop, 0.30f, 0.28f, 0.24f, 0.35f);
-    drawOverlayRectNdc(ftick50, yBot, ftick50 + 0.001f, yTop, 0.30f, 0.28f, 0.24f, 0.35f);
-    drawOverlayRectNdc(ftick75, yBot, ftick75 + 0.001f, yTop, 0.30f, 0.28f, 0.24f, 0.35f);
-    // Fill
-    if (frac > 0.001f) {
-        float fillR = fLeft + fW * (frac > 1.0f ? 1.0f : frac);
-        drawOverlayRectNdc(fLeft + 0.002f, yBot + 0.002f, fillR - 0.002f, yTop - 0.002f, fr, fg, fb, 0.85f);
-    }
-    // Border frame around bar track
-    drawBorderRect(fLeft, yBot, fRight, yTop, 0.40f, 0.36f, 0.30f, 0.85f, 0.004f);
-    drawIcon(HUD_ICON_FLASHLIGHT, fLeft - 0.012f, -0.93f, 0.046f, 0.65f, 0.6f, 0.5f, 0.9f);
-    glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
+    static HudBarAnim anim;
+    UiCol fill = isOn ? UiCol{0.86f, 0.78f, 0.24f} : UiCol{0.36f, 0.35f, 0.32f};
+    if (isOn && battery < 20.0f) fill = uiMix(fill, UI_BAD, uiPulse(6.0f));
+    drawVitalBar(anim, 0, true, HUD_ICON_FLASHLIGHT, battery / 100.0f, battery < 100.0f, fill);
+}
+
+// Shift clock, top-right.
+inline void drawSurvivalTime(float t) {
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%d:%02d", (int)(t / 60.0f), (int)t % 60);
+    float right = uiHalfW() - 40.0f, y = uiHalfH() - 36.0f;
+    float w = uiTextW(buf, 2.0f);
+    uiTextShadow(buf, right - w, y, 2.0f, UI_DIM, 0.85f);
+}
+
+// Colour bleeding in from the edges of the screen.
+inline void drawEdgeVignette(UiCol c, float a, float reach) {
+    float hw = uiHalfW(), hh = uiHalfH();
+    uiGradV(-hw, hh - reach, hw, hh, c, 0.0f, a);
+    uiGradV(-hw, -hh, hw, -hh + reach, c, a, 0.0f);
+    uiGradH(-hw, -hh, -hw + reach * 1.3f, hh, c, a, 0.0f);
+    uiGradH(hw - reach * 1.3f, -hh, hw, hh, c, 0.0f, a);
+}
+
+// Red at the edges: a flash on every hit, and a steady stain below half health.
+inline void drawDamageOverlay(float flash, float hp) {
+    if (flash < 0.01f && hp > 50.0f) return;
+    float a = flash + (100.0f - hp) / 100.0f * 0.3f;
+    if (a > 0.8f) a = 0.8f;
+    drawEdgeVignette({0.62f, 0.0f, 0.0f}, a * 0.85f, 150.0f + 110.0f * uiClamp01(flash));
 }
 
 inline void drawHallucinationEffect(float intensity) {
     if (intensity < 0.05f) return;
-    glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     float a = intensity * 0.3f;
     if (a > 0.4f) a = 0.4f;
-    // Purple vignette edges
-    drawOverlayRectNdc(-1.0f, 0.88f, 1.0f, 1.0f, 0.3f, 0.0f, 0.4f, a);
-    drawOverlayRectNdc(-1.0f, -1.0f, 1.0f, -0.88f, 0.3f, 0.0f, 0.4f, a);
-    drawOverlayRectNdc(-1.0f, -1.0f, -0.88f, 1.0f, 0.3f, 0.0f, 0.4f, a * 0.8f);
-    drawOverlayRectNdc(0.88f, -1.0f, 1.0f, 1.0f, 0.3f, 0.0f, 0.4f, a * 0.8f);
-    glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
+    drawEdgeVignette({0.30f, 0.0f, 0.42f}, a * (1.3f + 0.3f * uiPulse(1.7f)), 170.0f);
 }

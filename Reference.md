@@ -38,7 +38,7 @@ src/
 ├── entity_model.h  - Entity mesh generation
 ├── entity.h        - Entity AI/manager
 ├── story.h         - Notes & phases
-├── menu.h          - UI rendering
+├── menu.h          - Font, text, backdrop (UI kit: see "UI")
 ├── input.h         - Input handling
 ├── net.h           - UDP networking
 ├── player_model.h  - Player meshes
@@ -60,7 +60,7 @@ src/
 | entity_model.h | Entity meshes | geometry.h |
 | entity.h | Entity logic | entity_types.h |
 | story.h | Game story | math.h |
-| menu.h | Draw UI | OpenGL |
+| menu.h | Font, text, backdrop; UI kit in ui_core.h / ui_widgets.h | OpenGL |
 | input.h | Handle keys | GLFW, menu.h |
 | net.h | Networking | winsock2 |
 | player_model.h | Player meshes | net.h |
@@ -234,7 +234,7 @@ Not wired into the loop (dead code, old design): echo signals and the trap corri
 | hud_icon_ids.h / hud_icon_art.h / hud_icons.h | pictogram ids, CPU atlas painter, GL drawing (icons, key caps, gauges, hold ring) |
 | hud_heist.h | goals, carry slots, prompts, toasts, kiosk price list, lesson hints, field notes |
 | hud_gameplay.h | world markers + edge pointer, downed / revive prompts |
-| hud_shift_report.h | extraction report, death screen, key sheet (pause -> GUIDE) |
+| hud_shift_report.h | extraction report, death screen, key sheet (pause -> KEY SHEET) |
 | void_shift_runtime.h | attention (noise / light) and the events it triggers |
 
 ### Monsters
@@ -438,6 +438,37 @@ void update(float dt){if(health<=0){die();return;}position+=velocity*dt;checkCol
 - Join game UI
 - IP entry
 - Player list
+
+## UI
+
+Menus and the HUD share one kit. Layouts are written for a 1280x720 canvas (origin in the middle,
+y up) and scale with the window, so text and panels keep their proportions at any resolution and
+aspect ratio.
+
+| File | Role |
+|------|------|
+| settings_model.h | `Settings`, the tabs and the row table of the settings screen: kind, label, hint, adjust / cycle / value text, bind swapping. No GL (tests: `tests/settings_model_tests.cpp`) |
+| menu.h | font atlas, text and overlay shaders, `drawText`, corridor backdrop, `GameState` |
+| ui_core.h | canvas units, palette (`UI_*`), flat / gradient quads, text helpers, per-frame state `ui`: click zones, mouse, key edges, typed characters, fade-in and highlight easing |
+| ui_widgets.h | panel, header, list row, button, slider, switch, stepper, tabs, text field, key cap, hint bar, spinner. Text on darkness: no boxes, frames or divider lines; selection is the accent colour plus one thin bar |
+| menu_screens.h | main menu, pause menu (item order enums shared with input) |
+| menu_settings.h | settings screen |
+| menu_multi.h | multiplayer: mode + callsign, join (rooms list), host lobby, waiting room |
+| menu_hud.h | vital bars, shift clock, hurt / hallucination vignettes, HUD plates |
+| input_common.h | `uiPollInput` (one mouse + key snapshot per frame), `uiMenuNav`, `uiBackRequested` |
+| input_menu.h / input_settings.h / input_multi.h | what each screen does with that input |
+
+How a screen works: the draw function lays out widgets and each widget registers a click zone
+(`uiZone`); next frame the input function calls `uiPollInput`, then `uiMenuNav(count)` for
+up/down, hover and click on the items, and checks the special zones it cares about (tabs, slider
+tracks, steppers, back). Keyboard and mouse always do the same thing. A click is press + release
+on the same item. Text fields read `ui.chars`, filled by the GLFW char / key callbacks.
+
+To add a setting: add a `SET_*` id, one line in the tab's row table and its case in the
+`setting*Ref` switch in settings_model.h. The screen and the input pick it up from there.
+
+Every menu screen is drawn into `build/selftest_ui_*.bmp` by the self-test (src/dev_selftest_ui.h);
+`BACKROOMS_SELFTEST_SIZE=1920x1080` runs it at another window size.
 
 ## Audio
 

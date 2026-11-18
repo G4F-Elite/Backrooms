@@ -99,9 +99,8 @@ inline void drawHeistCarry() {
     float step = h / hudAspect() * 1.15f;
     float x0 = -step * 1.5f;
     for (int i = 0; i < HEIST_CARRY_SLOTS; i++) {
-        float cx = x0 + step * (float)i, hw = h * 0.5f / hudAspect();
-        drawOverlayRectNdc(cx - hw, y - h * 0.5f, cx + hw, y + h * 0.5f, 0.02f, 0.02f, 0.03f, 0.50f);
-        drawBorderRect(cx - hw, y - h * 0.5f, cx + hw, y + h * 0.5f, 0.40f, 0.36f, 0.30f, 0.80f, 0.004f);
+        float cx = x0 + step * (float)i;
+        drawHudSlot(cx, y, h, carry[i] >= 0);
         if (carry[i] < 0) continue;
         HudColor c = lootInfo(carry[i]).weight >= 3 ? HUD_BAD : (lootInfo(carry[i]).weight == 2 ? HUD_PAPER : HUD_GOOD);
         drawIconC(lootIcon(carry[i]), cx, y, h * 0.78f, carry[i] == LOOT_CORE ? HUD_COOL : c);
@@ -188,8 +187,7 @@ inline void drawHeistShop() {
     const int keys[SHOP_ITEM_COUNT] = {settings.binds.item1, settings.binds.item2, settings.binds.item3, settings.binds.item4};
     const float h = 0.10f, y = -0.05f;
     float colW = 0.20f, x0 = -colW * 1.5f;
-    drawOverlayRectNdc(x0 - 0.12f, y - 0.20f, -x0 + 0.12f, y + 0.12f, 0.02f, 0.02f, 0.03f, 0.66f);
-    drawBorderRect(x0 - 0.12f, y - 0.20f, -x0 + 0.12f, y + 0.12f, 0.50f, 0.45f, 0.36f, 0.85f, 0.004f);
+    drawHudPlate(x0 - 0.12f, y - 0.20f, -x0 + 0.12f, y + 0.12f, 0.72f);
     drawIconC(HUD_ICON_SHOP, x0 - 0.07f, y + 0.07f, 0.06f, HUD_DIM);
     for (int i = 0; i < SHOP_ITEM_COUNT; i++) {
         int price = shopPrice(i, heistSquadSize());

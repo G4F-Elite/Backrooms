@@ -16,6 +16,7 @@ int main(){
     int appliedSwapInterval = settings.vsync ? 1 : 0;
     glfwSwapInterval(appliedSwapInterval);
     glfwSetCursorPosCallback(gWin,mouse);
+    uiInstallCallbacks(gWin);
     glfwSetFramebufferSizeCallback(gWin,windowResize);
     if(!gladLoadGL())return -1;
     glEnable(GL_DEPTH_TEST);glEnable(GL_CULL_FACE);
@@ -114,8 +115,6 @@ int main(){
             }
         }else if(gameState==STATE_SETTINGS) settingsInput(gWin,false);
         else if(gameState==STATE_SETTINGS_PAUSE) settingsInput(gWin,true);
-        else if(gameState==STATE_KEYBINDS) keybindsInput(gWin,false);
-        else if(gameState==STATE_KEYBINDS_PAUSE) keybindsInput(gWin,true);
         else if(gameState==STATE_MENU||gameState==STATE_GUIDE||gameState==STATE_PAUSE||
                  gameState==STATE_MULTI||gameState==STATE_MULTI_HOST||gameState==STATE_MULTI_JOIN||gameState==STATE_MULTI_WAIT){
             menuInput(gWin);
@@ -133,7 +132,7 @@ int main(){
                         restoreAfterReconnect = false;
                         multiState = MULTI_NONE;
                         gameState = STATE_MULTI;
-                        menuSel = 1;
+                        menuSel = MULTI_ITEM_JOIN;
                     }
                 }
             }
@@ -288,7 +287,7 @@ int main(){
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         gPostFx.sceneDrawn=false;
         spectatorBeginView(); // dead co-op players watch through the spectator camera
-        if((gameState==STATE_GAME&&!isPlayerDead)||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_KEYBINDS_PAUSE||gameState==STATE_NOTE)
+        if((gameState==STATE_GAME&&!isPlayerDead)||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_NOTE)
             renderScene();
         
         glBindFramebuffer(GL_FRAMEBUFFER,0);
@@ -297,7 +296,7 @@ int main(){
         glDisable(GL_DEPTH_TEST);
 
         glUseProgram(vhsShader);
-        bool vhsMenu=(gameState==STATE_MENU||gameState==STATE_GUIDE||gameState==STATE_MULTI||gameState==STATE_MULTI_HOST||gameState==STATE_MULTI_JOIN||gameState==STATE_MULTI_WAIT),vhsGameplay=(gameState==STATE_GAME||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_KEYBINDS_PAUSE||gameState==STATE_INTRO); float vI=0.0f;
+        bool vhsMenu=(gameState==STATE_MENU||gameState==STATE_SETTINGS||gameState==STATE_GUIDE||gameState==STATE_MULTI||gameState==STATE_MULTI_HOST||gameState==STATE_MULTI_JOIN||gameState==STATE_MULTI_WAIT),vhsGameplay=(gameState==STATE_GAME||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_INTRO); float vI=0.0f;
         if(vhsMenu) vI=0.0f; else if(vhsGameplay){
             float sanityLoss=1.0f-(playerSanity/100.0f);
             if(sanityLoss<0.0f) sanityLoss=0.0f;

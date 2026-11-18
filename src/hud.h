@@ -28,18 +28,43 @@ inline void drawEyeMarker(float sx, float sy, float scale, float alpha) {
 #include "hud_gameplay.h"
 #include "hud_shift_report.h"
 
+// The squad size line in the co-op pause menu.
+inline const char* pauseSquadNote(){
+    static char note[32];
+    if(multiState!=MULTI_IN_GAME) return nullptr;
+    snprintf(note,sizeof(note),"SQUAD %d/%d",netMgr.getPlayerCount(),MAX_PLAYERS);
+    return note;
+}
+
+// F10 debug tools: a list of cheats and teleports.
+inline void drawDebugToolsPanel(){
+    const float w=420.0f, rowH=30.0f;
+    float h=UI_HEADER_H+16.0f+rowH*(float)DEBUG_ACTION_COUNT+14.0f;
+    float l=-w*0.5f, r=w*0.5f, t=h*0.5f+20.0f, b=t-h;
+    drawFullscreenOverlay(0.02f,0.03f,0.04f,0.45f);
+    uiPanel(l,b,r,t);
+    float y=uiPanelHeader(l,r,t,"DEBUG TOOLS","F10")-16.0f-rowH*0.5f;
+    for(int i=0;i<DEBUG_ACTION_COUNT;i++){
+        const char* lbl = debugActionLabel(i);
+        if(i==DEBUG_ACT_TP_NOTE) lbl = "TP NEAREST LOOT";
+        else if(i==DEBUG_ACT_TP_ECHO) lbl = "TP KIOSK";
+        else if(i==DEBUG_ACT_TP_EXIT) lbl = "TP DRILL";
+        uiListItem(i,lbl,l+14.0f,r-14.0f,y-rowH*(float)i,rowH-4.0f,debugTools.selectedAction==i,UI_ROW_TEXT);
+    }
+    static const UiHint hints[]={{"F10","CLOSE"}};
+    uiHintBar(hints,1);
+}
+
 void drawUI(){
+    uiBeginFrame(vhsTime,dTime);
     if(gameState==STATE_MENU) drawMenu(vhsTime);
     else if(gameState==STATE_GUIDE) drawGuideScreen();
     else if(gameState==STATE_MULTI) drawMultiMenuScreen(vhsTime);
     else if(gameState==STATE_MULTI_HOST) drawHostLobbyScreen(vhsTime,netMgr.getPlayerCount());
     else if(gameState==STATE_MULTI_JOIN) drawJoinMenuScreen(vhsTime);
     else if(gameState==STATE_MULTI_WAIT) drawWaitingScreen(vhsTime);
-    else if(gameState==STATE_PAUSE){
-        if(multiState==MULTI_IN_GAME) drawMultiPause(netMgr.getPlayerCount());
-        else drawPause();
-    }else if(gameState==STATE_SETTINGS||gameState==STATE_SETTINGS_PAUSE) drawSettings(gameState==STATE_SETTINGS_PAUSE);
-    else if(gameState==STATE_KEYBINDS||gameState==STATE_KEYBINDS_PAUSE) drawKeybindsMenu(gameState==STATE_KEYBINDS_PAUSE, menuSel, keybindCaptureIndex);
+    else if(gameState==STATE_PAUSE) drawPause(multiState==MULTI_IN_GAME,pauseSquadNote());
+    else if(gameState==STATE_SETTINGS||gameState==STATE_SETTINGS_PAUSE) drawSettings(gameState==STATE_SETTINGS_PAUSE,vhsTime);
     else if(gameState==STATE_GAME){
         gSurvivalTime=survivalTime;
         if(playerEscaped) drawShiftReportScreen(vhsTime);
@@ -73,12 +98,11 @@ void drawUI(){
                 }
             }
 
-            drawLeftBarPanel();  // Always visible
-            if(hudHealth<100)drawHealthBar(hudHealth);
-            if(playerSanity<100)drawSanityBar(playerSanity);
+            // Vital bars fade in only while they have something to say.
+            drawHealthBar(hudHealth);
+            drawSanityBar(playerSanity);
             drawStaminaBar(playerStamina);
-            if(flashlightBattery<100)drawFlashlightBattery(flashlightBattery,flashlightOn);
-            else drawRightBarPanel();  // Always visible when flashlight bar not drawn
+            drawFlashlightBattery(flashlightBattery,flashlightOn);
             if(activeDeviceSlot == 2){
                 // scanner: signal strength, and heat while it is locked on
                 float y = -0.78f;
@@ -180,22 +204,7 @@ void drawUI(){
                 drawIconC(HUD_ICON_WARNING,0.0f,0.80f,0.09f,HUD_BAD,0.6f+0.35f*hudPulse(6.0f));
             }
             // === DEBUG MODE: debug tools panel (F10) ===
-            if(settings.debugMode && debugTools.open){
-                drawFullscreenOverlay(0.02f,0.03f,0.04f,0.62f);
-                drawHudTextCentered("DEBUG TOOLS",0.0f,0.56f,1.8f,0.9f,0.95f,0.82f,0.98f);
-                for(int i=0;i<DEBUG_ACTION_COUNT;i++){
-                    float y = 0.47f - i*0.08f;
-                    float s = (debugTools.selectedAction==i)?1.0f:0.65f;
-                    const char* lbl = debugActionLabel(i);
-                    if(i==DEBUG_ACT_TP_NOTE) lbl = "TP NEAREST LOOT";
-                    else if(i==DEBUG_ACT_TP_ECHO) lbl = "TP KIOSK";
-                    else if(i==DEBUG_ACT_TP_EXIT) lbl = "TP DRILL";
-                    float baseX = -measureTextWidthNdc(lbl, 1.35f) * 0.5f;
-                    if(debugTools.selectedAction==i) drawHudText(">",baseX - 0.07f,y,1.4f,0.92f,0.9f,0.65f,0.95f);
-                    drawHudText(lbl,baseX,y,1.35f,0.82f*s,0.88f*s,0.72f*s,0.92f);
-                }
-                drawHudTextCentered("F10 TOGGLE  ENTER APPLY  ESC CLOSE",0.0f,-0.80f,1.12f,0.67f,0.72f,0.78f,0.90f);
-            }
+            if(settings.debugMode && debugTools.open) drawDebugToolsPanel();
         }
     }
 }

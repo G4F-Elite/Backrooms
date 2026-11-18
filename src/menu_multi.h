@@ -1,11 +1,14 @@
 #pragma once
-// Multiplayer menu UI - requires menu.h and net.h to be included first
-// Include order: glad.h -> menu.h -> net.h -> menu_multi.h
+// Multiplayer screens: mode + callsign, join, host lobby, waiting room.
+// Requires menu.h and net.h first. Input: input_multi.h (item order is shared through the
+// enums below).
+
 #include "lan_discovery.h"
 #include "player_name.h"
 #include "dedicated_client.h"
+#include "ui_widgets.h"
+#include "menu_screens.h"
 
-// Multiplayer state
 enum MultiState {
     MULTI_NONE = 0,
     MULTI_HOST_LOBBY,
@@ -15,13 +18,10 @@ enum MultiState {
 };
 
 inline MultiState multiState = MULTI_NONE;
-inline int multiMenuSel = 0;
 inline char multiJoinIP[64] = "192.168.0.1";
 inline char multiJoinPort[8] = "27015";
-inline int multiInputField = 0;  // 0 = IP, 1 = Port
 inline bool multiIPManualEdit = false;
 inline bool multiMasterManualEdit = false;
-inline bool multiEditingNickname = false;
 inline char multiNickname[PLAYER_NAME_BUF_LEN] = "Player";
 inline int multiNetworkMode = 0; // 0 LAN, 1 DEDICATED
 inline char multiMasterIP[64] = "127.0.0.1";
@@ -29,263 +29,205 @@ inline char multiMasterPort[8] = "27015";
 inline char multiConnectStatus[128] = "";
 inline float multiWaitBeforeStart = 0.0f;
 
-// Draw multiplayer main menu
+enum MultiMenuItem { MULTI_ITEM_NICK = 0, MULTI_ITEM_HOST, MULTI_ITEM_JOIN, MULTI_ITEM_COUNT };
+enum JoinMenuItem { JOIN_ITEM_ADDRESS = 0, JOIN_ITEM_PORT, JOIN_ITEM_CONNECT, JOIN_ITEM_FIRST_ROOM };
+enum HostMenuItem { HOST_ITEM_START = 0, HOST_ITEM_CLOSE, HOST_ITEM_COUNT };
+
+inline constexpr int JOIN_ROOMS_SHOWN = 5;
+inline constexpr float MULTI_PANEL_W = 600.0f;
+
+inline int joinRoomsShown() {
+    if (multiNetworkMode != 0) return 0;
+    return lanDiscovery.roomCount < JOIN_ROOMS_SHOWN ? lanDiscovery.roomCount : JOIN_ROOMS_SHOWN;
+}
+
+inline int joinItemCount() {
+    return JOIN_ITEM_FIRST_ROOM + joinRoomsShown();
+}
+
+inline void drawNetworkTabs(float l, float r, float y) {
+    static const char* names[2] = {"LAN", "SERVERS"};
+    uiTabs(l + 28.0f, r - 28.0f, y, 40.0f, names, 2, multiNetworkMode);
+}
+
+// Bottom strip of a panel: one line of status. `warn` paints it as a problem.
+inline void drawPanelStrip(float l, float r, float b, const char* text, bool warn = false) {
+    uiText(text, l + 28.0f, b + 18.0f, UI_SMALL_TEXT, warn ? UI_BAD : UI_MUTE);
+}
+
+// "LABEL   [ field ]" row. The field is item `idx`.
+inline void drawFieldRow(int idx, const char* label, float l, float r, float y, const char* text) {
+    uiText(label, l + 28.0f, y, UI_ROW_TEXT, menuSel == idx ? UI_ACCENT : UI_DIM);
+    uiField(idx, l + 190.0f, r - 28.0f, y, 32.0f, text, menuSel == idx);
+}
+
+// The four seats of the squad: who is in, who hosts, which are still empty.
+inline float drawSquadSlots(float l, float r, float y) {
+    const float rowH = 30.0f;
+    for (int i = 0; i < MAX_PLAYERS; i++) {
+        float ry = y - rowH * (float)i;
+        bool active = netMgr.players[i].active;
+        char num[8];
+        snprintf(num, sizeof(num), "%d", i + 1);
+        uiText(num, l, ry, UI_ROW_TEXT, UI_MUTE);
+        if (!active) continue;
+        uiText(netMgr.players[i].name[0] ? netMgr.players[i].name : "Player", l + 30.0f, ry, UI_ROW_TEXT, UI_TEXT);
+        if (i == 0) uiTextR("HOST", r, ry, UI_SMALL_TEXT, UI_DIM);
+        else if (i == netMgr.myId) uiTextR("YOU", r, ry, UI_SMALL_TEXT, UI_DIM);
+    }
+    return y - rowH * (float)MAX_PLAYERS;
+}
+
+inline void beginMultiScreen(float tm, float& in) {
+    uiBeginScreen();
+    uiMenuBackdrop(tm, 0.42f);
+    in = uiScreenIn(0.18f);
+    ui.alpha = in;
+}
+
+// Mode, callsign, then host or join.
 inline void drawMultiMenuScreen(float tm) {
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    
-    drawTextCentered("MULTIPLAYER", 0.0f, 0.45f, 3.0f, 0.9f, 0.85f, 0.4f, 0.9f);
-    
-    const char* opts[] = {"HOST GAME", "JOIN GAME", "BACK"};
-    for (int i = 0; i < 3; i++) {
-        float s = (menuSel == i) ? 1.0f : 0.5f;
-        float y = 0.1f - i * 0.12f;
-        float baseX = -measureTextWidthNdc(opts[i], 2.0f) * 0.5f;
-        if (menuSel == i) drawText(">", baseX - 0.08f, y, 2.0f, 0.9f * s, 0.85f * s, 0.4f * s);
-        drawText(opts[i], baseX, y, 2.0f, 0.9f * s, 0.85f * s, 0.4f * s);
-    }
-    
-    const bool lanTab = (multiNetworkMode == 0);
-    drawTextCentered(lanTab ? "[LAN]   SERVERS" : " LAN   [SERVERS]", 0.0f, -0.30f, 1.55f, 0.65f, 0.75f, 0.5f, 0.88f);
-    drawTextCentered(lanTab ? "LAN MODE: USE RADMIN OR HAMACHI" : "SERVERS MODE: CENTRALIZED DIRECTORY", 0.0f, -0.40f, 1.3f, 0.55f, 0.62f, 0.46f, 0.74f);
-    drawTextCentered("PORT: 27015 UDP", 0.0f, -0.48f, 1.35f, 0.5f, 0.5f, 0.4f, 0.6f);
-    drawText("NICKNAME:", -0.22f, -0.58f, 1.4f, 0.75f, 0.8f, 0.55f, 0.85f);
-    char nickVal[64];
-    snprintf(nickVal, 64, "[%s%s]", multiNickname, multiEditingNickname ? "_" : "");
-    drawText(nickVal, 0.05f, -0.58f, 1.4f, 0.82f, 0.86f, 0.62f, 0.90f);
-    drawTextCentered("TAB: EDIT NICKNAME   LEFT/RIGHT: SWITCH TAB", 0.0f, -0.68f, 1.1f, 0.55f, 0.6f, 0.45f, 0.7f);
+    float in = 0.0f;
+    beginMultiScreen(tm, in);
+    float l = -MULTI_PANEL_W * 0.5f, r = MULTI_PANEL_W * 0.5f;
+    float t = 170.0f - (1.0f - in) * 10.0f, b = t - 290.0f;
+    uiPanel(l, b, r, t);
+    float y = uiPanelHeader(l, r, t, "MULTIPLAYER") - 20.0f;
+    drawNetworkTabs(l, r, y);
+    y -= 48.0f;
+    drawFieldRow(MULTI_ITEM_NICK, "CALLSIGN", l, r, y, multiNickname);
+    y -= 48.0f;
+    uiButton(MULTI_ITEM_HOST, "HOST A GAME", l + 28.0f, y - 17.0f, r - 28.0f, y + 17.0f, menuSel == MULTI_ITEM_HOST);
+    y -= 36.0f;
+    uiButton(MULTI_ITEM_JOIN, "JOIN A GAME", l + 28.0f, y - 17.0f, r - 28.0f, y + 17.0f, menuSel == MULTI_ITEM_JOIN);
+
     lanDiscovery.ensureLocalIP();
-    char ipLine[96];
-    snprintf(ipLine, 96, "LOCAL IP: %s", lanDiscovery.localIP);
-    drawTextCentered(ipLine, 0.0f, -0.78f, 1.2f, 0.55f, 0.65f, 0.45f, 0.75f);
-    
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
+    char line[96];
+    snprintf(line, sizeof(line), "YOUR IP  %s    PORT  %d UDP", lanDiscovery.localIP, (int)NET_PORT);
+    if (multiConnectStatus[0]) drawPanelStrip(l, r, b, multiConnectStatus, true);
+    else drawPanelStrip(l, r, b, line);
+
+    ui.alpha = 1.0f;
+    static const UiHint hints[] = {{"ESC", "BACK"}, {"TAB", "LAN / SERVERS"}};
+    uiHintBar(hints, 2);
+    uiEndScreen();
 }
 
-// Draw join game IP entry with separate IP and Port fields
+inline void drawLanRoomRow(int idx, const LanRoomInfo& room, float l, float r, float y) {
+    float glow = uiRowBack(idx, l, y - 14.0f, r, y + 14.0f, menuSel == idx);
+    UiCol c = uiMix(UI_TEXT, UI_ACCENT, glow);
+    char players[16];
+    snprintf(players, sizeof(players), "%d/%d", (int)room.playerCount, (int)room.maxPlayers);
+    uiText(room.hostName[0] ? room.hostName : "Host", l + 14.0f, y, UI_ROW_TEXT, c);
+    uiText(room.ip, l + 204.0f, y, UI_SMALL_TEXT, UI_MUTE);
+    uiTextR(players, r - 100.0f, y, UI_ROW_TEXT, c);
+    uiTextR(room.gameStarted ? "IN GAME" : "LOBBY", r, y, UI_SMALL_TEXT, room.gameStarted ? UI_BAD : UI_DIM);
+}
+
+// What is known about the dedicated server the fields point at.
+inline void drawDedicatedInfo(float l, float y) {
+    char line[128];
+    float nowT = (float)glfwGetTime();
+    snprintf(line, sizeof(line), "TARGET  %s:%s", multiMasterIP, multiMasterPort);
+    uiText(line, l, y, UI_ROW_TEXT, UI_TEXT);
+    if (dedicatedDirectory.hasRecentResponse(nowT)) {
+        snprintf(line, sizeof(line), "DIRECTORY ONLINE, LAST ANSWER %.1fS AGO.", nowT - dedicatedDirectory.lastResponseAt);
+    } else if (dedicatedDirectory.queriesSent > 0) {
+        snprintf(line, sizeof(line), "DIRECTORY HAS NOT ANSWERED YET (%d REQUESTS).", dedicatedDirectory.queriesSent);
+    } else {
+        snprintf(line, sizeof(line), "DIRECT CONNECTION: NO SERVER DIRECTORY IS USED.");
+    }
+    uiText(line, l, y - 28.0f, UI_SMALL_TEXT, UI_DIM);
+}
+
+// Address + port, connect, and the rooms found on the local network.
 inline void drawJoinMenuScreen(float tm) {
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    
-    bool dedicated = (multiNetworkMode == 1);
-    drawTextCentered("JOIN GAME", 0.0f, 0.55f, 3.0f, 0.9f, 0.85f, 0.4f, 0.9f);
-    drawTextCentered(dedicated ? " LAN   [SERVERS]" : "[LAN]   SERVERS", 0.0f, 0.43f, 1.45f, 0.68f, 0.78f, 0.52f, 0.90f);
+    float in = 0.0f;
+    beginMultiScreen(tm, in);
+    bool dedicated = multiNetworkMode == 1;
+    float l = -MULTI_PANEL_W * 0.5f - 20.0f, r = MULTI_PANEL_W * 0.5f + 20.0f;
+    float t = 236.0f - (1.0f - in) * 10.0f, b = t - 452.0f;
+    uiPanel(l, b, r, t);
+    float y = uiPanelHeader(l, r, t, "JOIN") - 20.0f;
+    drawNetworkTabs(l, r, y);
+    y -= 48.0f;
+    drawFieldRow(JOIN_ITEM_ADDRESS, dedicated ? "SERVER IP" : "HOST IP", l, r, y, dedicated ? multiMasterIP : multiJoinIP);
+    y -= 40.0f;
+    drawFieldRow(JOIN_ITEM_PORT, "PORT", l, r, y, dedicated ? multiMasterPort : multiJoinPort);
+    y -= 48.0f;
+    uiButton(JOIN_ITEM_CONNECT, "CONNECT", l + 28.0f, y - 17.0f, r - 28.0f, y + 17.0f, menuSel == JOIN_ITEM_CONNECT);
+    y -= 52.0f;
 
-    // IP Field (LAN target IP or Public server IP)
-    float ipSel = (multiInputField == 0) ? 1.0f : 0.5f;
-    drawText(dedicated ? "PUBLIC IP:" : "IP ADDRESS:", -0.54f, 0.25f, 1.65f, 0.6f*ipSel, 0.6f*ipSel, 0.5f*ipSel, 0.8f);
-    char ipBuf[48];
-    const char* shownIP = dedicated ? multiMasterIP : multiJoinIP;
-    if (multiInputField == 0) {
-        snprintf(ipBuf, 48, "[%s_]", shownIP);
+    if (dedicated) {
+        uiSection(l + 28.0f, r - 28.0f, y, "DEDICATED SERVER");
+        drawDedicatedInfo(l + 28.0f, y - 34.0f);
     } else {
-        snprintf(ipBuf, 48, "[%s]", shownIP);
-    }
-    drawText(ipBuf, -0.54f, 0.12f, 1.85f, 0.9f*ipSel, 0.9f*ipSel, 0.6f*ipSel, 1.0f);
-    
-    // Port Field (LAN target port or Public server port)
-    float portSel = (multiInputField == 1) ? 1.0f : 0.5f;
-    drawText(dedicated ? "PUBLIC PORT:" : "PORT:", 0.16f, 0.25f, 1.65f, 0.6f*portSel, 0.6f*portSel, 0.5f*portSel, 0.8f);
-    char portBuf[24];
-    const char* shownPort = dedicated ? multiMasterPort : multiJoinPort;
-    if (multiInputField == 1) {
-        snprintf(portBuf, 24, "[%s_]", shownPort);
-    } else {
-        snprintf(portBuf, 24, "[%s]", shownPort);
-    }
-    drawText(portBuf, 0.16f, 0.12f, 1.85f, 0.9f*portSel, 0.9f*portSel, 0.6f*portSel, 1.0f);
-    
-    // Menu options
-    const char* opts[] = {"CONNECT", "BACK"};
-    for (int i = 0; i < 2; i++) {
-        float s = (menuSel == i) ? 1.0f : 0.5f;
-        float y = -0.1f - i * 0.12f;
-        float baseX = -measureTextWidthNdc(opts[i], 2.0f) * 0.5f;
-        if (menuSel == i) drawText(">", baseX - 0.08f, y, 2.0f, 0.9f * s, 0.85f * s, 0.4f * s);
-        drawText(opts[i], baseX, y, 2.0f, 0.9f * s, 0.85f * s, 0.4f * s);
-    }
-    
-    drawTextCentered("TAB TO SWITCH FIELDS    0-9 AND . FOR INPUT", 0.0f, -0.4f, 1.3f, 0.5f, 0.5f, 0.4f, 0.6f);
-    drawTextCentered(dedicated ? "BACKSPACE TO DELETE     ENTER/G CONNECT" : "BACKSPACE TO DELETE     ENTER TO CONNECT", 0.0f, -0.5f, 1.3f, 0.5f, 0.5f, 0.4f, 0.6f);
-    drawTextCentered("LEFT/RIGHT OR T: SWITCH LAN/SERVERS TAB", 0.0f, -0.57f, 1.1f, 0.55f, 0.62f, 0.46f, 0.72f);
-    if (multiNetworkMode == 0) drawTextCentered("AUTO LAN SCAN: R REFRESH, F NEXT ROOM", 0.0f, -0.64f, 1.2f, 0.55f, 0.65f, 0.45f, 0.7f);
-    else drawTextCentered("PUBLIC ROOM: ENTER IP/PORT, G OR ENTER CONNECT", 0.0f, -0.64f, 1.05f, 0.55f, 0.65f, 0.45f, 0.7f);
-    
-    char roomHead[64];
-    snprintf(roomHead, 64, multiNetworkMode == 0 ? "ROOMS FOUND: %d" : "PUBLIC ROOM MODE", multiNetworkMode == 0 ? lanDiscovery.roomCount : dedicatedDirectory.roomCount);
-    drawTextCentered(roomHead, 0.0f, -0.76f, 1.2f, 0.7f, 0.8f, 0.55f, 0.75f);
-    if (!dedicated) {
-        for (int i = 0; i < lanDiscovery.roomCount && i < 3; i++) {
-            const LanRoomInfo& room = lanDiscovery.rooms[i];
-            char roomLine[128];
-            snprintf(roomLine, 128, "%s %d/%d %s", room.ip, (int)room.playerCount, (int)room.maxPlayers, room.gameStarted ? "IN GAME" : "LOBBY");
-            float alpha = (i == lanDiscovery.selectedRoom) ? 0.95f : 0.65f;
-            drawTextCentered(roomLine, 0.0f, -0.84f - i * 0.07f, 1.1f, 0.75f, 0.85f, 0.6f, alpha);
+        uiSection(l + 28.0f, r - 28.0f, y, "ROOMS");
+        int shown = joinRoomsShown();
+        for (int i = 0; i < shown; i++) {
+            drawLanRoomRow(JOIN_ITEM_FIRST_ROOM + i, lanDiscovery.rooms[i], l + 14.0f, r - 28.0f, y - 30.0f - 30.0f * (float)i);
         }
-    } else {
-        char roomLine[128];
-        snprintf(roomLine, 128, "TARGET PUBLIC ROOM: %s:%s", multiMasterIP, multiMasterPort);
-        drawTextCentered(roomLine, 0.0f, -0.84f, 1.1f, 0.75f, 0.85f, 0.6f, 0.95f);
-        float nowT = (float)glfwGetTime();
-        char linkLine[128];
-        if (dedicatedDirectory.hasRecentResponse(nowT)) snprintf(linkLine, 128, "MASTER LINK: ONLINE (%.1fs ago)", nowT - dedicatedDirectory.lastResponseAt);
-        else if (dedicatedDirectory.queriesSent > 0) snprintf(linkLine, 128, "MASTER LINK: NO RESPONSE YET (%d req)", dedicatedDirectory.queriesSent);
-        else snprintf(linkLine, 128, "MASTER LINK: NOT USED IN PUBLIC DIRECT MODE");
-        drawTextCentered(linkLine, 0.0f, -0.99f, 1.06f, 0.78f, 0.86f, 0.62f, 0.86f);
+        if (shown == 0) {
+            uiSpinner(l + 37.0f, y - 32.0f, 7.0f, UI_DIM);
+            uiText("SEARCHING", l + 56.0f, y - 32.0f, UI_SMALL_TEXT, UI_MUTE);
+        }
     }
-    if (multiConnectStatus[0]) {
-        drawTextCentered(multiConnectStatus, 0.0f, -1.13f, 1.04f, 0.90f, 0.66f, 0.46f, 0.90f);
-    }
-    
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
+    if (multiConnectStatus[0]) drawPanelStrip(l, r, b, multiConnectStatus, true);
+
+    ui.alpha = 1.0f;
+    static const UiHint hints[] = {{"ESC", "BACK"}, {"TAB", "LAN / SERVERS"}};
+    uiHintBar(hints, 2);
+    uiEndScreen();
 }
 
-// Draw host lobby
+// Host: the seats fill up, then the host starts the shift.
 inline void drawHostLobbyScreen(float tm, int playerCount) {
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    
-    drawTextCentered("HOST LOBBY", 0.0f, 0.45f, 3.0f, 0.9f, 0.85f, 0.4f, 0.9f);
-    drawTextCentered("WAITING FOR PLAYERS...", 0.0f, 0.2f, 1.8f, 0.6f, 0.7f, 0.5f, 0.7f);
-    
-    char buf[48];
-    snprintf(buf, 48, "PLAYERS CONNECTED: %d/%d", playerCount, MAX_PLAYERS);
-    drawTextCentered(buf, 0.0f, 0.05f, 1.4f, 0.5f, 0.6f, 0.4f, 0.8f);
-    
-    const char* opts[] = {"START GAME", "BACK"};
-    for (int i = 0; i < 2; i++) {
-        float s = (menuSel == i) ? 1.0f : 0.5f;
-        float y = -0.15f - i * 0.12f;
-        float baseX = -measureTextWidthNdc(opts[i], 2.0f) * 0.5f;
-        if (menuSel == i) drawText(">", baseX - 0.08f, y, 2.0f, 0.9f * s, 0.85f * s, 0.4f * s);
-        drawText(opts[i], baseX, y, 2.0f, 0.9f * s, 0.85f * s, 0.4f * s);
-    }
-    
-    float listY = -0.42f;
-    drawTextCentered("PLAYERS IN LOBBY:", 0.0f, listY, 1.3f, 0.65f, 0.75f, 0.55f, 0.8f);
-    listY -= 0.08f;
-    for (int i = 0; i < MAX_PLAYERS; i++) {
-        char playerLine[80];
-        const bool active = netMgr.players[i].active;
-        const char* name = active ? netMgr.players[i].name : "(empty)";
-        if (active && i == 0) snprintf(playerLine, 80, "%d. %s [HOST]", i + 1, name);
-        else snprintf(playerLine, 80, "%d. %s", i + 1, name);
-        drawTextCentered(playerLine, 0.0f, listY, 1.1f, active ? 0.7f : 0.45f, active ? 0.8f : 0.45f, active ? 0.55f : 0.4f, active ? 0.85f : 0.6f);
-        listY -= 0.07f;
-    }
+    float in = 0.0f;
+    beginMultiScreen(tm, in);
+    float l = -MULTI_PANEL_W * 0.5f, r = MULTI_PANEL_W * 0.5f;
+    float t = 180.0f - (1.0f - in) * 10.0f, b = t - 330.0f;
+    uiPanel(l, b, r, t);
+    char note[32];
+    snprintf(note, sizeof(note), "%d/%d", playerCount, MAX_PLAYERS);
+    float y = uiPanelHeader(l, r, t, "LOBBY", note) - 26.0f;
+    y = drawSquadSlots(l + 28.0f, r - 28.0f, y) - 18.0f;
+    uiButton(HOST_ITEM_START, "START THE SHIFT", l + 28.0f, y - 17.0f, r - 28.0f, y + 17.0f, menuSel == HOST_ITEM_START);
+    y -= 36.0f;
+    uiButton(HOST_ITEM_CLOSE, "CLOSE LOBBY", l + 28.0f, y - 17.0f, r - 28.0f, y + 17.0f, menuSel == HOST_ITEM_CLOSE);
 
-    drawTextCentered("SHARE YOUR RADMIN/HAMACHI IP", 0.0f, -0.75f, 1.3f, 0.5f, 0.5f, 0.4f, 0.6f);
     lanDiscovery.ensureLocalIP();
-    char ipLine[96];
-    snprintf(ipLine, 96, "YOUR LAN IP: %s", lanDiscovery.localIP);
-    drawTextCentered(ipLine, 0.0f, -0.84f, 1.2f, 0.6f, 0.75f, 0.5f, 0.8f);
-    
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
+    char line[96];
+    snprintf(line, sizeof(line), "%s:%d", lanDiscovery.localIP, (int)NET_PORT);
+    drawPanelStrip(l, r, b, line);
+
+    ui.alpha = 1.0f;
+    static const UiHint hints[] = {{"ESC", "CLOSE LOBBY"}};
+    uiHintBar(hints, 1);
+    uiEndScreen();
 }
 
-// Draw connecting/waiting screen
+// Client: handshake, then the lobby until the host starts.
 inline void drawWaitingScreen(float tm) {
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    
-    if(netMgr.welcomeReceived){
-        drawTextCentered("CONNECTED TO HOST", 0.0f, 0.3f, 2.5f, 0.3f, 0.8f, 0.3f, 0.9f);
-        drawTextCentered("WAITING FOR HOST TO START...", 0.0f, 0.1f, 2.0f, 0.9f, 0.85f, 0.6f, 0.7f+0.2f*sinf(tm*2.0f));
-    }else{
-        drawTextCentered("CONNECTING TO HOST...", 0.0f, 0.3f, 2.5f, 0.85f, 0.75f, 0.45f, 0.9f);
-        drawTextCentered("NO HANDSHAKE YET", 0.0f, 0.1f, 1.8f, 0.8f, 0.65f, 0.45f, 0.85f);
-    }
-    char pc[48];
-    snprintf(pc, 48, "LOBBY: %d/%d PLAYERS", netMgr.getPlayerCount(), MAX_PLAYERS);
-    drawTextCentered(pc, 0.0f, -0.05f, 1.4f, 0.65f, 0.75f, 0.55f, 0.8f);
-    if(netMgr.connected){
-        char netLine[72];
-        std::snprintf(netLine, 72, "NET: %s  PING: %.0fms", netMgr.connectionQualityLabel((float)glfwGetTime()), netMgr.rttMs);
-        drawTextCentered(netLine, 0.0f, -0.12f, 1.2f, 0.68f, 0.78f, 0.58f, 0.82f);
-        if(netMgr.connectionUnstable((float)glfwGetTime())){
-            drawTextCentered("CONNECTION UNSTABLE. AUTO-RECOVERY ACTIVE.", 0.0f, -0.20f, 1.12f, 0.9f, 0.62f, 0.42f, 0.9f);
-        }
-    }
-    float py = -0.30f;
-    for (int i = 0; i < MAX_PLAYERS; i++) {
-        if (!netMgr.players[i].active) continue;
-        char line[72];
-        const char* nm = netMgr.players[i].name[0] ? netMgr.players[i].name : "Player";
-        snprintf(line, 72, "%d. %s%s", i + 1, nm, i == 0 ? " [HOST]" : "");
-        drawTextCentered(line, 0.0f, py, 1.1f, 0.72f, 0.82f, 0.62f, 0.78f);
-        py -= 0.07f;
-    }
-    
-    drawTextCentered("PRESS ESC TO DISCONNECT", 0.0f, -0.7f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);
-    if(multiConnectStatus[0]) drawTextCentered(multiConnectStatus, 0.0f, -0.78f, 1.05f, 0.90f, 0.66f, 0.46f, 0.88f);
-    
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
-}
+    float in = 0.0f;
+    beginMultiScreen(tm, in);
+    float l = -MULTI_PANEL_W * 0.5f, r = MULTI_PANEL_W * 0.5f;
+    float t = 150.0f - (1.0f - in) * 10.0f, b = t - 270.0f;
+    uiPanel(l, b, r, t);
+    bool inLobby = netMgr.welcomeReceived;
+    char note[48] = "";
+    float nowT = (float)glfwGetTime();
+    if (netMgr.connected) snprintf(note, sizeof(note), "%s  %.0f MS", netMgr.connectionQualityLabel(nowT), netMgr.rttMs);
+    float y = uiPanelHeader(l, r, t, inLobby ? "LOBBY" : "CONNECTING", note) - 26.0f;
+    drawSquadSlots(l + 28.0f, r - 28.0f, y);
+    uiSpinner(l + 37.0f, b + 54.0f, 7.0f, UI_DIM);
+    uiText(inLobby ? "WAITING FOR THE HOST" : "NO ANSWER YET", l + 56.0f, b + 54.0f, UI_SMALL_TEXT, UI_MUTE);
 
-// Draw multiplayer pause menu with teleport option
-inline void drawMultiPause(int playerCount) {
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    drawFullscreenOverlay(0.02f,0.02f,0.03f,0.72f);
-    
-    drawTextCentered("PAUSED", 0.0f, 0.35f, 3.0f, 0.9f, 0.85f, 0.4f);
-    
-    char buf[32];
-    snprintf(buf, 32, "PLAYERS: %d", playerCount);
-    drawTextCentered(buf, 0.0f, 0.2f, 1.5f, 0.5f, 0.7f, 0.5f, 0.7f);
-    
-    const char* opts[] = {"RESUME", "TELEPORT TO PLAYER", "SETTINGS", "GUIDE", "DISCONNECT", "QUIT"};
-    for (int i = 0; i < 6; i++) {
-        float s = (menuSel == i) ? 1.0f : 0.5f;
-        float y = 0.0f - i * 0.1f;
-        float baseX = -measureTextWidthNdc(opts[i], 1.8f) * 0.5f;
-        if (menuSel == i) drawText(">", baseX - 0.07f, y, 1.8f, 0.9f * s, 0.85f * s, 0.4f * s);
-        drawText(opts[i], baseX, y, 1.8f, 0.9f * s, 0.85f * s, 0.4f * s);
-    }
-    
-    drawTextCentered("ESC - RESUME", 0.0f, -0.65f, 1.5f, 0.5f, 0.5f, 0.4f, 0.6f);
-    
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
-}
+    bool unstable = netMgr.connected && netMgr.connectionUnstable(nowT);
+    if (unstable) drawPanelStrip(l, r, b, "CONNECTION UNSTABLE. RECOVERING ON ITS OWN.", true);
+    else if (multiConnectStatus[0]) drawPanelStrip(l, r, b, multiConnectStatus);
 
-// Draw in-game multiplayer HUD
-inline void drawMultiHUD(int playerCount, bool isHost) {
-    glDisable(GL_DEPTH_TEST);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    
-    char buf[32];
-    snprintf(buf, 32, "PLAYERS: %d", playerCount);
-    drawText(buf, 0.65f, 0.85f, 1.2f, 0.6f, 0.8f, 0.5f, 0.7f);
-    
-    if (isHost) {
-        drawText("HOST", 0.75f, 0.78f, 1.0f, 0.2f, 0.7f, 0.3f, 0.6f);
-    }
-    
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
-}
-
-// Handle IP input for join menu
-inline void handleIPInput(int key) {
-    int len = (int)strlen(multiJoinIP);
-    if (key >= '0' && key <= '9' && len < 15) {
-        multiJoinIP[len] = (char)key;
-        multiJoinIP[len + 1] = 0;
-    } else if (key == '.' && len < 15 && len > 0 && multiJoinIP[len-1] != '.') {
-        multiJoinIP[len] = '.';
-        multiJoinIP[len + 1] = 0;
-    } else if ((key == 8 || key == 127) && len > 0) { // Backspace
-        multiJoinIP[len - 1] = 0;
-    }
+    ui.alpha = 1.0f;
+    static const UiHint hints[] = {{"ESC", "DISCONNECT"}};
+    uiHintBar(hints, 1);
+    uiEndScreen();
 }

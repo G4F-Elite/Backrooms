@@ -119,6 +119,7 @@ inline void drawGuideRow(const char* key, int iconA, int iconB, float x, float y
 // Key sheet: every key next to what it does. Left: tools and hauling. Right: squad and danger.
 inline void drawGuideScreen() {
     beginHudPage(0.02f, 0.02f, 0.03f, 0.84f);
+    drawHudPlate(-0.76f, -0.30f, 0.80f, 0.80f, 0.55f);
     const GameplayBinds& k = settings.binds;
     float y = 0.66f;
     const float left = -0.62f, right = 0.14f, step = 0.115f;
@@ -160,6 +161,7 @@ inline void drawGuideScreen() {
     drawIconC(HUD_ICON_ARROW_RIGHT, 0.57f, y, 0.045f, HUD_DIM);
     drawIconC(HUD_ICON_EXTRACT, 0.66f, y, 0.09f, HUD_GOOD);
 
-    drawPageKey("ESC", HUD_ICON_CHECK, 0.0f, HUD_DIM);
+    static const UiHint hints[] = {{"ESC", "BACK"}};
+    uiHintBar(hints, 1);
     endHudPage();
 }

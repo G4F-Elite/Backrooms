@@ -2,8 +2,7 @@
 #include <cstring>
 #include <cmath>
 #include <cstdio>
-#include "upscaler_settings.h"
-#include "keybinds.h"
+#include "settings_model.h"
 #include "progression.h"
 
 const unsigned char FONT_DATA[96][7] = {
@@ -27,49 +26,10 @@ inline GLuint menuBgShader=0, menuFxShader=0;
 // Textures are created in game_main_entry.h (declared in game.cpp)
 extern GLuint wallTex, floorTex, ceilTex, lampTex;
 extern char gDeathReason[80];
-struct Settings {
-    float masterVol=0.7f;
-    float musicVol=0.55f;
-    float ambienceVol=0.75f;
-    float sfxVol=0.7f;
-    float voiceVol=0.65f;
-    float vhsIntensity=0.58f;
-    float mouseSens=0.002f;
-    int upscalerMode=UPSCALER_MODE_FSR10;
-    int renderScalePreset=RENDER_SCALE_PRESET_DEFAULT;
-    float fsrSharpness=0.35f;
-    int aaMode=AA_MODE_TAA;
-    bool fastMath=false;
-    int ssaoQuality=0; int giQuality=0; bool godRays=false; bool bloom=false;
-    bool rtxDenoise=true;
-    float rtxDenoiseStrength=0.65f;
-    int frameGenMode=FRAME_GEN_MODE_OFF;
-    bool vsync=true;
-    bool debugMode=false;
-    GameplayBinds binds = {};
-};
 inline Settings settings;
-enum SettingsTab {
-    SETTINGS_TAB_VIDEO = 0,
-    SETTINGS_TAB_EFFECTS = 1,
-    SETTINGS_TAB_AUDIO = 2,
-    SETTINGS_TAB_BINDS = 3
-};
 inline int settingsTab = SETTINGS_TAB_VIDEO;
 
-inline int settingsItemsForTab(int tab) { if(tab==SETTINGS_TAB_AUDIO) return 7; if(tab==SETTINGS_TAB_EFFECTS) return 8; if(tab==SETTINGS_TAB_BINDS) return 3; return 12; }
-inline int settingsBindsIndexForTab(int tab) { return (tab == SETTINGS_TAB_BINDS) ? 1 : -1; }
-inline int settingsBackIndexForTab(int tab) { if(tab==SETTINGS_TAB_AUDIO) return 6; if(tab==SETTINGS_TAB_EFFECTS) return 7; if(tab==SETTINGS_TAB_BINDS) return 2; return 11; }
-
-inline int clampSettingsSelection(int tab, int idx) {
-    int cnt = settingsItemsForTab(tab);
-    if (cnt <= 0) return 0;
-    if (idx < 0) return cnt - 1;
-    if (idx >= cnt) return 0;
-    return idx;
-}
-
-enum GameState { STATE_MENU, STATE_GUIDE, STATE_GAME, STATE_PAUSE, STATE_SETTINGS, STATE_SETTINGS_PAUSE, STATE_KEYBINDS, STATE_KEYBINDS_PAUSE, STATE_INTRO, STATE_NOTE, STATE_MULTI, STATE_MULTI_HOST, STATE_MULTI_JOIN, STATE_MULTI_WAIT };
+enum GameState { STATE_MENU, STATE_GUIDE, STATE_GAME, STATE_PAUSE, STATE_SETTINGS, STATE_SETTINGS_PAUSE, STATE_INTRO, STATE_NOTE, STATE_MULTI, STATE_MULTI_HOST, STATE_MULTI_JOIN, STATE_MULTI_WAIT };
 inline GameState gameState = STATE_MENU;
 inline int menuSel=0, currentWinW=1280, currentWinH=720;
 inline bool guideReturnToPause = false;
@@ -143,14 +103,46 @@ void main() { gl_Position = vec4(p, 0.0, 1.0); uv = p * 0.5 + 0.5; })";
 inline const char* menuBgFS = R"(#version 330 core
 in vec2 uv; out vec4 fc; uniform float tm; uniform sampler2D wallT; uniform sampler2D floorT; uniform sampler2D ceilT; uniform sampler2D lampT; float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);} void main(){vec2 p=uv*2.0-1.0; p.x*=1.30; float time=tm*0.11; vec3 ro=vec3(0.0,0.1,-1.7); vec3 rd=normalize(vec3(p,1.35)); float yaw=sin(time*0.30)*0.04; rd.xz=mat2(cos(yaw),-sin(yaw),sin(yaw),cos(yaw))*rd.xz; float hw=2.6, hh=1.35; float tMin=1e9; int hit=0; vec3 hp=vec3(0); vec3 n=vec3(0); float tF=(-hh-ro.y)/rd.y; if(tF>0.0){vec3 q=ro+rd*tF; if(abs(q.x)<hw){tMin=tF;hit=1;hp=q;n=vec3(0,1,0);}} float tC=(hh-ro.y)/rd.y; if(tC>0.0){vec3 q=ro+rd*tC; if(abs(q.x)<hw && tC<tMin){tMin=tC;hit=2;hp=q;n=vec3(0,-1,0);}} float tL=(-hw-ro.x)/rd.x; if(tL>0.0){vec3 q=ro+rd*tL; if(abs(q.y)<hh && tL<tMin){tMin=tL;hit=3;hp=q;n=vec3(1,0,0);}} float tR=(hw-ro.x)/rd.x; if(tR>0.0){vec3 q=ro+rd*tR; if(abs(q.y)<hh && tR<tMin){tMin=tR;hit=4;hp=q;n=vec3(-1,0,0);}} vec3 col=vec3(0.22,0.20,0.14); if(hit!=0){float z=hp.z+time*3.2+0.9; vec2 q=(hit==1)?vec2(hp.x*0.35,z*0.22):(hit==2?vec2(hp.x*0.28,z*0.20):vec2(z*0.18,(hp.y+hh)*0.42)); vec2 pq=q; if(hit>=3){pq=vec2(z*0.18,(hp.y+hh)*0.42); float seam=floor(pq.x*3.2); pq.x+=seam*0.02; float ht=texture(wallT,pq).a-0.5; pq+=ht*0.03*vec2(rd.z,rd.y); } else if(hit==1){float ht=texture(floorT,pq).a-0.5; pq+=ht*0.02*vec2(rd.x,rd.z);} else if(hit==2){float ht=texture(ceilT,pq).a-0.5; pq+=ht*0.015*vec2(rd.x,rd.z);} vec3 al=(hit==1)?texture(floorT,pq).rgb:(hit==2?texture(ceilT,pq).rgb:texture(wallT,pq).rgb); if(hit>=3){al=pow(al,vec3(0.95)); float seamLine=smoothstep(0.495,0.505,fract(pq.x*3.2)); al*=1.0-0.10*seamLine; } float segF=(z+1.0)*0.55; float dz=abs(fract(segF)-0.5)/0.55; float lampX=sin(segF*2.0)*0.60; float dx=hp.x-lampX; float dy=hp.y-(hh-0.06); float strip=exp(-dz*dz*10.0); float l=(1.9*strip)/(1.0+dx*dx*0.9+dy*dy*1.8); float fall=smoothstep(0.0,0.8,hh-hp.y); l*=fall; float ambient=0.40; col=al*(ambient+l); col+=texture(lampT,vec2(hp.x*0.35,z*0.25)).rgb*l*0.34; col*=clamp(0.72+0.28*abs(n.y),0.0,1.0);} float fog=exp(-tMin*0.12); col=mix(vec3(0.10,0.10,0.10),col,fog); float vig=smoothstep(1.25,0.25,length(p)); col*=0.78+0.22*vig; col*=0.99+0.01*sin(uv.y*900.0); float drift=0.96+0.04*sin(tm*0.12+uv.y*3.0); col*=drift; vec2 duv=uv+vec2(tm*0.006,tm*0.012); float d=h(floor(duv*vec2(160.0,90.0)))-0.5; col+=d*0.03; col=col/(col+vec3(0.85)); col=clamp(col,0.0,1.0); fc=vec4(col,1.0);} )";
 
+// UI scale: layouts are authored for a 1280x720 canvas and grow with the window.
+inline float uiScale() {
+    float sx = (float)currentWinW / 1280.0f, sy = (float)currentWinH / 720.0f;
+    float s = sx < sy ? sx : sy;
+    return s < 0.5f ? 0.5f : s;
+}
+
+// Each font texel is stored as a FONT_UPSCALE x FONT_UPSCALE block and sampled with linear
+// filtering: glyph edges stay hard at any text size instead of dropping or doubling pixels.
+inline constexpr int FONT_UPSCALE = 4;
+
 inline GLuint genFontTex() {
-    unsigned char* data = new unsigned char[96*8*8*3]; memset(data,0,96*8*8*3);
-    for(int c=0;c<96;c++) for(int y=0;y<7;y++) for(int x=0;x<5;x++)
-        if(FONT_DATA[c][y]&(1<<(4-x))) { int i=(c*8+(y+1)*96*8+x+1)*3; data[i]=data[i+1]=data[i+2]=255; }
-    GLuint t; glGenTextures(1,&t); glBindTexture(GL_TEXTURE_2D,t);
-    glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,96*8,8,0,GL_RGB,GL_UNSIGNED_BYTE,data);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST); delete[] data; return t;
+    const int cell = 8 * FONT_UPSCALE, texW = 96 * cell, texH = cell;
+    unsigned char* data = new unsigned char[texW * texH * 3];
+    memset(data, 0, texW * texH * 3);
+    for (int c = 0; c < 96; c++) {
+        for (int y = 0; y < 7; y++) {
+            for (int x = 0; x < 5; x++) {
+                if (!(FONT_DATA[c][y] & (1 << (4 - x)))) continue;
+                for (int sy = 0; sy < FONT_UPSCALE; sy++) {
+                    for (int sx = 0; sx < FONT_UPSCALE; sx++) {
+                        int px = c * cell + (x + 1) * FONT_UPSCALE + sx;
+                        int py = (y + 1) * FONT_UPSCALE + sy;
+                        int i = (py * texW + px) * 3;
+                        data[i] = data[i + 1] = data[i + 2] = 255;
+                    }
+                }
+            }
+        }
+    }
+    GLuint t;
+    glGenTextures(1, &t);
+    glBindTexture(GL_TEXTURE_2D, t);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, texW, texH, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    delete[] data;
+    return t;
 }
 
 inline void initText() {
@@ -192,6 +184,7 @@ inline void initText() {
 }
 
 inline void drawFullscreenOverlay(float r, float g, float b, float a) {
+    glDisable(GL_DEPTH_TEST);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
     glUseProgram(overlayShader);
@@ -232,28 +225,59 @@ inline void drawMainMenuBackdrop(float tm) {
     glDrawArrays(GL_TRIANGLES,0,6);
 }
 
+// Glyph cell and advance in whole pixels, so every letter lands on the pixel grid.
+inline float textCellPx(float sc) {
+    float px = floorf(sc * 8.0f * uiScale() + 0.5f);
+    return px < 4.0f ? 4.0f : px;
+}
+
+inline float textAdvancePx(float sc) {
+    return floorf(textCellPx(sc) * 0.75f + 0.5f);
+}
+
+// `sc` 1.0 is an 8 px cell on the 1280x720 canvas; (x, y) is the bottom-left corner in NDC.
 inline void drawText(const char* s, float x, float y, float sc, float r, float g, float b, float a=1.0f) {
+    if (!s || !*s) return;
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    float v[512*24]; int vc=0; float cx=x,cy=y,cw=sc*8.0f/(float)currentWinW*2.0f,ch=sc*8.0f/(float)currentWinH*2.0f;
-    for(const char*p=s;*p && vc<512*24-24;p++) { if(*p=='\n'){cx=x;cy-=ch*1.2f;continue;} int c=*p-32; if(c<0||c>95)c=0;
-        float u0=c*8.0f/(96.0f*8.0f),u1=(c+1)*8.0f/(96.0f*8.0f);
-        float t[24]={cx,cy,u0,1,cx+cw,cy,u1,1,cx+cw,cy+ch,u1,0,cx,cy,u0,1,cx+cw,cy+ch,u1,0,cx,cy+ch,u0,0};
-        for(int i=0;i<24;i++) v[vc++]=t[i];
-        cx+=cw*0.75f;
+    const float pxW = 2.0f / (float)currentWinW, pxH = 2.0f / (float)currentWinH;
+    x = floorf((x + 1.0f) / pxW + 0.5f) * pxW - 1.0f;
+    y = floorf((y + 1.0f) / pxH + 0.5f) * pxH - 1.0f;
+    float v[512*24];
+    int vc = 0;
+    float cx = x, cy = y;
+    float cw = textCellPx(sc) * pxW, ch = textCellPx(sc) * pxH, adv = textAdvancePx(sc) * pxW;
+    for (const char* p = s; *p && vc < 512*24-24; p++) {
+        if (*p == '\n') { cx = x; cy -= floorf(textCellPx(sc) * 1.2f + 0.5f) * pxH; continue; }
+        int c = *p - 32;
+        if (c < 0 || c > 95) c = 0;
+        float u0 = (float)c / 96.0f, u1 = (float)(c + 1) / 96.0f;
+        float t[24] = {cx,cy,u0,1, cx+cw,cy,u1,1, cx+cw,cy+ch,u1,0, cx,cy,u0,1, cx+cw,cy+ch,u1,0, cx,cy+ch,u0,0};
+        if (c != 0) for (int i = 0; i < 24; i++) v[vc++] = t[i];
+        cx += adv;
     }
-    glBindBuffer(GL_ARRAY_BUFFER,textVBO); glBufferData(GL_ARRAY_BUFFER,vc*sizeof(float),v,GL_STATIC_DRAW);
-    glUseProgram(textShader); glUniform3f(glGetUniformLocation(textShader,"col"),r,g,b);
-    glUniform1f(glGetUniformLocation(textShader,"alpha"),a);
-    glBindTexture(GL_TEXTURE_2D,fontTex); glBindVertexArray(textVAO); glDrawArrays(GL_TRIANGLES,0,vc/4);
+    if (vc == 0) return;
+    static GLint colLoc = -1, alphaLoc = -1;
+    glUseProgram(textShader);
+    if (colLoc < 0) {
+        colLoc = glGetUniformLocation(textShader, "col");
+        alphaLoc = glGetUniformLocation(textShader, "alpha");
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, textVBO);
+    glBufferData(GL_ARRAY_BUFFER, vc * sizeof(float), v, GL_STATIC_DRAW);
+    glUniform3f(colLoc, r, g, b);
+    glUniform1f(alphaLoc, a);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, fontTex);
+    glBindVertexArray(textVAO);
+    glDrawArrays(GL_TRIANGLES, 0, vc / 4);
     glEnable(GL_CULL_FACE);
 }
 
 inline float textAdvanceNdc(float sc) {
-    float cw = sc * 8.0f / (float)currentWinW * 2.0f;
-    return cw * 0.75f;
+    return textAdvancePx(sc) * 2.0f / (float)currentWinW;
 }
 
 inline float measureTextWidthNdc(const char* s, float sc) {
@@ -271,36 +295,7 @@ inline void drawTextCentered(const char* s, float centerX, float y, float sc, fl
     drawText(s, centerX - measureTextWidthNdc(s, sc) * 0.5f, y, sc, r, g, b, a);
 }
 
-inline bool sliderInputActive = false;
-inline int sliderInputTab = -1;
-inline int sliderInputItem = -1;
-inline char sliderInputBuf[8] = {};
-inline int sliderInputLen = 0;
-
-inline void drawSlider(float x,float y,float w,float val,float r,float g,float b) {
-    (void)w;
-    const int slots = 30;
-    int filled = (int)(val * (float)slots + 0.5f);
-    if(filled < 0) filled = 0;
-    if(filled > slots) filled = slots;
-
-    char base[slots + 1];
-    for(int i=0;i<slots;i++) base[i]='-';
-    base[slots]=0;
-    drawText(base,x,y,1.55f,r*0.25f,g*0.25f,b*0.25f,0.85f);
-
-    if(filled > 0){
-        char fill[slots + 1];
-        for(int i=0;i<filled;i++) fill[i]='=';
-        fill[filled]=0;
-        drawText(fill,x,y,1.55f,r,g,b,0.95f);
-    }
-
-    int knobIndex = filled > 0 ? (filled - 1) : 0;
-    float knobX = x + textAdvanceNdc(1.55f) * (float)knobIndex;
-    drawText("|",knobX,y,1.55f,0.98f,0.96f,0.88f,0.98f);
-}
-
+// Corridor fly-through plus haze: the backdrop of every screen outside a run.
 inline void drawMenuAtmosphere(float tm) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
@@ -309,172 +304,4 @@ inline void drawMenuAtmosphere(float tm) {
     glBindVertexArray(overlayVAO);
     glDrawArrays(GL_TRIANGLES,0,6);
     glDisable(GL_BLEND);
-    float drift = 0.5f + 0.5f * sinf(tm * 0.28f);
-    drawOverlayRectNdc(-1.0f,-1.0f,1.0f,-0.94f,0.03f,0.03f,0.03f,0.03f + drift * 0.01f);
-    drawOverlayRectNdc(-1.0f,0.94f,1.0f,1.0f,0.03f,0.03f,0.03f,0.03f + (1.0f - drift) * 0.01f);
-}
-
-inline void drawMenu(float tm) {
-    glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    drawMainMenuBackdrop(tm);
-    drawMenuAtmosphere(tm);
-    // Keep corridor visible while adding warm grade
-    drawFullscreenOverlay(0.02f,0.02f,0.02f,0.08f);
-    drawFullscreenOverlay(0.17f,0.13f,0.08f,0.015f);
-    float p=0.82f+0.06f*sinf(tm*2.0f);
-    float gl = sinf(tm * 0.7f) * 0.0016f;
-    drawTextCentered("BACKROOMS: SEED ROUND",0.0f+gl,0.5f,3.4f,0.9f,0.85f,0.4f,p);
-    const char* it[]={"START","MULTIPLAYER","SETTINGS","TUTORIAL","QUIT"};
-    for(int i=0;i<5;i++){
-        float s=(menuSel==i)?1.0f:0.5f; float y=0.10f-i*0.11f;
-        float baseX = -measureTextWidthNdc(it[i], 2.0f * 0.5f);
-        if(menuSel==i)drawText(">", baseX - 0.08f, y, 2.0f, 0.9f*s,0.85f*s,0.4f*s);
-        drawText(it[i], baseX, y, 2.0f,0.9f*s,0.85f*s,0.4f*s);
-    }
-    drawTextCentered("UP/DOWN - SELECT    ENTER - CONFIRM",0.0f,-0.6f,1.5f,0.5f,0.5f,0.4f,0.6f);
-    drawTextCentered("v1.0.0",0.0f,-0.72f,1.2f,0.64f,0.62f,0.54f,0.75f);
-    glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
-}
-
-inline void drawSettings(bool fp) {
-    glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    if(fp) drawFullscreenOverlay(0.02f,0.02f,0.03f,0.72f);
-    drawTextCentered("SETTINGS",0.0f,0.55f,3.0f,0.9f,0.85f,0.4f);
-    const float rightColCenterX = 0.50f, rcx = rightColCenterX;
-    const bool audioTab = settingsTab == SETTINGS_TAB_AUDIO, effectsTab = settingsTab == SETTINGS_TAB_EFFECTS;
-    const int itemCount = settingsItemsForTab(settingsTab);
-    const char* tabN[4]={"VIDEO","EFFECTS","AUDIO","BINDS"}; const char* tabB[4]={"[VIDEO]","[EFFECTS]","[AUDIO]","[BINDS]"};
-    for(int t=0;t<4;t++){ float a=settingsTab==t?1.0f:0.52f;
-        drawTextCentered(settingsTab==t?tabB[t]:tabN[t],-0.45f+0.30f*t,0.44f,1.35f,0.86f*a,0.84f*a,0.58f*a,0.96f);
-    }
-    for(int i=0;i<itemCount;i++){
-        float s=(menuSel==i)?1.0f:0.5f;
-        float y=0.33f-i*0.09f;
-        if(menuSel==i)drawText(">",-0.55f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-        if(i==0){
-            drawText("CATEGORY",-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            drawTextCentered(tabN[settingsTab],rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            continue;
-        }
-        if(audioTab){
-            const char* lb[]={"MASTER VOL","MUSIC VOL","AMBIENCE VOL","SFX VOL","VOICE VOL","BACK"};
-            float* vl[] = {&settings.masterVol,&settings.musicVol,&settings.ambienceVol,&settings.sfxVol,&settings.voiceVol,nullptr};
-            float mx[] = {1.0f,1.0f,1.0f,1.0f,1.0f,1.0f};
-            int ai = i - 1;
-            drawText(lb[ai],-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            if(vl[ai]){
-                float nv=*vl[ai]/mx[ai]; if(nv>1.0f)nv=1.0f;
-                drawSlider(-0.02f,y,0.45f,nv,0.9f*s,0.85f*s,0.4f*s);
-                char b[16]; snprintf(b,16,"%d%%",(int)(nv*100));
-                drawTextCentered(b,rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            }
-        }else if(effectsTab){
-            const char* lb[]={"SSAO","GI","GOD RAYS","BLOOM","DENOISER","DENOISE STR","BACK"};
-            int vi = i - 1;
-            drawText(lb[vi],-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            if(vi==0) drawTextCentered(ssaoLabel(settings.ssaoQuality),rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            else if(vi==1) drawTextCentered(giLabel(settings.giQuality),rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            else if(vi==2) drawTextCentered(settings.godRays?"ON":"OFF",rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            else if(vi==3) drawTextCentered(settings.bloom?"ON":"OFF",rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            else if(vi==4) drawTextCentered(settings.rtxDenoise?"ON":"OFF",rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            else if(vi==5){
-                float nv=settings.rtxDenoiseStrength; if(nv>1.0f)nv=1.0f; if(nv<0.0f)nv=0.0f;
-                drawSlider(-0.02f,y,0.45f,nv,0.9f*s,0.85f*s,0.4f*s);
-                char b[16]; snprintf(b,16,"%d%%",(int)(nv*100));
-                drawTextCentered(b,rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            }
-        }else if(settingsTab==SETTINGS_TAB_BINDS){
-            if(i==1){ drawText("OPEN BIND MENU",-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s); drawTextCentered("ENTER",rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s); }
-            else if(i==2){ drawText("BACK",-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s); }
-        }else{
-            const char* lb[]={"VHS EFFECT","MOUSE SENS","UPSCALER","RESOLUTION","FSR SHARPNESS","ANTI-ALIASING","FAST MATH","FRAME GEN","V-SYNC","DEBUG MODE","BACK"};
-            int vi = i - 1;
-            drawText(lb[vi],-0.48f,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            if(vi==0 || vi==1 || vi==4){
-                float val = 0.0f; float maxV = 1.0f;
-                if(vi==0) val = settings.vhsIntensity;
-                else if(vi==1){ val = settings.mouseSens; maxV = 0.006f; }
-                else val = settings.fsrSharpness;
-                float nv=val/maxV; if(nv>1.0f)nv=1.0f;
-                drawSlider(-0.02f,y,0.45f,nv,0.9f*s,0.85f*s,0.4f*s);
-                char b[16]; snprintf(b,16,"%d%%",(int)(nv*100));
-                drawTextCentered(b,rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            }else if(vi==2){
-                drawTextCentered(upscalerModeLabel(settings.upscalerMode),rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            }else if(vi==3){
-                char rb[24];
-                if(clampUpscalerMode(settings.upscalerMode)==UPSCALER_MODE_OFF) snprintf(rb,24,"NATIVE");
-                else { snprintf(rb,24,"%d%%",renderScalePercentFromPreset(settings.renderScalePreset)); }
-                drawTextCentered(rb,rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            }else if(vi==5){
-                drawTextCentered(aaModeLabel(settings.aaMode),rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            }else if(vi==6){
-                drawTextCentered(settings.fastMath?"ON":"OFF",rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            }else if(vi==7){
-                drawTextCentered(frameGenModeLabel(settings.frameGenMode),rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            }else if(vi==8){
-                drawTextCentered(settings.vsync?"ON":"OFF",rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            }else if(vi==9){
-                drawTextCentered(settings.debugMode?"ON":"OFF",rcx,y,1.7f,0.9f*s,0.85f*s,0.4f*s);
-            }
-        }
-    }
-    // Show numeric input overlay if active
-    if(sliderInputActive) {
-        float iy = 0.33f - sliderInputItem * 0.09f;
-        drawOverlayRectNdc(0.42f, iy - 0.02f, 0.72f, iy + 0.04f, 0.05f, 0.05f, 0.08f, 0.9f);
-        char inputDisp[16];
-        sliderInputBuf[sliderInputLen] = 0;
-        snprintf(inputDisp, 16, "%s_%%", sliderInputBuf);
-        drawText(inputDisp, 0.44f, iy, 1.9f, 0.95f, 0.9f, 0.5f, 1.0f);
-        drawTextCentered("TYPE 0-100  ENTER CONFIRM  ESC CANCEL", 0.0f, -0.58f, 1.35f, 0.7f, 0.65f, 0.35f, 0.8f);
-    } else {
-        if(settingsTab==SETTINGS_TAB_BINDS) drawTextCentered("TAB NEXT TAB  ENTER OPEN BIND MENU  ESC BACK", 0.0f, -0.58f, 1.35f, 0.5f, 0.5f, 0.4f, 0.6f);
-        else drawTextCentered("TAB NEXT TAB  L/R ADJUST  ENTER TYPE VALUE  ESC BACK", 0.0f, -0.58f, 1.35f, 0.5f, 0.5f, 0.4f, 0.6f);
-    }
-    glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
-}
-
-inline void drawPause() {
-    glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    drawFullscreenOverlay(0.02f,0.02f,0.03f,0.72f);
-    drawTextCentered("PAUSED",0.0f,0.25f,3.0f,0.9f,0.85f,0.4f);
-    const char* it[]={"RESUME","SETTINGS","GUIDE","MAIN MENU","QUIT"};
-    for(int i=0;i<5;i++){
-        float s=(menuSel==i)?1.0f:0.5f,y=-i*0.1f;
-        float baseX = -measureTextWidthNdc(it[i], 1.8f * 0.5f);
-        if(menuSel==i)drawText(">",baseX - 0.07f,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
-        drawText(it[i],baseX,y,1.8f,0.9f*s,0.85f*s,0.4f*s);
-    }
-    drawTextCentered("ESC - RESUME",0.0f,-0.55f,1.5f,0.5f,0.5f,0.4f,0.6f);
-    glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
-}
-
-inline void drawSurvivalTime(float t) {
-    glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    int m=(int)(t/60),s=(int)t%60; char b[16]; snprintf(b,16,"%d:%02d",m,s);
-    drawText(b,0.96f-measureTextWidthNdc(b,2.0f),0.9f,2.0f,0.78f,0.72f,0.48f,0.96f);
-    glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
-}
-
-inline void drawKeybindsMenu(bool fromPause, int selected, int captureIndex) {
-    glDisable(GL_DEPTH_TEST); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    if(fromPause) drawFullscreenOverlay(0.02f,0.02f,0.03f,0.72f);
-    drawTextCentered("KEY BINDS",0.0f,0.62f,2.6f,0.9f,0.85f,0.4f);
-    for(int i=0;i<GAMEPLAY_BIND_COUNT;i++){
-        float s=(selected==i)?1.0f:0.55f;
-        float y=0.48f-i*0.075f;
-        if(selected==i) drawText(">",-0.62f,y,1.45f,0.92f*s,0.86f*s,0.42f*s);
-        drawText(gameplayBindLabel(i),-0.56f,y,1.38f,0.9f*s,0.85f*s,0.4f*s);
-        const char* keyName = keyNameForUi(*gameplayBindByIndex(settings.binds, i));
-        if(captureIndex==i) keyName = "...";
-        drawText(keyName,0.38f,y,1.38f,0.82f*s,0.9f*s,0.72f*s,0.95f);
-    }
-    float bs=(selected==KEYBINDS_BACK_INDEX)?1.0f:0.55f;
-    float by=0.48f-GAMEPLAY_BIND_COUNT*0.075f;
-    if(selected==KEYBINDS_BACK_INDEX) drawText(">",-0.62f,by,1.45f,0.92f*bs,0.86f*bs,0.42f*bs);
-    drawText("BACK",-0.56f,by,1.45f,0.9f*bs,0.85f*bs,0.4f*bs);
-    drawTextCentered(captureIndex>=0?"PRESS ANY KEY TO REBIND":"ENTER TO REBIND  ESC TO BACK",0.0f,-0.84f,1.35f,0.58f,0.58f,0.46f,0.86f);
-    if(fromPause) drawTextCentered("APPLIES IN CURRENT RUN",0.0f,-0.92f,1.1f,0.5f,0.55f,0.45f,0.7f);
-    glDisable(GL_BLEND); glEnable(GL_DEPTH_TEST);
 }

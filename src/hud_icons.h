@@ -55,18 +55,19 @@ inline void drawIcon(int icon, float cx, float cy, float h, float r, float g, fl
     glEnable(GL_CULL_FACE);
 }
 
-// Keyboard key: a dark cap with the key name on it.
+// Keyboard key: the key name in a thin box.
 inline void drawKeyCap(const char* label, float cx, float cy, float h, float a = 0.95f) {
-    float sc = h * (float)currentWinH * 0.036f; // letter about 0.58 of the cap height
+    float sc = h * (float)currentWinH * 0.036f / uiScale(); // letter about 0.58 of the cap height
     float tw = measureTextWidthNdc(label, sc);
     float hw = tw * 0.5f + h * 0.30f / hudAspect() + 0.006f;
     float minHw = h * 0.5f / hudAspect();
     if (hw < minHw) hw = minHw;
     float hh = h * 0.5f;
-    drawOverlayRectNdc(cx - hw, cy - hh, cx + hw, cy + hh, 0.93f, 0.90f, 0.80f, a);
-    drawOverlayRectNdc(cx - hw + 0.004f, cy - hh + 0.012f, cx + hw - 0.004f, cy + hh - 0.006f, 0.10f, 0.10f, 0.11f, a);
-    float ch = sc * 8.0f / (float)currentWinH * 2.0f;
-    drawText(label, cx - tw * 0.5f, cy - ch * 0.5f + 0.003f, sc, 0.96f, 0.93f, 0.82f, a);
+    float bx = 3.0f * uiScale() / (float)currentWinW, by = 3.0f * uiScale() / (float)currentWinH; // 1.5 canvas px
+    drawOverlayRectNdc(cx - hw, cy - hh, cx + hw, cy + hh, 0.90f, 0.87f, 0.74f, a * 0.85f);
+    drawOverlayRectNdc(cx - hw + bx, cy - hh + by, cx + hw - bx, cy + hh - by, 0.06f, 0.06f, 0.06f, a);
+    float ch = textCellPx(sc) / (float)currentWinH * 2.0f;
+    drawText(label, cx - tw * 0.5f, cy - ch * 0.4375f, sc, 0.90f, 0.87f, 0.74f, a);
 }
 
 // Horizontal gauge: dark track, coloured fill.

@@ -18,6 +18,13 @@ inline void selftestInit() {
     if (!gSelftest) return;
     gSelftestLog = std::fopen("build/selftest.log", "w");
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+    // BACKROOMS_SELFTEST_SIZE=1920x1080 runs the script (and its screenshots) at another window size.
+    const char* size = std::getenv("BACKROOMS_SELFTEST_SIZE");
+    int sizeW = 0, sizeH = 0;
+    if (size && std::sscanf(size, "%dx%d", &sizeW, &sizeH) == 2 && sizeW >= 640 && sizeH >= 360) {
+        winW = sizeW;
+        winH = sizeH;
+    }
     // BACKROOMS_SELFTEST_FX=<ssao><gi><rays><bloom><denoise><aa>, e.g. 421110, turns post effects on for the screenshots.
     const char* fx = std::getenv("BACKROOMS_SELFTEST_FX");
     size_t fxLen = fx ? std::strlen(fx) : 0;
@@ -95,6 +102,8 @@ inline void selftestStartRun(bool skipTutorial) {
     settings.masterVol = 0.0f;
 }
 
+#include "dev_selftest_ui.h"
+
 // One scripted step every few frames, so each change gets rendered before its screenshot.
 inline void selftestFrame() {
     if (!gSelftest) return;
@@ -103,10 +112,10 @@ inline void selftestFrame() {
     if (++frame % 12 != 0) return;
     Vec3 base = heistCellCenter(heist.baseX, heist.baseZ);
     switch (step++) {
-    case 0: selftestStartRun(false); selftestLog("tutorial starts in the garage", heist.stage == HEIST_TUT_GARAGE && heistPosInGarage(cam.pos)); break;
-    case 1: selftestShot("01_garage"); cam.yaw = 3.1415927f; break;
-    case 2: selftestShot("02_whiteboard"); selftestLookAt(heist.padPos + Vec3(-3.0f, 0, 2.0f), heist.padPos); break;
-    case 3: selftestShot("03_pallet"); selftestLookAt(base + Vec3(0, 0, 3.0f), heist.portalPos); break;
+    case 0: selftestMenuShots(); selftestStartRun(false); selftestLog("tutorial starts in the garage", heist.stage == HEIST_TUT_GARAGE && heistPosInGarage(cam.pos)); break;
+    case 1: selftestShot("01_garage"); selftestPauseShot(0); cam.yaw = 3.1415927f; break;
+    case 2: selftestShot("02_whiteboard"); selftestPauseShot(1); selftestLookAt(heist.padPos + Vec3(-3.0f, 0, 2.0f), heist.padPos); break;
+    case 3: selftestShot("03_pallet"); selftestPauseShot(2); selftestLookAt(base + Vec3(0, 0, 3.0f), heist.portalPos); break;
     case 4: selftestShot("04_portal_from_backrooms"); selftestLog("leaving the garage starts the haul", heist.stage == HEIST_TUT_HAUL); break;
     case 5: case 7: case 9: {
         if (step == 10) heistBreakWall(heist.baseX - 1, heist.baseZ - 1);
