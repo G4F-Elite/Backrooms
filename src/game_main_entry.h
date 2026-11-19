@@ -37,6 +37,7 @@ int main(){
     initHudIcons();
     entityMgr.init();
     initPlayerModels(); playerModelsInit = true;
+    legsInitGfx();
     std::thread aT(audioThread);
     int cachedRefreshRateHz = detectActiveRefreshRateHz(gWin);
     gPerfRefreshHz = cachedRefreshRateHz;
@@ -287,6 +288,7 @@ int main(){
         glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         gPostFx.sceneDrawn=false;
         spectatorBeginView(); // dead co-op players watch through the spectator camera
+        legsBeginView(); // the living look out of the head of their simulated body
         if((gameState==STATE_GAME&&!isPlayerDead)||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_NOTE)
             renderScene();
         
@@ -436,6 +438,7 @@ int main(){
         }
         glEnable(GL_DEPTH_TEST);
         drawUI();
+        legsEndView();
         spectatorEndView();
         glDisable(GL_BLEND);
         glEnable(GL_DEPTH_TEST);

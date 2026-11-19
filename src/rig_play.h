@@ -3,6 +3,7 @@
 // predict, the host corrects), carries whoever stands on it, keeps bodies out of the hull,
 // tells the monsters where the haven is, and turns its moods into things you see and hear.
 // Included from heist_play.h.
+#include "player_legs.h"
 
 inline constexpr float RIG_CABIN_SANITY_PER_SEC = 5.0f;  // sitting in the break room
 inline constexpr float RIG_HAVEN_SANITY_PER_SEC = 2.4f;  // standing in its light
@@ -50,6 +51,7 @@ inline void rigMoveLocalPlayer(const Vec3& delta) {
     if (rigOnBoard(lx, lz)) {
         cam.pos.x += delta.x;
         cam.pos.z += delta.z;
+        legsCarry(delta); // the feet stand on the deck
     }
 
     RigPoint p = rigLocal(cam.pos);

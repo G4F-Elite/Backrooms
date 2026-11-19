@@ -49,6 +49,8 @@ struct SoundState {
     float crouch = 0.0f;
     bool stepTrig = false;
     float stepPitch = 1.0f;
+    float stepWeight = 0.0f;  // added to the step's weight: below 0 for a shuffle on the spot
+    int stepFoot = -1;        // 0 left, 1 right; -1 = just alternate
     float moveIntensity = 0.0f;
     float sprintIntensity = 0.0f;
     float lowStamina = 0.0f;
@@ -140,7 +142,9 @@ inline AudioEngine gAudioEngine;
 inline void audioConsumeTriggers(AudioEngine& e) {
     if (sndState.stepTrig) {
         sndState.stepTrig = false;
-        e.sfx.startStep(sndState.stepPitch, e.director.params.value[AP_SPRINT]);
+        // (startStep() alternates feet by itself; point it at the foot that really landed.)
+        if (sndState.stepFoot >= 0) e.sfx.leftFoot = sndState.stepFoot != 0;
+        e.sfx.startStep(sndState.stepPitch, e.director.params.value[AP_SPRINT] + sndState.stepWeight);
     }
     if (sndState.scareVol > 0.0f) {
         e.cues.start(CUE_SCARE, sndState.scareVol * 1.15f);

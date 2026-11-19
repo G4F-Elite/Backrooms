@@ -47,8 +47,11 @@ void renderScene(){
     float shX=camShake*(rand()%100-50)/500.0f,shY=camShake*(rand()%100-50)/500.0f;
     float moveSway = sndState.moveIntensity * 0.006f;
     float sprintSway = sndState.sprintIntensity * 0.004f;
-    shX += sinf(vhsTime * (8.0f + sndState.sprintIntensity * 4.0f)) * (moveSway + sprintSway);
-    shY += cosf(vhsTime * (12.5f + sndState.sprintIntensity * 5.0f)) * (moveSway * 0.75f + sprintSway);
+    // (On foot the camera rides on the simulated head: its sway is the body's, not a sine.)
+    if(!gLegs.viewActive){
+        shX += sinf(vhsTime * (8.0f + sndState.sprintIntensity * 4.0f)) * (moveSway + sprintSway);
+        shY += cosf(vhsTime * (12.5f + sndState.sprintIntensity * 5.0f)) * (moveSway * 0.75f + sprintSway);
+    }
     // Camera view (world rendering) uses full shake.
     float viewYaw = cam.yaw + shX;
     float viewPitch = cam.pitch + shY;
@@ -61,7 +64,7 @@ void renderScene(){
     float vmPitch = cam.pitch + shY * vmShake;
     Vec3 la=cam.pos+Vec3(mSin(viewYaw)*mCos(viewPitch),mSin(viewPitch),
                          mCos(viewYaw)*mCos(viewPitch));
-    Mat4 view=Mat4::look(cam.pos,la,Vec3(0,1,0)),model;
+    Mat4 view=Mat4::look(cam.pos,la,legsViewUp(viewYaw)),model;
     
     glUniformMatrix4fv(mu.P,1,GL_FALSE,proj.m);
     glUniformMatrix4fv(mu.V,1,GL_FALSE,view.m);
@@ -102,6 +105,7 @@ void renderScene(){
     glUniform3f(mu.flashDir, camFwd.x, camFwd.y, camFwd.z);
     // Default flashlight cone origin is camera; if we render a held flashlight we override below.
     glUniform3f(mu.flashPos, cam.pos.x, cam.pos.y, cam.pos.z);
+    Vec3 flashOrigin = cam.pos;
     float remoteFlashPos[12] = {0};
     float remoteFlashDir[12] = {0};
     int remoteFlashCount = 0;
@@ -133,6 +137,7 @@ void renderScene(){
         Vec3 base = cam.pos + vmFwdPos * fwd + vmRightPos * side + worldUp * up;
         Vec3 lens = base + vmFwdPos * vmFlashLensFwd + vmRightPos * vmFlashLensSide + worldUp * vmFlashLensUp;
         glUniform3f(mu.flashPos, lens.x, lens.y, lens.z);
+        flashOrigin = lens;
     }
     
     glBindTexture(GL_TEXTURE_2D,wallTex);glBindVertexArray(wallVAO);glDrawArrays(GL_TRIANGLES,0,wallVC);
@@ -291,6 +296,18 @@ void renderScene(){
         if(mu.tint >= 0) glUniform3f(mu.tint,1.0f,1.0f,1.0f);
     }
     
+    // The player's own legs, lit like everything else.
+    LegsLighting legsLight;
+    legsLight.flashDir = camFwd;
+    legsLight.flashPos = flashOrigin;
+    legsLight.flashOn = flashVisualOn;
+    legsLight.remoteFlashCount = remoteFlashCount;
+    legsLight.remoteFlashPos = remoteFlashPos;
+    legsLight.remoteFlashDir = remoteFlashDir;
+    legsLight.lightCount = nl;
+    legsLight.lightPos = lpos;
+    legsDraw(proj, view, legsLight);
+
     if(multiState==MULTI_IN_GAME && playerModelsInit){
         renderPlayers(mainShader, proj, view, netMgr.myId);
     }

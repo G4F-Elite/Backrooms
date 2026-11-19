@@ -190,6 +190,7 @@ void gameInput(GLFWwindow*w){
     pingPressed = pingNow;
     
     if(playerFalling){
+        legsRest();
         fallTimer += dTime;
         fallVelocity += 12.0f * dTime;
         cam.pos.y -= fallVelocity * dTime;
@@ -205,7 +206,7 @@ void gameInput(GLFWwindow*w){
         return;
     }
 
-    float spd=4.0f*dTime;
+    float spd=LEGS_WALK_SPEED*dTime;
     bool sprinting=glfwGetKey(w,settings.binds.sprint)==GLFW_PRESS&&playerStamina>0&&staminaCooldown<=0&&!playerDowned;
     if(debugTools.infiniteStamina){
         sprinting = glfwGetKey(w,settings.binds.sprint)==GLFW_PRESS;
@@ -215,7 +216,7 @@ void gameInput(GLFWwindow*w){
     if(playerDowned) spd *= 0.42f;
     spd *= heistMoveScale(); // hauling loot is heavy
     if(sprinting){
-        spd*=1.6f;
+        spd*=LEGS_SPRINT_SCALE;
         if(!debugTools.infiniteStamina){
             playerStamina-=(14.0f+2.0f*(float)carryWeight(heistMyCarry()))*dTime;
             if(playerStamina<0){playerStamina=0;staminaCooldown=1.0f;}
@@ -236,58 +237,32 @@ void gameInput(GLFWwindow*w){
         cam.curH=PH;
     }else{
         if(glfwGetKey(w,settings.binds.crouch)==GLFW_PRESS){
-            cam.targetH=PH_CROUCH;cam.crouch=true;spd*=0.5f;
+            cam.targetH=PH_CROUCH;cam.crouch=true;spd*=LEGS_CROUCH_SCALE;
         }else{cam.targetH=PH;cam.crouch=false;}
         cam.curH+=(cam.targetH-cam.curH)*10.0f*dTime;
     }
 
-    Vec3 fwd(mSin(cam.yaw),0,mCos(cam.yaw)),right(mCos(cam.yaw),0,-mSin(cam.yaw));
-    Vec3 np=cam.pos;bool mv=false;
+    // On foot the player is the body of the leg simulation (player_legs.h): the keys push it,
+    // the camera rides on its head and the footsteps are its heel strikes.
+    bool mv=false;
     bool onFoot=!spectatorRiding(); // a riding ghost goes where its ride goes; the keys drive the camera
-    if(onFoot&&glfwGetKey(w,settings.binds.forward)==GLFW_PRESS){np=np+fwd*spd;mv=true;}
-    if(onFoot&&glfwGetKey(w,settings.binds.back)==GLFW_PRESS){np=np-fwd*spd;mv=true;}
-    if(onFoot&&glfwGetKey(w,settings.binds.left)==GLFW_PRESS){np=np+right*spd;mv=true;}
-    if(onFoot&&glfwGetKey(w,settings.binds.right)==GLFW_PRESS){np=np-right*spd;mv=true;}
     if(debugTools.flyMode){
+        legsRest();
+        Vec3 fwd(mSin(cam.yaw),0,mCos(cam.yaw)),right(mCos(cam.yaw),0,-mSin(cam.yaw));
+        Vec3 np=cam.pos;
+        if(onFoot&&glfwGetKey(w,settings.binds.forward)==GLFW_PRESS){np=np+fwd*spd;mv=true;}
+        if(onFoot&&glfwGetKey(w,settings.binds.back)==GLFW_PRESS){np=np-fwd*spd;mv=true;}
+        if(onFoot&&glfwGetKey(w,settings.binds.left)==GLFW_PRESS){np=np+right*spd;mv=true;}
+        if(onFoot&&glfwGetKey(w,settings.binds.right)==GLFW_PRESS){np=np-right*spd;mv=true;}
         if(glfwGetKey(w,GLFW_KEY_SPACE)==GLFW_PRESS){np.y += spd; mv=true;}
         if(glfwGetKey(w,settings.binds.crouch)==GLFW_PRESS){np.y -= spd; mv=true;}
-    }
-
-    if(debugTools.flyMode){
         cam.pos=np;
+        cam.pos.y=cam.curH+(cam.pos.y-cam.curH)*0.9f;
+    }else if(!onFoot){
+        legsRest();
+        cam.pos.y=cam.curH+(cam.pos.y-cam.curH)*0.9f;
     }else{
-        bool xBlockedWorld = collideWorld(np.x,cam.pos.z,PR) || collideCoopDoor(np.x,cam.pos.z,PR) || collideHeistSolids(np.x,cam.pos.z,PR) ||
-                             (falseDoorTimer>0&&nearPoint2D(Vec3(np.x,0,cam.pos.z),falseDoorPos,1.0f));
-        bool xBlockedProps = collideMapProps(np.x,cam.pos.z,PR);
-        if(!xBlockedWorld && !xBlockedProps){
-            cam.pos.x=np.x;
-        }else if(!xBlockedWorld && xBlockedProps){
-            if(tryPushMapProps(np.x,cam.pos.z,PR,np.x-cam.pos.x,0.0f)) cam.pos.x=np.x;
-        }
-
-        bool zBlockedWorld = collideWorld(cam.pos.x,np.z,PR) || collideCoopDoor(cam.pos.x,np.z,PR) || collideHeistSolids(cam.pos.x,np.z,PR) ||
-                             (falseDoorTimer>0&&nearPoint2D(Vec3(cam.pos.x,0,np.z),falseDoorPos,1.0f));
-        bool zBlockedProps = collideMapProps(cam.pos.x,np.z,PR);
-        if(!zBlockedWorld && !zBlockedProps){
-            cam.pos.z=np.z;
-        }else if(!zBlockedWorld && zBlockedProps){
-            if(tryPushMapProps(cam.pos.x,np.z,PR,0.0f,np.z-cam.pos.z)) cam.pos.z=np.z;
-        }
-    }
-
-    static float bobT=0,lastB=0;
-    if(mv && !debugTools.flyMode){
-        bobT+=dTime*(spd>5.0f?12.0f:8.0f);
-        float cb=mSin(bobT);cam.pos.y=cam.curH+cb*0.04f;
-        if(lastB>-0.7f&&cb<=-0.7f&&!sndState.stepTrig){
-            sndState.stepTrig=true;
-            float pitchRnd = 0.88f + (float)(rand()%30) / 100.0f;
-            if(spd > 5.0f) pitchRnd += 0.10f;
-            sndState.stepPitch = pitchRnd;
-        }
-        lastB=cb;
-    }else{
-        cam.pos.y=cam.curH+(cam.pos.y-cam.curH)*0.9f;bobT=0;lastB=0;
+        mv=legsWalk(w,spd/dTime,sprinting,onFoot);
     }
 
     float moveIntensity = mv ? (sprinting ? 1.0f : 0.62f) : 0.0f;

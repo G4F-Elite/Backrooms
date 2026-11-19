@@ -109,6 +109,9 @@ inline void selftestFrame() {
     if (!gSelftest) return;
     static int frame = 0;
     static int step = 0;
+    static Vec3 legsFrom;
+    static float wait = 0.0f;  // seconds to let the game run before the next step
+    if (wait > 0.0f) { wait -= dTime; return; }
     if (++frame % 12 != 0) return;
     Vec3 base = heistCellCenter(heist.baseX, heist.baseZ);
     switch (step++) {
@@ -231,7 +234,20 @@ inline void selftestFrame() {
         selftestLookAt(rigWorld(1.6f, -10.5f), rigWorld(0.0f, -1.0f));
         break;
     }
-    case 39: selftestShot("21_tunnel"); break;
+    case 39: selftestShot("21_tunnel"); cam.pitch = -1.0f; gLegsScriptFwd = 1.0f; legsFrom = cam.pos; wait = 1.2f; break;
+    case 40: {
+        // the player is the body of the leg simulation: it walks down the lane, looking at its feet
+        selftestShot("22_legs_walk");
+        const LegSim& sim = gLegs.sim;
+        float walked = sqrtf((cam.pos.x - legsFrom.x) * (cam.pos.x - legsFrom.x) + (cam.pos.z - legsFrom.z) * (cam.pos.z - legsFrom.z));
+        float eyeY = gLegs.eye.y;
+        if (gSelftestLog) std::fprintf(gSelftestLog, "     legs: walked %.2f m in %d steps, %.2f m/s, eyes at %.2f m\n", walked, sim.stepsTaken, sim.speed, eyeY);
+        selftestLog("the player walks on simulated legs", gLegs.live && walked > 0.2f && walked < 20.0f && sim.stepsTaken > 0 && eyeY > 1.3f && eyeY < 1.8f);
+        gLegsScriptFwd = 0.0f;
+        wait = 1.5f;
+        break;
+    }
+    case 41: selftestShot("23_legs_stand"); selftestLog("and comes to a stand", gLegs.sim.speed < 0.2f && !gLegs.sim.walking); break;
     default:
         if (gSelftestLog) std::fprintf(gSelftestLog, "done, %d failure(s)\n", gSelftestFails);
         if (gSelftestLog) std::fclose(gSelftestLog);
