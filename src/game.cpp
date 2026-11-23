@@ -1,252 +1,224 @@
-// Backrooms VHS Horror - Level 0
-// Modular architecture: each .h file has single responsibility
+// Backrooms VHS Horror: the game in the LIMEN world (limen_*.h, see LIMEN.md): an endless
+// synthesized world of slabs and megastructures, human-scale thin partitions, walkable dry
+// basins, generated sound, a 128x128 far-lamp lightmap + cell AO, and a per-slab GPU cache.
+// The game's own modules are included first with the functions LIMEN replaces renamed to
+// legacy*, LIMEN's versions are defined under the original names, then game_core.h (the game
+// itself) is compiled against them.
+//
+// With -DLIMEN_SHOTS the same translation unit becomes a frame grabber (tools/limen_shots.cpp).
 
 #define _USE_MATH_DEFINES
 #include <cstdio>
 #include <cstdlib>
+#include <cmath>
+#include <string>
 #include <vector>
 #include <random>
 #include <thread>
 #include <unordered_map>
-
-// Windows networking first (before glad)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-
-// OpenGL
 #define GLFW_INCLUDE_NONE
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
-// Game modules (in dependency order)
+// The game puts the rig down in rigPlace() and asks for the first fault delay right after it
+// has fixed the start cell and the heading. That call is where the narrator learns the lane.
+void lmNarRigHook();
+#define rigFaultDelay legacyRigFaultDelay
+#include "rig_rules.h"
+#undef rigFaultDelay
+inline float rigFaultDelay(int level, float roll01) {
+    lmNarRigHook();
+    return legacyRigFaultDelay(level, roll01);
+}
+
 #include "math.h"
+#define persp(fov, asp, n, f) persp(fov, asp, n, ((f) == 100.0f ? 320.0f : (f)))
+
+#define fillAudio legacyFillAudio
+#define updateGameplayAudioState legacyUpdateGameplayAudioState
 #include "audio.h"
+#undef fillAudio
+#undef updateGameplayAudioState
+
+#include "limen_audio.h"
+
+void lmSyncPlayerElevationAndAudio();
+inline void updateGameplayAudioState(float moveIntensity, float sprintIntensity, float staminaNorm,
+                                     float monsterProximity, float monsterMenace, float monsterType = 0.0f) {
+    legacyUpdateGameplayAudioState(moveIntensity, sprintIntensity, staminaNorm,
+                                   monsterProximity, monsterMenace, monsterType);
+    lmSyncPlayerElevationAndAudio();
+}
+
 #include "shaders.h"
-#include "textures.h"
-#include "geometry.h"
+
+#define initQuad legacyInitQuad
 #include "render.h"
-#include "perf_tuning.h"
-#include "perf_overlay.h"
+#undef initQuad
+
+#define generateChunk legacyGenerateChunk
+#define updateVisibleChunks legacyUpdateVisibleChunks
+#define updateLightsAndPillars legacyUpdateLightsAndPillars
+#define reshuffleBehind legacyReshuffleBehind
+#define chunkStyleAt legacyChunkStyleAt
+#define collideWorld legacyCollideWorld
 #include "world.h"
+#undef generateChunk
+#undef updateVisibleChunks
+#undef updateLightsAndPillars
+#undef reshuffleBehind
+#undef chunkStyleAt
+#undef collideWorld
+
+#include "limen_hooks.h"
+
+// Falling (fall_sim.h) asks the world one thing: is the floor missing in this cell. LIMEN's
+// shafts are missing floor too, so a body going down one slides along its real walls.
+inline bool lmIsVoidCell(int wx, int wz) { return lmTagAt(wx, wz) == LT_VOID; }
+#define fallStep legacyFallStep
+#include "fall_sim.h"
+#undef fallStep
+template <class OpenFn>
+inline void fallStep(FallState& s, float dt, float cs, OpenFn isOpen) {
+    legacyFallStep(s, dt, cs, [&](int wx, int wz) { return isOpen(wx, wz) || lmIsVoidCell(wx, wz); });
+}
+
+#define updateMapContent legacyUpdateMapContent
 #include "map_content.h"
-#include "entity_types.h"
-#include "monster_profiles.h"
-#include "entity_model.h"
-#include "entity.h"
-#include "entity_ai.h"
-#include "story.h"
-#include "menu.h"
-#include "input.h"
-#include "cheats.h"
-#include "minimap.h"
-#include "content_events.h"
-#include "trap_events.h"
-#include "net_types.h"
-#include "net.h"
-#include "player_model.h"
-#include "menu_multi.h"
-#include "scare_system.h"
+#undef updateMapContent
 
-// Constants
-const float CS = 5.0f;
-const float WH = 4.5f;
-const float PH = 1.7f;
-const float PH_CROUCH = 0.9f;
-const float PR = 0.3f;
+#include "limen_props.h"
 
-// Window
-int winW = 1280, winH = 720;
-int renderW = 960, renderH = 540;
-GLFWwindow* gWin;
+// The game's own world mesher (shell + props + z-fight repair of the whole view) is replaced
+// wholesale by `lmPostBuildGeom`, which overwrites every buffer it fills. Building it anyway
+// cost ~0.9 s per chunk crossing, so `buildGeom` gets empty stand-ins instead.
+#define buildWorldBaseMesh legacyBuildWorldBaseMesh
+#define buildWorldLampMesh legacyBuildWorldLampMesh
+#define resolveWorldMesh legacyResolveWorldMesh
+#include "world_mesh.h"
+#undef buildWorldBaseMesh
+#undef buildWorldLampMesh
+#undef resolveWorldMesh
+template <class HoleFn> inline void buildWorldBaseMesh(WorldMesh&, int, int, HoleFn) {}
+inline void buildWorldLampMesh(WorldMesh&) {}
+inline ZfReport resolveWorldMesh(WorldMesh&) { return ZfReport{}; }
 
-// World data
-std::unordered_map<long long, Chunk> chunks;
-std::vector<Light> lights;
-std::vector<Vec3> pillars;
-std::vector<MapProp> mapProps;
-std::vector<MapPoi> mapPois;
-std::mt19937 rng;
-int playerChunkX = 0, playerChunkZ = 0;
-int lastBuildChunkX = -999, lastBuildChunkZ = -999;
-unsigned int worldSeed = 0;
+inline void initQuad(GLuint& vao, GLuint& vbo) {
+    legacyInitQuad(vao, vbo);
+    lmPostBuildGeom();
+}
 
-// Player state
-struct {
-    Vec3 pos;
-    float yaw, pitch;
-    float targetH, curH;
-    bool crouch;
-} cam = {{}, 0, 0, PH, PH, false};
+#define gatherNearestSceneLights legacyGatherNearestSceneLights
+#include "perf_tuning.h"
+#undef gatherNearestSceneLights
 
-// Game state
-float dTime, lastFrame, vhsTime;
-float lastX = 640, lastY = 360;
-float entitySpawnTimer, playerHealth = 100, playerSanity = 100;
-float camShake, damageFlash, survivalTime, reshuffleTimer;
-float playerStamina = 125, staminaCooldown = 0, flashlightBattery = 100;
-bool flashlightOn = false, flashlightPressed = false;
-bool flashlightShutdownBlinkActive = false;
-float flashlightShutdownBlinkTimer = 0.0f;
-bool minimapEnabled = false;
-int minimapCheatProgress = 0;
-int nearbyWorldItemId = -1;
-int nearbyWorldItemType = -1;
-ScareSystemState scareState = {};
-bool interactPressed = false, spacePressed = false;
-int nearNoteId = -1, lastSpawnedNote = -1;
-float noteSpawnTimer = 0;
-bool firstMouse = true;
-bool escPressed, enterPressed, isPlayerDead;
-bool playerDowned = false;
-float playerDownedTimer = 0.0f;
-bool playerEscaped = false;
-char gDeathReason[80] = "CAUSE: INCIDENT UNCONFIRMED";
-bool upPressed, downPressed, leftPressed, rightPressed;
-float gPerfFrameMs = 16.6f;
-float gPerfFpsSmoothed = 60.0f;
-bool gPerfDebugOverlay = false;
-bool gHudTelemetryVisible = true;
-int gPerfRefreshHz = 60;
-int gPerfFrameGenBaseCap = 0;
-float gPerfFrameTimeHistory[PERF_GRAPH_SAMPLES] = {};
-int gPerfFrameTimeHead = PERF_GRAPH_SAMPLES - 1;
+inline int gatherNearestSceneLights(const std::vector<Light>& sceneLights, const Vec3& camPos, float outPos[SCENE_LIGHT_LIMIT * 3]) {
+    return lmGatherLightsAndDrawMega(sceneLights, camPos, outPos);
+}
 
-// OpenGL resources
-GLuint wallTex, floorTex, ceilTex, lightTex, lampTex, propTex;
-// Dedicated texture for handheld devices (flashlight/scanner) so they don't use wood-like propTex.
-GLuint deviceTex = 0;
-// Material atlas for built structures (props, POI sets, door frames).
-GLuint decorTex = 0;
-GLuint plushTex = 0;
-// Dedicated texture for player models so they don't inherit whatever was bound last.
-GLuint playerTex = 0;
-GLuint mainShader, vhsShader, lightShader;
-GLuint wallVAO, wallVBO, floorVAO, floorVBO;
-GLuint ceilVAO, ceilVBO, lightVAO, lightVBO;
-GLuint lightOffVAO, lightOffVBO;
-GLuint pillarVAO, pillarVBO;
-GLuint decorVAO, decorVBO;
-GLuint quadVAO, quadVBO;
-GLuint fbo, fboTex, fboDepthTex;
-GLuint taaHistoryTex = 0;
-GLuint taaResolveTex = 0;
-GLuint taaResolveFbo = 0;
-bool taaHistoryValid = false;
-int taaFrameIndex = 0;
-int wallVC, floorVC, ceilVC, lightVC, lightOffVC, pillarVC, decorVC;
+#ifdef LIMEN_SHOTS
+#define main backrooms_game_main
+#include "game_core.h"
+#undef main
+#include "limen_mega.h"
+#include "limen_narrator_game.h"
+#else
+// The F10 debug menu is LIMEN's own (limen_debug.h): the game's key polls and its one buffer
+// swap go through two shims, which is all the menu needs to take keys and draw last.
+int lmDbgGetKey(GLFWwindow* w, int key);
+void lmDbgSwapBuffers(GLFWwindow* w);
+#define glfwGetKey(w, k) lmDbgGetKey(w, k)
+#define glfwSwapBuffers(w) lmDbgSwapBuffers(w)
+#include "game_core.h"
+#undef glfwGetKey
+#undef glfwSwapBuffers
+#include "limen_mega.h"
+#include "limen_narrator_game.h"
+#include "limen_debug.h"
+#endif
 
-// Audio
-SoundState sndState;
-std::atomic<bool> audioRunning{true};
-HANDLE hEvent;
-short* waveBufs[BUF_COUNT];
-HWAVEOUT hWaveOut;
-WAVEHDR waveHdrs[BUF_COUNT];
+// Skull above the eye point, and how far the player ducks under a lintel without being asked.
+const float LM_HEAD_ABOVE_EYE = 0.14f;
+const float LM_AUTO_DUCK = 0.14f;
 
-// Managers
-EntityManager entityMgr;
+// Highest eye height (above the floor) that still fits under the lintels over (x, z).
+inline float lmEyeCapAt(float x, float z) {
+    float lb = lmLintelBottomAt(x, z, PR);
+    if (lb > 1e8f) return 1e9f;
+    float cap = lb - LM_HEAD_ABOVE_EYE - lmGroundHeightAt(x, z, CS);
+    return cap < PH_CROUCH ? PH_CROUCH : cap;   // a crouched player always fits
+}
 
-// Audio thread function
-void audioThread() {
-    hEvent = CreateEvent(0, FALSE, FALSE, 0);
-    const int frameBytes = AUDIO_CHANNELS * (int)sizeof(short);
-    WAVEFORMATEX wfx = {WAVE_FORMAT_PCM, (WORD)AUDIO_CHANNELS, SAMP_RATE, (DWORD)(SAMP_RATE*frameBytes), (WORD)frameBytes, 16, 0};
-    waveOutOpen(&hWaveOut, WAVE_MAPPER, &wfx, (DWORD_PTR)hEvent, 0, CALLBACK_EVENT);
-    
-    for (int i = 0; i < BUF_COUNT; i++) {
-        waveBufs[i] = new short[BUF_LEN * AUDIO_CHANNELS];
-        memset(&waveHdrs[i], 0, sizeof(WAVEHDR));
-        waveHdrs[i].lpData = (LPSTR)waveBufs[i];
-        waveHdrs[i].dwBufferLength = BUF_LEN * frameBytes;
-        fillAudio(waveBufs[i], BUF_LEN);
-        waveOutPrepareHeader(hWaveOut, &waveHdrs[i], sizeof(WAVEHDR));
-        waveOutWrite(hWaveOut, &waveHdrs[i], sizeof(WAVEHDR));
-    }
-    
-    while (audioRunning) {
-        WaitForSingleObject(hEvent, INFINITE);
-        for (int i = 0; i < BUF_COUNT; i++) {
-            if (waveHdrs[i].dwFlags & WHDR_DONE) {
-                waveOutUnprepareHeader(hWaveOut, &waveHdrs[i], sizeof(WAVEHDR));
-                fillAudio(waveBufs[i], BUF_LEN);
-                waveOutPrepareHeader(hWaveOut, &waveHdrs[i], sizeof(WAVEHDR));
-                waveOutWrite(hWaveOut, &waveHdrs[i], sizeof(WAVEHDR));
-            }
+// A lintel stops the player on foot when the head is clearly above it: crouch to get through.
+// Small deficits are ducked automatically (see the clamp below). Once under a lintel nothing is
+// blocked any more, so standing up inside a doorway can never trap anyone.
+bool lmPlayerHeadBlocked(float x, float z, float r) {
+    if (debugTools.flyMode || playerFalling || fabsf(r - PR) > 1e-4f) return false;
+    float dx = x - cam.pos.x, dz = z - cam.pos.z;
+    if (dx * dx + dz * dz > 1.5f * 1.5f) return false;   // a probe elsewhere, not a step
+    float cap = lmEyeCapAt(x, z);
+    if (cam.curH <= cap + LM_AUTO_DUCK) return false;
+    if (lmLintelBottomAt(cam.pos.x, cam.pos.z, PR) < 1e8f) return false;
+    return true;
+}
+
+// The game's player walks on a leg simulation that knows only a floor at y = 0, and the picture
+// is taken from the eyes of that body (legsBeginView), not from cam.pos. So the ground height is
+// given to the body itself: the eyes go up by it for good (they are computed anew by every
+// walk), the drawn skeleton only between two walks, each foot onto the step it stands on.
+// lmLegsUnlift() runs right before the next simulation step (limen_debug.h, the sprint key poll).
+struct LmLegLift { bool on = false; float orig[5] = {}, put[5] = {}; };
+inline LmLegLift gLmLegLift;
+inline float* lmLegLiftField(int k) {
+    LegSim& s = gLegs.sim;
+    return k == 0 ? &s.pelvisPos.y : (k <= 2 ? &s.hip[k - 1].y : &s.foot[k - 3].pose.anchor.y);
+}
+void lmLegsUnlift() {
+    LmLegLift& L = gLmLegLift;
+    if (!L.on) return;
+    L.on = false;
+    // (a body put down anew in the meantime stands on fresh numbers: leave those alone)
+    for (int k = 0; k < 5; k++) { float* f = lmLegLiftField(k); if (*f == L.put[k]) *f = L.orig[k]; }
+}
+inline void lmLegsLift(float g) {
+    lmLegsUnlift();
+    if (!gLegs.live || !gLegs.placed) return;
+    gLegs.eye.y += g;
+    LmLegLift& L = gLmLegLift;
+    for (int k = 0; k < 5; k++) {
+        float* f = lmLegLiftField(k);
+        float lift = g;
+        if (k >= 3) {
+            const Vec3& a = gLegs.sim.foot[k - 3].pose.anchor;
+            float fg = lmGroundHeightAt(a.x, a.z, CS);
+            lift = fg < g - 0.45f ? g - 0.45f : (fg > g + 0.45f ? g + 0.45f : fg);
         }
+        L.orig[k] = *f; *f += lift; L.put[k] = *f;
     }
-    
-    waveOutReset(hWaveOut);
-    for (int i = 0; i < BUF_COUNT; i++) {
-        waveOutUnprepareHeader(hWaveOut, &waveHdrs[i], sizeof(WAVEHDR));
-        delete[] waveBufs[i];
-    }
-    waveOutClose(hWaveOut);
-    CloseHandle(hEvent);
+    L.on = true;
 }
 
-void initTaaTargets() {
-    if (taaResolveFbo) glDeleteFramebuffers(1, &taaResolveFbo);
-    if (taaHistoryTex) glDeleteTextures(1, &taaHistoryTex);
-    if (taaResolveTex) glDeleteTextures(1, &taaResolveTex);
-
-    glGenTextures(1, &taaHistoryTex);
-    glBindTexture(GL_TEXTURE_2D, taaHistoryTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, winW, winH, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-    glGenTextures(1, &taaResolveTex);
-    glBindTexture(GL_TEXTURE_2D, taaResolveTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, winW, winH, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-    glGenFramebuffers(1, &taaResolveFbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, taaResolveFbo);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, taaResolveTex, 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
-    taaHistoryValid = false;
-    taaFrameIndex = 0;
+inline void lmSyncPlayerElevationAndAudio() {
+    if (!debugTools.flyMode && !playerFalling) {
+        // The game has just written cam.pos.y = curH + bob (walking) or eased last frame's value
+        // toward curH (standing), knowing nothing of the ground. Recover the bob alone, so the
+        // ground offset is never fed back into it (that made the camera saw on gentle slopes).
+        static float prevY = 1e9f, prevBob = 0.0f, smoothG = 0.0f;
+        static bool hasSmoothG = false;
+        float raw = cam.pos.y - cam.curH;
+        float bob = (fabsf(raw - (prevY - cam.curH) * 0.9f) < 1e-4f) ? prevBob * 0.9f : raw;
+        if (fabsf(bob) > 0.06f) bob = 0.0f;
+        float targetG = lmGroundHeightAt(cam.pos.x, cam.pos.z, CS);
+        if (!hasSmoothG || fabsf(targetG - smoothG) > 1.6f) { smoothG = targetG; hasSmoothG = true; }
+        else { float k = fminf(1.0f, fmaxf(dTime, 0.001f) * 14.0f); smoothG += (targetG - smoothG) * k; }
+        float cap = lmEyeCapAt(cam.pos.x, cam.pos.z);
+        if (cam.curH > cap) cam.curH = cap;               // head stays under the lintel
+        cam.pos.y = cam.curH + bob + smoothG;
+        prevY = cam.pos.y; prevBob = bob;
+        lmLegsLift(smoothG);
+    } else lmLegsUnlift();
+    lmNarFrame();
+    lmUpdateSpatialAudio(cam.pos.x, cam.pos.z, cam.yaw, CS);
 }
-
-// Window resize callback
-void windowResize(GLFWwindow*, int w, int h) {
-    if (w < 100) w = 100;
-    if (h < 100) h = 100;
-    winW = w;
-    winH = h;
-    computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), renderW, renderH);
-    if (fbo) glDeleteFramebuffers(1, &fbo);
-    if (fboTex) glDeleteTextures(1, &fboTex);
-    if (fboDepthTex) glDeleteTextures(1, &fboDepthTex);
-    initFBO(fbo, fboTex, fboDepthTex, renderW, renderH);
-    initTaaTargets();
-}
-
-// Shader compiler
-GLuint mkShader(const char* vs, const char* fs) {
-    GLuint v = glCreateShader(GL_VERTEX_SHADER);
-    glShaderSource(v, 1, &vs, 0);
-    glCompileShader(v);
-    
-    GLuint f = glCreateShader(GL_FRAGMENT_SHADER);
-    glShaderSource(f, 1, &fs, 0);
-    glCompileShader(f);
-    
-    GLuint p = glCreateProgram();
-    glAttachShader(p, v);
-    glAttachShader(p, f);
-    glLinkProgram(p);
-    
-    glDeleteShader(v);
-    glDeleteShader(f);
-    return p;
-}
-
-// Include game loop (uses all above)
-#include "game_loop.h"
