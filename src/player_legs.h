@@ -153,6 +153,11 @@ inline void legsRest() {
     gLegs.placed = false;
 }
 
+// How fast the body is walking right now (nothing when the player is not on foot).
+inline Vec3 legsVelocity() {
+    return (gLegs.live && gLegs.placed) ? gLegs.sim.vel : Vec3();
+}
+
 // A pushable prop in the way is shoved along, as walking into it always did. The body is
 // about to move `reach` metres along (dirX, dirZ).
 inline void legsPushProps(float dirX, float dirZ, float reach) {
@@ -252,10 +257,12 @@ inline void legsEndView() {
     cam.pitch = g.savedPitch;
 }
 
-// The camera's up vector: the head rolls a little with the hips.
+// The camera's up vector: the head rolls a little with the hips, and a lot with a body
+// tumbling down a shaft (it stays as it was when the fall killed).
 inline Vec3 legsViewUp(float viewYaw) {
-    if (!gLegs.viewActive) return Vec3(0, 1, 0);
-    float roll = gLegs.head.roll;
+    bool fell = (playerFalling || isPlayerDead) && !gSpectator.viewActive;
+    if (!gLegs.viewActive && !fell) return Vec3(0, 1, 0);
+    float roll = gLegs.viewActive ? gLegs.head.roll : fallViewRoll(gFall);
     return Vec3(0, cosf(roll), 0) + headingRight(viewYaw) * sinf(roll);
 }
 

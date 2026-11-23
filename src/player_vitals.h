@@ -54,6 +54,7 @@ inline void convertDeathToGhost() {
     if (multiState != MULTI_IN_GAME || !isPlayerDead) return;
     isPlayerDead = false;
     playerFalling = false;
+    gFall = FallState();
     cam.pos = Vec3(netMgr.spawnPos.x, PH, netMgr.spawnPos.z);
     cam.pitch = 0.0f;
     glfwSetInputMode(gWin, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -90,13 +91,16 @@ inline void updateSanity() {
     setEchoStatus("DOWNED: MORALE HIT ZERO. SOMEBODY HUG THIS PERSON");
 }
 
+inline Vec3 legsVelocity();  // player_legs.h
+
 inline void updateFloorFall() {
     int cellX = (int)floorf(cam.pos.x / CS);
     int cellZ = (int)floorf(cam.pos.z / CS);
     if (playerFalling || !isFallCell(cellX, cellZ) || rigPosInCabin(cam.pos)) return; // the rig bridges holes
-    float dx = cam.pos.x - (cellX + 0.5f) * CS;
-    float dz = cam.pos.z - (cellZ + 0.5f) * CS;
-    if (sqrtf(dx * dx + dz * dz) >= CS * 0.35f) return;
+    // The floor ends where it is seen to end, and holds a body whose middle is still near the lip.
+    if (fallSupported(cam.pos.x, cam.pos.z, CS, isFallCell)) return;
+    // The body goes over the edge with the speed it was walking at.
+    gFall = fallBegin(cam.pos, legsVelocity(), cam.yaw, cam.pitch);
     playerFalling = true;
     fallVelocity = 0.0f;
     fallTimer = 0.0f;

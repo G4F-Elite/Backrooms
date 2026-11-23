@@ -12,6 +12,7 @@
 #include "item_types.h"
 #include "entity_ai.h"
 #include "trap_events.h"
+#include "fall_sim.h"
 #include "debug_tools.h"
 #include <vector>
 
@@ -108,7 +109,8 @@ std::vector<WorldItem> worldItems;
 std::vector<FloorHole> floorHoles;
 AbyssLocation abyss = {};
 bool playerFalling = false;
-float fallVelocity = 0.0f;
+float fallVelocity = 0.0f;  // m/s downwards
+FallState gFall;  // the fall itself (fall_sim.h)
 float fallTimer = 0.0f;
 int nextWorldItemId = 1;
 float itemSpawnTimer = 12.0f;

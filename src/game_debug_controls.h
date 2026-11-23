@@ -191,11 +191,16 @@ void gameInput(GLFWwindow*w){
     
     if(playerFalling){
         legsRest();
-        fallTimer += dTime;
-        fallVelocity += 12.0f * dTime;
-        cam.pos.y -= fallVelocity * dTime;
-        camShake = 0.08f + fallTimer * 0.04f;
-        if(cam.pitch > -1.0f) cam.pitch -= 0.5f * dTime;
+        // Free fall down the shaft (fall_sim.h): the camera is the body's eyes, tumbling with it.
+        fallStep(gFall, dTime, CS, isFallCell);
+        fallTimer = gFall.time;
+        fallVelocity = -gFall.vel.y;
+        cam.pos = gFall.pos;
+        cam.yaw = fallViewYaw(gFall);     // the head on its neck: thrown about by the walls, late for the body
+        cam.pitch = fallViewPitch(gFall);
+        float shake = fallShake(gFall);
+        if(camShake < shake) camShake = shake;
+        if(gFall.hit > 2.0f){ sndState.hitTrig = true; damageFlash = 0.25f; } // slammed into the shaft wall
         if(cam.pos.y < -25.0f || fallTimer > 3.0f){
             playerHealth = 0.0f;
             isPlayerDead = true;

@@ -231,6 +231,7 @@ void genWorld(){
     playerFalling = false;
     fallVelocity = 0.0f;
     fallTimer = 0.0f;
+    gFall = FallState();
     lastSpawnedNote=-1;noteSpawnTimer=8.0f;
 }
 
