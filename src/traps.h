@@ -182,7 +182,7 @@ inline void spawnFloorHoleEvent(const Vec3& around, int count, float ttl){
         int wz = cz + oz;
 
         if(abs(ox) + abs(oz) < 3) continue;
-        if(getCellWorld(wx, wz) != 0) continue;
+        if(getCellWorld(wx, wz) != 0 || !floorCanOpen(wx, wz)) continue;
         if(tooCloseToAnyPlayer(wx, wz)) continue;
         if(rigPosInQuiet(Vec3((wx + 0.5f) * CS, 0.0f, (wz + 0.5f) * CS))) continue; // not around the running drill
         if(isFloorHoleCell(wx, wz)) continue;

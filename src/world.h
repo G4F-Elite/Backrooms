@@ -105,6 +105,10 @@ inline void generateChunk(int cx, int cz) {
     chunks[key] = c;
 }
 
+// May the game open a hole in this cell's floor (trap holes, the abyss)? The world says no
+// where the floor is not the flat slab that a shaft can be cut through.
+inline bool floorCanOpen(int, int) { return true; }
+
 inline void setCellPersistent(int wx, int wz, int val) {
     gCellOverrides[cellKey(wx, wz)] = val;
     setCellWorld(wx, wz, val);

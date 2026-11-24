@@ -64,7 +64,9 @@ inline void updateGameplayAudioState(float moveIntensity, float sprintIntensity,
 #define reshuffleBehind legacyReshuffleBehind
 #define chunkStyleAt legacyChunkStyleAt
 #define collideWorld legacyCollideWorld
+#define floorCanOpen legacyFloorCanOpen
 #include "world.h"
+#undef floorCanOpen
 #undef generateChunk
 #undef updateVisibleChunks
 #undef updateLightsAndPillars
@@ -73,6 +75,11 @@ inline void updateGameplayAudioState(float moveIntensity, float sprintIntensity,
 #undef collideWorld
 
 #include "limen_hooks.h"
+
+// Trap holes and the abyss are cut by the per-cell floor mesher (limen_mega_frame.h). Vault
+// floors, terraces and pits come whole from the slab cache, where a hole would only be a fall
+// through a floor that is still drawn: the game opens none there.
+inline bool floorCanOpen(int wx, int wz) { return !lmHighAt(wx, wz) && !lmIsPitTag(lmTagAt(wx, wz)); }
 
 // Falling (fall_sim.h) asks the world one thing: is the floor missing in this cell. LIMEN's
 // shafts are missing floor too, so a body going down one slides along its real walls.

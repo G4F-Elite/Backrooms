@@ -141,6 +141,13 @@ inline void placeAbyss(const Vec3& base) {
             }
         }
         if (!centerOpen || isNearAnyObjective(cx, cz, radius + 4)) continue;
+        bool canOpen = true;   // the whole pit, not only its middle
+        for (int dx = -radius; dx <= radius && canOpen; dx++) {
+            for (int dz = -radius; dz <= radius && canOpen; dz++) {
+                if (dx * dx + dz * dz <= radius * radius && !floorCanOpen(cx + dx, cz + dz)) canOpen = false;
+            }
+        }
+        if (!canOpen) continue;
 
         abyss.centerX = cx;
         abyss.centerZ = cz;
