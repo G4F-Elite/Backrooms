@@ -7,8 +7,8 @@ set -e
 cd "$(dirname "$0")/../.."
 mkdir -p build
 FLAGS="-std=c++17 -O2 -fno-strict-aliasing -Wall -Wno-unused-result -Wno-unknown-pragmas -static -static-libgcc -static-libstdc++"
-LIBS="-Ldeps/lib -lglfw3 -lopengl32 -lgdi32 -luser32 -lkernel32 -lwinmm -lws2_32"
-INC="-Ideps/include -Isrc"
+LIBS="-Ldeps/lib -lglfw3 -lopusfile -lopus -logg -lopengl32 -lgdi32 -luser32 -lkernel32 -lwinmm -lws2_32"
+INC="-Ideps/include -Ideps/include/opus -Isrc"
 what="${*:-tool shots}"
 for w in $what; do
   case $w in

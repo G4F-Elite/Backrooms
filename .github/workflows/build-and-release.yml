@@ -31,15 +31,7 @@ jobs:
       - name: Build backrooms.exe
         shell: pwsh
         run: |
-          $ErrorActionPreference = "Stop"
-          if (!(Test-Path build)) { New-Item -ItemType Directory -Path build | Out-Null }
-          g++ -std=c++17 -O2 -Wall -Wno-unused-result -Wno-unknown-pragmas -mwindows -static -static-libgcc -static-libstdc++ `
-            -I"deps/include" `
-            -o "build/backrooms.exe" `
-            "src/game.cpp" `
-            "deps/src/glad.c" `
-            -L"deps/lib" `
-            -lglfw3 -lopengl32 -lgdi32 -luser32 -lkernel32 -lwinmm -lws2_32
+          cmd /c build_client_windows.bat
 
       - name: Package windows release files
         shell: pwsh

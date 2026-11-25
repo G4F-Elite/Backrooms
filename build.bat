@@ -42,13 +42,16 @@ if errorlevel 1 (
 
 echo.
 echo Compiling...
+windres deps/licenses/voice.rc -O coff -o build/voice-licenses.o
+if errorlevel 1 exit /b 1
 g++ -std=c++17 -O2 -Wall -Wno-unused-result -Wno-unknown-pragmas -mwindows -static -static-libgcc -static-libstdc++ ^
-    -I"deps/include" ^
+    -I"deps/include" -I"deps/include/opus" ^
     -o "build/backrooms.exe" ^
     "src/game.cpp" ^
     "deps/src/glad.c" ^
+    "build/voice-licenses.o" ^
     -L"deps/lib" ^
-    -lglfw3 -lopengl32 -lgdi32 -luser32 -lkernel32 -lwinmm -lws2_32
+    -lglfw3 -lopusfile -lopus -logg -lopengl32 -lgdi32 -luser32 -lkernel32 -lwinmm -lws2_32
 
 if errorlevel 1 (
     echo.

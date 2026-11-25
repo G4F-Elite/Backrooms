@@ -1,0 +1,4 @@
+// Keep the decoder notices available in the standalone Windows executable.
+LIBOGG_LICENSE RCDATA "deps/licenses/libogg/COPYING"
+LIBOPUS_LICENSE RCDATA "deps/licenses/opus/COPYING"
+LIBOPUSFILE_LICENSE RCDATA "deps/licenses/opusfile/LICENSE"
