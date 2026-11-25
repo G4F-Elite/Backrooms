@@ -15,7 +15,7 @@ struct DispatcherClipBytes {
     extern "C" const unsigned char dispatcher_start_##id[], dispatcher_end_##id[]; \
     asm(".section .rdata, \"dr\"\n" \
         ".balign 2\n.globl dispatcher_start_" #id "\ndispatcher_start_" #id ":\n" \
-        ".incbin \"assets/dispatcher/" #id ".wav\"\n" \
+        ".incbin \"assets/dispatcher/" #id ".opus\"\n" \
         ".globl dispatcher_end_" #id "\ndispatcher_end_" #id ":\n.text\n");
 #include "dispatcher_lines.inc"
 #undef DISPATCH_LINE

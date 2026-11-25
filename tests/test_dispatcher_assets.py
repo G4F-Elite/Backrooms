@@ -4,9 +4,9 @@ from array import array
 from collections import Counter
 from pathlib import Path
 import re
+import subprocess
 import sys
 import unittest
-import wave
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,9 +36,9 @@ class DispatcherAssetTests(unittest.TestCase):
         self.assertEqual(len(subtitles), len(set(subtitles)), "repeated subtitle")
 
     def test_bank_and_shipped_files_correspond_one_to_one(self):
-        names = [clip + ".wav" for _, clip, _ in self.lines]
+        names = [clip + ".opus" for _, clip, _ in self.lines]
         self.assertEqual(len(names), len(set(names)), "reused clip identifier")
-        self.assertSetEqual(set(names), {path.name for path in CLIPS.glob("*.wav")})
+        self.assertSetEqual(set(names), {path.name for path in CLIPS.iterdir() if path.is_file()})
 
     def test_narrator_observes_without_addressing_the_player(self):
         speaker_or_listener = re.compile(
@@ -49,16 +49,30 @@ class DispatcherAssetTests(unittest.TestCase):
             with self.subTest(clip=clip):
                 self.assertNotRegex(subtitle, speaker_or_listener)
 
-    def test_each_clip_contains_audible_complete_mono_pcm(self):
+    def test_each_clip_contains_audible_complete_mono_opus(self):
         for _, clip, _ in self.lines:
-            with self.subTest(clip=clip), wave.open(str(CLIPS / (clip + ".wav")), "rb") as audio:
-                self.assertEqual(audio.getnchannels(), 1)
-                self.assertEqual(audio.getsampwidth(), 2)
-                self.assertEqual(audio.getframerate(), 16000)
-                self.assertEqual(audio.getcomptype(), "NONE")
-                frames = audio.getnframes()
-                self.assertGreaterEqual(frames, audio.getframerate() // 2)
-                pcm = audio.readframes(frames)
+            with self.subTest(clip=clip):
+                path = CLIPS / (clip + ".opus")
+                data = path.read_bytes()
+                offset = 0
+                while offset < len(data):
+                    header = data[offset:offset + 27]
+                    self.assertEqual(len(header), 27)
+                    self.assertEqual(header[:5], b"OggS\x00")
+                    payload = offset + 27 + header[26]
+                    self.assertLessEqual(payload, len(data))
+                    if offset == 0:
+                        self.assertEqual(data[payload:payload + 10], b"OpusHead\x01\x01")
+                        pre_skip = int.from_bytes(data[payload + 10:payload + 12], "little")
+                    offset = payload + sum(data[offset + 27:payload])
+                    self.assertLessEqual(offset, len(data))
+                    self.assertEqual(bool(header[5] & 4), offset == len(data), "misplaced or missing EOS")
+                frames = int.from_bytes(header[6:14], "little") - pre_skip
+                self.assertGreaterEqual(frames, 24000)
+                pcm = subprocess.check_output([
+                    "ffmpeg", "-nostdin", "-v", "error", "-xerror", "-i", str(path),
+                    "-map", "0:a:0", "-ar", "48000", "-f", "s16le", "pipe:1",
+                ])
                 self.assertEqual(len(pcm), frames * 2)
                 samples = array("h", pcm)
                 if sys.byteorder == "big":
