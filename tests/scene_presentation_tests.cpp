@@ -110,6 +110,7 @@ int main() {
     assert(gladLoadGL());
     initQuad(quadVAO,quadVBO);
     vhsShader=mkShader(vhsVS,vhsFS);
+    settings.ssaoQuality=0; // compare isolated history, bloom and tape passes
     exerciseHistory();
     exercisePasses();
     glfwTerminate();

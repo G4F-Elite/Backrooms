@@ -101,6 +101,7 @@ int main() {
     vhsShader=mkShader(vhsVS,vhsFS);
     settings.upscalerMode=UPSCALER_MODE_OFF;
     settings.aaMode=AA_MODE_OFF;
+    settings.ssaoQuality=0; // the tape calibration image must reach VHS unchanged
     windowResize(nullptr,width,height);
     display.prepare(width,height);
     glActiveTexture(GL_TEXTURE0);
