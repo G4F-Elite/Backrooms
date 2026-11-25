@@ -1,0 +1,4 @@
+# Only enter src when discovering files from the repository root.
+/*
+!/src/
+!/src/**
