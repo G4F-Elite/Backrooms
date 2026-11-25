@@ -35,6 +35,8 @@ inline void selftestInit() {
     settings.bloom = fxDigit(3) > 0;
     settings.rtxDenoise = fxDigit(4) > 0;
     settings.aaMode = fxDigit(5);
+    // BACKROOMS_SELFTEST_VHS=0..100 overrides the tape effect strength; 0 gives clean screenshots.
+    if (const char* vhs = std::getenv("BACKROOMS_SELFTEST_VHS")) settings.vhsIntensity = std::clamp(std::atoi(vhs) / 100.0f, 0.0f, 1.0f);
 }
 
 inline void selftestLog(const char* what, bool ok) {

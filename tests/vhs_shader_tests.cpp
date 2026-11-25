@@ -1,5 +1,5 @@
 // Present a calibration image through the real VHS path on a hidden GL context.
-// One half measures temporal grain; one-pixel vertical bars measure horizontal detail.
+// One half measures temporal grain; vertical bars measure horizontal detail.
 #define LIMEN_SHOTS
 #define main vhs_test_unused_client_main
 #include "../src/game_core.h"
@@ -14,11 +14,11 @@ using Image = std::vector<unsigned char>;
 using ReadPixels = void (APIENTRY*)(GLint,GLint,GLsizei,GLsizei,GLenum,GLenum,void*);
 PostTarget display;
 
-Image calibrationImage() {
+Image calibrationImage(int bar=1) {
     Image rgba(4*width*height);
     for (int y=0; y<height; ++y) for (int x=0; x<width; ++x) {
         size_t pos=4*(y*width+x);
-        unsigned char v = x<width/2 ? 104 : (x%2==0 ? 180 : 64);
+        unsigned char v = x<width/2 ? 104 : (x/bar%2==0 ? 180 : 64);
         rgba[pos]=rgba[pos+1]=rgba[pos+2]=v;
         rgba[pos+3]=255;
     }
@@ -54,7 +54,7 @@ double luma(const Image& image, int x, int y) {
 
 struct Metrics { double grainRms=0, detailContrast=0; };
 
-Metrics measure(float level, float rows=height/3.f) {
+Metrics measure(float level, float rows=height/3.f, int bar=1) {
     Metrics result;
     constexpr int frames=8;
     Image last;
@@ -75,8 +75,8 @@ Metrics measure(float level, float rows=height/3.f) {
                 result.grainRms+=rowSquares-rowSum*rowSum/(hi-lo);
                 grains+=hi-lo;
             }
-            for(int x=width*5/8; x<width*7/8; x+=2){
-                result.detailContrast+=luma(current,x,y)-luma(current,x+1,y);
+            for(int x=width*5/8; x<width*7/8; x+=2*bar) for(int i=0; i<bar; ++i){
+                result.detailContrast+=luma(current,x+i,y)-luma(current,x+bar+i,y);
                 ++pairs;
             }
         }
@@ -112,11 +112,22 @@ int main() {
     const Metrics off=measure(0.f), half=measure(.5f), full=measure(1.f);
     std::printf("VHS 0/50/100%%, grain RMS %.2f / %.2f / %.2f; bar contrast %.2f / %.2f / %.2f\n",
                 off.grainRms,half.grainRms,full.grainRms,off.detailContrast,half.detailContrast,full.detailContrast);
+    std::fflush(stdout);
     assert(off.grainRms==0 && off.detailContrast>115);
     assert(half.grainRms>0.5 && full.grainRms>half.grainRms*1.15);
     assert(half.detailContrast<off.detailContrast && full.detailContrast<0.9*half.detailContrast);
-    const Metrics native=measure(1.f,height);
-    assert(native.grainRms>0.5 && native.detailContrast>full.detailContrast);
+
+    // One-pixel bars are finer than the tape's bandwidth on any raster, so the raster comparison
+    // uses bars that a native raster can still carry and a coarse one cannot.
+    constexpr int wideBar=2;
+    const Image wide=calibrationImage(wideBar);
+    glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,width,height,0,GL_RGBA,GL_UNSIGNED_BYTE,wide.data());
+    const Metrics coarse=measure(1.f,height/3.f,wideBar), native=measure(1.f,height,wideBar);
+    std::printf("100%% on a coarse/native raster, grain RMS %.2f / %.2f; wide bar contrast %.2f / %.2f\n",
+                coarse.grainRms,native.grainRms,coarse.detailContrast,native.detailContrast);
+    std::fflush(stdout);
+    assert(native.grainRms>0.5 && native.detailContrast>2*coarse.detailContrast);
+    glTexImage2D(GL_TEXTURE_2D,0,GL_RGB,width,height,0,GL_RGBA,GL_UNSIGNED_BYTE,source.data());
 
     // Check the game's actual settings-to-uniform binding, using the manually
     // specified shader results as references for the same source and field.
