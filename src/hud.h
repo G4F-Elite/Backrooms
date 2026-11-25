@@ -78,9 +78,7 @@ void drawUI(){
             // === DEBUG MODE: FPS/telemetry overlay ===
             if(settings.debugMode){
                 char fpsBuf[48];
-                snprintf(fpsBuf,48,"FPS %.0f",gPerfFpsSmoothed);
-                char fgBuf[80];
-                formatFrameGenPipeline(fgBuf,80,gPerfRefreshHz,gPerfFrameGenBaseCap,settings.frameGenMode,settings.vsync);
+                snprintf(fpsBuf,48,"FPS %.0f | DISPLAY %d HZ",gPerfFpsSmoothed,gPerfRefreshHz);
                 char upBuf[96];
                 formatUpscalePipeline(upBuf,96,settings.upscalerMode,renderW,renderH,winW,winH);
                 if(gHudTelemetryVisible){
@@ -91,7 +89,7 @@ void drawUI(){
                     if(multiState==MULTI_IN_GAME) snprintf(netBuf,40,"NET %s",netMgr.connectionQualityLabel((float)glfwGetTime()));
                     else snprintf(netBuf,40,"NET --");
                     char perfRow[300];
-                    snprintf(perfRow,300,"%s | %s | %s | %s | %s",fpsBuf,fgBuf,upBuf,pingBuf,netBuf);
+                    snprintf(perfRow,300,"%s | %s | %s | %s",fpsBuf,upBuf,pingBuf,netBuf);
                     drawHudText(perfRow,-0.95f,0.95f,1.20f,0.88f,0.93f,0.78f,0.98f);
                 }else{
                     drawHudText("HUD HIDDEN",-0.95f,0.95f,1.00f,0.80f,0.86f,0.74f,0.95f);
@@ -207,6 +205,9 @@ void drawUI(){
             if(settings.debugMode && debugTools.open) drawDebugToolsPanel();
         }
     }
+#ifndef LIMEN_SHOTS
+    renderNarratorFrame();
+#endif
 }
 
 void updateMultiplayer(){

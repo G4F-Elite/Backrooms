@@ -78,17 +78,26 @@ void testMouseSensitivityKeepsItsRange() {
     assert(s.mouseSens > 0.0029f && s.mouseSens < 0.0031f);
 }
 
-void testChoicesStepClampAndCycle() {
+void testChoicesWrapInBothDirections() {
     Settings s;
-    SettingRow aa = {SETTING_CHOICE, SET_AA, "", ""};
-    s.aaMode = AA_MODE_OFF;
-    assert(!settingCanStep(s, SET_AA, -1));
-    assert(settingCanStep(s, SET_AA, 1));
-    assert(!adjustSetting(s, aa, -1));
-    assert(adjustSetting(s, aa, 1) && s.aaMode == AA_MODE_FXAA);
-    s.aaMode = AA_MODE_COUNT - 1;
-    assert(!adjustSetting(s, aa, 1));
-    assert(cycleSetting(s, aa) && s.aaMode == AA_MODE_OFF);
+    for (int tab = 0; tab < SETTINGS_TAB_COUNT; ++tab) {
+        for (int i = 0; i < settingsRowCount(tab); ++i) {
+            SettingRow row = settingsRowAt(tab, i);
+            if (row.kind != SETTING_CHOICE) continue;
+            const int count = settingChoiceCount(row.id);
+            int& value = *settingChoiceRef(s, row.id);
+            const int initial = value;
+            for (int before = 0; before < count; ++before) {
+                value = before;
+                assert(settingCanStep(s, row.id, -1) && settingCanStep(s, row.id, 1));
+                assert(!adjustSetting(s, row, 0) && value == before);
+                assert(adjustSetting(s, row, -1) && value == (before + count - 1) % count);
+                assert(cycleSetting(s, row) && value == before);
+                assert(adjustSetting(s, row, 1) && value == (before + 1) % count);
+            }
+            value = initial;
+        }
+    }
 }
 
 void testTogglesFlip() {
@@ -158,7 +167,7 @@ int main() {
     testSelectionWraps();
     testSlidersClampAndStep();
     testMouseSensitivityKeepsItsRange();
-    testChoicesStepClampAndCycle();
+    testChoicesWrapInBothDirections();
     testTogglesFlip();
     testRenderScaleLockedWithoutUpscaler();
     testValueText();

@@ -137,14 +137,7 @@ inline int lmGatherLightsAndDrawMega(const std::vector<Light>& sceneLights, cons
         GLint locPass = glGetUniformLocation(mainShader, "uPass");
         if (locPass >= 0) glUniform1f(locPass, 0.0f);
     }
-    static float lastPixRows = -1.0f;
-    if (pixRows != lastPixRows && vhsShader != 0) {
-        glUseProgram(vhsShader);
-        GLint locPix = glGetUniformLocation(vhsShader, "uLmPix");
-        if (locPix >= 0) glUniform1f(locPix, pixRows);
-        glUseProgram(mainShader);
-        lastPixRows = pixRows;
-    }
+    gPostPixelRows = pixRows;
 
     if (lightShader != 0) {
         glUseProgram(lightShader);

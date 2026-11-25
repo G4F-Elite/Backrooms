@@ -1,4 +1,5 @@
 #pragma once
+#include "render_history.h"
 // Scene data for the screen-space effects in the post shader (SSAO, GI, god rays, bloom).
 // renderScene() captures the camera projection and the visible lamps every frame;
 // the post pass uploads them together with the EFFECTS settings.
@@ -7,6 +8,9 @@ inline constexpr int POST_FX_RAY_LIGHTS = 4;
 
 struct PostFxFrame {
     bool sceneDrawn = false;
+    Mat4 viewProjection;
+    float jitterX = 0, jitterY = 0;
+    float depthA = 0, depthB = 0;
     float tanHalfX = 1.0f;
     float tanHalfY = 1.0f;
     int rayCount = 0;
@@ -18,9 +22,15 @@ inline PostFxFrame gPostFx;
 // in front of the camera, on screen (or just outside it) and not too far away.
 inline void postFxCaptureScene(const Mat4& proj, const Mat4& view, const float* lightPos, int lightCount) {
     gPostFx.sceneDrawn = true;
+    gPostFx.viewProjection = view * proj; // Mat4 composes in application order
+    gPostFx.jitterX = -0.5f * proj.m[8];
+    gPostFx.jitterY = -0.5f * proj.m[9];
+    gPostFx.depthA = proj.m[10];
+    gPostFx.depthB = proj.m[14];
     gPostFx.tanHalfX = 1.0f / proj.m[0];
     gPostFx.tanHalfY = 1.0f / proj.m[5];
     gPostFx.rayCount = 0;
+    if (!settings.godRays) return;
     float strength[POST_FX_RAY_LIGHTS] = {0};
     for (int i = 0; i < lightCount; i++) {
         Vec3 v = view.transformPoint(Vec3(lightPos[i * 3], lightPos[i * 3 + 1], lightPos[i * 3 + 2]));
@@ -53,7 +63,7 @@ inline void postFxCaptureScene(const Mat4& proj, const Mat4& view, const float* 
 inline void postFxSetUniforms(GLuint shader, bool enabled) {
     static GLuint cachedShader = 0;
     static GLint ssaoLoc = -1, giLoc = -1, raysLoc = -1, bloomLoc = -1;
-    static GLint denoiseLoc = -1, denoiseStrLoc = -1, projLoc = -1, rayCountLoc = -1, rayPosLoc = -1;
+    static GLint denoiseLoc = -1, denoiseStrLoc = -1, projLoc = -1, depthALoc = -1, rayCountLoc = -1, rayPosLoc = -1;
     if (cachedShader != shader) {
         cachedShader = shader;
         ssaoLoc = glGetUniformLocation(shader, "rtxA");
@@ -63,6 +73,7 @@ inline void postFxSetUniforms(GLuint shader, bool enabled) {
         denoiseLoc = glGetUniformLocation(shader, "rtxDenoiseOn");
         denoiseStrLoc = glGetUniformLocation(shader, "rtxDenoiseStrength");
         projLoc = glGetUniformLocation(shader, "projInfo");
+        depthALoc = glGetUniformLocation(shader, "depthA");
         rayCountLoc = glGetUniformLocation(shader, "rayN");
         rayPosLoc = glGetUniformLocation(shader, "rayL");
     }
@@ -74,7 +85,8 @@ inline void postFxSetUniforms(GLuint shader, bool enabled) {
     glUniform1i(bloomLoc, on && settings.bloom ? 1 : 0);
     glUniform1i(denoiseLoc, settings.rtxDenoise ? 1 : 0);
     glUniform1f(denoiseStrLoc, settings.rtxDenoiseStrength);
-    glUniform3f(projLoc, gPostFx.tanHalfX, gPostFx.tanHalfY, 0.0f);
+    glUniform3f(projLoc, gPostFx.tanHalfX, gPostFx.tanHalfY, gPostFx.depthB);
+    glUniform1f(depthALoc, gPostFx.depthA);
     glUniform1i(rayCountLoc, rayCount);
     if (rayCount > 0) glUniform3fv(rayPosLoc, rayCount, gPostFx.rays);
 }

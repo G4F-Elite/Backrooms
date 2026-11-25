@@ -5,6 +5,7 @@
 
 #include <cstdio>
 #include "upscaler_settings.h"
+#include "vhs_settings.h"
 #include "keybinds.h"
 
 struct Settings {
@@ -14,6 +15,7 @@ struct Settings {
     float sfxVol = 0.7f;
     float voiceVol = 0.65f;
     float vhsIntensity = 0.58f;
+    int vhsResolution = VHS_RES_AUTO;
     float mouseSens = 0.002f;
     int upscalerMode = UPSCALER_MODE_FSR10;
     int renderScalePreset = RENDER_SCALE_PRESET_DEFAULT;
@@ -26,7 +28,6 @@ struct Settings {
     bool bloom = false;
     bool rtxDenoise = true;
     float rtxDenoiseStrength = 0.65f;
-    int frameGenMode = FRAME_GEN_MODE_OFF;
     bool vsync = true;
     bool debugMode = false;
     GameplayBinds binds = {};
@@ -45,11 +46,11 @@ enum SettingsTab {
 
 enum SettingId {
     SET_VHS = 0,
+    SET_VHS_RESOLUTION,
     SET_UPSCALER,
     SET_RENDER_SCALE,
     SET_SHARPNESS,
     SET_AA,
-    SET_FRAME_GEN,
     SET_VSYNC,
     SET_FAST_MATH,
     SET_DEBUG,
@@ -90,11 +91,11 @@ inline const char* settingsTabName(int tab) {
 
 inline constexpr SettingRow SETTINGS_VIDEO_ROWS[] = {
     {SETTING_SLIDER, SET_VHS, "VHS EFFECT", "TAPE NOISE AND DISTORTION OVER THE PICTURE."},
+    {SETTING_CHOICE, SET_VHS_RESOLUTION, "VHS RESOLUTION", "VERTICAL DETAIL OF THE TAPE IMAGE. AUTO USES UP TO 400 LINES."},
     {SETTING_CHOICE, SET_UPSCALER, "UPSCALER", "RENDERS BELOW WINDOW SIZE AND SCALES THE PICTURE UP."},
     {SETTING_CHOICE, SET_RENDER_SCALE, "RENDER SCALE", "INTERNAL RESOLUTION. LOWER IS FASTER AND SOFTER."},
     {SETTING_SLIDER, SET_SHARPNESS, "SHARPNESS", "SHARPENING APPLIED AFTER UPSCALING."},
     {SETTING_CHOICE, SET_AA, "ANTI-ALIASING", "SMOOTHS JAGGED EDGES."},
-    {SETTING_CHOICE, SET_FRAME_GEN, "FRAME GEN", "BLENDS EXTRA FRAMES BETWEEN RENDERED ONES."},
     {SETTING_TOGGLE, SET_VSYNC, "V-SYNC", "LOCKS THE FRAME RATE TO THE DISPLAY. REMOVES TEARING."},
     {SETTING_TOGGLE, SET_FAST_MATH, "FAST MATH", "CHEAPER APPROXIMATE MATH. SMALL SPEED-UP."},
     {SETTING_TOGGLE, SET_DEBUG, "DEBUG MODE", "FPS READOUT, OBJECTIVE TEXT AND THE F10 TOOLS PANEL."},
@@ -206,10 +207,10 @@ inline bool settingToggleValue(const Settings& s, int id) {
 
 inline int* settingChoiceRef(Settings& s, int id) {
     switch (id) {
+        case SET_VHS_RESOLUTION: return &s.vhsResolution;
         case SET_UPSCALER: return &s.upscalerMode;
         case SET_RENDER_SCALE: return &s.renderScalePreset;
         case SET_AA: return &s.aaMode;
-        case SET_FRAME_GEN: return &s.frameGenMode;
         case SET_SSAO: return &s.ssaoQuality;
         case SET_GI: return &s.giQuality;
         default: return nullptr;
@@ -218,10 +219,10 @@ inline int* settingChoiceRef(Settings& s, int id) {
 
 inline int settingChoiceCount(int id) {
     switch (id) {
+        case SET_VHS_RESOLUTION: return VHS_RES_COUNT;
         case SET_UPSCALER: return UPSCALER_MODE_COUNT;
         case SET_RENDER_SCALE: return RENDER_SCALE_PRESET_COUNT;
         case SET_AA: return AA_MODE_COUNT;
-        case SET_FRAME_GEN: return FRAME_GEN_MODE_COUNT;
         case SET_SSAO: return SSAO_COUNT;
         case SET_GI: return GI_COUNT;
         default: return 0;
@@ -237,6 +238,7 @@ inline int settingChoiceValue(const Settings& s, int id) {
 
 // Render scale means nothing while the upscaler is off: the row is shown, but locked.
 inline bool settingEnabled(const Settings& s, int id) {
+    if (id == SET_VHS_RESOLUTION) return s.vhsIntensity > 0.0f;
     bool upscaling = clampUpscalerMode(s.upscalerMode) != UPSCALER_MODE_OFF;
     if (id == SET_RENDER_SCALE || id == SET_SHARPNESS) return upscaling;
     if (id == SET_DENOISE_STRENGTH) return s.rtxDenoise;
@@ -244,10 +246,7 @@ inline bool settingEnabled(const Settings& s, int id) {
 }
 
 inline bool settingCanStep(const Settings& s, int id, int dir) {
-    int count = settingChoiceCount(id);
-    if (count <= 0 || !settingEnabled(s, id)) return false;
-    int next = settingChoiceValue(s, id) + (dir > 0 ? 1 : -1);
-    return next >= 0 && next < count;
+    return dir != 0 && settingChoiceCount(id) > 1 && settingEnabled(s, id);
 }
 
 // Left / right on a row. Returns true when something changed.
@@ -267,20 +266,15 @@ inline bool adjustSetting(Settings& s, const SettingRow& row, int dir) {
     }
     if (row.kind == SETTING_CHOICE) {
         if (!settingCanStep(s, row.id, dir)) return false;
-        *settingChoiceRef(s, row.id) = settingChoiceValue(s, row.id) + dir;
+        const int count = settingChoiceCount(row.id);
+        *settingChoiceRef(s, row.id) = (settingChoiceValue(s, row.id) + dir + count) % count;
         return true;
     }
     return false;
 }
 
 // ENTER / click on a choice: next value, and back to the first one after the last.
-inline bool cycleSetting(Settings& s, const SettingRow& row) {
-    if (row.kind != SETTING_CHOICE) return adjustSetting(s, row, 1);
-    int count = settingChoiceCount(row.id);
-    if (count <= 0 || !settingEnabled(s, row.id)) return false;
-    *settingChoiceRef(s, row.id) = (settingChoiceValue(s, row.id) + 1) % count;
-    return true;
-}
+inline bool cycleSetting(Settings& s, const SettingRow& row) { return adjustSetting(s, row, 1); }
 
 inline void settingValueText(const Settings& s, const SettingRow& row, char* out, int cap) {
     if (row.kind == SETTING_SLIDER) {
@@ -289,9 +283,9 @@ inline void settingValueText(const Settings& s, const SettingRow& row, char* out
         std::snprintf(out, cap, "%s", settingToggleValue(s, row.id) ? "ON" : "OFF");
     } else if (row.kind == SETTING_CHOICE) {
         int v = settingChoiceValue(s, row.id);
-        if (row.id == SET_UPSCALER) std::snprintf(out, cap, "%s", upscalerModeLabel(v));
+        if (row.id == SET_VHS_RESOLUTION) std::snprintf(out, cap, "%s", VHS_RESOLUTIONS[v].label);
+        else if (row.id == SET_UPSCALER) std::snprintf(out, cap, "%s", upscalerModeLabel(v));
         else if (row.id == SET_AA) std::snprintf(out, cap, "%s", aaModeLabel(v));
-        else if (row.id == SET_FRAME_GEN) std::snprintf(out, cap, "%s", frameGenModeLabel(v));
         else if (row.id == SET_SSAO) std::snprintf(out, cap, "%s", ssaoLabel(v));
         else if (row.id == SET_GI) std::snprintf(out, cap, "%s", giLabel(v));
         else if (!settingEnabled(s, row.id)) std::snprintf(out, cap, "NATIVE");

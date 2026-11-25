@@ -1,6 +1,6 @@
 #pragma once
 #include "post_fx.h"
-inline Mat4 composeModelMatrix(const Vec3& pos, float yaw, float pitch, const Vec3& scale);
+#include "model_transform.h"
 
 void renderScene(){
     glDisable(GL_BLEND);
@@ -44,6 +44,8 @@ void renderScene(){
 
     glUseProgram(mainShader);
     Mat4 proj=Mat4::persp(1.2f,(float)winW/winH,0.1f,100.0f);
+    if (needsRenderHistory(settings.upscalerMode, settings.aaMode))
+        jitterSceneProjection(proj, taaFrameIndex, renderW, renderH);
     float shX=camShake*(rand()%100-50)/500.0f,shY=camShake*(rand()%100-50)/500.0f;
     float moveSway = sndState.moveIntensity * 0.006f;
     float sprintSway = sndState.sprintIntensity * 0.004f;
@@ -367,80 +369,3 @@ inline int detectActiveRefreshRateHz(GLFWwindow* w){
     if(!vm || vm->refreshRate <= 0) return 60;
     return vm->refreshRate;
 }
-
-inline Mat4 composeModelMatrix(const Vec3& pos, float yaw, float pitch, const Vec3& scale){
-    Vec3 forward(mSin(yaw) * mCos(pitch), mSin(pitch), mCos(yaw) * mCos(pitch));
-    forward.normalize();
-
-    Vec3 worldUp(0.0f, 1.0f, 0.0f);
-    Vec3 right = worldUp.cross(forward);
-    if(right.lenSq() < 0.0001f){
-        right = Vec3(mCos(yaw), 0.0f, -mSin(yaw));
-    }else{
-        right.normalize();
-    }
-    Vec3 up = forward.cross(right).norm();
-
-    Mat4 r;
-    r.m[0] = right.x * scale.x;
-    r.m[1] = right.y * scale.x;
-    r.m[2] = right.z * scale.x;
-    r.m[3] = 0.0f;
-
-    r.m[4] = up.x * scale.y;
-    r.m[5] = up.y * scale.y;
-    r.m[6] = up.z * scale.y;
-    r.m[7] = 0.0f;
-
-    r.m[8] = forward.x * scale.z;
-    r.m[9] = forward.y * scale.z;
-    r.m[10] = forward.z * scale.z;
-    r.m[11] = 0.0f;
-
-    r.m[12] = pos.x;
-    r.m[13] = pos.y;
-    r.m[14] = pos.z;
-    r.m[15] = 1.0f;
-    return r;
-}
-
-inline void applyFramePacing(double frameStartTime, int targetFps){
-    if(targetFps <= 0) return;
-    double targetFrameSec = 1.0 / (double)targetFps;
-    double elapsed = glfwGetTime() - frameStartTime;
-    double remain = targetFrameSec - elapsed;
-    if(remain <= 0.0) return;
-
-    if(remain > 0.002){
-        DWORD sleepMs = (DWORD)((remain - 0.001) * 1000.0);
-        if(sleepMs > 0) Sleep(sleepMs);
-    }
-    while((glfwGetTime() - frameStartTime) < targetFrameSec){}
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

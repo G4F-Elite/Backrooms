@@ -8,6 +8,7 @@
 #include <atomic>
 #include <mutex>
 #include "limen_sound.h"
+#include "dispatcher_audio.h"
 
 struct LmAudioBridge {
     std::mutex lock;
@@ -99,6 +100,7 @@ inline void fillAudio(short* buf, int frames) {
         int n = frames > 2048 ? 2048 : frames;
         memset(b.mixBuf, 0, sizeof(float) * 2 * (size_t)n);
         synth.render(b.mixBuf, n, mix);
+        dispatcher_audio::player.mix(b.mixBuf, n, SAMP_RATE, master * gAudioEngine.vol.bus[BUS_VOICE]);
         for (int i = 0; i < n * 2; i++) {
             float x = (float)buf[i] * (1.0f / 32767.0f) + b.mixBuf[i];
             // The game's limiter has already run; keep the sum inside full scale without a hard edge.

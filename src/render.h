@@ -61,9 +61,10 @@ inline void initFBO(GLuint& fbo, GLuint& fboTex, GLuint& depthTex, int W, int H)
 }
 
 inline void initQuad(GLuint& vao, GLuint& vbo) {
+    if (vao && vbo) return;
     float qv[] = {-1, -1, 0, 0, 1, -1, 1, 0, 1, 1, 1, 1, -1, -1, 0, 0, 1, 1, 1, 1, -1, 1, 0, 1};
-    glGenVertexArrays(1, &vao);
-    glGenBuffers(1, &vbo);
+    if (!vao) glGenVertexArrays(1, &vao);
+    if (!vbo) glGenBuffers(1, &vbo);
     glBindVertexArray(vao);
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glBufferData(GL_ARRAY_BUFFER, sizeof(qv), qv, GL_STATIC_DRAW);

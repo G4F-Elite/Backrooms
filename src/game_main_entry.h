@@ -3,6 +3,8 @@
 #include "sanity_balance.h"
 #include "window_title.h"
 #include "dev_selftest.h"
+#include "scene_presentation.h"
+#include "game_post_intensity.h"
 int main(){
     std::random_device rd;rng.seed(rd());
     if(!glfwInit())return -1;
@@ -29,6 +31,7 @@ int main(){
     plushTex=genTex(7);
     playerTex=propTex; // players use a stable texture so held-item textures don't bleed
     mainShader=mkShader(mainVS,mainFS);lightShader=mkShader(lightVS,lightFS);vhsShader=mkShader(vhsVS,vhsFS);
+    scenePrograms();
     buildGeom();
     computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), renderW, renderH);
     initFBO(fbo,fboTex,fboDepthTex,renderW,renderH);
@@ -44,18 +47,19 @@ int main(){
     double nextRefreshProbeTime = 0.0;
     initFrameTimeHistory(gPerfFrameTimeHistory, PERF_GRAPH_SAMPLES, 16.6f);
     gPerfFrameTimeHead = PERF_GRAPH_SAMPLES - 1;
+    double previousFrameTime = 0.0;
     while(!glfwWindowShouldClose(gWin)){
         double frameStartTime = glfwGetTime();
         float now=(float)frameStartTime;
-        float rawDt = now - lastFrame;
-        if(lastFrame <= 0.0f || rawDt <= 0.0f || rawDt > 0.5f) rawDt = 0.016f;
-        dTime = rawDt;
-        lastFrame = now;
+        const float elapsed = static_cast<float>(frameStartTime - previousFrameTime);
+        const float frameSeconds = previousFrameTime > 0 && elapsed > 0 ? elapsed : 0.016f;
+        previousFrameTime = frameStartTime;
+        dTime = frameSeconds > 0.5f ? 0.016f : frameSeconds;
         vhsTime = now;
         updateWindowTitleForLevel();
-        gPerfFrameMs = dTime * 1000.0f;
+        gPerfFrameMs = frameSeconds * 1000.0f;
         pushFrameTimeSample(gPerfFrameTimeHistory, PERF_GRAPH_SAMPLES, gPerfFrameTimeHead, gPerfFrameMs);
-        float fpsNow = 1.0f / dTime;
+        float fpsNow = 1.0f / frameSeconds;
         if(gPerfFpsSmoothed < 1.0f) gPerfFpsSmoothed = fpsNow;
         else gPerfFpsSmoothed = gPerfFpsSmoothed * 0.90f + fpsNow * 0.10f;
         if(now >= (float)nextRefreshProbeTime){
@@ -292,150 +296,7 @@ int main(){
         if((gameState==STATE_GAME&&!isPlayerDead)||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_NOTE)
             renderScene();
         
-        glBindFramebuffer(GL_FRAMEBUFFER,0);
-        glViewport(0,0,winW,winH);
-        glClear(GL_COLOR_BUFFER_BIT);
-        glDisable(GL_DEPTH_TEST);
-
-        glUseProgram(vhsShader);
-        bool vhsMenu=(gameState==STATE_MENU||gameState==STATE_SETTINGS||gameState==STATE_GUIDE||gameState==STATE_MULTI||gameState==STATE_MULTI_HOST||gameState==STATE_MULTI_JOIN||gameState==STATE_MULTI_WAIT),vhsGameplay=(gameState==STATE_GAME||gameState==STATE_PAUSE||gameState==STATE_SETTINGS_PAUSE||gameState==STATE_INTRO); float vI=0.0f;
-        if(vhsMenu) vI=0.0f; else if(vhsGameplay){
-            float sanityLoss=1.0f-(playerSanity/100.0f);
-            if(sanityLoss<0.0f) sanityLoss=0.0f;
-            if(sanityLoss>1.0f) sanityLoss=1.0f;
-            float stress=entityMgr.dangerLevel*0.65f+sanityLoss*0.35f;
-            if(stress<0.0f) stress=0.0f;
-            if(stress>1.0f) stress=1.0f;
-            float panicBoost = sanityLoss * 0.20f + entityMgr.dangerLevel * 0.15f;
-            vI=settings.vhsIntensity*(0.62f+0.78f*stress)+panicBoost;
-            static float deathFx = 0.0f; deathFx += isPlayerDead ? dTime * 0.95f : -dTime * 1.4f;
-            if(deathFx < 0.0f) deathFx = 0.0f; if(deathFx > 1.0f) deathFx = 1.0f;
-            if(isPlayerDead) vI += deathFx * (0.52f + (0.55f + 0.45f * sinf(vhsTime * 5.8f)) * 0.44f);
-            if(vI>1.35f) vI=1.35f;
-        }
-        static GLint vhsTmLoc=-1,vhsIntenLoc=-1,vhsUpscalerLoc=-1,vhsAaModeLoc=-1;
-        static GLint vhsSharpnessLoc=-1,vhsTexelXLoc=-1,vhsTexelYLoc=-1;
-        static GLint vhsTaaHistLoc=-1,vhsTaaBlendLoc=-1,vhsTaaJitterLoc=-1,vhsTaaValidLoc=-1;
-        static GLint vhsFrameGenLoc=-1,vhsFrameGenBlendLoc=-1;
-        static GLint vhsDepthTexLoc=-1,vhsDeathFxLoc=-1;
-        if(vhsTmLoc<0){
-            glUniform1i(glGetUniformLocation(vhsShader,"tex"),0);
-            vhsTmLoc=glGetUniformLocation(vhsShader,"tm"); vhsIntenLoc=glGetUniformLocation(vhsShader,"inten");
-            vhsUpscalerLoc=glGetUniformLocation(vhsShader,"upscaler"); vhsAaModeLoc=glGetUniformLocation(vhsShader,"aaMode");
-            vhsSharpnessLoc=glGetUniformLocation(vhsShader,"sharpness"); vhsTexelXLoc=glGetUniformLocation(vhsShader,"texelX");
-            vhsTexelYLoc=glGetUniformLocation(vhsShader,"texelY"); vhsTaaHistLoc=glGetUniformLocation(vhsShader,"histTex");
-            vhsTaaBlendLoc=glGetUniformLocation(vhsShader,"taaBlend"); vhsTaaJitterLoc=glGetUniformLocation(vhsShader,"taaJitter");
-            vhsTaaValidLoc=glGetUniformLocation(vhsShader,"taaValid"); vhsFrameGenLoc=glGetUniformLocation(vhsShader,"frameGen");
-            vhsFrameGenBlendLoc=glGetUniformLocation(vhsShader,"frameGenBlend"); vhsDepthTexLoc=glGetUniformLocation(vhsShader,"depthTex");
-            vhsDeathFxLoc=glGetUniformLocation(vhsShader,"deathFx");
-        }
-        float preDeathFx = gSanityCollapseTimer / 2.3f; if(preDeathFx < 0.0f) preDeathFx = 0.0f; if(preDeathFx > 1.0f) preDeathFx = 1.0f;
-        float deathFxUniform = (gameState==STATE_GAME || gameState==STATE_PAUSE) ? (isPlayerDead ? (0.55f + 0.45f * sinf(vhsTime * 2.9f)) : preDeathFx) : (isPlayerDead ? 1.0f : 0.0f);
-        static int prevAaMode = -1;
-        int aaMode = clampAaMode(settings.aaMode);
-        if(aaMode != prevAaMode){ prevAaMode = aaMode; taaHistoryValid = false; taaFrameIndex = 0; }
-        float jitterX = 0.0f;
-        float jitterY = 0.0f;
-        if(aaMode == AA_MODE_TAA){
-            static const float jitterSeq[8][2] = {
-                {0.5f, 0.5f}, {0.75f, 0.25f}, {0.25f, 0.75f}, {0.875f, 0.625f},
-                {0.375f, 0.125f}, {0.625f, 0.875f}, {0.125f, 0.375f}, {0.9375f, 0.9375f}
-            };
-            jitterX = jitterSeq[taaFrameIndex & 7][0] - 0.5f;
-            jitterY = jitterSeq[taaFrameIndex & 7][1] - 0.5f;
-        }
-        if(aaMode==AA_MODE_TAA){
-            glBindFramebuffer(GL_FRAMEBUFFER,taaResolveFbo);
-            glViewport(0,0,winW,winH);
-            glClear(GL_COLOR_BUFFER_BIT);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D,fboTex);
-            glActiveTexture(GL_TEXTURE0 + 1);
-            glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
-            glUniform1i(vhsTaaHistLoc,1);
-            glActiveTexture(GL_TEXTURE0 + 2);
-            glBindTexture(GL_TEXTURE_2D,fboDepthTex);
-            glUniform1i(vhsDepthTexLoc,2);
-            postFxSetUniforms(vhsShader,true);
-            glActiveTexture(GL_TEXTURE0);
-            glUniform1f(vhsTmLoc,vhsTime);
-            glUniform1f(vhsIntenLoc,vI);
-            glUniform1i(vhsUpscalerLoc,clampUpscalerMode(settings.upscalerMode));
-            glUniform1i(vhsAaModeLoc,AA_MODE_TAA);
-            glUniform1f(vhsSharpnessLoc,clampFsrSharpness(settings.fsrSharpness));
-            glUniform1f(vhsTexelXLoc,1.0f/(float)renderW);
-            glUniform1f(vhsTexelYLoc,1.0f/(float)renderH);
-            glUniform1f(vhsTaaBlendLoc,0.88f);
-            glUniform3f(vhsTaaJitterLoc,jitterX,jitterY,0.0f);
-            glUniform1f(vhsTaaValidLoc,taaHistoryValid?1.0f:0.0f);
-            glUniform1i(vhsFrameGenLoc,isFrameGenEnabled(settings.frameGenMode)?1:0);
-            glUniform1f(vhsFrameGenBlendLoc,frameGenBlendStrength(settings.frameGenMode));
-            glUniform1f(vhsDeathFxLoc,deathFxUniform);
-            glBindVertexArray(quadVAO);
-            glDrawArrays(GL_TRIANGLES,0,6);
-
-            taaHistoryValid = true;
-            taaFrameIndex = (taaFrameIndex + 1) & 7;
-
-            GLuint taaTmp = taaHistoryTex;
-            taaHistoryTex = taaResolveTex;
-            taaResolveTex = taaTmp;
-            glBindFramebuffer(GL_FRAMEBUFFER,taaResolveFbo);
-            glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,taaResolveTex,0);
-
-            glBindFramebuffer(GL_FRAMEBUFFER,0);
-            glViewport(0,0,winW,winH);
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
-            glActiveTexture(GL_TEXTURE0 + 1);
-            glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
-            glUniform1i(vhsTaaHistLoc,1);
-            glActiveTexture(GL_TEXTURE0);
-            glUniform1f(vhsTmLoc,vhsTime);
-            glUniform1f(vhsIntenLoc,0.0f);
-            glUniform1i(vhsUpscalerLoc,UPSCALER_MODE_OFF);
-            glUniform1i(vhsAaModeLoc,AA_MODE_OFF);
-            glUniform1f(vhsSharpnessLoc,0.0f);
-            glUniform1f(vhsTexelXLoc,1.0f/(float)winW);
-            glUniform1f(vhsTexelYLoc,1.0f/(float)winH);
-            glUniform1f(vhsTaaBlendLoc,0.0f);
-            glUniform3f(vhsTaaJitterLoc,0.0f,0.0f,0.0f);
-            glUniform1f(vhsTaaValidLoc,0.0f);
-            glUniform1i(vhsFrameGenLoc,0);
-            glUniform1f(vhsFrameGenBlendLoc,0.0f);
-            glUniform1f(vhsDeathFxLoc,0.0f);
-            postFxSetUniforms(vhsShader,false);
-            glBindVertexArray(quadVAO);
-            glDrawArrays(GL_TRIANGLES,0,6);
-        }else{
-            taaHistoryValid = false;
-            taaFrameIndex = 0;
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D,fboTex);
-            glActiveTexture(GL_TEXTURE0 + 1);
-            glBindTexture(GL_TEXTURE_2D,taaHistoryTex);
-            glUniform1i(vhsTaaHistLoc,1);
-            glActiveTexture(GL_TEXTURE0 + 2);
-            glBindTexture(GL_TEXTURE_2D,fboDepthTex);
-            glUniform1i(vhsDepthTexLoc,2);
-            postFxSetUniforms(vhsShader,true);
-            glActiveTexture(GL_TEXTURE0);
-            glUniform1f(vhsTmLoc,vhsTime);
-            glUniform1f(vhsIntenLoc,vI);
-            glUniform1i(vhsUpscalerLoc,clampUpscalerMode(settings.upscalerMode));
-            glUniform1i(vhsAaModeLoc,aaMode);
-            glUniform1f(vhsSharpnessLoc,clampFsrSharpness(settings.fsrSharpness));
-            glUniform1f(vhsTexelXLoc,1.0f/(float)renderW);
-            glUniform1f(vhsTexelYLoc,1.0f/(float)renderH);
-            glUniform1f(vhsTaaBlendLoc,0.0f);
-            glUniform3f(vhsTaaJitterLoc,0.0f,0.0f,0.0f);
-            glUniform1f(vhsTaaValidLoc,0.0f);
-            glUniform1i(vhsFrameGenLoc,0);
-            glUniform1f(vhsFrameGenBlendLoc,0.0f);
-            glUniform1f(vhsDeathFxLoc,deathFxUniform);
-            glBindVertexArray(quadVAO);
-            glDrawArrays(GL_TRIANGLES,0,6);
-        }
+        presentGameScene();
         glEnable(GL_DEPTH_TEST);
         drawUI();
         legsEndView();
@@ -443,11 +304,8 @@ int main(){
         glDisable(GL_BLEND);
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
-        int frameGenBaseCap = frameGenBaseFpsCap(cachedRefreshRateHz, settings.frameGenMode, settings.vsync);
-        gPerfFrameGenBaseCap = frameGenBaseCap;
         selftestFrame();
         glfwSwapBuffers(gWin);glfwPollEvents();
-        if(!settings.vsync) applyFramePacing(frameStartTime, frameGenBaseCap);
     }
     audioRunning=false;SetEvent(hEvent);aT.join();glfwTerminate();return 0;
 }

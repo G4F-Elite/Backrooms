@@ -6,7 +6,7 @@
 #include "rig_models.h"
 #include "zfight_guard.h"
 
-inline Mat4 composeModelMatrix(const Vec3& pos, float yaw, float pitch, const Vec3& scale);
+#include "model_transform.h"
 
 inline GLuint rigHullVAO = 0, rigHullVBO = 0;
 inline GLuint rigAugerVAO = 0, rigAugerVBO = 0;

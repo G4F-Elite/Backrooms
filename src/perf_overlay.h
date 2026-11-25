@@ -78,36 +78,6 @@ inline void buildFrameTimeGraph(
     out[width] = '\0';
 }
 
-inline int frameGenOutputTargetHz(int refreshRateHz, int baseFpsCap, int frameGenMode, bool vsyncEnabled) {
-    if (!isFrameGenEnabled(frameGenMode)) return 0;
-    if (vsyncEnabled && refreshRateHz > 0) return refreshRateHz;
-    if (baseFpsCap <= 0) return 0;
-    int hz = (int)((float)baseFpsCap * frameGenMultiplier(frameGenMode) + 0.5f);
-    if (hz < 1) hz = 1;
-    return hz;
-}
-
-inline void formatFrameGenPipeline(
-    char* out,
-    int outSize,
-    int refreshRateHz,
-    int baseFpsCap,
-    int frameGenMode,
-    bool vsyncEnabled
-) {
-    if (!out || outSize <= 0) return;
-    if (!isFrameGenEnabled(frameGenMode)) {
-        snprintf(out, outSize, "FG: OFF");
-        return;
-    }
-    int targetHz = frameGenOutputTargetHz(refreshRateHz, baseFpsCap, frameGenMode, vsyncEnabled);
-    if (baseFpsCap > 0 && targetHz > 0) {
-        snprintf(out, outSize, "FG %s: %d -> %d HZ", frameGenModeLabel(frameGenMode), baseFpsCap, targetHz);
-    } else {
-        snprintf(out, outSize, "FG %s: UNCAPPED", frameGenModeLabel(frameGenMode));
-    }
-}
-
 inline void formatUpscalePipeline(
     char* out,
     int outSize,

@@ -8,6 +8,7 @@
 #include "decor_atlas.h"
 #include "heist_render.h"
 #include "rig_render.h"
+#include "device_mesh_cache.h"
 
 // World mutations (trap corridor, exit portal, floor holes, reshuffles) can leave decor inside
 // a wall, in the exit doorway or above a pit. Drop it before meshing.
@@ -49,6 +50,15 @@ void buildGeom(){
     pruneInvalidDecor();
     heistApplyDarkZone();
     int pcx=playerChunkX,pcz=playerChunkZ;
+    ensureDeviceMesh(flashlightVAO, flashlightVBO, flashlightVC, buildFlashlightModel, "flashlight");
+    ensureDeviceMesh(scannerVAO, scannerVBO, scannerVC, buildScannerModel, "scanner");
+    ensureDeviceMesh(plushVAO, plushVBO, plushVC, buildPlushToyModel, "plush toy");
+    ensureDeviceMesh(batteryVAO, batteryVBO, batteryVC, buildBatteryModel, "battery");
+    ensureDeviceMesh(medSprayVAO, medSprayVBO, medSprayVC, buildMedSprayModel, "med spray");
+    buildHeistItemMeshes();
+#ifdef BACKROOMS_LIMEN_GEOMETRY
+    lmPostBuildGeom();
+#else
     WorldMesh world;
     buildWorldBaseMesh(world,pcx,pcz,[](int wx,int wz){ return isFloorHoleCell(wx,wz) || isAbyssCell(wx,wz); });
     if(coop.initialized) buildHeistModels(world.decor);
@@ -57,42 +67,6 @@ void buildGeom(){
     gZfightWorld = resolveWorldMesh(world);
     std::vector<float>&wv=world.walls,&fv=world.floors,&cv=world.ceilings,&pv=world.pillars;
     std::vector<float>&dv=world.decor,&lv=world.lampsOn,&lvOff=world.lampsOff;
-    {
-        std::vector<float> m;
-        buildFlashlightModel(m);
-        resolveModelMesh(m, "flashlight");
-        flashlightVC = (int)m.size()/8;
-        if(flashlightVC>0) setupVAO(flashlightVAO, flashlightVBO, m, true);
-    }
-    {
-        std::vector<float> m;
-        buildScannerModel(m);
-        resolveModelMesh(m, "scanner");
-        scannerVC = (int)m.size()/8;
-        if(scannerVC>0) setupVAO(scannerVAO, scannerVBO, m, true);
-    }
-    {
-        std::vector<float> m;
-        buildPlushToyModel(m);
-        resolveModelMesh(m, "plush toy");
-        plushVC = (int)m.size()/8;
-        if(plushVC>0) setupVAO(plushVAO, plushVBO, m, true);
-    }
-    {
-        std::vector<float> m;
-        buildBatteryModel(m);
-        resolveModelMesh(m, "battery");
-        batteryVC = (int)m.size()/8;
-        if(batteryVC>0) setupVAO(batteryVAO, batteryVBO, m, true);
-    }
-    buildHeistItemMeshes();
-    {
-        std::vector<float> m;
-        buildMedSprayModel(m);
-        resolveModelMesh(m, "med spray");
-        medSprayVC = (int)m.size()/8;
-        if(medSprayVC>0) setupVAO(medSprayVAO, medSprayVBO, m, true);
-    }
     wallVC=(int)wv.size()/8;floorVC=(int)fv.size()/8;ceilVC=(int)cv.size()/8;
     pillarVC=(int)pv.size()/8;decorVC=(int)dv.size()/8;lightVC=(int)lv.size()/5;lightOffVC=(int)lvOff.size()/5;
     setupVAO(wallVAO,wallVBO,wv,true);setupVAO(floorVAO,floorVBO,fv,true);
@@ -100,6 +74,7 @@ void buildGeom(){
     if(decorVC>0)setupVAO(decorVAO,decorVBO,dv,true);
     setupVAO(lightVAO,lightVBO,lv,false);
     if(!lvOff.empty())setupVAO(lightOffVAO,lightOffVBO,lvOff,false);
+#endif
     initQuad(quadVAO,quadVBO);lastBuildChunkX=pcx;lastBuildChunkZ=pcz;
 }
 void buildNotes(float tm){

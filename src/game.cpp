@@ -54,9 +54,7 @@ inline void updateGameplayAudioState(float moveIntensity, float sprintIntensity,
 
 #include "shaders.h"
 
-#define initQuad legacyInitQuad
 #include "render.h"
-#undef initQuad
 
 #define generateChunk legacyGenerateChunk
 #define updateVisibleChunks legacyUpdateVisibleChunks
@@ -98,24 +96,9 @@ inline void fallStep(FallState& s, float dt, float cs, OpenFn isOpen) {
 
 #include "limen_props.h"
 
-// The game's own world mesher (shell + props + z-fight repair of the whole view) is replaced
-// wholesale by `lmPostBuildGeom`, which overwrites every buffer it fills. Building it anyway
-// cost ~0.9 s per chunk crossing, so `buildGeom` gets empty stand-ins instead.
-#define buildWorldBaseMesh legacyBuildWorldBaseMesh
-#define buildWorldLampMesh legacyBuildWorldLampMesh
-#define resolveWorldMesh legacyResolveWorldMesh
-#include "world_mesh.h"
-#undef buildWorldBaseMesh
-#undef buildWorldLampMesh
-#undef resolveWorldMesh
-template <class HoleFn> inline void buildWorldBaseMesh(WorldMesh&, int, int, HoleFn) {}
-inline void buildWorldLampMesh(WorldMesh&) {}
-inline ZfReport resolveWorldMesh(WorldMesh&) { return ZfReport{}; }
-
-inline void initQuad(GLuint& vao, GLuint& vbo) {
-    legacyInitQuad(vao, vbo);
-    lmPostBuildGeom();
-}
+// buildGeom shares the equipment setup across clients. LIMEN builds its world buffers
+// directly, including heist decor, portals, lamps and the collision updates.
+#define BACKROOMS_LIMEN_GEOMETRY
 
 #define gatherNearestSceneLights legacyGatherNearestSceneLights
 #include "perf_tuning.h"
@@ -136,6 +119,7 @@ inline int gatherNearestSceneLights(const std::vector<Light>& sceneLights, const
 // swap go through two shims, which is all the menu needs to take keys and draw last.
 int lmDbgGetKey(GLFWwindow* w, int key);
 void lmDbgSwapBuffers(GLFWwindow* w);
+void renderNarratorFrame();
 #define glfwGetKey(w, k) lmDbgGetKey(w, k)
 #define glfwSwapBuffers(w) lmDbgSwapBuffers(w)
 #include "game_core.h"
@@ -144,6 +128,12 @@ void lmDbgSwapBuffers(GLFWwindow* w);
 #include "limen_mega.h"
 #include "limen_narrator_game.h"
 #include "limen_debug.h"
+#include "dispatcher_game.h"
+#include "narrator_subtitles.h"
+
+void renderNarratorFrame() {
+    if (const char* text = updateGameDispatcher()) drawNarratorSubtitle(text);
+}
 #endif
 
 // Skull above the eye point, and how far the player ducks under a lintel without being asked.

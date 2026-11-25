@@ -7,6 +7,8 @@
 #include <cstdlib>
 #include <vector>
 #include <random>
+#include <stdexcept>
+#include <string>
 #include <thread>
 #include <unordered_map>
 
@@ -80,7 +82,7 @@ struct {
 } cam = {{}, 0, 0, PH, PH, false};
 
 // Game state
-float dTime, lastFrame, vhsTime;
+float dTime, vhsTime;
 float lastX = 640, lastY = 360;
 float entitySpawnTimer, playerHealth = 100, playerSanity = 100;
 float camShake, damageFlash, survivalTime, reshuffleTimer;
@@ -108,7 +110,6 @@ float gPerfFpsSmoothed = 60.0f;
 bool gPerfDebugOverlay = false;
 bool gHudTelemetryVisible = true;
 int gPerfRefreshHz = 60;
-int gPerfFrameGenBaseCap = 0;
 float gPerfFrameTimeHistory[PERF_GRAPH_SAMPLES] = {};
 int gPerfFrameTimeHead = PERF_GRAPH_SAMPLES - 1;
 
@@ -129,9 +130,7 @@ GLuint pillarVAO, pillarVBO;
 GLuint decorVAO, decorVBO;
 GLuint quadVAO, quadVBO;
 GLuint fbo, fboTex, fboDepthTex;
-GLuint taaHistoryTex = 0;
-GLuint taaResolveTex = 0;
-GLuint taaResolveFbo = 0;
+float gPostPixelRows = 0;
 bool taaHistoryValid = false;
 int taaFrameIndex = 0;
 int wallVC, floorVC, ceilVC, lightVC, lightOffVC, pillarVC, decorVC;
@@ -186,31 +185,6 @@ void audioThread() {
 }
 
 void initTaaTargets() {
-    if (taaResolveFbo) glDeleteFramebuffers(1, &taaResolveFbo);
-    if (taaHistoryTex) glDeleteTextures(1, &taaHistoryTex);
-    if (taaResolveTex) glDeleteTextures(1, &taaResolveTex);
-
-    glGenTextures(1, &taaHistoryTex);
-    glBindTexture(GL_TEXTURE_2D, taaHistoryTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, winW, winH, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-    glGenTextures(1, &taaResolveTex);
-    glBindTexture(GL_TEXTURE_2D, taaResolveTex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, winW, winH, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-    glGenFramebuffers(1, &taaResolveFbo);
-    glBindFramebuffer(GL_FRAMEBUFFER, taaResolveFbo);
-    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, taaResolveTex, 0);
-    glBindFramebuffer(GL_FRAMEBUFFER, 0);
-
     taaHistoryValid = false;
     taaFrameIndex = 0;
 }
@@ -246,6 +220,14 @@ GLuint mkShader(const char* vs, const char* fs) {
     
     glDeleteShader(v);
     glDeleteShader(f);
+    GLint linked = GL_FALSE;
+    glGetProgramiv(p, GL_LINK_STATUS, &linked);
+    if (linked != GL_TRUE) {
+        char log[4096] = {};
+        glGetProgramInfoLog(p, sizeof(log), nullptr, log);
+        glDeleteProgram(p);
+        throw std::runtime_error(std::string("Shader program failed to link: ") + log);
+    }
     return p;
 }
 

@@ -36,10 +36,6 @@ void testGraphBuild() {
 }
 
 void testPipelineFormatting() {
-    char fg[80] = {};
-    formatFrameGenPipeline(fg, 80, 180, 90, FRAME_GEN_MODE_200, true);
-    assert(std::string(fg).find("90 -> 180") != std::string::npos);
-
     char upA[96] = {};
     formatUpscalePipeline(upA, 96, UPSCALER_MODE_OFF, 1280, 720, 1280, 720);
     assert(std::string(upA).find("NATIVE 1280x720") != std::string::npos);

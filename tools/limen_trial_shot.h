@@ -33,6 +33,7 @@ inline bool trialInitGl() {
     mainShader = mkShader(mainVS, mainFS);
     lightShader = mkShader(lightVS, lightFS);
     vhsShader = mkShader(vhsVS, vhsFS);
+    scenePrograms();
     computeRenderTargetSize(winW, winH, effectiveRenderScale(settings.upscalerMode, settings.renderScalePreset), renderW, renderH);
     initFBO(fbo, fboTex, fboDepthTex, renderW, renderH);
     initTaaTargets();
@@ -70,46 +71,9 @@ inline void trialFreezeState() {
     gameState = STATE_GAME;
 }
 
-// The game's non-TAA post-process branch with gameplay intensity at zero stress.
-// TAA is skipped: it needs frame history, and a still frame has none.
+// Capture the same effects, reconstruction and presentation as the client.
 inline void trialPostPass() {
-    glBindFramebuffer(GL_FRAMEBUFFER, trialOutFbo);
-    glViewport(0, 0, winW, winH);
-    glClear(GL_COLOR_BUFFER_BIT);
-    glDisable(GL_DEPTH_TEST);
-    glUseProgram(vhsShader);
-    GLuint s = vhsShader;
-    glUniform1i(glGetUniformLocation(s, "tex"), 0);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, fboTex);
-    glActiveTexture(GL_TEXTURE0 + 1);
-    glBindTexture(GL_TEXTURE_2D, taaHistoryTex);
-    glUniform1i(glGetUniformLocation(s, "histTex"), 1);
-    glActiveTexture(GL_TEXTURE0 + 2);
-    glBindTexture(GL_TEXTURE_2D, fboDepthTex);
-    glUniform1i(glGetUniformLocation(s, "depthTex"), 2);
-    glActiveTexture(GL_TEXTURE0);
-    glUniform1i(glGetUniformLocation(s, "rtxA"), clampSsao(settings.ssaoQuality));
-    glUniform1i(glGetUniformLocation(s, "rtxG"), clampGi(settings.giQuality));
-    glUniform1i(glGetUniformLocation(s, "rtxR"), settings.godRays ? 1 : 0);
-    glUniform1i(glGetUniformLocation(s, "rtxB"), settings.bloom ? 1 : 0);
-    glUniform1i(glGetUniformLocation(s, "rtxDenoiseOn"), settings.rtxDenoise ? 1 : 0);
-    glUniform1f(glGetUniformLocation(s, "rtxDenoiseStrength"), settings.rtxDenoiseStrength);
-    glUniform1f(glGetUniformLocation(s, "tm"), vhsTime);
-    glUniform1f(glGetUniformLocation(s, "inten"), settings.vhsIntensity * 0.62f);
-    glUniform1i(glGetUniformLocation(s, "upscaler"), clampUpscalerMode(settings.upscalerMode));
-    glUniform1i(glGetUniformLocation(s, "aaMode"), AA_MODE_FXAA);
-    glUniform1f(glGetUniformLocation(s, "sharpness"), clampFsrSharpness(settings.fsrSharpness));
-    glUniform1f(glGetUniformLocation(s, "texelX"), 1.0f / (float)renderW);
-    glUniform1f(glGetUniformLocation(s, "texelY"), 1.0f / (float)renderH);
-    glUniform1f(glGetUniformLocation(s, "taaBlend"), 0.0f);
-    glUniform3f(glGetUniformLocation(s, "taaJitter"), 0.0f, 0.0f, 0.0f);
-    glUniform1f(glGetUniformLocation(s, "taaValid"), 0.0f);
-    glUniform1i(glGetUniformLocation(s, "frameGen"), 0);
-    glUniform1f(glGetUniformLocation(s, "frameGenBlend"), 0.0f);
-    glUniform1f(glGetUniformLocation(s, "deathFx"), 0.0f);
-    glBindVertexArray(quadVAO);
-    glDrawArrays(GL_TRIANGLES, 0, 6);
+    presentScene(trialOutFbo, settings.vhsIntensity, 0.0f);
     glEnable(GL_DEPTH_TEST);
 }
 
